@@ -521,7 +521,7 @@ struct menu {
 	{ label7, 10,8, 10,10,10,10,10,10,10,10,10,0,10,10 },	/* use */
 	{ labelB, 10,5, 10,10,10,10,10,10,10,10,0,0,0,0 }};	/* files */
 
-#define LMENUS 38
+#define LMENUS 37	/* PORT: was 38, one more than the table has (read past its end) */
 
 struct letters
 {	char letter,menu,choice; }
