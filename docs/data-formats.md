@@ -147,10 +147,11 @@ This is the Electronic Arts SMUS score format, flattened.
 units comes from `notevals`; its sound is cut off 300 units before the end (a small gap) unless
 shorter.
 
-**`v6`:** the first 1024 bytes are 8 waveforms of 128 bytes each (signed 8-bit samples). The next
-2560 bytes are 10 volume envelopes of 256 bytes each: byte 0 is the starting volume, following
-bytes are the volume on each tick, a negative byte means "stop changing". The file is larger
-(4628 bytes) but only the first 3584 are read.
+**`v6`:** `open_all` reads 1024 bytes (8 waveforms of 128 bytes, signed 8-bit samples) from
+offset 0, then calls `Seek(file, 1024, 0)`. Mode 0 means "from the current position", so this
+skips another 1024 bytes, and the volume envelopes (10 x 256 bytes) come from offset 2048. Each
+envelope: byte 0 is the starting volume, the following bytes are the volume on each tick, and a
+negative byte means "stop changing". 2048 + 2560 = 4608 of the file's 4628 bytes are used.
 
 Waveform trick: each 128-byte waveform holds one octave-stack. The `ptable` second column is a
 start offset (0, 16, 24, 28 in units of 4 bytes): high notes play a shorter copy of the cycle

@@ -13,7 +13,8 @@ long prdec(), text(), move(), ssp(), placard(void), placard_text(), question(), 
 long event(), speak(), msg(), prq();
 long map_draw(void), strip_draw(), row_draw(), scrollmap(), bigdraw();
 long make_mask(), maskit(), mask_blit(void), shape_blit(void), save_blit(), rest_blit(), clear_blit();
-long unpack_line(), ReadHeader(void), ReadLength(void), do_error();
+long do_error();
+void ReadHeader(void), ReadLength(void), unpack_line(unsigned char *dest);
 long init_music(), wrap_music(void), setscore(), playscore(), stopscore(void), playsample();
 long MakeBitMap(), UnMakeBitMap();
 

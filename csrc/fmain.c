@@ -1032,9 +1032,9 @@ read_sample()
 
 	smem = sample_mem;
 	for (i=0; i<6; i++)
-	{	num = (unsigned char *)(&ifflen);
-		*num++ = *smem++; *num++ = *smem++;
-		*num++ = *smem++; *num++ = *smem++;
+	{	/* PORT: the length is stored big-endian */
+		ifflen = ((long)smem[0] << 24) | ((long)smem[1] << 16) | ((long)smem[2] << 8) | smem[3];
+		smem += 4;
 		sample[i] = smem;
 		sample_size[i] = ifflen;
 		smem += ifflen;

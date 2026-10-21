@@ -49,16 +49,28 @@ Each phase should end with something that builds and runs.
       `open_all`), structs saved to disk, `sizeof` of structs that were laid out for the 68000.
 
 ### Phase 3 - Rust platform layer
-Rust implements the Amiga calls the C code makes, exposed with `extern "C"`.
-- [ ] Memory: `AllocMem`/`FreeMem` as plain allocation.
-- [ ] Files: `Open`/`Read`/`Write`/`Seek`/`Close` on normal files, with case-insensitive paths.
-- [ ] Disk: route all trackdisk reads to the `image` file (reuse the `hdrive.c` approach).
-- [ ] Bitmaps and rastports: planar bitmaps in memory, `InitBitMap`, `AllocRaster`.
-- [ ] Drawing: `BltBitMap`, `SetAPen`, `Move`, `Draw`, `Text`, `SetFont`, `ScrollRaster`.
-- [ ] Palette: `SetRGB4`, `LoadRGB4`.
-- [ ] Display: convert planar bitmaps to a texture and present each frame with SDL2.
-- [ ] Sprites: `GetSprite`, `ChangeSprite`.
-- [ ] Input and timing: keyboard and joystick via SDL; 50/60 Hz tick standing in for the vertical blank.
+Rust implements the Amiga calls the C code makes, exported with `extern "C"` from `src/platform/`.
+The C code is built into the Rust binary by `build.rs`; `main()` in `fmain.c` is called from Rust.
+- [x] Memory: `AllocMem`/`FreeMem` (calloc/free), `AllocRaster`, `AvailMem`, `TypeOfMem`.
+- [x] Files: `Open`/`Read`/`Write`/`Seek`/`Close`/`Lock` on normal files, case-insensitive paths
+      (data dir `FTA_DATA`, default `faery-tale-amiga/game`; `dfN:` names go to `saves/`).
+- [x] Disk: the game already reads blocks from the `image` file when it exists; the trackdisk
+      calls are no-ops.
+- [x] Bitmaps and rastports: planar bitmaps, `InitBitMap`, `MakeBitMap`.
+- [x] Drawing: `BltBitMap` (plain copy only), `SetAPen`, `Move`, `Draw`, `RectFill`, `SetRast`,
+      `ScrollRaster`, filled polygons.
+- [x] Palette: `SetRGB4`, `LoadRGB4`, `GetRGB4`, `GetColorMap`.
+- [x] Display: viewports are composed into a 640x200 frame and shown with SDL2 when the game
+      calls `LoadView` (page flip), paced at 50 Hz. `FTA_SHOT=file.ppm FTA_SHOT_AFTER=n`
+      saves a screenshot for testing without a screen (`tools/ppm2png.py` converts it).
+- [x] Milestone: the intro story book (pictures and page flips) shows correctly.
+- [ ] Text: uses a stand-in 8x8 font for both fonts. Still to do: load `fonts/Amber/9` (the
+      story font) and find or draw a Topaz 8 look-alike.
+- [ ] Sprites: the mouse pointer sprite (`GetSprite`, `ChangeSprite`, `MoveSprite`) is a no-op.
+- [ ] Input and timing: keyboard and mouse through SDL feeding the game's key ring buffer
+      (replaces `HandlerInterface` in `fsubs.asm`), joystick, mouse menu clicks.
+- [ ] Audio device, see Phase 5.
+- [ ] Layer clipping for the witch's polygon is skipped.
 
 ### Phase 4 - Rewrite the assembly
 Rewrite in C first (easy to compare), then Rust later with the rest of the game.

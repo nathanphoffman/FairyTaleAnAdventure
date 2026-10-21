@@ -18,6 +18,8 @@
 char *kluge = "FORMILBMBMHDCMAPGRABBODYCAMGCRNG";
 long *tags;
 
+#define BE16(v) ((unsigned short)((((v) >> 8) & 0xff) | (((v) & 0xff) << 8)))
+
 long file_length;
 long myfile;
 long header;
@@ -154,7 +156,9 @@ char *filename; struct BitMap *bitmap; short x,y;
 	{	ReadHeader();
 		if (header == ILBM) ;
 		else if (header == BMHD)
-		{	ReadLength(); Read(myfile,&bmhd,blocklength); }
+		{	ReadLength(); Read(myfile,&bmhd,blocklength);
+			/* PORT: the file is big-endian */
+			bmhd.width = BE16(bmhd.width); bmhd.height = BE16(bmhd.height); }
 		else if (header == CAMG || header == CRNG || header == DEST
 			|| header == CMAP || header == GRAB)
 		{	ReadLength(); Seek(myfile,blocklength,0); }

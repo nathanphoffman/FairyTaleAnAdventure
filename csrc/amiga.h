@@ -82,6 +82,7 @@ struct TextFont {
 	UWORD tf_XSize;
 	UWORD tf_Baseline;
 	UBYTE tf_Flags;
+	APTR priv;	/* our own glyph data, owned by the platform layer */
 };
 #define FPF_ROMFONT 1
 
