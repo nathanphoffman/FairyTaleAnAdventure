@@ -43,6 +43,11 @@ struct Display {
     script: Vec<(u32, String, bool)>,
     /// scripted mouse clicks for tests: (tick, x in lores pixels, y)
     clicks: Vec<(u32, i32, i32)>,
+    controller_system: sdl2::GameControllerSubsystem,
+    /// open gamepads (they stop sending events when dropped)
+    pads: Vec<sdl2::controller::GameController>,
+    /// left stick state: left, right, up, down
+    stick: [bool; 4],
 }
 
 thread_local! {
@@ -67,6 +72,16 @@ pub fn init() -> Result<(), String> {
     canvas.set_logical_size(WIDTH, HEIGHT * 2).map_err(|e| e.to_string())?;
     let creator = canvas.texture_creator();
     let events = sdl.event_pump()?;
+    let controller_system = sdl.game_controller()?;
+    let mut pads = Vec::new();
+    for i in 0..controller_system.num_joysticks().unwrap_or(0) {
+        if controller_system.is_game_controller(i) {
+            if let Ok(c) = controller_system.open(i) {
+                pads.push(c);
+            }
+        }
+    }
+    super::input::load_config();
     sdl.mouse().show_cursor(false); // the game draws its own pointer
     match sdl.audio() {
         Ok(audio) => super::audio::init(&audio),
@@ -85,6 +100,9 @@ pub fn init() -> Result<(), String> {
             presents: 0,
             ticks: 0,
             clicks: parse_clicks(),
+            controller_system,
+            pads,
+            stick: [false; 4],
             script: {
                 let mut script = parse_script();
                 if SKIP_INTRO.load(Ordering::Relaxed) {
@@ -229,6 +247,41 @@ fn handle_events(d: &mut Display) {
         match event {
             Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
                 std::process::exit(0)
+            }
+            // F11 or Alt+Enter: fullscreen on/off
+            Event::KeyDown { keycode: Some(k), keymod, .. }
+                if k == Keycode::F11
+                    || (k == Keycode::Return && keymod.intersects(sdl2::keyboard::Mod::LALTMOD | sdl2::keyboard::Mod::RALTMOD)) =>
+            {
+                let window = d.canvas.window_mut();
+                let next = match window.fullscreen_state() {
+                    sdl2::video::FullscreenType::Off => sdl2::video::FullscreenType::Desktop,
+                    _ => sdl2::video::FullscreenType::Off,
+                };
+                let _ = window.set_fullscreen(next);
+            }
+            Event::ControllerDeviceAdded { which, .. } => {
+                if let Ok(c) = d.controller_system.open(which) {
+                    d.pads.push(c);
+                }
+            }
+            Event::ControllerButtonDown { button, .. } => super::input::pad_button(button, true),
+            Event::ControllerButtonUp { button, .. } => super::input::pad_button(button, false),
+            Event::ControllerAxisMotion { axis, value, .. } => {
+                use sdl2::controller::Axis;
+                const DEAD: i16 = 12000;
+                // left stick: (index into stick, direction input, pressed)
+                let changes: [(usize, usize, bool); 2] = match axis {
+                    Axis::LeftX => [(0, 2, value < -DEAD), (1, 3, value > DEAD)],
+                    Axis::LeftY => [(2, 0, value < -DEAD), (3, 1, value > DEAD)],
+                    _ => continue,
+                };
+                for (si, dir, on) in changes {
+                    if d.stick[si] != on {
+                        d.stick[si] = on;
+                        super::input::pad_direction(dir, on);
+                    }
+                }
             }
             Event::KeyDown { keycode: Some(k), repeat: false, .. } => super::input::key_event(k, true),
             Event::KeyUp { keycode: Some(k), .. } => super::input::key_event(k, false),

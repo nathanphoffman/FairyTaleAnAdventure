@@ -1,6 +1,6 @@
 // Compiles the original C game code (csrc/) into the Rust binary.
 // The Amiga library calls and the assembly routines are provided by Rust (src/platform/*),
-// except the ones still listed in csrc/platform_stubs.c and csrc/asm_stubs.c.
+// except the ones still listed in csrc/asm_stubs.c.
 fn main() {
     let files = [
         "fmain.c",
@@ -14,7 +14,6 @@ fn main() {
         "asm_blit.c",
         "asm_text.c",
         "narr_data.c",
-        "platform_stubs.c",
         "asm_stubs.c",
     ];
     let mut b = cc::Build::new();

@@ -145,10 +145,10 @@ Move modules one at a time, with the game runnable after each one. Rough order, 
 - [ ] `fmain.c` (largest, split into modules as it moves)
 
 ### Phase 8 - Polish
-- [ ] Window scaling and fullscreen, correct aspect ratio.
-- [ ] Config file and key remapping.
-- [ ] Remove leftover Amiga stand-ins.
-- [ ] Packaging and how to supply game data.
+- [x] Window scaling and fullscreen, correct aspect ratio. (F11, resizable; gamepad added too)
+- [x] Config file and key remapping.
+- [x] Remove leftover Amiga stand-ins.
+- [x] Packaging and how to supply game data.
 
 ### Phase 9 - Reusable engine (stretch goal)
 Turn the port into a modern engine that runs this game, and could run other games too.

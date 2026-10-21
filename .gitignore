@@ -13,3 +13,5 @@ build/
 
 # Game saves
 saves/
+dist/
+controls.cfg

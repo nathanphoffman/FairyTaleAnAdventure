@@ -7,7 +7,8 @@
 
 use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::os::raw::c_int;
 
 unsafe extern "C" {
@@ -18,8 +19,10 @@ unsafe extern "C" {
 }
 
 thread_local! {
-    /// up, down, left, right arrow state
-    static ARROWS: Cell<[bool; 4]> = const { Cell::new([false; 4]) };
+    /// up, down, left, right from the keyboard (0-3) and the gamepad (4-7)
+    static ARROWS: Cell<[bool; 8]> = const { Cell::new([false; 8]) };
+    /// key remapping from controls.cfg: pressed key -> key the game sees
+    static REMAP: RefCell<HashMap<Keycode, Keycode>> = RefCell::new(HashMap::new());
     /// direction key code currently held down (20-27), 0 = none
     static DIR: Cell<u8> = const { Cell::new(0) };
     static BUTTONS: Cell<(bool, bool)> = const { Cell::new((false, false)) };
@@ -80,7 +83,71 @@ fn translate(key: Keycode) -> u8 {
     }
 }
 
+/// Reads `controls.cfg` (or the file named by FTA_CONTROLS). Each line is `Key = Action`, where
+/// both are SDL key names, e.g. `W = Up`. Lines starting with # are comments.
+pub fn load_config() {
+    let path = std::env::var("FTA_CONTROLS").unwrap_or_else(|_| "controls.cfg".to_string());
+    let Ok(text) = std::fs::read_to_string(&path) else { return };
+    for line in text.lines() {
+        let line = line.split('#').next().unwrap_or("").trim();
+        let Some((from, to)) = line.split_once('=') else { continue };
+        match (Keycode::from_name(from.trim()), Keycode::from_name(to.trim())) {
+            (Some(f), Some(t)) => { REMAP.with(|r| r.borrow_mut().insert(f, t)); }
+            _ => eprintln!("{path}: cannot read line '{line}'"),
+        }
+    }
+}
+
+/// Sets one direction input (0-3 keyboard up/down/left/right, 4-7 the same on the gamepad) and
+/// sends the matching keypad direction key to the game.
+fn direction(i: usize, down: bool) {
+    let mut a = ARROWS.with(|c| c.get());
+    a[i] = down;
+    ARROWS.with(|c| c.set(a));
+    // arrows are turned into the keypad direction keys, so two arrows give a diagonal
+    let new = dir_code(a[0] || a[4], a[1] || a[5], a[2] || a[6], a[3] || a[7]);
+    let old = DIR.with(|c| c.replace(new));
+    if new != old {
+        unsafe {
+            if old != 0 {
+                fta_key(old as c_int | 0x80);
+            }
+            if new != 0 {
+                fta_key(new as c_int);
+            }
+        }
+    }
+}
+
+pub fn pad_direction(i: usize, down: bool) {
+    direction(4 + i, down);
+}
+
+/// Gamepad buttons act as the original's menu keys.
+pub fn pad_button(button: sdl2::controller::Button, down: bool) {
+    use sdl2::controller::Button as B;
+    let code = match button {
+        B::A => {
+            unsafe { fta_pia = if down { 0x7f } else { 0xff } }; // fire
+            return;
+        }
+        B::X => b'T',          // Take
+        B::Y => b'I',          // List
+        B::B => b'?',          // Look
+        B::LeftShoulder => b'U', // Use
+        B::RightShoulder => b'G', // Give
+        B::Start => 0x20,      // Pause
+        B::DPadUp => return pad_direction(0, down),
+        B::DPadDown => return pad_direction(1, down),
+        B::DPadLeft => return pad_direction(2, down),
+        B::DPadRight => return pad_direction(3, down),
+        _ => return,
+    };
+    unsafe { fta_key(code as c_int | if down { 0 } else { 0x80 }) };
+}
+
 pub fn key_event(key: Keycode, down: bool) {
+    let key = REMAP.with(|r| r.borrow().get(&key).copied()).unwrap_or(key);
     let arrow = match key {
         Keycode::Up => Some(0),
         Keycode::Down => Some(1),
@@ -89,22 +156,7 @@ pub fn key_event(key: Keycode, down: bool) {
         _ => None,
     };
     if let Some(i) = arrow {
-        let mut a = ARROWS.with(|c| c.get());
-        a[i] = down;
-        ARROWS.with(|c| c.set(a));
-        // arrows are turned into the keypad direction keys, so two arrows give a diagonal
-        let new = dir_code(a[0], a[1], a[2], a[3]);
-        let old = DIR.with(|c| c.replace(new));
-        if new != old {
-            unsafe {
-                if old != 0 {
-                    fta_key(old as c_int | 0x80);
-                }
-                if new != 0 {
-                    fta_key(new as c_int);
-                }
-            }
-        }
+        direction(i, down);
         return;
     }
     if key == Keycode::LCtrl || key == Keycode::RCtrl {

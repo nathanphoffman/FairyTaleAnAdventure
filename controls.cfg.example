@@ -1,0 +1,6 @@
+# Copy to controls.cfg to remap keys. Format: Key = Action (SDL key names).
+# Press W and the game sees the Up arrow, and so on.
+W = Up
+S = Down
+A = Left
+D = Right

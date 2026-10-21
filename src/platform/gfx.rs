@@ -344,7 +344,13 @@ pub extern "C" fn AreaEnd(rp: *mut RastPort) -> LONG {
     }
     let bm = unsafe { &*rp.BitMap };
     let complement = rp.DrawMode & COMPLEMENT != 0;
+    // a layer limits drawing to its rectangle (x1/y1 are the last pixel)
+    let (cx0, cy0, cx1, cy1) = match unsafe { rp.Layer.as_ref() } {
+        Some(l) => (l.x0, l.y0, l.x1, l.y1),
+        None => (i32::MIN, i32::MIN, i32::MAX, i32::MAX),
+    };
     let (ymin, ymax) = pts.iter().fold((i32::MAX, i32::MIN), |(lo, hi), p| (lo.min(p.1), hi.max(p.1)));
+    let (ymin, ymax) = (ymin.max(cy0), ymax.min(cy1));
     for y in ymin..=ymax {
         let mut xs = Vec::new();
         for i in 0..pts.len() {
@@ -356,7 +362,7 @@ pub extern "C" fn AreaEnd(rp: *mut RastPort) -> LONG {
         xs.sort();
         for pair in xs.chunks(2) {
             if let [x0, x1] = pair {
-                for x in *x0..=*x1 {
+                for x in (*x0).max(cx0)..=(*x1).min(cx1) {
                     unsafe { plot(bm, x, y, rp.FgPen, complement) };
                 }
             }
@@ -365,7 +371,7 @@ pub extern "C" fn AreaEnd(rp: *mut RastPort) -> LONG {
     0
 }
 
-// ---- layers (only used to clip the witch's polygon, clipping is skipped) ----
+// ---- layers (only used to clip the witch's polygon to the map area) ----
 
 #[unsafe(no_mangle)]
 pub extern "C" fn NewLayerInfo() -> *mut c_void {
@@ -381,15 +387,15 @@ pub extern "C" fn DisposeLayerInfo(li: *mut c_void) {
 pub extern "C" fn CreateUpfrontLayer(
     _li: *mut c_void,
     bm: *mut BitMap,
-    _x0: LONG,
-    _y0: LONG,
-    _x1: LONG,
-    _y1: LONG,
+    x0: LONG,
+    y0: LONG,
+    x1: LONG,
+    y1: LONG,
     _flags: LONG,
     _super: *mut BitMap,
 ) -> *mut Layer {
     let layer = unsafe { libc::calloc(1, std::mem::size_of::<Layer>()) } as *mut Layer;
-    unsafe { (*layer).rp_bitmap = bm };
+    unsafe { *layer = Layer { rp_bitmap: bm, x0, y0, x1, y1 } };
     layer
 }
 

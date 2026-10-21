@@ -34,6 +34,10 @@ pub struct BitMap {
 #[repr(C)]
 pub struct Layer {
     pub rp_bitmap: *mut BitMap,
+    pub x0: i32,
+    pub y0: i32,
+    pub x1: i32,
+    pub y1: i32,
 }
 
 #[repr(C)]

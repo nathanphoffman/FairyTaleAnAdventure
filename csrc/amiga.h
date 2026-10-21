@@ -80,6 +80,7 @@ struct BitMap {
 
 struct Layer {
 	struct BitMap *rp_bitmap;
+	int x0, y0, x1, y1;	/* clip rectangle (stand-in for the layer's region) */
 };
 struct Layer_Info {
 	int dummy;

@@ -52,7 +52,14 @@ cargo run --bin dump_image -- faery-tale-amiga/game/image   # map of the floppy 
   Items menu: `I` List, `T` Take, `?` Look, `U` Use, `G` Give.
   Talk: `Y` Yell, `S` Say, `A` Ask. Game: Space Pause, `M` Music, `F` Sound, `Q` Quit, `L` Load.
   Buy: `O R 8 C W B E`. Save menu: `V` Save, `X` Exit. Magic: F1-F7. Use: `1`-`7`, `K` keys.
+- **Gamepad:** left stick or D-pad walks, A fights, X Take, Y List, B Look, LB Use, RB Give, Start Pause.
+- **Fullscreen:** F11 or Alt+Enter. The window can also be resized.
+- **Remap keys:** copy `controls.cfg.example` to `controls.cfg` and edit it (`W = Up`).
 - **Esc** closes the window.
+
+## Packaging
+
+`tools/package.sh` builds a release binary and packs it (no game data) into `dist/`.
 
 ## Saving
 
