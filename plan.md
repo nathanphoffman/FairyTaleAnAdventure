@@ -127,8 +127,12 @@ the game. Routines still stubbed are in `csrc/asm_stubs.c` and print "STUB calle
       (`A.faery` ...). Checked by saving after walking, then loading in a fresh run: the map area
       came out pixel-identical. Save files are the same size as the original's (about 1.2K).
 - [ ] Combat, items, shops, dialogue, doors and caves: needs playtesting.
-- [ ] Sweep for other leftovers of the 32-bit Amiga (pointers stored in ints, raw struct dumps,
-      raw multi-byte reads from files). Fix byte-order bugs as they show up.
+- [x] Sweep for leftovers of the 32-bit Amiga: grepped for pointer/int casts, raw struct reads
+      and writes, and file reads; ran scripted sessions (walking, fighting, menus, intro) under
+      AddressSanitizer. Found and fixed: the random seed was read as 64 bits (corrupting the next
+      variable), and the menu key table was read one entry past its end. Nothing else showed up.
+      (ASan build: `CFLAGS=-fsanitize=address RUSTFLAGS="-C link-arg=-Wl,--no-as-needed -C link-arg=-lasan"
+      cargo build --target x86_64-unknown-linux-gnu`, run with `LD_PRELOAD=$(gcc -print-file-name=libasan.so)`.)
 - [ ] Test helpers: `FTA_CLICK="tick:x:y,..."` clicks the left button (x in 0-319, y in screen
       lines); `FTA_INJECT` presses keys. Gameplay starts around tick 300, and the Game menu items
       are at x 225/250 and y 148 + 9 * row.

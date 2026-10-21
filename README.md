@@ -44,6 +44,16 @@ cargo run -- --intro                        # plays the story-book intro first
 cargo run --bin dump_image -- faery-tale-amiga/game/image   # map of the floppy image
 ```
 
+## Controls
+
+- **Walk:** arrow keys (two together for diagonals), keypad digits, or hold the left mouse button over the compass.
+- **Fight:** right mouse button, Ctrl, or keypad 0.
+- **Menus:** click them, or use the keys the original game had:
+  Items menu: `I` List, `T` Take, `?` Look, `U` Use, `G` Give.
+  Talk: `Y` Yell, `S` Say, `A` Ask. Game: Space Pause, `M` Music, `F` Sound, `Q` Quit, `L` Load.
+  Buy: `O R 8 C W B E`. Save menu: `V` Save, `X` Exit. Magic: F1-F7. Use: `1`-`7`, `K` keys.
+- **Esc** closes the window.
+
 ## Saving
 
 Saves go in `saves/` (git-ignored) as `A.faery` ... `H.faery`. Use Game, Quit, Save.
