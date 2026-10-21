@@ -196,14 +196,10 @@ fn compose(view: *const View, frame: &mut [u32]) {
     }
 }
 
-/// Window pixel position to a position in the 640x200 frame (the window letterboxes the
-/// 640x400 logical screen, each frame row is two logical rows).
-fn to_frame(d: &Display, wx: i32, wy: i32) -> (i32, i32) {
-    let (w, h) = d.canvas.window().size();
-    let scale = (w as f32 / WIDTH as f32).min(h as f32 / (HEIGHT * 2) as f32);
-    let ox = (w as f32 - WIDTH as f32 * scale) / 2.0;
-    let oy = (h as f32 - (HEIGHT * 2) as f32 * scale) / 2.0;
-    (((wx as f32 - ox) / scale) as i32, (((wy as f32 - oy) / scale) / 2.0) as i32)
+/// SDL already reports mouse positions in the 640x400 logical screen (it does that when a logical
+/// size is set, and it handles the letterboxing), so only the doubled rows need undoing.
+fn to_frame(_d: &Display, lx: i32, ly: i32) -> (i32, i32) {
+    (lx, ly / 2)
 }
 
 fn handle_events(d: &mut Display) {
