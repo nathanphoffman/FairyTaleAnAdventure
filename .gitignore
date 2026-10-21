@@ -1,0 +1,7 @@
+# Original Amiga source (reference only, not part of this project)
+faery-tale-amiga/
+
+# Build output
+target/
+build/
+*.o
