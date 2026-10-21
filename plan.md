@@ -27,9 +27,9 @@ Each phase should end with something that builds and runs.
 ### Phase 1 - Understand the code and data
 - [x] Read `fmain.c` and list what it calls from the Amiga libraries (the main ones: `AllocMem`,
       `SetAPen`, `Read`, `Open`, `Text`, `SetRGB4`, `DoIO`, `BltBitMap`, `SetFont`, `LoadRGB4`).
-- [~] Document the data file formats (`image`, `p1a`..`p3b`, `page0`, `songs`, `v6`, `winpic`,
+- [x] Document the data file formats (`image`, `p1a`..`p3b`, `page0`, `songs`, `v6`, `winpic`,
       `hiscreen`, fonts).
-- [~] Document the assembly routines in `fsubs.asm`, `fsupp.asm`, `MakeBitMap.asm` and
+- [x] Document the assembly routines in `fsubs.asm`, `fsupp.asm`, `MakeBitMap.asm` and
       `gdriver.asm`: what each one does and who calls it.
 - [x] Write findings into `docs/` (first pass done; open questions listed at the end of each file).
 

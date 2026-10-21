@@ -57,14 +57,118 @@ Each of 10 regions has `{ image[4], terra1, terra2, sector, region, setchar }`:
 
 Regions 0-7 are the outdoor world (a grid), 8 and 9 are inside and underground.
 
-### Still to work out
+## Map data layout
 
-- Where `cfiles[]` is defined and the full list of sprite sheets (file_id, width, height, count).
-- Exact layout of the sector, map and terrain blocks. `px_to_im` in `fsubs.asm` shows how the
-  terrain table is indexed: 4 bytes per tile, byte 1 high nibble = terrain type, byte 2 = tile
-  mask bits.
-- Layout of the instrument file `v6` and the track encoding in `songs`.
-- Format of sprite sheets: planar, 5 planes, with a separate mask built at load time by `make_mask`.
+World coordinates are 15-bit (0 to 0x7FFF) and wrap around. One map tile ("image" or "char") is
+16 pixels wide and 32 tall, so `imx = x/16` and `imy = y/32`.
+
+**Sectors.** A sector is 16 x 8 tiles (128 bytes, one byte per tile = tile number 0-255). Up to
+256 sectors are loaded into `sector_mem` (32K, from 64 blocks at `need.sector`).
+
+**Region map.** `map_mem` (4096 bytes, from 8 blocks at `need.region`) is a 128 x 32 grid of
+sector numbers, one byte each. `xreg` and `yreg` give the grid origin of the loaded region in
+sectors. For a tile (imx, imy):
+
+```
+secx = imx / 16 - xreg          (wraps; see px_to_im for the odd wrap trick)
+secy = imy / 8  - yreg          (clamped to 0..31)
+sec_num   = map_mem[secy * 128 + secx + xreg]
+tile      = sector_mem[sec_num * 128 + (imy & 7) * 16 + (imx & 15)]
+```
+
+**Terrain table** (`terra_mem`, 1024 bytes = 256 tiles x 4 bytes). Built by `terrain.c`, so the
+four bytes are `maptag`, `terrain`, `tiles`, `big_colors`:
+
+| Byte | Meaning |
+|------|---------|
+| 0 | `maptag`: image characteristics (not yet traced) |
+| 1 | `terrain`: high nibble = terrain type (0-15), low nibble = a second value (not yet traced) |
+| 2 | `tiles`: 8 bit mask saying which of the tile's 8 sub-areas are solid. `px_to_im` picks the bit from pixel bits x:3, y:3, y:4 |
+| 3 | `big_colors`: colour (0-31) this tile gets on the overview map, used by `bigdraw` |
+
+Terrain types seen in code: 0 open, 1 blocked, 2-7 and up to 9 passable with effects (water,
+etc., not yet traced), `prox` treats 1 and >= 10 (and in `px_to_im`-style checks >= 8) as blocked.
+Two blocks are loaded per region (`TERRA_BLOCK + terra1` into bytes 0-511 for tiles 0-127,
+`TERRA_BLOCK + terra2` into bytes 512-1023 for tiles 128-255).
+
+**Tile graphics** (`image_mem`, 5 planes x 16384 bytes). Each plane holds 256 tiles x 64 bytes
+(16 pixels = 2 bytes wide, 32 lines). Tiles are in four groups of 64. Each group `i` comes from
+40 blocks at `need.image[i]`: 5 chunks of 8 blocks (4096 bytes), one chunk per bitplane, placed at
+`image_mem + plane * 16384 + group * 4096`. So tile `t` plane `p` is at `p * 16384 + t * 64`.
+
+## Sprite sheets (`cfiles[]` in `fmain2.c:643`)
+
+Table fields are `{ width_in_words, height_lines, frame_count, numblocks, slot, start_block }`.
+One frame is 5 bitplanes stored back to back, each plane `width * height` words. Total bytes
+loaded = `numblocks * 512` = frames x 5 x (width x height x 2). After loading, `make_mask` builds a
+one-plane mask per frame (AND of all 5 planes, inverted, so colour 31 is transparent) placed right
+after the pixel data.
+
+| # | Name | w (words) | h | frames | blocks | slot | start block |
+|---|------|-----------|---|--------|--------|------|-------------|
+| 0 | julian | 1 | 32 | 67 | 42 | PHIL | 1376 |
+| 1 | phillip | 1 | 32 | 67 | 42 | PHIL | 1418 |
+| 2 | kevin | 1 | 32 | 67 | 42 | PHIL | 1460 |
+| 3 | objects | 1 | 16 | 116 | 36 | OBJECTS | 1312 |
+| 4 | raft | 2 | 32 | 2 | 3 | RAFT | 1348 |
+| 5 | turtle | 2 | 32 | 16 | 20 | CARRIER | 1351 |
+| 6 | ogre | 1 | 32 | 64 | 40 | ENEMY | 960 |
+| 7 | ghost | 1 | 32 | 64 | 40 | ENEMY | 1080 |
+| 8 | dknight/spiders | 1 | 32 | 64 | 40 | ENEMY | 1000 |
+| 9 | necromancer/farmer | 1 | 32 | 64 | 40 | ENEMY | 1040 |
+| 10 | dragon | 3 | 40 | 5 | 12 | DRAGON | 1160 |
+| 11 | bird | 4 | 64 | 8 | 40 | CARRIER | 1120 |
+| 12 | snake/salamander | 1 | 32 | 64 | 40 | ENEMY | 1376 (same block as julian; looks like a placeholder, check) |
+| 13 | wizard/priest | 1 | 32 | 8 | 5 | SETFIG | 936 |
+| 14 | royal set | 1 | 32 | 8 | 5 | SETFIG | 931 |
+| 15 | bartender | 1 | 32 | 8 | 5 | SETFIG | 941 |
+| 16 | witch | 1 | 32 | 8 | 5 | SETFIG | 946 |
+| 17 | ranger/beggar | 1 | 32 | 8 | 5 | SETFIG | 951 |
+
+The brother's sheet is `cfiles[brother-1]`. Enemy sheet is `cfiles[actor_file]`, the set-figure
+sheet is `cfiles[set_file]`. All sprites are 16 pixels wide except the raft, turtle, dragon and bird.
+
+## Music data
+
+**`songs`:** up to 28 tracks (4 voices x 7 songs). Each is a 4 byte length in words, then that
+many words of events. Each event is 2 bytes `(command, value)`:
+
+| Command | Meaning |
+|---------|---------|
+| 0-127 | A note. Command = note number (index into `ptable`, 6 notes per row of 12 half steps...). Value bits 0-5 = duration (index into `notevals`, 64 entries). Value bit 7 = chorded (ignored), bit 6 = tied (kept but unused) |
+| 128 | Rest, value as above |
+| 129 | Set instrument, value & 15 indexes `new_wave[]` in `fmain.c` to pick a waveform number |
+| 0x90 | Set tempo to value (non-standard SMUS extension) |
+| 255 | End of track. Value 0 = stop the voice, non-zero = loop to start |
+
+This is the Electronic Arts SMUS score format, flattened.
+
+**Timing:** each vertical blank adds `tempo` (initially 150) to a clock. A note's length in clock
+units comes from `notevals`; its sound is cut off 300 units before the end (a small gap) unless
+shorter.
+
+**`v6`:** the first 1024 bytes are 8 waveforms of 128 bytes each (signed 8-bit samples). The next
+2560 bytes are 10 volume envelopes of 256 bytes each: byte 0 is the starting volume, following
+bytes are the volume on each tick, a negative byte means "stop changing". The file is larger
+(4628 bytes) but only the first 3584 are read.
+
+Waveform trick: each 128-byte waveform holds one octave-stack. The `ptable` second column is a
+start offset (0, 16, 24, 28 in units of 4 bytes): high notes play a shorter copy of the cycle
+stored later in the 128 bytes, so one table covers several octaves. The first column is the
+Amiga hardware period. Frequency = 3546895 / period (PAL clock) or 3579545 / period (NTSC), then
+divided by the number of samples in the cycle used.
+
+## Save games (`savegame` in `fmain2.c:1474`)
+
+Saved as raw memory dumps of game variables in a fixed order (80 bytes starting at `map_x` and the
+variables that follow it in memory, `region_num`, 6 bytes at `anix`, then `anim_list`, extents,
+global objects, the per-region object tables). This depends on C variable layout in memory, so the
+port must pick an explicit order and field list. We do not need to read the original saves.
+
+## Copy protection
+
+`cpytest()`, `prot2()`, `IsHardDrive()` and the block 880 read check that the original disk is
+present. Not needed. Remove when porting.
 
 ## Memory budget in the original
 
