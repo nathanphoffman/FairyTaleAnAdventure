@@ -19,10 +19,10 @@ at first and ported to Rust gradually. Original source (reference) is in `faery-
 Each phase should end with something that builds and runs.
 
 ### Phase 0 - Project setup
-- [ ] Install Rust, gcc, `libsdl2-dev`.
-- [ ] `cargo init`, add `sdl2`, `cc` and `bindgen` (if needed) dependencies.
-- [ ] Open an SDL window and draw a test pattern.
-- [ ] Write a small tool that dumps the layout of `game/image` so we understand the data.
+- [x] Install Rust, gcc, `libsdl2-dev`.
+- [x] `cargo init`, add `sdl2`, `cc` and `bindgen` (if needed) dependencies.
+- [x] Open an SDL window and draw a test pattern.
+- [x] Write a small tool that dumps the layout of `game/image` so we understand the data.
 
 ### Phase 1 - Understand the code and data
 - [x] Read `fmain.c` and list what it calls from the Amiga libraries (the main ones: `AllocMem`,

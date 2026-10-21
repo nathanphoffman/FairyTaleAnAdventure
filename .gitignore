@@ -5,3 +5,8 @@ faery-tale-amiga/
 target/
 build/
 *.o
+
+
+# Added by cargo
+
+/target

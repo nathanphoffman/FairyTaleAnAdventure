@@ -13,7 +13,7 @@ git clone https://github.com/viridia/faery-tale-amiga
 
 ## Status
 
-Planning. See [plan.md](plan.md).
+Phase 0 done (project builds, SDL window opens). See [plan.md](plan.md).
 
 ## Approach
 
@@ -34,7 +34,12 @@ Planning. See [plan.md](plan.md).
 
 ## Building
 
-Not buildable yet. Will need Rust (stable), a C compiler (gcc) and SDL2 (`libsdl2-dev`).
+Needs Rust (stable), a C compiler (gcc) and SDL2 (`libsdl2-dev`).
+
+```
+cargo run                                   # opens a window with a test pattern (Esc to quit)
+cargo run --bin dump_image -- faery-tale-amiga/game/image   # map of the floppy image
+```
 
 ## Legal
 
