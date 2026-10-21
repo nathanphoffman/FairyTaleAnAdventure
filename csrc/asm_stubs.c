@@ -1,0 +1,92 @@
+/* asm_stubs.c - routines that were 68000 assembly (Phase 4 rewrites these)
+ *
+ * Every function here just reports that it was called and returns 0. They exist so the game
+ * links. Replace them one by one with real code (see plan.md).
+ */
+#include <stdio.h>
+
+
+static void stub_called(const char *name)
+{
+	static int count;
+	if (count++ < 20) fprintf(stderr, "STUB called: %s\n", name);
+}
+#define STUB(name) long name() { stub_called(#name); return 0; }
+
+STUB(bigdraw)
+STUB(clear_blit)
+STUB(cursor)
+STUB(decode_mouse)
+STUB(do_error)
+STUB(event)
+STUB(genmini)
+STUB(getkey)
+STUB(init_music)
+STUB(make_mask)
+STUB(map_adjust)
+STUB(map_draw)
+STUB(mapxy)
+STUB(mask_blit)
+STUB(maskit)
+STUB(move)
+STUB(msg)
+STUB(newx)
+STUB(newy)
+STUB(page_det)
+STUB(placard)
+STUB(playsample)
+STUB(playscore)
+STUB(prdec)
+STUB(prox)
+STUB(prq)
+STUB(px_to_im)
+STUB(rest_blit)
+STUB(row_draw)
+STUB(save_blit)
+STUB(scrollmap)
+STUB(set_course)
+STUB(setscore)
+STUB(shape_blit)
+STUB(speak)
+STUB(ssp)
+STUB(stopscore)
+STUB(strip_draw)
+STUB(stuff_flag)
+STUB(text)
+STUB(trapper)
+STUB(unpack_line)
+STUB(wrap)
+STUB(wrap_music)
+STUB(placard_text)
+STUB(question)
+STUB(MakeBitMap)
+STUB(UnMakeBitMap)
+STUB(ReadHeader)
+STUB(ReadLength)
+STUB(HandlerInterface)
+
+/* Data that the assembly files define. Real contents come from narr.asm / fsubs.asm later. */
+unsigned char hinor[16 * 16], hivar[16 * 16];
+unsigned char place_tbl[512], inside_tbl[512];
+char place_msg[4096], inside_msg[4096];
+char titletext[256];
+void *WBenchMsg;
+
+/* The game's own random number generator (fsubs.asm). Must match exactly, and must replace the
+ * libc rand() that the linker would otherwise pick silently. */
+extern long seed1;   /* defined in fmain.c */
+
+int rand(void)
+{
+	/* mulu.w multiplies only the low 16 bits of the seed */
+	seed1 = (long)((unsigned long)((unsigned short)seed1) * 45821UL) + 1;
+	unsigned int r = ((unsigned int)seed1 >> 6) | ((unsigned int)seed1 << 26); /* ror.l #6 */
+	return (int)(r & 0x7fffffff);
+}
+long bitrand(long mask) { return rand() & mask; }
+long rand2(void) { return rand() & 1; }
+long rand4(void) { return rand() & 3; }
+long rand8(void) { return rand() & 7; }
+long rand64(void) { return rand() & 63; }
+long rand256(void) { return rand() & 255; }
+long rnd(long n) { return (long)((unsigned long)((unsigned short)rand()) % (unsigned long)(n & 0xffff)); }
