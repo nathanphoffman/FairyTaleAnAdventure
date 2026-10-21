@@ -1266,6 +1266,7 @@ no_intro:
 
 		cycle++;
 		flasher++;
+		fta_test_hook();	/* PORT: test commands, does nothing normally */
 
 		key = getkey();
 			

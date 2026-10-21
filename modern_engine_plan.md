@@ -34,14 +34,17 @@ games/  original  improved  remastered  reimagined
 
 ## Steps
 
-### 1. Safety net  (mostly done)
+### 1. Safety net  (done)
 - [x] State dump: `FTA_STATE=file FTA_STATE_AFTER=tick` writes hero, stats, all 20 actors, inventory
       and RNG seed as text (`csrc/statedump.c`). Same inputs give identical output.
 - [x] `tests/state_regress.sh` + `tests/state_golden.txt`: compares state instead of pixels
       (takes about 7 minutes; run `--update` to accept new output).
 - [x] Extra scenarios in `tests/state_scenarios.txt`: 8 seeded random sessions (`fuzz_N`). One
       reaches region 8 (indoors). They stand in for shops, talking, doors, caves and dying.
-- [ ] Targeted scenarios for shops, talking, dying, brother swap, swan/turtle (need map positions).
+- [x] Targeted scenarios (`FTA_CMD="tick:tp:x:y,tick:kill:luck"` teleports like a door or kills the
+      hero; applied by `fta_test_hook()` at the top of the main loop): `talk_beggar`, `shop_buy`
+      (inn, bartender), `inn_inside` (region 8), `die_fairy` (revived), `die_brother` (brother 2).
+- [ ] Still without scenarios: caves/underground, swan/turtle, key doors, combat kills.
 - [x] Record and replay: `FTA_RECORD=file` logs keys and mouse; `FTA_REPLAY=file` repeats them.
       Checked: replay gives an identical state file.
 - [x] `regress.sh` golden pixel hashes were stale (they failed on the previous commit too); screens checked by eye, hashes updated. `soak.sh` passes.

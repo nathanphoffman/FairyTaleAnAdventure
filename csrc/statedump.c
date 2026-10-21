@@ -31,3 +31,22 @@ void fta_dump_state(const char *path)
 	fprintf(f, "\n");
 	fclose(f);
 }
+
+/* Test commands (FTA_CMD in display.rs): queued from the display thread, applied at the top of the
+   game's main loop by fta_test_hook(), so they never run in the middle of a frame. */
+static int cmd_kind, cmd_a, cmd_b;
+
+void fta_queue_cmd(int kind, int a, int b)
+{	cmd_kind = kind; cmd_a = a; cmd_b = b;
+}
+
+extern short luck;
+void fta_test_hook(void)
+{	int kind = cmd_kind;
+	if (!kind) return;
+	cmd_kind = 0;
+	if (kind == 1) xfer((unsigned short)cmd_a, (unsigned short)cmd_b, 1);	/* teleport, like a door */
+	else if (kind == 2)													/* kill the hero with the given luck */
+	{	luck = cmd_a; anim_list[0].vitality = 0; checkdead(0, 5);
+	}
+}

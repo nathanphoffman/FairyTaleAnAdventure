@@ -395,8 +395,28 @@ fn replay_events(tick: u32) {
     });
 }
 
+/// FTA_CMD="900:tp:18310:15969,1200:kill:0" runs test commands at those ticks: tp = teleport the
+/// hero like a door does (x, y), kill = set luck and kill the hero.
+fn run_cmds(tick: u32) {
+    let Ok(cmds) = std::env::var("FTA_CMD") else { return };
+    for item in cmds.split(',') {
+        let p: Vec<&str> = item.split(':').collect();
+        if p.len() < 3 || p[0].parse::<u32>().ok() != Some(tick) {
+            continue;
+        }
+        let a: i32 = p[2].parse().unwrap_or(0);
+        let b: i32 = p.get(3).and_then(|v| v.parse().ok()).unwrap_or(0);
+        match p[1] {
+            "tp" => unsafe { fta_queue_cmd(1, a, b) },
+            "kill" => unsafe { fta_queue_cmd(2, a, b) },
+            _ => {}
+        }
+    }
+}
+
 fn run_script(d: &mut Display) {
     let tick = d.ticks;
+    run_cmds(tick);
     super::input::TICK.store(tick, std::sync::atomic::Ordering::Relaxed);
     replay_events(tick);
     for (t, x, y) in d.clicks.clone() {
@@ -417,6 +437,7 @@ fn run_script(d: &mut Display) {
 }
 
 unsafe extern "C" {
+    fn fta_queue_cmd(kind: i32, a: i32, b: i32);
     fn fta_dump_state(path: *const std::ffi::c_char);
 }
 

@@ -107,3 +107,5 @@ extern void InvalidLastDiskIO (void);
 extern void main (int argc, char *argv);
 extern void WaitDiskIO (int num);
 extern void WaitLastDiskIO (void);
+
+extern void fta_test_hook(void);
