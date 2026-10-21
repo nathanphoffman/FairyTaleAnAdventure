@@ -39,7 +39,8 @@ Needs Rust (stable), a C compiler (gcc) and SDL2 (`libsdl2-dev`).
 
 ```
 cd csrc && make                             # builds ../build/fta_c (C part only, stubbed)
-cargo run                                   # runs the game (Esc quits)
+cargo run                                   # runs the game, skipping the intro (Esc quits)
+cargo run -- --intro                        # plays the story-book intro first
 cargo run --bin dump_image -- faery-tale-amiga/game/image   # map of the floppy image
 ```
 

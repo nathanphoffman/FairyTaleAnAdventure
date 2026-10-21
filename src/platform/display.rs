@@ -19,6 +19,13 @@ use std::time::{Duration, Instant};
 /// Counts calls to wait_frame/present; the test watchdog uses it to see if the game is stuck.
 static BEAT: AtomicU32 = AtomicU32::new(0);
 
+/// Set before init(): press Space for the player early on, which skips the intro.
+static SKIP_INTRO: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn set_skip_intro(skip: bool) {
+    SKIP_INTRO.store(skip, Ordering::Relaxed);
+}
+
 pub const WIDTH: u32 = 640;
 pub const HEIGHT: u32 = 200;
 const TICK: Duration = Duration::from_millis(20); // 50 Hz
@@ -75,7 +82,14 @@ pub fn init() -> Result<(), String> {
             started: Instant::now(),
             presents: 0,
             ticks: 0,
-            script: parse_script(),
+            script: {
+                let mut script = parse_script();
+                if SKIP_INTRO.load(Ordering::Relaxed) {
+                    script.push((5, "Space".to_string(), true));
+                    script.push((9, "Space".to_string(), false));
+                }
+                script
+            },
         })
     });
     Ok(())
