@@ -296,28 +296,41 @@ fn test_hooks(d: &mut Display) {
     }
 }
 
-/// Shows the current view on screen.
+/// Converts the current view to RGB and shows it.
+fn draw(d: &mut Display, view: *mut View) {
+    compose(view, &mut d.frame);
+    let bytes: &[u8] =
+        unsafe { std::slice::from_raw_parts(d.frame.as_ptr() as *const u8, d.frame.len() * 4) };
+    if let Ok(mut texture) = d.creator.create_texture_streaming(PixelFormatEnum::ARGB8888, WIDTH, HEIGHT) {
+        let _ = texture.update(None, bytes, WIDTH as usize * 4);
+        d.canvas.clear();
+        let _ = d.canvas.copy(&texture, None, None);
+        d.canvas.present();
+    }
+}
+
+/// Shows the current view on screen (the game calls this when it flips pages).
 pub fn present() {
     BEAT.fetch_add(1, Ordering::Relaxed);
     let view = VIEW.with(|c| *c.borrow());
     DISPLAY.with(|d| {
         let mut d = d.borrow_mut();
         let Some(d) = d.as_mut() else { return };
-        compose(view, &mut d.frame);
-        let bytes: &[u8] = unsafe {
-            std::slice::from_raw_parts(d.frame.as_ptr() as *const u8, d.frame.len() * 4)
-        };
-        if let Ok(mut texture) =
-            d.creator.create_texture_streaming(PixelFormatEnum::ARGB8888, WIDTH, HEIGHT)
-        {
-            let _ = texture.update(None, bytes, WIDTH as usize * 4);
-            d.canvas.clear();
-            let _ = d.canvas.copy(&texture, None, None);
-            d.canvas.present();
-        }
+        draw(d, view);
         d.presents += 1;
         handle_events(d);
         test_hooks(d);
+    });
+}
+
+/// Redraws every tick. Some screens (the item list, story pages) never flip pages, but the pointer
+/// still moves and text is still printed into the bitmaps.
+fn redraw() {
+    let view = VIEW.with(|c| *c.borrow());
+    DISPLAY.with(|d| {
+        if let Some(d) = d.borrow_mut().as_mut() {
+            draw(d, view);
+        }
     });
 }
 
@@ -338,6 +351,7 @@ pub fn wait_frame() {
     });
     if let Some(w) = wait {
         std::thread::sleep(w);
+        redraw();
     }
 }
 
