@@ -393,16 +393,72 @@ pub extern "C" fn DeleteLayer(_dummy: *mut c_void, layer: *mut Layer) -> LONG {
 
 // ---- text ----
 
-/// Font glyph source. Both game fonts currently use the built-in 8x8 font (a stand-in for the
-/// Amiga's Topaz; the story font in fonts/Amber/9 is not loaded yet).
-struct FontData {
-    width: i32,
+/// A bitmap font in the Amiga's layout: one wide strip of glyph bitmaps (`modulo` bytes per row)
+/// with a table giving each glyph's bit offset and width, its advance and its kerning.
+struct BitmapFont {
     height: i32,
     baseline: i32,
+    lo: u8,
+    hi: u8,
+    modulo: usize,
+    data: Vec<u8>,
+    loc: Vec<(u16, u16)>,
+    space: Vec<u16>,
+    kern: Vec<i16>,
 }
 
-fn new_font(width: i32, height: i32, baseline: i32) -> *mut TextFont {
-    let data = Box::into_raw(Box::new(FontData { width, height, baseline }));
+enum FontData {
+    /// Fixed 8x8 stand-in for the Amiga's ROM font Topaz 8.
+    Builtin,
+    Bitmap(BitmapFont),
+}
+
+fn be16(d: &[u8], o: usize) -> Option<u16> {
+    Some(u16::from_be_bytes(d.get(o..o + 2)?.try_into().ok()?))
+}
+
+fn be32(d: &[u8], o: usize) -> Option<u32> {
+    Some(u32::from_be_bytes(d.get(o..o + 4)?.try_into().ok()?))
+}
+
+/// Reads an Amiga disk font (fonts/Amber/9): an executable file whose only hunk holds a
+/// DiskFontHeader. Offsets inside it are relative to the start of that hunk's data.
+fn load_disk_font(path: &std::path::Path) -> Option<BitmapFont> {
+    let file = std::fs::read(path).ok()?;
+    if be32(&file, 0)? != 0x3f3 {
+        return None;
+    }
+    // HUNK_HEADER: 0, table size, first, last, one size per hunk, then HUNK_CODE, size, data
+    let table = be32(&file, 8)? as usize;
+    let hunk = 20 + 4 * table;
+    if be32(&file, hunk)? != 0x3e9 {
+        return None;
+    }
+    let seg = &file[hunk + 8..];
+    let tf = 58; // TextFont inside the DiskFontHeader
+    let height = be16(seg, tf + 20)? as i32;
+    let baseline = be16(seg, tf + 26)? as i32;
+    let lo = *seg.get(tf + 32)?;
+    let hi = *seg.get(tf + 33)?;
+    let chardata = be32(seg, tf + 34)? as usize;
+    let modulo = be16(seg, tf + 38)? as usize;
+    let charloc = be32(seg, tf + 40)? as usize;
+    let charspace = be32(seg, tf + 44)? as usize;
+    let charkern = be32(seg, tf + 48)? as usize;
+    let count = hi as usize - lo as usize + 2; // plus the "default" glyph at the end
+    let data = seg.get(chardata..chardata + modulo * height as usize)?.to_vec();
+    let mut loc = Vec::new();
+    let (mut space, mut kern) = (Vec::new(), Vec::new());
+    for i in 0..count {
+        loc.push((be16(seg, charloc + i * 4)?, be16(seg, charloc + i * 4 + 2)?));
+        space.push(be16(seg, charspace + i * 2)?);
+        kern.push(be16(seg, charkern + i * 2)? as i16);
+    }
+    Some(BitmapFont { height, baseline, lo, hi, modulo, data, loc, space, kern })
+}
+
+fn new_font(data: FontData, width: i32, height: i32, baseline: i32) -> *mut TextFont {
+    let data = Box::into_raw(Box::new(data));
     Box::into_raw(Box::new(TextFont {
         tf_YSize: height as UWORD,
         tf_XSize: width as UWORD,
@@ -414,12 +470,12 @@ fn new_font(width: i32, height: i32, baseline: i32) -> *mut TextFont {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn OpenFont(_attr: *mut TextAttr) -> *mut TextFont {
-    new_font(8, 8, 6)
+    new_font(FontData::Builtin, 8, 8, 6)
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn OpenDiskFont(_attr: *mut TextAttr) -> *mut TextFont {
-    new_font(8, 8, 6)
+    new_font(FontData::Builtin, 8, 8, 6)
 }
 
 #[unsafe(no_mangle)]
@@ -436,10 +492,14 @@ pub extern "C" fn SetFont(rp: *mut RastPort, f: *mut TextFont) {
 #[unsafe(no_mangle)]
 pub extern "C" fn LoadSeg(name: *const c_char) -> BPTR {
     let name = unsafe { CStr::from_ptr(name) }.to_string_lossy();
-    if super::dos::resolve(&name, false).is_none() {
-        return 0;
-    }
-    let tf = new_font(8, 9, 7);
+    let Some(path) = super::dos::resolve(&name, false) else { return 0 };
+    let tf = match load_disk_font(&path) {
+        Some(font) => {
+            let (h, b) = (font.height, font.baseline);
+            new_font(FontData::Bitmap(font), 10, h, b)
+        }
+        None => new_font(FontData::Builtin, 8, 9, 7),
+    };
     let header = Box::into_raw(Box::new(DiskFontHeader { dfh_TF: unsafe { std::ptr::read(tf) } }));
     ((header as isize) - 8) >> 2
 }
@@ -458,21 +518,47 @@ pub extern "C" fn Text(rp: *mut RastPort, s: *const u8, len: LONG) -> LONG {
     let bm = unsafe { &*rp.BitMap };
     let text = unsafe { std::slice::from_raw_parts(s, len as usize) };
     let jam2 = rp.DrawMode & JAM2 != 0;
-    let top = rp.cp_y as i32 - font.baseline;
     for &ch in text {
-        let glyph = font8x8::legacy::BASIC_LEGACY[(ch & 0x7f) as usize];
-        for row in 0..font.height.min(8) {
-            for col in 0..font.width.min(8) {
-                let on = glyph[row as usize] >> col & 1 != 0; // bit 0 is the leftmost pixel
-                let (x, y) = (rp.cp_x as i32 + col, top + row);
-                if on {
-                    unsafe { plot(bm, x, y, rp.FgPen, false) };
-                } else if jam2 {
-                    unsafe { plot(bm, x, y, rp.BgPen, false) };
+        match font {
+            FontData::Builtin => {
+                let top = rp.cp_y as i32 - 6;
+                let glyph = font8x8::legacy::BASIC_LEGACY[(ch & 0x7f) as usize];
+                for row in 0..8 {
+                    for col in 0..8 {
+                        let on = glyph[row as usize] >> col & 1 != 0; // bit 0 is leftmost
+                        let (x, y) = (rp.cp_x as i32 + col, top + row);
+                        if on {
+                            unsafe { plot(bm, x, y, rp.FgPen, false) };
+                        } else if jam2 {
+                            unsafe { plot(bm, x, y, rp.BgPen, false) };
+                        }
+                    }
                 }
+                rp.cp_x += 8;
+            }
+            FontData::Bitmap(f) => {
+                let idx = if ch >= f.lo && ch <= f.hi { (ch - f.lo) as usize } else { (f.hi - f.lo) as usize + 1 };
+                let (bit_off, bit_w) = f.loc[idx];
+                let advance = f.space[idx] as i32;
+                let kern = f.kern[idx] as i32;
+                let top = rp.cp_y as i32 - f.baseline;
+                for row in 0..f.height {
+                    if jam2 {
+                        for x in 0..advance {
+                            unsafe { plot(bm, rp.cp_x as i32 + x, top + row, rp.BgPen, false) };
+                        }
+                    }
+                    for col in 0..bit_w as i32 {
+                        let bit = bit_off as usize + col as usize;
+                        let byte = f.data[row as usize * f.modulo + bit / 8];
+                        if byte & (0x80 >> (bit % 8)) != 0 {
+                            unsafe { plot(bm, rp.cp_x as i32 + kern + col, top + row, rp.FgPen, false) };
+                        }
+                    }
+                }
+                rp.cp_x += advance as WORD;
             }
         }
-        rp.cp_x += font.width as WORD;
     }
     0
 }
@@ -591,6 +677,8 @@ pub extern "C" fn GetSprite(_s: *mut SimpleSprite, _n: LONG) -> LONG {
 #[unsafe(no_mangle)]
 pub extern "C" fn FreeSprite(_n: LONG) {}
 #[unsafe(no_mangle)]
-pub extern "C" fn ChangeSprite(_vp: *mut ViewPort, _s: *mut SimpleSprite, _data: *mut c_void) {}
+pub extern "C" fn ChangeSprite(_vp: *mut ViewPort, _s: *mut SimpleSprite, data: *mut c_void) {
+    super::display::set_sprite(data as *const u32);
+}
 #[unsafe(no_mangle)]
 pub extern "C" fn MoveSprite(_vp: *mut ViewPort, _s: *mut SimpleSprite, _x: LONG, _y: LONG) {}

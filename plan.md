@@ -64,13 +64,25 @@ The C code is built into the Rust binary by `build.rs`; `main()` in `fmain.c` is
       calls `LoadView` (page flip), paced at 50 Hz. `FTA_SHOT=file.ppm FTA_SHOT_AFTER=n`
       saves a screenshot for testing without a screen (`tools/ppm2png.py` converts it).
 - [x] Milestone: the intro story book (pictures and page flips) shows correctly.
-- [ ] Text: uses a stand-in 8x8 font for both fonts. Still to do: load `fonts/Amber/9` (the
-      story font) and find or draw a Topaz 8 look-alike.
-- [ ] Sprites: the mouse pointer sprite (`GetSprite`, `ChangeSprite`, `MoveSprite`) is a no-op.
-- [ ] Input and timing: keyboard and mouse through SDL feeding the game's key ring buffer
-      (replaces `HandlerInterface` in `fsubs.asm`), joystick, mouse menu clicks.
-- [ ] Audio device, see Phase 5.
-- [ ] Layer clipping for the witch's polygon is skipped.
+- [x] Text: the story font `fonts/Amber/9` is loaded from the original file. Topaz 8 (an Amiga
+      ROM font we do not have) is replaced by a fixed 8x8 stand-in font (`font8x8` crate).
+- [x] Sprites: the mouse pointer sprite is drawn on top of the text panel; the system cursor is hidden.
+- [x] Input: SDL keyboard and mouse feed the game's key ring buffer and mouse state
+      (`csrc/input.c` replaces `HandlerInterface`, `getkey`, `decode_mouse`). Arrow keys walk
+      (two arrows = diagonal), keypad digits work as on the Amiga, left mouse button walks
+      toward the compass pointer and clicks menus, right mouse button or keypad 0 fights, Ctrl is
+      the joystick fire button.
+- [x] The riddle copy protection (typing words from the manual) is skipped.
+- [x] Milestone: after the intro, the game's text panel, menu and compass show correctly. The map
+      area is black until Phase 4 (map drawing is still stubbed).
+- [ ] Left for later: joystick/gamepad, layer clipping for the witch's polygon, a real Topaz look-alike.
+- Audio device: see Phase 5.
+
+Test helpers (environment variables): `FTA_SHOT=file.ppm FTA_SHOT_AFTER=<ticks>` saves a screenshot
+after that many 1/50 s ticks and quits; `FTA_INJECT="60:Space,200:Return"` presses keys at given
+ticks; `FTA_SECONDS=n` quits after n seconds; `FTA_WATCHDOG=n` aborts if the game stops waiting
+for frames for n seconds (use under gdb to find a stuck loop). When running a test with a
+timeout use `timeout -s KILL`, SDL catches the normal termination signal.
 
 ### Phase 4 - Rewrite the assembly
 Rewrite in C first (easy to compare), then Rust later with the rest of the game.

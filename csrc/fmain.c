@@ -1269,7 +1269,8 @@ no_intro:
 	cheat1 = quitflag = FALSE;
 	while (!quitflag)
 	{	short cycle, atype, inum, notpause;
-		BYTE *pia = (BYTE *)0xbfe001;
+		extern unsigned char fta_pia;
+		BYTE *pia = (BYTE *)&fta_pia;	/* PORT: was the CIA register at 0xbfe001 */
 		unsigned char *backalloc, crack;
 
 		cycle++;

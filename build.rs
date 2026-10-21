@@ -9,6 +9,7 @@ fn main() {
         "hdrive.c",
         "layout.c",
         "asm_port.c",
+        "input.c",
         "platform_stubs.c",
         "asm_stubs.c",
     ];

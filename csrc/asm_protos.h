@@ -8,7 +8,9 @@
 
 long px_to_im(), prox(), newx(), newy(), wrap(), map_adjust(), genmini(), page_det();
 long rand(void), bitrand(), rand2(void), rand4(void), rand8(void), rand64(void), rand256(void), rnd();
-long getkey(void), decode_mouse(void), set_course(), stuff_flag();
+int getkey(void);
+void decode_mouse(void);
+long set_course(), stuff_flag();
 long prdec(), text(), move(), ssp(), placard(void), placard_text(), question(), cursor();
 long event(), speak(), msg(), prq();
 long map_draw(void), strip_draw(), row_draw(), scrollmap(), bigdraw();

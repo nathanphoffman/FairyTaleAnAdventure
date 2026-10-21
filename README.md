@@ -13,7 +13,7 @@ git clone https://github.com/viridia/faery-tale-amiga
 
 ## Status
 
-Phases 0-2 done: Rust project and SDL window, docs, and the original C compiling and linking with gcc against stubs. Nothing is playable yet. See [plan.md](plan.md).
+Phases 0-3 done: the original C game runs inside a Rust program on SDL2. The intro, menus and text panel work, with keyboard and mouse. The map is not drawn yet (Phase 4), so it is not playable. See [plan.md](plan.md).
 
 ## Approach
 
@@ -39,7 +39,7 @@ Needs Rust (stable), a C compiler (gcc) and SDL2 (`libsdl2-dev`).
 
 ```
 cd csrc && make                             # builds ../build/fta_c (C part only, stubbed)
-cargo run                                   # opens a window with a test pattern (Esc to quit)
+cargo run                                   # runs the game (Esc quits)
 cargo run --bin dump_image -- faery-tale-amiga/game/image   # map of the floppy image
 ```
 

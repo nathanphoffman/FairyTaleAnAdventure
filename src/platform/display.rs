@@ -13,7 +13,11 @@ use sdl2::render::{Canvas, TextureCreator};
 use sdl2::video::{Window, WindowContext};
 use sdl2::EventPump;
 use std::cell::RefCell;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, Instant};
+
+/// Counts calls to wait_frame/present; the test watchdog uses it to see if the game is stuck.
+static BEAT: AtomicU32 = AtomicU32::new(0);
 
 pub const WIDTH: u32 = 640;
 pub const HEIGHT: u32 = 200;
@@ -27,14 +31,20 @@ struct Display {
     next_tick: Instant,
     started: Instant,
     presents: u32,
+    ticks: u32,
+    /// scripted input for tests: (tick, key name, pressed)
+    script: Vec<(u32, String, bool)>,
 }
 
 thread_local! {
     static DISPLAY: RefCell<Option<Display>> = const { RefCell::new(None) };
     static VIEW: RefCell<*mut View> = const { RefCell::new(std::ptr::null_mut()) };
+    /// mouse pointer sprite data (Amiga sprite format), set by ChangeSprite
+    static SPRITE: RefCell<*const u32> = const { RefCell::new(std::ptr::null()) };
 }
 
 pub fn init() -> Result<(), String> {
+    start_watchdog();
     let sdl = sdl2::init()?;
     let video = sdl.video()?;
     let window = video
@@ -48,6 +58,7 @@ pub fn init() -> Result<(), String> {
     canvas.set_logical_size(WIDTH, HEIGHT * 2).map_err(|e| e.to_string())?;
     let creator = canvas.texture_creator();
     let events = sdl.event_pump()?;
+    sdl.mouse().show_cursor(false); // the game draws its own pointer
     std::mem::forget(sdl);
     std::mem::forget(video);
     DISPLAY.with(|d| {
@@ -59,9 +70,15 @@ pub fn init() -> Result<(), String> {
             next_tick: Instant::now() + TICK,
             started: Instant::now(),
             presents: 0,
+            ticks: 0,
+            script: parse_script(),
         })
     });
     Ok(())
+}
+
+pub fn set_sprite(data: *const u32) {
+    SPRITE.with(|c| *c.borrow_mut() = data);
 }
 
 pub fn set_view(v: *mut View) {
@@ -74,18 +91,59 @@ fn rgb4(c: u16) -> u32 {
     (r * 17) << 16 | (g * 17) << 8 | b * 17
 }
 
+const VP_HIDE: u16 = 0x2000;
+const SPRITES: u16 = 0x4000;
+
+/// Draws the mouse pointer: a 16 pixel wide sprite, 2 frame pixels per sprite pixel. Each line is
+/// two 16 bit planes (the high word of each 32 bit value is plane 0); colour = 16 + value.
+fn draw_pointer(frame: &mut [u32], colors: &ColorMap) {
+    let data = SPRITE.with(|c| *c.borrow());
+    if data.is_null() {
+        return;
+    }
+    let (px, py) = super::input::pointer();
+    let (ox, oy) = (px * 2, py);
+    let mut line = 0;
+    loop {
+        let word = unsafe { *data.add(1 + line) };
+        if word == 0 || line >= 32 {
+            break;
+        }
+        let (a, b) = ((word >> 16) as u16, word as u16);
+        for bit in 0..16 {
+            let v = (a >> (15 - bit) & 1) | (b >> (15 - bit) & 1) << 1;
+            let idx = 16 + v as usize;
+            if v == 0 || idx >= colors.Count as usize {
+                continue;
+            }
+            let color = rgb4(unsafe { *colors.ColorTable.add(idx) });
+            for dx in 0..2 {
+                let (x, y) = (ox + bit * 2 + dx, oy + line as i32);
+                if x >= 0 && x < WIDTH as i32 && y >= 0 && y < HEIGHT as i32 {
+                    frame[y as usize * WIDTH as usize + x as usize] = color;
+                }
+            }
+        }
+        line += 1;
+    }
+}
+
 /// Draws all viewports of the view into the 640x200 frame.
 fn compose(view: *const View, frame: &mut [u32]) {
     frame.fill(0);
     if view.is_null() {
         return;
     }
+    let mut pointer_colors: *const ColorMap = std::ptr::null();
     let mut vp = unsafe { (*view).ViewPort };
     while !vp.is_null() {
         let v = unsafe { &*vp };
         vp = v.Next;
-        if v.RasInfo.is_null() || v.ColorMap.is_null() {
+        if v.RasInfo.is_null() || v.ColorMap.is_null() || v.Modes & VP_HIDE != 0 {
             continue;
+        }
+        if v.Modes & SPRITES != 0 {
+            pointer_colors = v.ColorMap;
         }
         let ri = unsafe { &*v.RasInfo };
         if ri.BitMap.is_null() {
@@ -133,25 +191,98 @@ fn compose(view: *const View, frame: &mut [u32]) {
             }
         }
     }
+    if !pointer_colors.is_null() {
+        draw_pointer(frame, unsafe { &*pointer_colors });
+    }
+}
+
+/// Window pixel position to a position in the 640x200 frame (the window letterboxes the
+/// 640x400 logical screen, each frame row is two logical rows).
+fn to_frame(d: &Display, wx: i32, wy: i32) -> (i32, i32) {
+    let (w, h) = d.canvas.window().size();
+    let scale = (w as f32 / WIDTH as f32).min(h as f32 / (HEIGHT * 2) as f32);
+    let ox = (w as f32 - WIDTH as f32 * scale) / 2.0;
+    let oy = (h as f32 - (HEIGHT * 2) as f32 * scale) / 2.0;
+    (((wx as f32 - ox) / scale) as i32, (((wy as f32 - oy) / scale) / 2.0) as i32)
 }
 
 fn handle_events(d: &mut Display) {
-    for event in d.events.poll_iter() {
+    let events: Vec<Event> = d.events.poll_iter().collect();
+    for event in events {
         match event {
             Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
                 std::process::exit(0)
             }
+            Event::KeyDown { keycode: Some(k), repeat: false, .. } => super::input::key_event(k, true),
+            Event::KeyUp { keycode: Some(k), .. } => super::input::key_event(k, false),
+            Event::MouseMotion { x, y, .. } => {
+                let (fx, fy) = to_frame(d, x, y);
+                super::input::mouse_move(fx, fy);
+            }
+            Event::MouseButtonDown { mouse_btn, x, y, .. } => {
+                let (fx, fy) = to_frame(d, x, y);
+                super::input::mouse_move(fx, fy);
+                super::input::mouse_button(mouse_btn, true);
+            }
+            Event::MouseButtonUp { mouse_btn, .. } => super::input::mouse_button(mouse_btn, false),
             _ => {}
         }
     }
 }
 
-/// Test helpers: FTA_SHOT=file.ppm saves the screen after FTA_SHOT_AFTER presents (default 1)
+/// FTA_WATCHDOG=n aborts if the game goes n seconds without waiting for a frame (a stuck loop),
+/// so a debugger shows where.
+fn start_watchdog() {
+    let Some(limit) = std::env::var("FTA_WATCHDOG").ok().and_then(|s| s.parse::<u64>().ok()) else {
+        return;
+    };
+    std::thread::spawn(move || {
+        let mut last = BEAT.load(Ordering::Relaxed);
+        let mut still = 0;
+        loop {
+            std::thread::sleep(Duration::from_secs(1));
+            let now = BEAT.load(Ordering::Relaxed);
+            still = if now == last { still + 1 } else { 0 };
+            last = now;
+            if still >= limit {
+                eprintln!("WATCHDOG: game stuck for {limit}s");
+                std::process::abort();
+            }
+        }
+    });
+}
+
+/// FTA_INJECT="100:Space,200:Return" presses and releases those keys at those 1/50 s ticks.
+fn parse_script() -> Vec<(u32, String, bool)> {
+    let mut script = Vec::new();
+    for item in std::env::var("FTA_INJECT").unwrap_or_default().split(',') {
+        if let Some((t, name)) = item.split_once(':') {
+            if let Ok(t) = t.parse::<u32>() {
+                script.push((t, name.to_string(), true));
+                script.push((t + 4, name.to_string(), false));
+            }
+        }
+    }
+    script
+}
+
+fn run_script(d: &mut Display) {
+    let tick = d.ticks;
+    for (t, name, down) in d.script.clone() {
+        if t == tick {
+            if let Some(k) = sdl2::keyboard::Keycode::from_name(&name) {
+                super::input::key_event(k, down);
+            }
+        }
+    }
+}
+
+/// Test helpers: FTA_SHOT=file.ppm saves the screen after FTA_SHOT_AFTER ticks of 1/50 s (default 1)
 /// and quits; FTA_SECONDS=n quits after n seconds.
 fn test_hooks(d: &mut Display) {
     if let Some(path) = std::env::var_os("FTA_SHOT") {
         let after: u32 = std::env::var("FTA_SHOT_AFTER").ok().and_then(|s| s.parse().ok()).unwrap_or(1);
-        if d.presents >= after {
+        if d.ticks >= after {
             let mut out = format!("P6\n{WIDTH} {HEIGHT}\n255\n").into_bytes();
             for px in &d.frame {
                 out.extend_from_slice(&[(px >> 16) as u8, (px >> 8) as u8, *px as u8]);
@@ -169,6 +300,7 @@ fn test_hooks(d: &mut Display) {
 
 /// Shows the current view on screen.
 pub fn present() {
+    BEAT.fetch_add(1, Ordering::Relaxed);
     let view = VIEW.with(|c| *c.borrow());
     DISPLAY.with(|d| {
         let mut d = d.borrow_mut();
@@ -193,11 +325,14 @@ pub fn present() {
 
 /// Waits for the next 50 Hz tick (the Amiga's vertical blank), keeping the window alive.
 pub fn wait_frame() {
+    BEAT.fetch_add(1, Ordering::Relaxed);
     let wait = DISPLAY.with(|d| {
         let mut d = d.borrow_mut();
         let Some(d) = d.as_mut() else { return None };
         handle_events(d);
         test_hooks(d);
+        d.ticks += 1;
+        run_script(d);
         let now = Instant::now();
         let wait = d.next_tick.saturating_duration_since(now);
         d.next_tick = if now > d.next_tick + TICK * 4 { now + TICK } else { d.next_tick + TICK };

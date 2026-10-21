@@ -1311,6 +1311,9 @@ copy_protect_junk()
 	register char *a, *b;
 	long h;
 
+#ifdef NO_PROTECT
+	return TRUE;	/* PORT: skip the manual-lookup riddle (copy protection) */
+#endif
 	SetDrMd(rp,JAM2);
 	for (h=0; h<3; h++)
 	{	do { j = rand8(); } while ((a = answers[j])==0);
