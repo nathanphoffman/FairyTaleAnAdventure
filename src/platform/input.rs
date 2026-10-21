@@ -146,7 +146,29 @@ pub fn pad_button(button: sdl2::controller::Button, down: bool) {
     unsafe { fta_key(code as c_int | if down { 0 } else { 0x80 }) };
 }
 
+/// Tick counter set by the display loop; stamps the lines of the FTA_RECORD log.
+pub static TICK: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+/// FTA_RECORD=file logs every key and mouse event as "tick key NAME 1|0", "tick move X Y" or
+/// "tick button left|right 1|0". Feed the file back with FTA_REPLAY=file to repeat the session.
+fn record(line: std::fmt::Arguments) {
+    use std::io::Write;
+    use std::sync::{Mutex, OnceLock};
+    static LOG: OnceLock<Option<Mutex<std::fs::File>>> = OnceLock::new();
+    let log = LOG.get_or_init(|| {
+        let path = std::env::var_os("FTA_RECORD")?;
+        std::fs::File::create(path).ok().map(Mutex::new)
+    });
+    if let Some(f) = log {
+        let tick = TICK.load(std::sync::atomic::Ordering::Relaxed);
+        if let Ok(mut f) = f.lock() {
+            let _ = writeln!(f, "{tick} {line}");
+        }
+    }
+}
+
 pub fn key_event(key: Keycode, down: bool) {
+    record(format_args!("key {} {}", key.name().replace(' ', "_"), down as u8));
     let key = REMAP.with(|r| r.borrow().get(&key).copied()).unwrap_or(key);
     let arrow = match key {
         Keycode::Up => Some(0),
@@ -172,6 +194,7 @@ pub fn key_event(key: Keycode, down: bool) {
 
 /// `x`, `y` are positions in the 640x200 frame.
 pub fn mouse_move(frame_x: i32, frame_y: i32) {
+    record(format_args!("move {frame_x} {frame_y}"));
     let (x, y) = (frame_x / 2, frame_y);
     unsafe { fta_mouse_move(x, y) };
     POINTER.with(|p| p.set((x.clamp(5, 315), y.clamp(147, 195))));
@@ -184,6 +207,7 @@ pub fn mouse_button(button: MouseButton, down: bool) {
         MouseButton::Right => r = down,
         _ => return,
     }
+    record(format_args!("button {} {}", if button == MouseButton::Left { "left" } else { "right" }, down as u8));
     BUTTONS.with(|b| b.set((l, r)));
     unsafe { fta_mouse_button(l as c_int, r as c_int) };
 }

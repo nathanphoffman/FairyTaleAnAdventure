@@ -351,8 +351,54 @@ fn parse_clicks() -> Vec<(u32, i32, i32)> {
         .collect()
 }
 
+/// FTA_REPLAY=file replays a log written by FTA_RECORD.
+fn replay_events(tick: u32) {
+    use std::cell::RefCell;
+    thread_local! {
+        static LOG: RefCell<Vec<(u32, Vec<String>)>> = RefCell::new(
+            std::env::var_os("FTA_REPLAY")
+                .and_then(|p| std::fs::read_to_string(p).ok())
+                .map(|t| {
+                    t.lines()
+                        .filter_map(|l| {
+                            let mut w = l.split_whitespace().map(String::from);
+                            let tick = w.next()?.parse().ok()?;
+                            Some((tick, w.collect()))
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
+        );
+    }
+    LOG.with(|log| {
+        for (t, w) in log.borrow().iter().filter(|(t, _)| *t == tick) {
+            let _ = t;
+            let down = w.last().map(|s| s == "1").unwrap_or(false);
+            match w[0].as_str() {
+                "key" => {
+                    if let Some(k) = sdl2::keyboard::Keycode::from_name(&w[1].replace('_', " ")) {
+                        super::input::key_event(k, down);
+                    }
+                }
+                "move" => {
+                    if let (Ok(x), Ok(y)) = (w[1].parse(), w[2].parse()) {
+                        super::input::mouse_move(x, y);
+                    }
+                }
+                "button" => {
+                    let b = if w[1] == "left" { sdl2::mouse::MouseButton::Left } else { sdl2::mouse::MouseButton::Right };
+                    super::input::mouse_button(b, down);
+                }
+                _ => {}
+            }
+        }
+    });
+}
+
 fn run_script(d: &mut Display) {
     let tick = d.ticks;
+    super::input::TICK.store(tick, std::sync::atomic::Ordering::Relaxed);
+    replay_events(tick);
     for (t, x, y) in d.clicks.clone() {
         if t == tick {
             super::input::mouse_move(x * 2, y);
@@ -370,9 +416,23 @@ fn run_script(d: &mut Display) {
     }
 }
 
+unsafe extern "C" {
+    fn fta_dump_state(path: *const std::ffi::c_char);
+}
+
 /// Test helpers: FTA_SHOT=file.ppm saves the screen after FTA_SHOT_AFTER ticks of 1/50 s (default 1)
 /// and quits; FTA_SECONDS=n quits after n seconds; FTA_FAST=1 skips the 50 Hz pacing.
 fn test_hooks(d: &mut Display) {
+    // FTA_STATE=file writes the game state as text at tick FTA_STATE_AFTER (then quits).
+    if let Some(path) = std::env::var_os("FTA_STATE") {
+        let after: u32 = std::env::var("FTA_STATE_AFTER").ok().and_then(|s| s.parse().ok()).unwrap_or(1);
+        if d.ticks >= after {
+            if let Ok(c) = std::ffi::CString::new(path.as_encoded_bytes()) {
+                unsafe { fta_dump_state(c.as_ptr()) };
+            }
+            std::process::exit(0);
+        }
+    }
     if let Some(path) = std::env::var_os("FTA_SHOT") {
         let after: u32 = std::env::var("FTA_SHOT_AFTER").ok().and_then(|s| s.parse().ok()).unwrap_or(1);
         if d.ticks >= after {

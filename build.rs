@@ -15,6 +15,7 @@ fn main() {
         "asm_text.c",
         "narr_data.c",
         "asm_stubs.c",
+        "statedump.c",
     ];
     let mut b = cc::Build::new();
     for f in files {
