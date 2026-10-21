@@ -15,3 +15,4 @@ build/
 saves/
 dist/
 controls.cfg
+tests/out/

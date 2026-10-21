@@ -748,7 +748,7 @@ open_all()
 			return 1;
 	SETFN(AL_BMAP);		/* allocated the bitmap structures */
 
-	if (i = AllocDiskIO()) return i;
+	if ((i = AllocDiskIO())) return i;
 
 #if 0
 	if ((diskport = CreatePort(0,0))==0) return 30;
@@ -877,9 +877,9 @@ open_all()
 	vp_text.RasInfo = &ri_text;
 	MakeVPort( &v, &vp_text );
 
-	if (audioport = CreatePort(NULL,0))
+	if ((audioport = CreatePort(NULL,0)))
 	{
-		if (ioaudio = (struct IOAudio *)CreateExtIO(audioport,sizeof *ioaudio))
+		if ((ioaudio = (struct IOAudio *)CreateExtIO(audioport,sizeof *ioaudio)))
 		{	UBYTE	data = 0x0f;
 
 			ioaudio->ioa_Data = &data;
@@ -919,7 +919,7 @@ open_all()
 	if ((terra_mem = AllocMem(1024,MEMF_CHIP)) == NULL) return 34;
 	SETFN(AL_TERR);
 
-	if (file = Open("v6",1005))
+	if ((file = Open("v6",1005)))
 	{	Read(file,wavmem,S_WAVBUF);
 		Seek(file,S_WAVBUF,0);
 		Read(file,volmem,S_VOLBUF);
@@ -1432,8 +1432,8 @@ no_intro:
 		else	/* walk */
 		{	if (oldir < 9)
 			{	if (hunger > 120 && !(rand4()))
-				{	if (rand()&1) oldir = (oldir + 1 & 7);
-					else oldir = (oldir - 1 & 7);
+				{	if (rand()&1) oldir = ((oldir + 1) & 7);
+					else oldir = ((oldir - 1) & 7);
 				}
 				anim_list[0].facing = oldir;
 				if (handler_data.qualifier & 0x4000 || keydir)
@@ -1455,7 +1455,6 @@ no_intro:
 
 		if (riding==11) anim_list[0].environ = -2;
 
-		noswan:
 		for (i=0; i<anix; i++)
 		{	short d, e, s, dex, nvx, nvy, nvx1, nvy1;
 			struct missile *ms;
@@ -1702,7 +1701,7 @@ no_intro:
 			else if (s < 9)
 			{	inum = diroffs[d+8];
 				s = an->state = trans_list[s].newstate[rand4()];
-				if (i>2 && s==6 || s==7) s = 8;
+				if ((i>2 && s==6) || s==7) s = 8;
 				dex = s + inum;
 				frustflag = 0;
 				goto cpx;
@@ -1748,7 +1747,6 @@ no_intro:
 				if (an->race == 0x89) leave_item(i,27); /* leave the lasso */
 			}
 
-			sinker:
 			/* j is the Terrain type */
 			if (i==0 && raftprox) k = 0; /* can't drown on raft */
 			else if (j == 0) k = 0;
@@ -1809,7 +1807,7 @@ no_intro:
 					}
 				}
 				else if (k==7 && an->vitality == 0)
-				{	an->state == STILL;
+				{	(void)(an->state == STILL); /* original: a comparison with no effect (an assignment may have been meant); kept as is */
 					dex = 1;
 				}
 			}
@@ -2642,8 +2640,9 @@ find_place(flag) short flag;
 	findagain:
 	j = hero_sector = hero_sector & 255;
 
-	((hero_x>>8) - xreg) & 64;
-	((hero_y>>8) - yreg) & 32;
+	/* original statements with no effect, kept as is */
+	(void)(((hero_x>>8) - xreg) & 64);
+	(void)(((hero_y>>8) - yreg) & 32);
 	if (region_num > 7)
 	{	tbl = inside_tbl; ms = inside_msg; hero_sector += 256; }
 	else { tbl = place_tbl; ms = place_msg; }
@@ -3004,7 +3003,7 @@ struct Interrupt handlerStuff;
 extern struct MsgPort *CreatePort();
 extern struct IOStdReq *CreateStdIO();
 
-extern HandlerInterface();
+extern int HandlerInterface();
 
 add_device()
 {	SHORT error;
@@ -3015,7 +3014,7 @@ add_device()
 	if(inputRequestBlock == 0) { DeletePort(inputDevPort); return FALSE; }
 
 	handlerStuff.is_Data = (APTR)&handler_data;
-	handlerStuff.is_Code = (void (*)())HandlerInterface;
+	handlerStuff.is_Code = (void (*)())(void *)HandlerInterface;
 	handlerStuff.is_Node.ln_Pri = 51;
 
 	error = OpenDevice("input.device",0,(struct IORequest *)inputRequestBlock,0);
@@ -3370,7 +3369,8 @@ do_option(hit) short hit;
 			}
 			switch (k) {
 			case 0: if (kind < 10) speak(35);	/* wizard */
-					else speak(27+an->goal); break;
+					else speak(27+an->goal);
+					break;
 			case 1: /* priest */
 					if (stuff[28])
 					{	if (ob_listg[10].ob_stat==0)
@@ -3397,7 +3397,8 @@ do_option(hit) short hit;
 					break;
 			case 8: if (fatigue < 5) speak(13);
 					else if (dayperiod > 7) speak(12);
-					else speak(14); break;
+					else speak(14);
+					break;
 			case 9: speak(46); break;	/* witch */
 			case 10: speak(47); break;	/* spectre */
 			case 11: speak(49); break;	/* ghost */

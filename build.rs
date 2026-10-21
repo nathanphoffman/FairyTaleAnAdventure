@@ -26,7 +26,22 @@ fn main() {
         .flag("-std=gnu89")
         .flag("-fcommon")
         .flag("-fno-strict-aliasing")
-        .flag("-w")
+        // The old code is built with warnings on. These categories are switched off because the
+        // 1980s K&R style trips them hundreds of times without pointing at real bugs.
+        .flag("-Wall")
+        .flag("-Wextra")
+        .flag("-Wno-implicit-int") // K&R functions without a return type
+        .flag("-Wno-return-type") // K&R functions that return int but fall off the end
+        .flag("-Wno-missing-field-initializers")
+        .flag("-Wno-missing-braces")
+        .flag("-Wno-pointer-sign")
+        .flag("-Wno-char-subscripts")
+        .flag("-Wno-sign-compare")
+        .flag("-Wno-unused-parameter")
+        .flag("-Wno-unused-variable")
+        .flag("-Wno-missing-parameter-type")
+        .flag("-Wno-unused-but-set-variable")
+        .flag("-Wno-implicit-fallthrough")
         // the C file with the game's main() is called from Rust as fta_main()
         .define("main", "fta_main")
         .compile("fta_c");

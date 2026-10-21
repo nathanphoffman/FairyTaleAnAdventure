@@ -57,6 +57,14 @@ cargo run --bin dump_image -- faery-tale-amiga/game/image   # map of the floppy 
 - **Remap keys:** copy `controls.cfg.example` to `controls.cfg` and edit it (`W = Up`).
 - **Esc** closes the window.
 
+## Testing
+
+All headless (no window opens, no sound):
+- `tests/regress.sh` replays scripted sessions (walking, fighting, menus, save/load) and compares screen hashes with `tests/golden.txt`. `--update` accepts new output.
+- `tests/soak.sh [runs] [ticks]` feeds random keys and clicks to an AddressSanitizer build.
+
+Set `SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy` to run the game itself headless, `FTA_FAST=1` to skip the 50 Hz pacing.
+
 ## Packaging
 
 `tools/package.sh` builds a release binary and packs it (no game data) into `dist/`.

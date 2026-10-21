@@ -371,7 +371,7 @@ fn run_script(d: &mut Display) {
 }
 
 /// Test helpers: FTA_SHOT=file.ppm saves the screen after FTA_SHOT_AFTER ticks of 1/50 s (default 1)
-/// and quits; FTA_SECONDS=n quits after n seconds.
+/// and quits; FTA_SECONDS=n quits after n seconds; FTA_FAST=1 skips the 50 Hz pacing.
 fn test_hooks(d: &mut Display) {
     if let Some(path) = std::env::var_os("FTA_SHOT") {
         let after: u32 = std::env::var("FTA_SHOT_AFTER").ok().and_then(|s| s.parse().ok()).unwrap_or(1);
@@ -447,7 +447,10 @@ pub fn wait_frame() {
         Some(wait)
     });
     if let Some(w) = wait {
-        std::thread::sleep(w);
+        // FTA_FAST=1 runs flat out (regression tests); game logic only counts ticks, not time
+        if std::env::var_os("FTA_FAST").is_none() {
+            std::thread::sleep(w);
+        }
         redraw();
     }
 }

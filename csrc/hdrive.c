@@ -33,7 +33,7 @@ int AllocDiskIO()
 {	short	i;
 	BPTR	lock;
 
-	if (lock = Lock("image",ACCESS_READ))
+	if ((lock = Lock("image",ACCESS_READ)))
 	{
 		hdrive = TRUE;
 		UnLock(lock);

@@ -128,7 +128,7 @@ _set_course
 ;	if (mode != 4)
 
 		cmp.b	#4,d3				; if mode 4
-		beq		6$					; then don't do
+		beq		6$					; then do not do
 
 ;	{	if ((xabs>>1) > yabs) ydir = 0;	/* if SMART_SEEK */
 
@@ -763,7 +763,7 @@ read_score()
 	long packlen, sc_load, sc_count;
 	register long i;
 	sc_load = sc_count = 0;
-	if (file = Open("songs",1005))
+	if ((file = Open("songs",1005)))
 	{	for (i=0; i<(4*7); i++)
 		{	Read(file,&packlen,4);
 			/* PORT: the length is stored big-endian */
@@ -836,7 +836,10 @@ flipscan()
 }
 
 skipint()
-{	return skipp = (getkey()==' ');}
+{	/* PORT: once Space has been seen the skip sticks (the original reset it on every poll without a key) */
+	if (getkey()==' ') skipp = 1;
+	return skipp;
+}
 
 /* UBYTE *AllocMem(); */
 
@@ -947,7 +950,7 @@ witch_fx(fp) register struct fpage *fp;
 	sg2 = 0; if (s2 >= 0) sg2 = 1;
 
 	SetDrMd(r,COMPLEMENT);
-	if (myras = AllocRaster(100,100))
+	if ((myras = AllocRaster(100,100)))
 	{	struct TmpRas *oldtmp; struct AreaInfo *oldarea;
 		oldtmp = r->TmpRas;
 		oldarea = r->AreaInfo;
@@ -1717,9 +1720,10 @@ day_fade()
 {	register long ll;
 	if (light_timer) ll = 200; else ll = 0;
 	if ((daynight & 3) == 0 || viewstatus > 97)
-		if (region_num < 8) /* no night inside buildings */
+	{	if (region_num < 8) /* no night inside buildings */
 			 fade_page(lightlevel-80+ll,lightlevel-61,lightlevel-62,TRUE,pagecolors);
 		else fade_page(100,100,100,TRUE,pagecolors);
+	}
 }
 
 extern short leader;

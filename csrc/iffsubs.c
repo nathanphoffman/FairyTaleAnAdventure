@@ -179,11 +179,16 @@ char *filename; struct BitMap *bitmap; short x,y;
 			plane4 = (char *)(bitmap->Planes[4])+bitoffset;
 			compress = bmhd.compression;
 			for (i=0; i<bmhd.height; i++)
-			{	if (bitmap->Depth > 0) unpack_line(plane0); plane0+=bitmap->BytesPerRow;
-				if (bitmap->Depth > 1) unpack_line(plane1); plane1+=bitmap->BytesPerRow;
-				if (bitmap->Depth > 2) unpack_line(plane2); plane2+=bitmap->BytesPerRow;
-				if (bitmap->Depth > 3) unpack_line(plane3); plane3+=bitmap->BytesPerRow;
-				if (bitmap->Depth > 4) unpack_line(plane4); plane4+=bitmap->BytesPerRow;
+			{	if (bitmap->Depth > 0) unpack_line(plane0);
+				plane0+=bitmap->BytesPerRow;
+				if (bitmap->Depth > 1) unpack_line(plane1);
+				plane1+=bitmap->BytesPerRow;
+				if (bitmap->Depth > 2) unpack_line(plane2);
+				plane2+=bitmap->BytesPerRow;
+				if (bitmap->Depth > 3) unpack_line(plane3);
+				plane3+=bitmap->BytesPerRow;
+				if (bitmap->Depth > 4) unpack_line(plane4);
+				plane4+=bitmap->BytesPerRow;
 			}
 			break;
 		}

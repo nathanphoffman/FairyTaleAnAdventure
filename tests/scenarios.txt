@@ -1,0 +1,12 @@
+# name | shot tick | FTA_INJECT | FTA_CLICK
+# Gameplay starts around tick 300 (the skip-intro key is sent by the harness itself).
+start        | 850  |                                  |
+walk_right   | 900  | 700:Right:60                     |
+walk_diag    | 900  | 700:Up:40,700:Left:40            |
+walk_far     | 1500 | 700:Down:200,900:Right:300       |
+fight        | 900  | 700:LCtrl:30                     |
+menu_list    | 800  |                                  | 700:250:166
+menu_game    | 800  |                                  | 700:225:166
+menu_items   | 800  | 700:I:3                          |
+magic_keys   | 900  | 700:F1:3,760:F2:3                |
+pause        | 900  | 700:Space:3                      |
