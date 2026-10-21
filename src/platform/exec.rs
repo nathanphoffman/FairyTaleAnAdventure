@@ -11,7 +11,8 @@ use std::ptr::{addr_of_mut, null_mut};
 #[unsafe(no_mangle)]
 pub extern "C" fn AllocMem(size: ULONG, _flags: ULONG) -> *mut c_void {
     // Always zeroed. Chip vs fast RAM does not exist here.
-    unsafe { libc::calloc(1, (size as usize).max(1)) }
+    // a little slack at the end: the original's blitter code reads a word past some buffers
+    unsafe { libc::calloc(1, size as usize + 128) }
 }
 
 #[unsafe(no_mangle)]

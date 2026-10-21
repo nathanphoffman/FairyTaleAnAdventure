@@ -93,8 +93,9 @@ the game. Routines still stubbed are in `csrc/asm_stubs.c` and print "STUB calle
       (the blitter scroll is now `memmove`). Milestone: the world shows and scrolls when you walk.
 - [x] IFF helpers: `ReadHeader`, `ReadLength`, `unpack_line` (`csrc/asm_port.c`), input (`csrc/input.c`),
       the game's random numbers (`rand`, `rnd`, ...).
-- [ ] Sprites: `make_mask`, `maskit`, `mask_blit`, `shape_blit`, `save_blit`, `rest_blit`,
-      `clear_blit` (hero, enemies and objects do not show yet).
+- [x] Sprites (`csrc/asm_blit.c`): `make_mask`, `maskit`, `mask_blit`, `shape_blit`, `save_blit`,
+      `rest_blit`, `clear_blit`. A small software blitter reproduces what the Amiga blitter did, so
+      the original sprite code runs unchanged. Milestone: the hero shows, walks and animates.
 - [ ] Text and story: `ssp`, `prdec`, `text`, `move`, `placard`, `placard_text`, `question`,
       `msg`, `event`, `speak`, `prq`, `cursor` (the story strings in `narr.asm` become data).
 - [ ] `set_course` (enemy movement), `stuff_flag`, `bigdraw` (overview map), the other inline

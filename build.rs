@@ -11,6 +11,7 @@ fn main() {
         "asm_port.c",
         "input.c",
         "asm_map.c",
+        "asm_blit.c",
         "platform_stubs.c",
         "asm_stubs.c",
     ];

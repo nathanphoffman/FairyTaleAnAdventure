@@ -433,10 +433,7 @@ UBYTE *stuff, julstuff[ARROWBASE], philstuff[ARROWBASE], kevstuff[ARROWBASE];
 
 /* defines the variables for on-screen animated shapes */
 
-struct sshape {
-	unsigned char *backsave;
-	short	savesize, blitsize, Coff, Cmod;
-};
+/* struct sshape is defined in ftale.h */
 
 struct sshape *shp;
 

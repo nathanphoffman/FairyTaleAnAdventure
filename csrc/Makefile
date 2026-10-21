@@ -3,7 +3,7 @@
 CC      = gcc
 CFLAGS  = -std=gnu89 -fcommon -g -O0 -I. -Istubs
 OBJDIR  = ../build/obj
-OBJS    = $(addprefix $(OBJDIR)/,fmain.o fmain2.o iffsubs.o hdrive.o platform_stubs.o asm_stubs.o asm_port.o input.o asm_map.o)
+OBJS    = $(addprefix $(OBJDIR)/,fmain.o fmain2.o iffsubs.o hdrive.o platform_stubs.o asm_stubs.o asm_port.o input.o asm_map.o asm_blit.o)
 
 all: ../build/fta_c
 

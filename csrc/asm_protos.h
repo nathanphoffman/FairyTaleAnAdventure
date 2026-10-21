@@ -19,7 +19,10 @@ long prdec(), text(), move(), ssp(), placard(void), placard_text(), question(), 
 long event(), speak(), msg(), prq();
 void map_draw(void), strip_draw(int x), row_draw(int r), scrollmap(int dir);
 long bigdraw();
-long make_mask(), maskit(), mask_blit(void), shape_blit(void), save_blit(), rest_blit(), clear_blit();
+void make_mask(unsigned char *src, unsigned char *dest, int words, int scans, int chars);
+void maskit(int x, int y, int mod, int ch);
+void mask_blit(void), shape_blit(void);
+void save_blit(unsigned char *savemem), rest_blit(unsigned char *savemem), clear_blit(unsigned char *mem, int size);
 long do_error();
 void ReadHeader(void), ReadLength(void), unpack_line(unsigned char *dest);
 long init_music(), wrap_music(void), setscore(), playscore(), stopscore(void), playsample();

@@ -67,6 +67,11 @@ struct shape {
 /*	APTR	source_struct;	*/ /* address of generating structure */
 };
 
+struct sshape {
+	unsigned char *backsave;
+	short	savesize, blitsize, Coff, Cmod;
+};
+
 struct fpage {
 	struct RasInfo *ri_page;
 	struct cprlist *savecop;

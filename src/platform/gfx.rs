@@ -46,19 +46,27 @@ pub extern "C" fn MakeBitMap(bm: *mut BitMap, depth: LONG, width: LONG, height: 
 pub extern "C" fn UnMakeBitMap(bm: *mut BitMap) {
     let b = unsafe { &mut *bm };
     for p in 0..b.Depth as usize {
-        unsafe { libc::free(b.Planes[p] as *mut c_void) };
+        FreeRaster(b.Planes[p], 0, 0);
         b.Planes[p] = null_mut();
     }
 }
 
+/// Bitplanes get padding on both sides: the blitter routines (csrc/asm_blit.c) read and write a
+/// word or two outside the visible area, as the Amiga's memory allowed.
+const RASTER_PAD: usize = 256;
+
 #[unsafe(no_mangle)]
 pub extern "C" fn AllocRaster(width: ULONG, height: ULONG) -> PLANEPTR {
-    unsafe { libc::calloc(1, bytes_per_row(width as i32) * height as usize) as PLANEPTR }
+    let size = bytes_per_row(width as i32) * height as usize + 2 * RASTER_PAD;
+    let base = unsafe { libc::calloc(1, size) as PLANEPTR };
+    if base.is_null() { base } else { unsafe { base.add(RASTER_PAD) } }
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn FreeRaster(p: PLANEPTR, _w: ULONG, _h: ULONG) {
-    unsafe { libc::free(p as *mut c_void) }
+    if !p.is_null() {
+        unsafe { libc::free(p.sub(RASTER_PAD) as *mut c_void) }
+    }
 }
 
 /// Returns bit `x` of row `y` in a plane.
