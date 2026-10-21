@@ -51,7 +51,7 @@ it exactly if we want the same game behaviour. Wrappers: `bitrand(mask)`, `rand2
 | `bigdraw(map_x, map_y)` | Draws the full-screen overview map: 18 x 9 sectors, each sector drawn as 16 x 8 coloured pixels using the `big_colors` byte (terra byte 3), written to the 5 planes and doubled vertically. Sets `secx` and `secy` |
 | `maskit(x, y, mod, char)` | Copies a tile's 32-line "shadow" mask (`shadow_mem`, 64 bytes per tile) into the sprite's mask buffer so sprites can pass behind scenery (trees, buildings) |
 | `make_mask(src, dest, words, scans, chars)` | For each sprite frame, ANDs all 5 planes together and inverts it, giving a 1-plane mask where colour 31 is transparent. Easy C |
-| `prox(x, y)` | Collision test: terrain at (x+4, y+2) via `px_to_im`; returns 0 if blocked (terrain 1 or >= 10 here, there is also a variant with >= 8) |
+| `prox(x, y)` | Collision test with two probes. Probe 1 is terrain at (x+4, y+2): blocked if the type is 1 or >= 10. Probe 2 is (x-4, y+2): blocked if 1 or >= 8. Returns the blocking type, or 0 if clear |
 | `newx(x, dir, speed)`, `newy(y, dir, speed)` | Move a coordinate in one of 8 directions. `xdir`/`ydir` tables hold -2..3 and the result is `(table * speed) >> 1`, masked to 15 bits. `newy` keeps bit 15 of y |
 | `wrap(x)` | If bit 14 set, set bit 15, else clear bit 15 (wraps the world coordinate into a signed range) |
 | `map_adjust(x, y)` | Camera follow: moves `map_x`/`map_y` toward the hero. If the hero is 70 pixels (24 vertically) from the camera it jumps, if over 20 (10 vertically) it moves 1 pixel per call |

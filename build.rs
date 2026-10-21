@@ -10,6 +10,7 @@ fn main() {
         "layout.c",
         "asm_port.c",
         "input.c",
+        "asm_map.c",
         "platform_stubs.c",
         "asm_stubs.c",
     ];

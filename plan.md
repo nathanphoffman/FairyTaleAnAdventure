@@ -85,12 +85,21 @@ for frames for n seconds (use under gdb to find a stuck loop). When running a te
 timeout use `timeout -s KILL`, SDL catches the normal termination signal.
 
 ### Phase 4 - Rewrite the assembly
-Rewrite in C first (easy to compare), then Rust later with the rest of the game.
-- [ ] `MakeBitMap.asm`
-- [ ] `fsupp.asm`
-- [ ] `fsubs.asm` (largest: map and rendering routines)
-- [ ] `narr.asm` (story text data, likely just becomes a data table)
-- [ ] `gdriver.asm` (music driver, see Phase 5)
+Rewritten in C first (easy to compare with the original), moved to Rust later with the rest of
+the game. Routines still stubbed are in `csrc/asm_stubs.c` and print "STUB called" when used.
+- [x] Map and collision (`csrc/asm_map.c`): `px_to_im`, `prox`, `mapxy`, `genmini`, `newx`,
+      `newy`, `wrap`, `map_adjust`, `page_det`.
+- [x] Map drawing (`csrc/asm_map.c`): `map_draw`, `strip_draw`, `row_draw`, `scrollmap`
+      (the blitter scroll is now `memmove`). Milestone: the world shows and scrolls when you walk.
+- [x] IFF helpers: `ReadHeader`, `ReadLength`, `unpack_line` (`csrc/asm_port.c`), input (`csrc/input.c`),
+      the game's random numbers (`rand`, `rnd`, ...).
+- [ ] Sprites: `make_mask`, `maskit`, `mask_blit`, `shape_blit`, `save_blit`, `rest_blit`,
+      `clear_blit` (hero, enemies and objects do not show yet).
+- [ ] Text and story: `ssp`, `prdec`, `text`, `move`, `placard`, `placard_text`, `question`,
+      `msg`, `event`, `speak`, `prq`, `cursor` (the story strings in `narr.asm` become data).
+- [ ] `set_course` (enemy movement), `stuff_flag`, `bigdraw` (overview map), the other inline
+      assembly in `fmain2.c`.
+- [ ] `gdriver.asm` (music driver): see Phase 5.
 
 ### Phase 5 - Sound
 - [ ] Work out the song and sample format in `game/songs`.

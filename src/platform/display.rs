@@ -252,15 +252,17 @@ fn start_watchdog() {
     });
 }
 
-/// FTA_INJECT="100:Space,200:Return" presses and releases those keys at those 1/50 s ticks.
+/// FTA_INJECT="100:Space,200:Right:60" presses keys at those 1/50 s ticks, held for 4 ticks or
+/// the given number.
 fn parse_script() -> Vec<(u32, String, bool)> {
     let mut script = Vec::new();
     for item in std::env::var("FTA_INJECT").unwrap_or_default().split(',') {
-        if let Some((t, name)) = item.split_once(':') {
-            if let Ok(t) = t.parse::<u32>() {
-                script.push((t, name.to_string(), true));
-                script.push((t + 4, name.to_string(), false));
-            }
+        let mut parts = item.split(':');
+        let (Some(t), Some(name)) = (parts.next(), parts.next()) else { continue };
+        let hold: u32 = parts.next().and_then(|h| h.parse().ok()).unwrap_or(4);
+        if let Ok(t) = t.parse::<u32>() {
+            script.push((t, name.to_string(), true));
+            script.push((t + hold, name.to_string(), false));
         }
     }
     script
