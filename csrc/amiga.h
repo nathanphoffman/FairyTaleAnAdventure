@@ -14,6 +14,13 @@
  * sizes and arithmetic. Make `long` mean 32 bit. Keep this after all system headers. */
 #define long int
 
+/* The game's globals/functions must not share names with libc or the libraries SDL loads:
+ * the executable's symbols win, so a global called `flock` replaced libc's flock() and crashed
+ * Mesa. The game's own rand() is also renamed (it is not the libc one). */
+#define flock fta_flock
+#define j1 fta_j1
+#define rand fta_rand
+
 /* ---- exec/types.h ---- */
 typedef void *APTR;
 typedef int32_t LONG;
