@@ -72,6 +72,15 @@ struct sshape {
 	short	savesize, blitsize, Coff, Cmod;
 };
 
+struct missile {
+	unsigned short	abs_x, abs_y;
+	char	missile_type,	/* NULL, arrow, rock, 'thing', or fireball */
+			time_of_flight, /* in frames? */
+			speed,			/* 0 = still unshot */
+			direction,
+			archer;			/* ID of archer */
+};
+
 struct fpage {
 	struct RasInfo *ri_page;
 	struct cprlist *savecop;

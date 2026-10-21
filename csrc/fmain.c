@@ -75,14 +75,8 @@ unsigned char anim_index[20];		/* for sorting */
 short anix, anix2;			/* allocation index - how many monsters + 1 */
 short mdex;
 
-struct missile {
-	unsigned short	abs_x, abs_y;
-	char	missile_type,	/* NULL, arrow, rock, 'thing', or fireball */
-			time_of_flight, /* in frames? */
-			speed,			/* 0 = still unshot */
-			direction,
-			archer;			/* ID of archer */
-} missile_list[6]; /* six missiles max */
+/* struct missile is defined in ftale.h */
+struct missile missile_list[6]; /* six missiles max */
 
 char	fiery_death;
 
@@ -3617,7 +3611,8 @@ effect(num,speed) short num; long speed;
 }
 
 mod1save()
-{	/* save stuff */
+{	short i;
+	/* save stuff */
 	saveload(julstuff,35);
 	saveload(philstuff,35);
 	saveload(kevstuff,35);
@@ -3625,5 +3620,5 @@ mod1save()
 	stuff = blist[brother-1].stuff;
 
 	/* save missile list - mdex already saved */
-	saveload((void *)missile_list,6 * sizeof (struct missile));
+	for (i=0; i<6; i++) sl_missile(&missile_list[i]);
 }

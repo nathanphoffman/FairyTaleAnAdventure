@@ -61,6 +61,15 @@ pub fn resolve(name: &str, for_write: bool) -> Option<PathBuf> {
             return find_ignore_case(&dir, rest);
         }
     }
+    // game saves (A.faery ...) go to the saves directory, not the data directory
+    if name.to_ascii_lowercase().ends_with(".faery") {
+        let dir = save_dir();
+        if for_write {
+            let _ = std::fs::create_dir_all(&dir);
+            return Some(dir.join(name));
+        }
+        return find_ignore_case(&dir, name);
+    }
     find_ignore_case(&data_dir(), name).or_else(|| {
         if for_write {
             Some(data_dir().join(name))

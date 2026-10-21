@@ -14,6 +14,7 @@
 #define NO_PROTECT
 
 extern unsigned short xreg, yreg;	/* where the region is */
+extern short mdex;
 #ifdef AMIGA_ASM_68K /* PORT: 68000 inline assembly, rewritten in asm_stubs.c for now */
 
 ; shape structure - anim_list
@@ -1485,27 +1486,32 @@ stest:
 	if (svflag) svfile = Open(name,1006);
 	else svfile = Open(name,1005);
 	if (svfile)
-	{	/* save misc variables */
-		saveload((void *)&map_x,80);
+	{	/* PORT: saved field by field in big-endian order (the original dumped raw memory,
+		   which depended on how the 68000 compiler laid out its variables) */
+
+		/* save misc variables */
+		sl_misc();
 
 		/* save region num */
-		saveload((void *)&region_num,2);
+		sl_u16(&region_num);
 
 		/* save anim_list & length */
-		saveload((void *)&anix,6);
-		saveload((void *)anim_list,anix * (sizeof (struct shape)));
+		sl_u16((unsigned short *)&anix); sl_u16((unsigned short *)&anix2); sl_u16((unsigned short *)&mdex);
+		for (i=0; i<anix; i++) sl_shape(&anim_list[i]);
 
 		mod1save();
 
 		/* save extents */
-		saveload((void *)extent_list,2 * sizeof (struct extent));
+		for (i=0; i<2; i++) sl_extent(&extent_list[i]);
 
 		/* save object lists */
-		saveload((void *)ob_listg,glbobs * (sizeof (struct object)));
-		saveload((void *)mapobs,20);
-		saveload((void *)dstobs,20);
+		for (i=0; i<glbobs; i++) sl_object(&ob_listg[i]);
+		for (i=0; i<10; i++) sl_u16((unsigned short *)&mapobs[i]);
+		for (i=0; i<10; i++) sl_u16((unsigned short *)&dstobs[i]);
 		for (i=0; i<10; i++)
-			saveload((void *)ob_table[i],mapobs[i] * (sizeof (struct object)));
+		{	long k;
+			for (k=0; k<mapobs[i]; k++) sl_object(&ob_table[i][k]);
+		}
 
 		Close(svfile);
 	}
@@ -1537,6 +1543,81 @@ saveload(buffer,length) char *buffer; long length;
 	if (svflag) err = Write(svfile,buffer,length);
 	else err = Read(svfile,buffer,length);
 	if (err < 0) sverr = IoErr();
+}
+
+/* ---- save game fields: written and read in big-endian order ---- */
+
+sl_u8(v) unsigned char *v;
+{	saveload((char *)v,1);
+}
+
+sl_u16(v) unsigned short *v;
+{	unsigned char b[2];
+	if (svflag)
+	{	b[0] = *v >> 8; b[1] = *v & 0xff;
+		saveload((char *)b,2);
+	}
+	else
+	{	saveload((char *)b,2);
+		*v = (b[0] << 8) | b[1];
+	}
+}
+
+extern short cheat1, riding, flying, wcarry, turtleprox, raftprox, brave, luck, kind, wealth,
+	hunger, fatigue, brother, princess, hero_sector, actor_file, set_file, active_carrier,
+	leader, secret_timer, light_timer, freeze_timer, cmode;
+extern unsigned short map_x, map_y, hero_x, hero_y, safe_x, safe_y, safe_r, img_x, img_y,
+	hero_place, daynight, lightlevel;
+extern unsigned short pad1, pad2, pad3;
+extern short mdex;
+
+/* the 40 variables the original saved as one 80 byte block, in that order */
+sl_misc()
+{	unsigned short *v[40];
+	short i;
+	v[0] = &map_x; v[1] = &map_y; v[2] = &hero_x; v[3] = &hero_y;
+	v[4] = &safe_x; v[5] = &safe_y; v[6] = &safe_r; v[7] = &img_x; v[8] = &img_y;
+	v[9] = (unsigned short *)&cheat1; v[10] = (unsigned short *)&riding;
+	v[11] = (unsigned short *)&flying; v[12] = (unsigned short *)&wcarry;
+	v[13] = (unsigned short *)&turtleprox; v[14] = (unsigned short *)&raftprox;
+	v[15] = (unsigned short *)&brave; v[16] = (unsigned short *)&luck;
+	v[17] = (unsigned short *)&kind; v[18] = (unsigned short *)&wealth;
+	v[19] = (unsigned short *)&hunger; v[20] = (unsigned short *)&fatigue;
+	v[21] = (unsigned short *)&brother; v[22] = (unsigned short *)&princess;
+	v[23] = (unsigned short *)&hero_sector; v[24] = &hero_place;
+	v[25] = &daynight; v[26] = &lightlevel;
+	v[27] = (unsigned short *)&actor_file; v[28] = (unsigned short *)&set_file;
+	v[29] = (unsigned short *)&active_carrier; v[30] = (unsigned short *)&xtype;
+	v[31] = (unsigned short *)&leader; v[32] = (unsigned short *)&secret_timer;
+	v[33] = (unsigned short *)&light_timer; v[34] = (unsigned short *)&freeze_timer;
+	v[35] = (unsigned short *)&cmode; v[36] = (unsigned short *)&encounter_type;
+	v[37] = &pad1; v[38] = &pad2; v[39] = &pad3;
+	for (i=0; i<40; i++) sl_u16(v[i]);
+}
+
+sl_shape(a) struct shape *a;
+{	sl_u16(&a->abs_x); sl_u16(&a->abs_y); sl_u16(&a->rel_x); sl_u16(&a->rel_y);
+	sl_u8(&a->type); sl_u8(&a->race); sl_u8(&a->index); sl_u8(&a->visible);
+	sl_u8(&a->weapon); sl_u8(&a->environ); sl_u8(&a->goal); sl_u8(&a->tactic);
+	sl_u8(&a->state); sl_u8(&a->facing);
+	sl_u16((unsigned short *)&a->vitality);
+	sl_u8(&a->vel_x); sl_u8(&a->vel_y);
+}
+
+sl_extent(e) struct extent *e;
+{	sl_u16(&e->x1); sl_u16(&e->y1); sl_u16(&e->x2); sl_u16(&e->y2);
+	sl_u8(&e->etype); sl_u8(&e->v1); sl_u8(&e->v2); sl_u8(&e->v3);
+}
+
+sl_object(o) struct object *o;
+{	sl_u16(&o->xc); sl_u16(&o->yc);
+	sl_u8(&o->ob_id); sl_u8(&o->ob_stat);
+}
+
+sl_missile(m) struct missile *m;
+{	sl_u16(&m->abs_x); sl_u16(&m->abs_y);
+	sl_u8(&m->missile_type); sl_u8(&m->time_of_flight); sl_u8(&m->speed);
+	sl_u8(&m->direction); sl_u8(&m->archer);
 }
 
 move_extent(e,x,y) short e,x,y;

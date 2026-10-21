@@ -41,6 +41,8 @@ struct Display {
     ticks: u32,
     /// scripted input for tests: (tick, key name, pressed)
     script: Vec<(u32, String, bool)>,
+    /// scripted mouse clicks for tests: (tick, x in lores pixels, y)
+    clicks: Vec<(u32, i32, i32)>,
 }
 
 thread_local! {
@@ -82,6 +84,7 @@ pub fn init() -> Result<(), String> {
             started: Instant::now(),
             presents: 0,
             ticks: 0,
+            clicks: parse_clicks(),
             script: {
                 let mut script = parse_script();
                 if SKIP_INTRO.load(Ordering::Relaxed) {
@@ -282,8 +285,29 @@ fn parse_script() -> Vec<(u32, String, bool)> {
     script
 }
 
+/// FTA_CLICK="200:225:166,260:225:184" clicks the left button at those ticks and positions
+/// (x in 320 wide lores pixels, y in screen lines).
+fn parse_clicks() -> Vec<(u32, i32, i32)> {
+    std::env::var("FTA_CLICK")
+        .unwrap_or_default()
+        .split(',')
+        .filter_map(|item| {
+            let mut p = item.split(':').map(|v| v.parse::<i32>().ok());
+            Some((p.next()?? as u32, p.next()??, p.next()??))
+        })
+        .collect()
+}
+
 fn run_script(d: &mut Display) {
     let tick = d.ticks;
+    for (t, x, y) in d.clicks.clone() {
+        if t == tick {
+            super::input::mouse_move(x * 2, y);
+            super::input::mouse_button(sdl2::mouse::MouseButton::Left, true);
+        } else if t + 3 == tick {
+            super::input::mouse_button(sdl2::mouse::MouseButton::Left, false);
+        }
+    }
     for (t, name, down) in d.script.clone() {
         if t == tick {
             if let Some(k) = sdl2::keyboard::Keycode::from_name(&name) {

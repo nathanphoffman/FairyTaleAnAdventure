@@ -119,12 +119,19 @@ the game. Routines still stubbed are in `csrc/asm_stubs.c` and print "STUB calle
       whether the Amiga's low-pass filter should be imitated.
 
 ### Phase 6 - First playable build
-- [ ] Title screen shows correctly.
-- [ ] Game starts, the map renders and scrolling works.
-- [ ] Player moves, input works.
-- [ ] Combat, items, dialogue, save/load.
-- [ ] Music and effects.
-- [ ] Fix byte-order bugs as they show up.
+- [x] Title screen, intro, game start, map and scrolling.
+- [x] Player moves, input works (keyboard and mouse).
+- [x] Music and effects.
+- [x] Save and load (`csrc/fmain2.c`, `sl_*`): rewritten to save field by field in big-endian
+      order, so it no longer depends on how variables sit in memory. Files go to `saves/`
+      (`A.faery` ...). Checked by saving after walking, then loading in a fresh run: the map area
+      came out pixel-identical. Save files are the same size as the original's (about 1.2K).
+- [ ] Combat, items, shops, dialogue, doors and caves: needs playtesting.
+- [ ] Sweep for other leftovers of the 32-bit Amiga (pointers stored in ints, raw struct dumps,
+      raw multi-byte reads from files). Fix byte-order bugs as they show up.
+- [ ] Test helpers: `FTA_CLICK="tick:x:y,..."` clicks the left button (x in 0-319, y in screen
+      lines); `FTA_INJECT` presses keys. Gameplay starts around tick 300, and the Game menu items
+      are at x 225/250 and y 148 + 9 * row.
 
 ### Phase 7 - Port C to Rust
 Move modules one at a time, with the game runnable after each one. Rough order, easiest first:

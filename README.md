@@ -44,6 +44,10 @@ cargo run -- --intro                        # plays the story-book intro first
 cargo run --bin dump_image -- faery-tale-amiga/game/image   # map of the floppy image
 ```
 
+## Saving
+
+Saves go in `saves/` (git-ignored) as `A.faery` ... `H.faery`. Use Game, Quit, Save.
+
 ## Legal
 
 The original source is released by its author under an MIT-style license, but the copyright status

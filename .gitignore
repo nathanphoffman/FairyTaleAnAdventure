@@ -10,3 +10,6 @@ build/
 # Added by cargo
 
 /target
+
+# Game saves
+saves/
