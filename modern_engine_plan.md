@@ -44,8 +44,7 @@ games/  original  improved  remastered  reimagined
 - [ ] Targeted scenarios for shops, talking, dying, brother swap, swan/turtle (need map positions).
 - [x] Record and replay: `FTA_RECORD=file` logs keys and mouse; `FTA_REPLAY=file` repeats them.
       Checked: replay gives an identical state file.
-- [ ] `regress.sh` golden pixel hashes are stale: 7 of 9 scenarios differ even on the last commit.
-      Needs a decision on whether the current output is right, then `--update`.
+- [x] `regress.sh` golden pixel hashes were stale (they failed on the previous commit too); screens checked by eye, hashes updated. `soak.sh` passes.
 
 ### 2. Cut `main()` into functions (still C, no behaviour change)
 Input, hero update, actor update, combat, spawning, render, menus. Run tests after each cut.
