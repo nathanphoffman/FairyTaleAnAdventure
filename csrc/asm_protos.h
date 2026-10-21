@@ -28,7 +28,11 @@ void mask_blit(void), shape_blit(void);
 void save_blit(unsigned char *savemem), rest_blit(unsigned char *savemem), clear_blit(unsigned char *mem, int size);
 void do_error(long n);
 void ReadHeader(void), ReadLength(void), unpack_line(unsigned char *dest);
-long init_music(), wrap_music(void), setscore(), playscore(), stopscore(void), playsample();
+void init_music(short *ins, unsigned char *wav, unsigned char *vol);
+void wrap_music(void), stopscore(void);
+void setscore(unsigned char *t1, unsigned char *t2, unsigned char *t3, unsigned char *t4);
+void playscore(unsigned char *t1, unsigned char *t2, unsigned char *t3, unsigned char *t4);
+void playsample(unsigned char *data, long len, long period);
 long MakeBitMap(), UnMakeBitMap();
 
 /* more Amiga library calls (platform layer) */

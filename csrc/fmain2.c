@@ -765,6 +765,8 @@ read_score()
 	if (file = Open("songs",1005))
 	{	for (i=0; i<(4*7); i++)
 		{	Read(file,&packlen,4);
+			/* PORT: the length is stored big-endian */
+			packlen = (long)((((unsigned long)packlen & 0xff) << 24) | (((unsigned long)packlen & 0xff00) << 8) | (((unsigned long)packlen >> 8) & 0xff00) | ((unsigned long)packlen >> 24));
 			if ((packlen*2 + sc_load) > 5900) break;
 			track[sc_count] = scoremem + sc_load;
 			sc_count++;

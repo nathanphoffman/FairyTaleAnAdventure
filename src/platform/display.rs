@@ -59,6 +59,10 @@ pub fn init() -> Result<(), String> {
     let creator = canvas.texture_creator();
     let events = sdl.event_pump()?;
     sdl.mouse().show_cursor(false); // the game draws its own pointer
+    match sdl.audio() {
+        Ok(audio) => super::audio::init(&audio),
+        Err(e) => eprintln!("No audio: {e}"),
+    }
     std::mem::forget(sdl);
     std::mem::forget(video);
     DISPLAY.with(|d| {
@@ -286,11 +290,13 @@ fn test_hooks(d: &mut Display) {
                 out.extend_from_slice(&[(px >> 16) as u8, (px >> 8) as u8, *px as u8]);
             }
             let _ = std::fs::write(path, out);
+            super::audio::dump();
             std::process::exit(0);
         }
     }
     if let Some(secs) = std::env::var("FTA_SECONDS").ok().and_then(|s| s.parse::<u64>().ok()) {
         if d.started.elapsed().as_secs() >= secs {
+            super::audio::dump();
             std::process::exit(0);
         }
     }

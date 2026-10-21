@@ -107,9 +107,16 @@ the game. Routines still stubbed are in `csrc/asm_stubs.c` and print "STUB calle
       input handler hooks (`HandlerInterface`, `trapper`), which are not needed.
 
 ### Phase 5 - Sound
-- [ ] Work out the song and sample format in `game/songs`.
-- [ ] Write a player in Rust that mixes the channels and plays through SDL audio.
-- [ ] Add sound effects.
+- [x] Song and instrument formats worked out (`docs/data-formats.md`).
+- [x] Music player in Rust (`src/platform/audio.rs`): an SDL audio callback runs the four-voice
+      sequencer at 60 Hz (the vertical blank of the original) and mixes the four channels, with
+      voices 1 and 4 on the left and 2 and 3 on the right as on the Amiga.
+- [x] Sound effects: one-shot samples on voice 2, which pauses that music voice meanwhile.
+- [x] Fixed a big-endian bug that made the game load no songs (`read_score`).
+- [x] Test helper: `FTA_AUDIO_DUMP=file.wav` writes the mixed audio (with `FTA_SECONDS=n`).
+- [ ] Checked by measuring the output (notes, harmonics, levels), not yet by ear. Things that may
+      need tuning: overall volume, tempo (the original ran at the TV's 60 Hz or 50 Hz), and
+      whether the Amiga's low-pass filter should be imitated.
 
 ### Phase 6 - First playable build
 - [ ] Title screen shows correctly.
