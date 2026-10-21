@@ -12,6 +12,8 @@ fn main() {
         "input.c",
         "asm_map.c",
         "asm_blit.c",
+        "asm_text.c",
+        "narr_data.c",
         "platform_stubs.c",
         "asm_stubs.c",
     ];

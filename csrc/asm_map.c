@@ -259,3 +259,52 @@ void scrollmap(int dir)
 		}
 	}
 }
+
+/* bigdraw(map_x, map_y): the overview map (magic spell): each sector is drawn as 16 x 16 pixels,
+ * 18 x 9 sectors on the screen. Each pixel's colour is the tile's overview colour (terra byte 3).
+ * secx / secy tell the caller which sector is at the top left. */
+extern long secx, secy;
+
+void bigdraw(int mx, int my)
+{
+	short x = (short)(((unsigned short)mx >> 8) - 9 - xreg);
+	short y = (short)(((unsigned short)my >> 8) - 4 - yreg);
+	long offset = 0;
+	int i, j;
+
+	if (x < 32) x += 128;
+	if (x > 96) x -= 128;
+	if (y < 32) y += 128;
+	if (y > 96) y -= 128;
+	if (x < 0) x = 0;
+	if (x > 64 - 18) x = 64 - 18;
+	if (y < 0) y = 0;
+	if (y > 32 - 9) y = 32 - 9;
+	secx = x;
+	secy = y;
+
+	for (j = 0; j < 9; j++)
+	{	for (i = 0; i < 18; i++)
+		{	unsigned char sec = map_mem[(unsigned short)(xreg + x + i + ((y + j) << 7))];
+			unsigned char *tiles = sector_mem + sec * 128;
+			int line, px, p;
+
+			for (line = 0; line < 8; line++)
+			{	unsigned int word[5] = { 0, 0, 0, 0, 0 };
+
+				for (px = 0; px < 16; px++)
+				{	unsigned char color = terra_mem[tiles[line * 16 + px] * 4 + 3];
+					for (p = 0; p < 5; p++)
+						word[p] = (word[p] << 1) | ((color >> p) & 1);
+				}
+				for (p = 0; p < 5; p++)
+				{	unsigned char *d = planes[p] + offset + line * 80;
+					d[0] = d[40] = word[p] >> 8;
+					d[1] = d[41] = word[p];
+				}
+			}
+			offset += 2;
+		}
+		offset += (40 * 15) + 4;
+	}
+}

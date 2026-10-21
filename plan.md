@@ -96,11 +96,15 @@ the game. Routines still stubbed are in `csrc/asm_stubs.c` and print "STUB calle
 - [x] Sprites (`csrc/asm_blit.c`): `make_mask`, `maskit`, `mask_blit`, `shape_blit`, `save_blit`,
       `rest_blit`, `clear_blit`. A small software blitter reproduces what the Amiga blitter did, so
       the original sprite code runs unchanged. Milestone: the hero shows, walks and animates.
-- [ ] Text and story: `ssp`, `prdec`, `text`, `move`, `placard`, `placard_text`, `question`,
-      `msg`, `event`, `speak`, `prq`, `cursor` (the story strings in `narr.asm` become data).
-- [ ] `set_course` (enemy movement), `stuff_flag`, `bigdraw` (overview map), the other inline
-      assembly in `fmain2.c`.
-- [ ] `gdriver.asm` (music driver): see Phase 5.
+- [x] Text and story (`csrc/asm_text.c`): `ssp`, `prdec`, `text`, `move`, `placard`,
+      `placard_text`, `question`, `msg`, `event`, `speak`, `prq`, `cursor`. The story strings and
+      tables from `narr.asm` (plus the title text and compass graphics from `fsubs.asm`) are
+      converted to C data by `tools/narr2c.py` into `csrc/narr_data.c`. Milestone: messages
+      and the status line show in the panel.
+- [x] `set_course` (enemy steering), `stuff_flag`, `bigdraw` (overview map), `do_error`.
+- [ ] Still stubbed in `csrc/asm_stubs.c`: the music and sound routines (`init_music`,
+      `playscore`, `setscore`, `stopscore`, `playsample`, `wrap_music`; Phase 5) and the Amiga
+      input handler hooks (`HandlerInterface`, `trapper`), which are not needed.
 
 ### Phase 5 - Sound
 - [ ] Work out the song and sample format in `game/songs`.

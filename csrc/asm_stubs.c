@@ -13,36 +13,16 @@ static void stub_called(const char *name)
 }
 #define STUB(name) long name() { stub_called(#name); return 0; }
 
-STUB(bigdraw)
-STUB(cursor)
-STUB(do_error)
-STUB(event)
 STUB(init_music)
-STUB(move)
-STUB(msg)
-STUB(placard)
 STUB(playsample)
 STUB(playscore)
-STUB(prdec)
-STUB(prq)
-STUB(set_course)
 STUB(setscore)
-STUB(speak)
-STUB(ssp)
 STUB(stopscore)
-STUB(stuff_flag)
-STUB(text)
 STUB(trapper)
 STUB(wrap_music)
-STUB(placard_text)
-STUB(question)
 STUB(HandlerInterface)
 
 /* Data that the assembly files define. Real contents come from narr.asm / fsubs.asm later. */
-unsigned char hinor[16 * 16], hivar[16 * 16];
-unsigned char place_tbl[512], inside_tbl[512];
-char place_msg[4096], inside_msg[4096];
-char titletext[256];
 void *WBenchMsg;
 
 /* The game's own random number generator (fsubs.asm). Must match exactly, and must replace the
