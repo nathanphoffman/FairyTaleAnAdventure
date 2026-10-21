@@ -118,6 +118,20 @@ Move modules one at a time, with the game runnable after each one. Rough order, 
 - [ ] Remove leftover Amiga stand-ins.
 - [ ] Packaging and how to supply game data.
 
+### Phase 9 - Reusable engine (stretch goal)
+Turn the port into a modern engine that runs this game, and could run other games too.
+- [ ] Split engine from game: world and tile map, scrolling, sprites and masking, input,
+      audio, menus and text, save system go in an engine crate; the Faery Tale rules, item and
+      enemy tables and story text stay in a game crate.
+- [ ] Replace Amiga-shaped data in the engine with plain, documented types (RGB colors and
+      chunky pixel buffers instead of 12 bit palettes and bitplanes) while still loading the
+      original planar data files.
+- [ ] Move game data (map regions, item tables, enemy tables, text) out of code into data files.
+- [ ] Write documentation and a small example game on the engine, with its own placeholder assets.
+- [ ] Keep the original game's assets out of the repo: players supply their own copy of the
+      data files. The code is covered by the original author's MIT-style license, so keep their
+      license notice and credit in the repo. The copyright status of the original game data is unclear.
+
 ## Risks
 
 - The graphics code is tied to Amiga bitplanes and hardware tricks (split screens, sprites, copper
