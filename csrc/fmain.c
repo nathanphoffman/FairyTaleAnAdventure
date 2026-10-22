@@ -1204,6 +1204,90 @@ static void handle_key(key, notpause) char key; short notpause;
 	}
 }
 
+/* PORT: split out of main(): timers, then the hero's state from the controls (dead/falling and the
+   good fairy, shooting, riding, fighting, walking). cycle is the main loop's frame counter. */
+static void update_hero(cycle) short cycle;
+{	short inum, dif_x, dif_y;
+	unsigned short ytest;
+	struct shape *an;
+	extern unsigned char fta_pia;
+	BYTE *pia = (BYTE *)&fta_pia;	/* PORT: was the CIA register at 0xbfe001 */
+
+	if (light_timer) light_timer--;
+	if (secret_timer) secret_timer--;
+	if (freeze_timer) freeze_timer--;
+
+	fiery_death =
+		(map_x>8802 && map_x<13562 && map_y>24744 && map_y<29544);
+
+	inum = anim_list[0].state;
+	if (inum == DEAD || inum==FALL)
+	{	if (goodfairy == 1) { revive(FALSE); inum = STILL; }
+		else if (--goodfairy < 20) ; /* do ressurection effect/glow */
+		else if (luck<1 && goodfairy<200) { revive(TRUE); inum = STILL; }
+		else if (anim_list[0].state == FALL && goodfairy<200)
+		{	revive(FALSE); inum = STILL; }
+		else if (goodfairy < 120)
+		{	an = anim_list + 3;
+			anix = 4;
+			an->abs_x = hero_x + goodfairy*2 - 20;
+			an->abs_y = hero_y;
+			an->type = OBJECTS;
+			an->index = 100 + (cycle & 1);
+			an->state = STILL;
+			an->weapon = an->environ = 0;
+			an->race = 0xff;
+			actors_on_screen = TRUE;
+			battleflag = FALSE;
+		}
+	}
+	else if (inum==DYING || inum==SINK || inum == SLEEP);
+	else if (handler_data.qualifier&0x2000||keyfight||(*pia&(128))==0)
+	{	dif_x = anim_list[0].vel_x;
+		dif_y = anim_list[0].vel_y;
+		if (xtype > 80)
+		{	if (inum != SHOOT1 && xtype == 81) event(15);
+			if (inum != SHOOT1 && xtype == 82) event(16);
+			inum = SHOOT1;
+		}
+		else if (riding==11)
+		{	if (fiery_death) event(32);
+			else if (dif_x>-15 && dif_x<15 && dif_y>-15 && dif_y<15)
+			{	ytest = anim_list[0].abs_y - 14;
+				if (proxcheck(anim_list[0].abs_x,ytest,0)==0 &&
+					proxcheck(anim_list[0].abs_x,ytest+10,0)==0)
+				{	riding = 0;			/* dismount */
+					anim_list[0].abs_y = ytest;
+				}
+			}
+			else event(33);
+		}
+		else
+		{	if (oldir < 9) anim_list[0].facing = oldir;
+			if (inum >= WALKING)
+			{	if (anim_list[0].weapon == 4) inum = SHOOT1;
+				else if (anim_list[0].weapon == 5)
+				{	if (inum < SHOOT1) inum = SHOOT1;	}
+				else inum = FIGHTING;
+			}
+		}
+	}
+	else if (inum == SHOOT1) inum = SHOOT3; /* release */
+	else	/* walk */
+	{	if (oldir < 9)
+		{	if (hunger > 120 && !(rand4()))
+			{	if (rand()&1) oldir = ((oldir + 1) & 7);
+				else oldir = ((oldir - 1) & 7);
+			}
+			anim_list[0].facing = oldir;
+			if (handler_data.qualifier & 0x4000 || keydir)
+				inum = WALKING;
+		}
+		else inum = STILL;
+	}
+	anim_list[0].state = inum;
+}
+
 void main(int argc,char argv[])
 {	register long i;
 	short j, k; char key;
@@ -1377,79 +1461,7 @@ no_intro:
 
 		if (menus[GAME].enabled[5] & 1) { Delay(1); continue; }
 
-		if (light_timer) light_timer--;
-		if (secret_timer) secret_timer--;
-		if (freeze_timer) freeze_timer--;
-
-		fiery_death =
-			(map_x>8802 && map_x<13562 && map_y>24744 && map_y<29544);
-
-		inum = anim_list[0].state;
-		if (inum == DEAD || inum==FALL)
-		{	if (goodfairy == 1) { revive(FALSE); inum = STILL; }
-			else if (--goodfairy < 20) ; /* do ressurection effect/glow */
-			else if (luck<1 && goodfairy<200) { revive(TRUE); inum = STILL; }
-			else if (anim_list[0].state == FALL && goodfairy<200)
-			{	revive(FALSE); inum = STILL; }
-			else if (goodfairy < 120)
-			{	an = anim_list + 3;
-				anix = 4;
-				an->abs_x = hero_x + goodfairy*2 - 20;
-				an->abs_y = hero_y;
-				an->type = OBJECTS;
-				an->index = 100 + (cycle & 1);
-				an->state = STILL;
-				an->weapon = an->environ = 0;
-				an->race = 0xff;
-				actors_on_screen = TRUE;
-				battleflag = FALSE;
-			}
-		}
-		else if (inum==DYING || inum==SINK || inum == SLEEP);
-		else if (handler_data.qualifier&0x2000||keyfight||(*pia&(128))==0)
-		{	dif_x = anim_list[0].vel_x;
-			dif_y = anim_list[0].vel_y;
-			if (xtype > 80)
-			{	if (inum != SHOOT1 && xtype == 81) event(15);
-				if (inum != SHOOT1 && xtype == 82) event(16);
-				inum = SHOOT1;
-			}
-			else if (riding==11)
-			{	if (fiery_death) event(32);
-				else if (dif_x>-15 && dif_x<15 && dif_y>-15 && dif_y<15)
-				{	ytest = anim_list[0].abs_y - 14;
-					if (proxcheck(anim_list[0].abs_x,ytest,0)==0 &&
-						proxcheck(anim_list[0].abs_x,ytest+10,0)==0)
-					{	riding = 0;			/* dismount */
-						anim_list[0].abs_y = ytest;
-					}
-				}
-				else event(33);
-			}
-			else
-			{	if (oldir < 9) anim_list[0].facing = oldir;
-				if (inum >= WALKING)
-				{	if (anim_list[0].weapon == 4) inum = SHOOT1;
-					else if (anim_list[0].weapon == 5)
-					{	if (inum < SHOOT1) inum = SHOOT1;	}
-					else inum = FIGHTING;
-				}
-			}
-		}
-		else if (inum == SHOOT1) inum = SHOOT3; /* release */
-		else	/* walk */
-		{	if (oldir < 9)
-			{	if (hunger > 120 && !(rand4()))
-				{	if (rand()&1) oldir = ((oldir + 1) & 7);
-					else oldir = ((oldir - 1) & 7);
-				}
-				anim_list[0].facing = oldir;
-				if (handler_data.qualifier & 0x4000 || keydir)
-					inum = WALKING;
-			}
-			else inum = STILL;
-		}
-		anim_list[0].state = inum;
+		update_hero(cycle);
 
 		/* determine the monster and character motion effects */
 		raftprox = turtleprox = FALSE;

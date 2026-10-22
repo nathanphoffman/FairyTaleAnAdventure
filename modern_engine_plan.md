@@ -52,7 +52,8 @@ games/  original  improved  remastered  reimagined
 ### 2. Cut `main()` into functions (still C, no behaviour change)
 Input, hero update, actor update, combat, spawning, render, menus. Run tests after each cut.
 - [x] `handle_key` (key and menu handling at the top of the loop). State and pixel tests unchanged.
-- [ ] controls, monster and hero motion, bed/doors/map, drawing, missiles and scroll.
+- [x] `update_hero` (timers, dead/fairy, shoot/ride/fight/walk state). Tests unchanged.
+- [ ] monster and hero motion, bed/doors/map, drawing, missiles and scroll.
 
 ### 3. Gather the game state into structs
 Hero, world, actors, inventory, time. Clear split between rules state and drawing state.
