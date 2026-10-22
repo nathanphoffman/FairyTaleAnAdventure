@@ -136,8 +136,14 @@ the game. Routines still stubbed are in `csrc/asm_stubs.c` and print "STUB calle
 - [ ] Test helpers: `FTA_CLICK="tick:x:y,..."` clicks the left button (x in 0-319, y in screen
       lines); `FTA_INJECT` presses keys. Gameplay starts around tick 300, and the Game menu items
       are at x 225/250 and y 148 + 9 * row.
+- [x] More test helpers (see `modern_engine_plan.md`, step 1): `FTA_STATE=file FTA_STATE_AFTER=tick`
+      writes the game state as text (compare with `tests/state_regress.sh`);
+      `FTA_CMD="tick:tp:x:y,tick:kill:luck"` teleports or kills the hero;
+      `FTA_RECORD=file` logs input and `FTA_REPLAY=file` plays it back.
 
 ### Phase 7 - Port C to Rust
+Superseded by `modern_engine_plan.md` (steps 2-4), which first cuts `main()` into functions and
+gathers the state into structs, then ports the rules to Rust. Keep this list as a rough guide.
 Move modules one at a time, with the game runnable after each one. Rough order, easiest first:
 - [ ] `text.c`, `terrain.c`, `iffsubs.c`
 - [ ] `hdrive.c`, `rtrack.c`, `mtrack.c`
@@ -151,6 +157,8 @@ Move modules one at a time, with the game runnable after each one. Rough order, 
 - [x] Packaging and how to supply game data.
 
 ### Phase 9 - Reusable engine (stretch goal)
+Now planned in `modern_engine_plan.md` (two engines, four games: original, improved, remastered,
+reimagined). This list is the older, more general version.
 Turn the port into a modern engine that runs this game, and could run other games too.
 - [ ] Split engine from game: world and tile map, scrolling, sprites and masking, input,
       audio, menus and text, save system go in an engine crate; the Faery Tale rules, item and

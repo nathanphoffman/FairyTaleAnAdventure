@@ -9,6 +9,9 @@ Goal: four games from one project, on two engines.
 | remastered | modern | New UI, bigger view (zoomed out), most logic in Rust. |
 | reimagined | modern | Remastered plus new content: spells, items, tweaks. |
 
+Safety: git tag `original-baseline` marks the classic C game as it was before this work. See what
+changed in the C code since then with `git diff original-baseline -- csrc/`.
+
 Core idea: split the game into **rules** (what happens) and **presentation** (drawing and input).
 Both engines share the rules. They differ only in how they draw and read input.
 
