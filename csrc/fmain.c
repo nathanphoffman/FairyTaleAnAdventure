@@ -1117,6 +1117,93 @@ found:
 
 extern char titletext[];
 
+/* PORT: split out of main(): handles one key code from the key buffer (menus, direction keys,
+   fight key, debug keys). notpause is TRUE unless the game is paused. */
+static void handle_key(key, notpause) char key; short notpause;
+{	short inum = 0, atype;	/* inum started uninitialised in main(); it is assigned before use */
+	register long i;
+
+	if (viewstatus && notpause)
+	{	if ((key & 0x80) == 0) viewstatus = 99; }
+	else if (anim_list[0].state == DEAD) ; /* MAYBE */
+	else if (key >= 20 && key <= 29)
+	{	keydir = key;	}
+	else if ((key & 0x7f) == keydir) keydir = 0;
+	else if (key == '0') keyfight = TRUE;
+	else if ((key & 0x7f) == '0') keyfight = FALSE;
+
+	else if (key == 'B' && cheat1)
+	{	if (active_carrier == 11) stuff[5] = 1;
+		move_extent(0,hero_x+20,hero_y+20);
+		load_carrier(11);
+	}
+	else if (key == '.' && cheat1)
+		{	stuff[rnd(GOLDBASE)]+=3; set_options(); stuff[22]=0; }
+	else if ((key & 0x7f) >= 0x61)
+	{	if (inum > 11) inum = 11;
+		if (inum < 0) inum = 0;
+		inum = (key&0x7f) - 0x61;
+		hit = real_options[inum];
+		if (key & 0x80)	/* up mouse */
+		{	if (hit >= 0 && hit < menus[cmode].num) propt(inum,0); }
+		else	/* down mouse */
+		{	hitgo = TRUE;
+			if (hit >= 0 && hit < menus[cmode].num)
+			{	atype = menus[cmode].enabled[hit] & 0xfc;
+				if (atype != 8) handler_data.lastmenu = 0;
+				if (atype == 4)
+				{	menus[cmode].enabled[hit] ^= 1;
+					propt(inum,menus[cmode].enabled[hit] & 1);
+					do_option(hit);
+				}
+				else if (atype == 8)
+				{	propt(inum,1);
+					do_option(hit);
+				}
+				else if (atype == 12)
+				{	menus[cmode].enabled[hit] |= 1;
+					propt(inum,1);
+					do_option(hit);
+				}		/* go to different 'BUY' menus?? */
+				else if (!notpause);
+				else if (atype == 0 && hit < 5) { cmode = hit; prq(5); }
+				else propt(inum,menus[cmode].enabled[hit] & 1);
+			}
+		}
+	}
+
+	else if (key == 'R' && cheat1) rescue();
+	else if (key == '=' && cheat1) prq(2);
+	else if (key == 19 && cheat1) prq(3);
+	else if (key == 18 && cheat1) daynight += 1000;
+	else if (key == 1 && cheat1) { anim_list[0].abs_y -= 150; map_y -= 150; }
+	else if (key == 2 && cheat1) { anim_list[0].abs_y += 150; map_y += 150; }
+	else if (key == 3 && cheat1) { anim_list[0].abs_x += 280; map_x += 280; }
+	else if (key == 4 && cheat1) { anim_list[0].abs_x -= 280; map_x -= 280; }
+	else if (cmode == KEYS && ((key & 0x80) == 0))	/* key keys */
+	{	if (key >= '1' && key <= '6') do_option(key - '1' + 5);
+		else gomenu(ITEMS);
+	}
+	else if (key == ' ' || notpause)
+	{	for (i=0; i<LMENUS; i++)
+		{	if (letter_list[i].letter == key)
+			{	short menu;
+				menu = letter_list[i].menu;
+				if (menu == SAVEX && cmode != SAVEX) break;
+				cmode = menu;
+				/* how to highlight option?? */
+				hit = letter_list[i].choice;
+				hitgo = menus[cmode].enabled[hit] & 2;
+				atype = menus[cmode].enabled[hit] & 0xfc;
+				if (atype == 4) menus[cmode].enabled[hit] ^= 1;
+				do_option(hit);
+				print_options();
+				break;
+			}
+		}
+	}
+}
+
 void main(int argc,char argv[])
 {	register long i;
 	short j, k; char key;
@@ -1273,87 +1360,7 @@ no_intro:
 		/* debug keys */
 
 		notpause = !(menus[GAME].enabled[5] & 1);
-		if (key)
-		{	if (viewstatus && notpause)
-			{	if ((key & 0x80) == 0) viewstatus = 99; }
-			else if (anim_list[0].state == DEAD) ; /* MAYBE */
-			else if (key >= 20 && key <= 29)
-			{	keydir = key;	}
-			else if ((key & 0x7f) == keydir) keydir = 0;
-			else if (key == '0') keyfight = TRUE;
-			else if ((key & 0x7f) == '0') keyfight = FALSE;
-
-			else if (key == 'B' && cheat1)
-			{	if (active_carrier == 11) stuff[5] = 1;
-				move_extent(0,hero_x+20,hero_y+20);
-				load_carrier(11);
-			}
-			else if (key == '.' && cheat1)
-				{	stuff[rnd(GOLDBASE)]+=3; set_options(); stuff[22]=0; }
-			else if ((key & 0x7f) >= 0x61)
-			{	if (inum > 11) inum = 11;
-				if (inum < 0) inum = 0;
-				inum = (key&0x7f) - 0x61;
-				hit = real_options[inum];
-				if (key & 0x80)	/* up mouse */
-				{	if (hit >= 0 && hit < menus[cmode].num) propt(inum,0); }
-				else	/* down mouse */
-				{	hitgo = TRUE;
-					if (hit >= 0 && hit < menus[cmode].num)
-					{	atype = menus[cmode].enabled[hit] & 0xfc;
-						if (atype != 8) handler_data.lastmenu = 0;
-						if (atype == 4)
-						{	menus[cmode].enabled[hit] ^= 1;
-							propt(inum,menus[cmode].enabled[hit] & 1);
-							do_option(hit);
-						}
-						else if (atype == 8)
-						{	propt(inum,1);
-							do_option(hit);
-						}
-						else if (atype == 12)
-						{	menus[cmode].enabled[hit] |= 1;
-							propt(inum,1);
-							do_option(hit);
-						}		/* go to different 'BUY' menus?? */
-						else if (!notpause);
-						else if (atype == 0 && hit < 5) { cmode = hit; prq(5); }
-						else propt(inum,menus[cmode].enabled[hit] & 1);
-					}
-				}
-			}
-
-			else if (key == 'R' && cheat1) rescue();
-			else if (key == '=' && cheat1) prq(2);
-			else if (key == 19 && cheat1) prq(3);
-			else if (key == 18 && cheat1) daynight += 1000;
-			else if (key == 1 && cheat1) { anim_list[0].abs_y -= 150; map_y -= 150; }
-			else if (key == 2 && cheat1) { anim_list[0].abs_y += 150; map_y += 150; }
-			else if (key == 3 && cheat1) { anim_list[0].abs_x += 280; map_x += 280; }
-			else if (key == 4 && cheat1) { anim_list[0].abs_x -= 280; map_x -= 280; }
-			else if (cmode == KEYS && ((key & 0x80) == 0))	/* key keys */
-			{	if (key >= '1' && key <= '6') do_option(key - '1' + 5);
-				else gomenu(ITEMS);
-			}
-			else if (key == ' ' || notpause)
-			{	for (i=0; i<LMENUS; i++)
-				{	if (letter_list[i].letter == key)
-					{	short menu;
-						menu = letter_list[i].menu;
-						if (menu == SAVEX && cmode != SAVEX) break;
-						cmode = menu;
-						/* how to highlight option?? */
-						hit = letter_list[i].choice;
-						hitgo = menus[cmode].enabled[hit] & 2;
-						atype = menus[cmode].enabled[hit] & 0xfc;
-						if (atype == 4) menus[cmode].enabled[hit] ^= 1;
-						do_option(hit);
-						print_options();
-						break;
-					}
-				}
-			}
-		}
+		if (key) handle_key(key, notpause);
 
 		if (viewstatus == 2) 
 		{	Delay(200); viewstatus = 99; }
