@@ -56,7 +56,36 @@ games/  original  improved  remastered  reimagined
 Input, hero update, actor update, combat, spawning, render, menus. Run tests after each cut.
 - [x] `handle_key` (key and menu handling at the top of the loop). State and pixel tests unchanged.
 - [x] `update_hero` (timers, dead/fairy, shoot/ride/fight/walk state). Tests unchanged.
-- [ ] monster and hero motion, bed/doors/map, drawing, missiles and scroll.
+Remaining blocks inside the `main()` loop of `csrc/fmain.c` (line numbers as of commit 184cc37,
+they move after each cut; the `/* ... */` comments in the loop mark most boundaries):
+- [ ] ~1466 raft/turtle proximity setup (10 lines). Do together with the next one.
+- [ ] ~1478-1876 the per-actor motion loop `for (i=0; i<anix; i++)` (about 400 lines, has `goto`
+      labels such as `newloc`, `blocked`, `checkdev2`). Biggest and riskiest. Split it by actor
+      kind (hero, carrier/raft, setfig, enemy) only where the gotos stay inside one piece.
+- [ ] ~1877 "check for bed" and "update map position"
+- [ ] ~1902 "check for door" (about 65 lines)
+- [ ] ~1968 "update map position" and "generate map", ~1985 "undo witch fx"
+- [ ] ~1990-2245 map scroll/redraw (`scrollmap`, `map_draw`, `viewchange:`) and the per-tick
+      world updates: day/night, encounter spawning (~2068), mood/music (~2195-2208)
+- [ ] ~2248-2315 combat hit detection loop (weapon reach, `newx`/`newy`, damage)
+- [ ] ~2316 flying missiles, ~2337 sprite sort (bubble sort), ~2340 `drawnow:`
+- [ ] ~2371 finish map repair, ~2376 "do witch fx"
+- [ ] ~2395-2626 sprite drawing loop (masking, `passmode`, `blithigh`; about 230 lines)
+- Not planned: start-up (before the loop) and shutdown (`quit_all:`).
+
+How to do one cut (the method used for `handle_key` and `update_hero`):
+1. Move the block into a `static` function above `main()`. Mark it with a `/* PORT: ... */` comment.
+2. Variables that are locals of `main()` or of the loop become parameters or locals of the new
+   function. Before making one a plain local, grep for later uses: if anything later reads it
+   without assigning it first, it carries a value from this block and must be passed by pointer
+   (or made a file-level static) instead.
+3. `continue`, `break`, `goto` and `return` that jump out of the block stay in `main()`: cut the
+   block just before or after them, or return a flag and let `main()` do the jump.
+4. Do not change logic, order or names. Uninitialised locals in the original are initialised to 0
+   only if the value is provably never used.
+5. Test: `tests/state_regress.sh` and `tests/regress.sh` (both about 5-7 minutes; run them in the
+   background and wait for the result). Every scenario must say `ok`. Any `DIFF` means undo the cut.
+6. One commit per cut, and tick it off here.
 
 ### 3. Gather the game state into structs
 Hero, world, actors, inventory, time. Clear split between rules state and drawing state.
