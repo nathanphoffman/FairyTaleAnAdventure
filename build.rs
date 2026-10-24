@@ -5,7 +5,6 @@ fn main() {
     let files = [
         "fmain.c",
         "fmain2.c",
-        "iffsubs.c",
         "hdrive.c",
         "layout.c",
         "asm_map.c",

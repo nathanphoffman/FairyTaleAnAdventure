@@ -1,0 +1,168 @@
+//! Loads IFF ILBM pictures ("brushes") into a bitmap (from csrc/iffsubs.c). It also holds the
+//! state shared with the chunk and line helpers in `iff_helpers`.
+
+use crate::amiga::{BPTR, BitMap};
+use std::ffi::c_char;
+
+use super::iff_helpers::{ReadHeader, ReadLength, unpack_line};
+
+unsafe extern "C" {
+    fn Open(name: *const c_char, mode: i32) -> BPTR;
+    fn Close(file: BPTR);
+    fn Read(file: BPTR, buf: *mut u8, len: i32) -> i32;
+    fn Seek(file: BPTR, pos: i32, mode: i32) -> i32;
+    /// Scratch memory the compressed picture body is read into (csrc/fmain.c).
+    static shape_mem: *mut i8;
+}
+
+// State shared with iff_helpers; the names are the C ones.
+/// Bytes left in the FORM being read.
+#[unsafe(no_mangle)]
+pub static mut file_length: i32 = 0;
+#[unsafe(no_mangle)]
+pub static mut myfile: i32 = 0;
+/// The id of the chunk just read.
+#[unsafe(no_mangle)]
+pub static mut header: i32 = 0;
+#[unsafe(no_mangle)]
+pub static mut blocklength: i32 = 0;
+/// Bytes in one unpacked scan line.
+#[unsafe(no_mangle)]
+pub static mut bytecount: i32 = 0;
+/// Read position in the compressed body.
+#[unsafe(no_mangle)]
+pub static mut packdata: *const i8 = std::ptr::null();
+/// Compression type of the body: 0 = none, 1 = ByteRun1.
+#[unsafe(no_mangle)]
+pub static mut compress: i8 = 0;
+
+/// AmigaDOS open mode for an existing file.
+const MODE_OLDFILE: i32 = 1005;
+/// Seek relative to the current position.
+const OFFSET_CURRENT: i32 = 0;
+const TRUE: i32 = 1;
+const FALSE: i32 = 0;
+
+/// Planes the brush loader fills.
+const BRUSH_PLANES: usize = 5;
+
+/// A chunk id as the game compares it: the four characters in memory order.
+const fn chunk_id(name: &[u8; 4]) -> i32 {
+    i32::from_ne_bytes(*name)
+}
+const FORM: i32 = chunk_id(b"FORM");
+const ILBM: i32 = chunk_id(b"ILBM");
+const BMHD: i32 = chunk_id(b"BMHD");
+const BODY: i32 = chunk_id(b"BODY");
+const SKIPPED_CHUNKS: [i32; 4] = [chunk_id(b"CAMG"), chunk_id(b"CRNG"), chunk_id(b"CMAP"), chunk_id(b"GRAB")];
+
+/// The ILBM bitmap header chunk; the file is big-endian.
+#[repr(C)]
+#[derive(Default)]
+struct BitMapHeader {
+    width: i16,
+    height: i16,
+    xpic: i16,
+    ypic: i16,
+    n_planes: u8,
+    masking: u8,
+    compression: u8,
+    pad1: u8,
+    transcolor: i16,
+    x_aspect: i16,
+    y_aspect: i16,
+    page_width: i16,
+    page_height: i16,
+}
+
+/// Reads the BMHD chunk whose length was just read.
+unsafe fn read_bitmap_header() -> BitMapHeader {
+    let mut bmhd = BitMapHeader::default();
+    unsafe {
+        let len = blocklength.clamp(0, size_of::<BitMapHeader>() as i32);
+        Read(myfile as BPTR, (&raw mut bmhd).cast(), len);
+    }
+    bmhd.width = bmhd.width.swap_bytes();
+    bmhd.height = bmhd.height.swap_bytes();
+    bmhd
+}
+
+/// Unpacks the BODY chunk into the bitmap, starting `offset` bytes into each plane.
+unsafe fn read_body(bmhd: &BitMapHeader, bitmap: &BitMap, offset: usize) {
+    unsafe {
+        packdata = shape_mem;
+        bytecount = ((bmhd.width as i32 + 15) / 8) & 0xfffe;
+        ReadLength();
+        Read(myfile as BPTR, shape_mem.cast(), blocklength);
+        compress = bmhd.compression as i8;
+        let mut planes: [*mut u8; BRUSH_PLANES] =
+            std::array::from_fn(|p| bitmap.Planes[p].wrapping_add(offset));
+        for _ in 0..bmhd.height {
+            for (p, plane) in planes.iter_mut().enumerate() {
+                if bitmap.Depth as usize > p {
+                    unpack_line(*plane);
+                }
+                *plane = plane.wrapping_add(bitmap.BytesPerRow as usize);
+            }
+        }
+    }
+}
+
+/// Loads the picture `filename` into `bitmap` at byte column `x`, row `y`. Returns TRUE/FALSE.
+#[unsafe(no_mangle)]
+pub extern "C" fn unpackbrush(filename: *const c_char, bitmap: *mut BitMap, x: i16, y: i16) -> i32 {
+    unsafe {
+        let bitmap = &*bitmap;
+        let offset = (x as i32 + bitmap.BytesPerRow as i32 * y as i32) as usize;
+
+        myfile = Open(filename, MODE_OLDFILE) as i32;
+        if myfile == 0 {
+            return FALSE;
+        }
+        ReadHeader();
+        if header != FORM {
+            Close(myfile as BPTR);
+            return FALSE;
+        }
+        ReadLength();
+        file_length = blocklength;
+
+        let mut bmhd = BitMapHeader::default();
+        while file_length != 0 {
+            ReadHeader();
+            if header == ILBM {
+                // just the form type, no data
+            } else if header == BMHD {
+                ReadLength();
+                bmhd = read_bitmap_header();
+            } else if SKIPPED_CHUNKS.contains(&{ header }) {
+                ReadLength();
+                Seek(myfile as BPTR, blocklength, OFFSET_CURRENT);
+            } else if header == BODY {
+                read_body(&bmhd, bitmap, offset);
+                break;
+            } else {
+                Close(myfile as BPTR);
+                return FALSE;
+            }
+        }
+        Close(myfile as BPTR);
+        TRUE
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn chunk_ids_match_the_file_bytes() {
+        assert_eq!(FORM.to_ne_bytes(), *b"FORM");
+        assert_eq!(BODY.to_ne_bytes(), *b"BODY");
+    }
+
+    #[test]
+    fn bitmap_header_matches_the_c_struct() {
+        assert_eq!(size_of::<BitMapHeader>(), 22);
+    }
+}

@@ -1,16 +1,10 @@
 //! IFF picture file helpers (from fsubs.asm via csrc/asm_port.c). The state they work on lives
-//! in csrc/iffsubs.c.
+//! in `iffsubs`.
 
+use super::iffsubs::{blocklength, bytecount, compress, file_length, header, myfile, packdata};
 use crate::amiga::BPTR;
 
 unsafe extern "C" {
-    static mut file_length: i32;
-    static mut myfile: i32;
-    static mut header: i32;
-    static mut blocklength: i32;
-    static mut bytecount: i32;
-    static mut packdata: *const i8;
-    static mut compress: i8;
     fn Read(file: BPTR, buf: *mut u8, len: i32) -> i32;
 }
 
