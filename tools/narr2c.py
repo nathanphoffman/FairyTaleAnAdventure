@@ -8,6 +8,8 @@ bytes the assembler would have produced (strings are NUL separated, XY escapes a
 import re, sys
 
 SRCS = ['faery-tale-amiga/narr.asm', 'faery-tale-amiga/fsubs.asm']
+ENCODING = 'latin-1'
+UNTERMINATED_MARK = '\0UNTERM'
 NAMES = {'ETX': 0, 'XY': 128}
 
 def split_operands(text):
@@ -36,16 +38,16 @@ def split_operands(text):
         inner = body[1:]
         if inner.endswith("'"):
             inner = inner[:-1]
-        cur = '\0UNTERM' + q + inner
+        cur = UNTERMINATED_MARK + q + inner
     if cur.strip() or items:
-        items.append(cur if cur.startswith('\0UNTERM') else cur.strip())
+        items.append(cur if cur.startswith(UNTERMINATED_MARK) else cur.strip())
     return [x for x in items if x != '']
 
 def operand_bytes(tok):
-    if tok.startswith('\0UNTERM'):
-        return list((tok[7] + tok[8:]).encode('latin-1')) if tok[7] == '"' else list(tok[8:].encode('latin-1'))
+    if tok.startswith(UNTERMINATED_MARK):
+        return list((tok[7] + tok[8:]).encode(ENCODING)) if tok[7] == '"' else list(tok[8:].encode(ENCODING))
     if tok[0] in '\'"':
-        return list(tok[1:-1].encode('latin-1'))
+        return list(tok[1:-1].encode(ENCODING))
     if tok in NAMES:
         return [NAMES[tok]]
     if re.fullmatch(r'\$[0-9A-Fa-f]{5,8}', tok):          # a dc.l value: 4 bytes, big-endian
@@ -75,7 +77,7 @@ def main():
     blocks, order = {}, []
     tables = {}
     label = None
-    lines = [l for src in SRCS for l in open(src, encoding='latin-1')]
+    lines = [l for src in SRCS for l in open(src, encoding=ENCODING)]
     for raw in lines:
         line = raw.rstrip('\n')
         m = re.match(r'^(\w+)\s*(.*)$', line)

@@ -95,6 +95,23 @@ Give C a small API: `tick(input)` and `get_state()`.
 Small leaves first: RNG, collision, text, save/load. Then AI, combat, inventory, shops. The old
 `main()` loop goes last. Compare against the C using the state tests.
 
+### 4a. `rsrc/`: clean Rust copy of `csrc/` (decided, in progress)
+Decision: `csrc/` is never edited again. It stays as the reference. Each C file is ported 1:1 into
+`rsrc/` (same behaviour, same function names, bugs included), written to the cleanup rules (short
+functions, named constants, small files, tests). `rsrc/` is a module of the main crate
+(`#[path = "../rsrc/mod.rs"]` in `src/main.rs`), not a separate crate.
+How a file moves: write the Rust with the same `#[unsafe(no_mangle)] extern "C"` names, remove the
+file from the list in `build.rs`, check with `cargo test`, `tests/regress.sh` and
+`tests/state_regress.sh`. Globals still defined in C are read through `extern` statics; globals
+that move must keep their C name. Leaf files first, `fmain.c` / `fmain2.c` last.
+- [x] `asm_port.c` -> `rsrc/random.rs` (RNG, checked against values from the C) and
+      `rsrc/iff_helpers.rs` (`ReadHeader`, `ReadLength`, `unpack_line`).
+- [ ] `input.c`  (postponed on purpose, next)
+- [ ] `iffsubs.c` (postponed on purpose, then this)
+- [ ] Then `hdrive.c`, `asm_blit.c`, `asm_text.c`, `asm_map.c`, `asm_stubs.c`, `statedump.c`,
+      `layout.c`, `narr_data.c` (keep as generated data), `fmain2.c`, `fmain.c`.
+Left off: only `asm_port.c` is ported. Nothing else was started.
+
 ### 5. Classic engine: original and improved
 Move the planar drawing code (`asm_blit.c`, `asm_map.c`) into `fta-engine-classic`. Build
 `games/original`. Add `games/improved` options (free mouse, rebinds) on top.

@@ -14,6 +14,8 @@ pub type UBYTE = u8;
 pub type BYTE = i8;
 pub type BPTR = isize;
 
+/// An Amiga bitmap holds at most this many bitplanes.
+pub const MAX_PLANES: usize = 8;
 pub const MEMF_CHIP: u32 = 2;
 
 pub const JAM1: u8 = 0;
@@ -28,7 +30,7 @@ pub struct BitMap {
     pub Flags: UBYTE,
     pub Depth: UBYTE,
     pub pad: UWORD,
-    pub Planes: [PLANEPTR; 8],
+    pub Planes: [PLANEPTR; MAX_PLANES],
 }
 
 #[repr(C)]

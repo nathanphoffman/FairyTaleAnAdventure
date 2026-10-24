@@ -16,7 +16,7 @@ pub extern "C" fn InitBitMap(bm: *mut BitMap, depth: LONG, width: LONG, height: 
     bm.Flags = 0;
     bm.Depth = depth as UBYTE;
     bm.pad = 0;
-    bm.Planes = [null_mut(); 8];
+    bm.Planes = [null_mut(); MAX_PLANES];
 }
 
 /// Allocates the planes too. Returns 1 on success (this one was assembly in the original).

@@ -1,5 +1,7 @@
 mod amiga;
 mod platform;
+#[path = "../rsrc/mod.rs"]
+mod rsrc;
 
 use std::os::raw::{c_char, c_int};
 

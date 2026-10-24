@@ -8,7 +8,6 @@ fn main() {
         "iffsubs.c",
         "hdrive.c",
         "layout.c",
-        "asm_port.c",
         "input.c",
         "asm_map.c",
         "asm_blit.c",

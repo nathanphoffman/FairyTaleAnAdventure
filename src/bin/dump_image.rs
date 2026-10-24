@@ -7,6 +7,11 @@
 use std::fs;
 
 const BLOCK: usize = 512;
+/// Blocks summarised per line of the overview.
+const OVERVIEW_BLOCKS: usize = 16;
+/// Bytes shown per block in the hex dump.
+const PERCENT: usize = 100;
+const HEX_BYTES: usize = 32;
 
 /// Known block ranges from the original source (see docs/data-formats.md).
 const KNOWN: &[(usize, usize, &str)] = &[
@@ -70,18 +75,18 @@ fn main() {
     if let Some(first) = args.get(2).and_then(|s| s.parse::<usize>().ok()) {
         let count = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(1);
         for b in first..(first + count).min(blocks) {
-            let bytes = &data[b * BLOCK..b * BLOCK + 32];
+            let bytes = &data[b * BLOCK..b * BLOCK + HEX_BYTES];
             let hex: Vec<String> = bytes.iter().map(|x| format!("{x:02x}")).collect();
             println!("{b:5} {}  {}", hex.join(" "), label(b));
         }
         return;
     }
 
-    for start in (0..blocks).step_by(16) {
-        let end = (start + 16).min(blocks);
+    for start in (0..blocks).step_by(OVERVIEW_BLOCKS) {
+        let end = (start + OVERVIEW_BLOCKS).min(blocks);
         let chunk = &data[start * BLOCK..end * BLOCK];
         let used = chunk.iter().filter(|&&b| b != 0).count();
-        let pct = used * 100 / chunk.len();
+        let pct = used * PERCENT / chunk.len();
         println!(
             "{start:5}-{:<5} {pct:3}% non-zero  {}",
             end - 1,
