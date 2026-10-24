@@ -108,7 +108,7 @@ the game. Routines still stubbed are in `csrc/asm_stubs.c` and print "STUB calle
 
 ### Phase 5 - Sound
 - [x] Song and instrument formats worked out (`docs/data-formats.md`).
-- [x] Music player in Rust (`src/platform/audio.rs`): an SDL audio callback runs the four-voice
+- [x] Music player in Rust (`src/platform/audio/`): an SDL audio callback runs the four-voice
       sequencer at 60 Hz (the vertical blank of the original) and mixes the four channels, with
       voices 1 and 4 on the left and 2 and 3 on the right as on the Amiga.
 - [x] Sound effects: one-shot samples on voice 2, which pauses that music voice meanwhile.
