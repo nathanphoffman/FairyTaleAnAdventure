@@ -147,7 +147,7 @@ gathers the state into structs, then ports the rules to Rust. Keep this list as 
 The current approach is `rsrc/` (see section 4a of `modern_engine_plan.md`): `csrc/` stays untouched
 and each file is ported into `rsrc/`. Move modules one at a time, with the game runnable after each one. Rough order, easiest first:
 - [x] `asm_port.c`, `input.c`, `iffsubs.c`, `hdrive.c`
-- [ ] `asm_blit.c`, `asm_text.c`, `asm_map.c`, small leftovers
+- [x] `asm_blit.c`, `asm_text.c`, `asm_map.c`, `asm_stubs.c`
 - [ ] `fmain2.c`
 - [ ] `fmain.c` (largest, split into modules as it moves)
 

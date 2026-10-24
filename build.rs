@@ -6,11 +6,7 @@ fn main() {
         "fmain.c",
         "fmain2.c",
         "layout.c",
-        "asm_map.c",
-        "asm_blit.c",
-        "asm_text.c",
         "narr_data.c",
-        "asm_stubs.c",
         "statedump.c",
     ];
     let mut b = cc::Build::new();

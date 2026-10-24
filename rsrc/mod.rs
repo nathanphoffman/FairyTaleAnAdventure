@@ -3,6 +3,10 @@
 
 pub mod iff_helpers;
 pub mod iffsubs;
+pub mod asm_blit;
+pub mod asm_map;
+pub mod asm_stubs;
+pub mod asm_text;
 pub mod hdrive;
 pub mod input;
 pub mod random;
