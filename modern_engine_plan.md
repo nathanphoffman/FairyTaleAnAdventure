@@ -106,11 +106,14 @@ file from the list in `build.rs`, check with `cargo test`, `tests/regress.sh` an
 that move must keep their C name. Leaf files first, `fmain.c` / `fmain2.c` last.
 - [x] `asm_port.c` -> `rsrc/random.rs` (RNG, checked against values from the C) and
       `rsrc/iff_helpers.rs` (`ReadHeader`, `ReadLength`, `unpack_line`).
-- [ ] `input.c`  (postponed on purpose, next)
-- [ ] `iffsubs.c` (postponed on purpose, then this)
+- [x] `input.c` -> `rsrc/input.rs` (ring buffer, mouse, menu clicks, compass; pure parts unit tested).
+- [ ] `iffsubs.c` (next)
 - [ ] Then `hdrive.c`, `asm_blit.c`, `asm_text.c`, `asm_map.c`, `asm_stubs.c`, `statedump.c`,
       `layout.c`, `narr_data.c` (keep as generated data), `fmain2.c`, `fmain.c`.
-Left off: only `asm_port.c` is ported. Nothing else was started.
+Left off: `asm_port.c` and `input.c` are ported. `iffsubs.c` is next.
+Decision for `fmain.c`: cut `main()` into functions in `csrc/` first (step 2, the method above), then
+port the pieces to `rsrc/`. This is the one exception to "csrc is never edited": only step-2 cuts, with
+no behaviour change. Do the cuts before starting `fmain.c` in `rsrc/`; `fmain2.c` can be ported earlier.
 
 ### 5. Classic engine: original and improved
 Move the planar drawing code (`asm_blit.c`, `asm_map.c`) into `fta-engine-classic`. Build

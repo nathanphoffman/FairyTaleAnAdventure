@@ -2,4 +2,5 @@
 //! Each function keeps its C name so the C that is still left links against it unchanged.
 
 pub mod iff_helpers;
+pub mod input;
 pub mod random;
