@@ -6,12 +6,12 @@
 //! doubled horizontally.
 
 use crate::amiga::*;
+use sdl2::EventPump;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::render::{Canvas, TextureCreator};
 use sdl2::video::{Window, WindowContext};
-use sdl2::EventPump;
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, Instant};
@@ -69,16 +69,18 @@ pub fn init() -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     let mut canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
     // 640x200 pixels are shown on a 4:3 screen, so each row is drawn two pixels tall
-    canvas.set_logical_size(WIDTH, HEIGHT * 2).map_err(|e| e.to_string())?;
+    canvas
+        .set_logical_size(WIDTH, HEIGHT * 2)
+        .map_err(|e| e.to_string())?;
     let creator = canvas.texture_creator();
     let events = sdl.event_pump()?;
     let controller_system = sdl.game_controller()?;
     let mut pads = Vec::new();
     for i in 0..controller_system.num_joysticks().unwrap_or(0) {
-        if controller_system.is_game_controller(i) {
-            if let Ok(c) = controller_system.open(i) {
-                pads.push(c);
-            }
+        if controller_system.is_game_controller(i)
+            && let Ok(c) = controller_system.open(i)
+        {
+            pads.push(c);
         }
     }
     super::input::load_config();
@@ -127,7 +129,7 @@ pub fn set_view(v: *mut View) {
 /// 12 bit Amiga colour (0x0RGB) to 0xRRGGBB.
 fn rgb4(c: u16) -> u32 {
     let (r, g, b) = ((c >> 8 & 15) as u32, (c >> 4 & 15) as u32, (c & 15) as u32);
-    (r * 17) << 16 | (g * 17) << 8 | b * 17
+    (r * 17) << 16 | (g * 17) << 8 | (b * 17)
 }
 
 const VP_HIDE: u16 = 0x2000;
@@ -209,7 +211,9 @@ fn compose(view: *const View, frame: &mut [u32]) {
                     if plane.is_null() {
                         continue;
                     }
-                    let byte = unsafe { *plane.add(sy as usize * bm.BytesPerRow as usize + (sx >> 3) as usize) };
+                    let byte = unsafe {
+                        *plane.add(sy as usize * bm.BytesPerRow as usize + (sx >> 3) as usize)
+                    };
                     if byte & (0x80 >> (sx & 7)) != 0 {
                         index |= 1 << p;
                     }
@@ -219,7 +223,11 @@ fn compose(view: *const View, frame: &mut [u32]) {
                 } else {
                     0
                 };
-                let ox = if hires { v.DxOffset as i32 + col } else { (v.DxOffset as i32 + col) * 2 };
+                let ox = if hires {
+                    v.DxOffset as i32 + col
+                } else {
+                    (v.DxOffset as i32 + col) * 2
+                };
                 let base = oy as usize * WIDTH as usize;
                 if ox >= 0 && ox < WIDTH as i32 {
                     frame[base + ox as usize] = color;
@@ -245,13 +253,21 @@ fn handle_events(d: &mut Display) {
     let events: Vec<Event> = d.events.poll_iter().collect();
     for event in events {
         match event {
-            Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
-                std::process::exit(0)
-            }
+            Event::Quit { .. }
+            | Event::KeyDown {
+                keycode: Some(Keycode::Escape),
+                ..
+            } => std::process::exit(0),
             // F11 or Alt+Enter: fullscreen on/off
-            Event::KeyDown { keycode: Some(k), keymod, .. }
-                if k == Keycode::F11
-                    || (k == Keycode::Return && keymod.intersects(sdl2::keyboard::Mod::LALTMOD | sdl2::keyboard::Mod::RALTMOD)) =>
+            Event::KeyDown {
+                keycode: Some(k),
+                keymod,
+                ..
+            } if k == Keycode::F11
+                || (k == Keycode::Return
+                    && keymod.intersects(
+                        sdl2::keyboard::Mod::LALTMOD | sdl2::keyboard::Mod::RALTMOD,
+                    )) =>
             {
                 let window = d.canvas.window_mut();
                 let next = match window.fullscreen_state() {
@@ -283,13 +299,21 @@ fn handle_events(d: &mut Display) {
                     }
                 }
             }
-            Event::KeyDown { keycode: Some(k), repeat: false, .. } => super::input::key_event(k, true),
-            Event::KeyUp { keycode: Some(k), .. } => super::input::key_event(k, false),
+            Event::KeyDown {
+                keycode: Some(k),
+                repeat: false,
+                ..
+            } => super::input::key_event(k, true),
+            Event::KeyUp {
+                keycode: Some(k), ..
+            } => super::input::key_event(k, false),
             Event::MouseMotion { x, y, .. } => {
                 let (fx, fy) = to_frame(d, x, y);
                 super::input::mouse_move(fx, fy);
             }
-            Event::MouseButtonDown { mouse_btn, x, y, .. } => {
+            Event::MouseButtonDown {
+                mouse_btn, x, y, ..
+            } => {
                 let (fx, fy) = to_frame(d, x, y);
                 super::input::mouse_move(fx, fy);
                 super::input::mouse_button(mouse_btn, true);
@@ -303,7 +327,10 @@ fn handle_events(d: &mut Display) {
 /// FTA_WATCHDOG=n aborts if the game goes n seconds without waiting for a frame (a stuck loop),
 /// so a debugger shows where.
 fn start_watchdog() {
-    let Some(limit) = std::env::var("FTA_WATCHDOG").ok().and_then(|s| s.parse::<u64>().ok()) else {
+    let Some(limit) = std::env::var("FTA_WATCHDOG")
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+    else {
         return;
     };
     std::thread::spawn(move || {
@@ -328,7 +355,9 @@ fn parse_script() -> Vec<(u32, String, bool)> {
     let mut script = Vec::new();
     for item in std::env::var("FTA_INJECT").unwrap_or_default().split(',') {
         let mut parts = item.split(':');
-        let (Some(t), Some(name)) = (parts.next(), parts.next()) else { continue };
+        let (Some(t), Some(name)) = (parts.next(), parts.next()) else {
+            continue;
+        };
         let hold: u32 = parts.next().and_then(|h| h.parse().ok()).unwrap_or(4);
         if let Ok(t) = t.parse::<u32>() {
             script.push((t, name.to_string(), true));
@@ -386,7 +415,11 @@ fn replay_events(tick: u32) {
                     }
                 }
                 "button" => {
-                    let b = if w[1] == "left" { sdl2::mouse::MouseButton::Left } else { sdl2::mouse::MouseButton::Right };
+                    let b = if w[1] == "left" {
+                        sdl2::mouse::MouseButton::Left
+                    } else {
+                        sdl2::mouse::MouseButton::Right
+                    };
                     super::input::mouse_button(b, down);
                 }
                 _ => {}
@@ -398,7 +431,9 @@ fn replay_events(tick: u32) {
 /// FTA_CMD="900:tp:18310:15969,1200:kill:0" runs test commands at those ticks: tp = teleport the
 /// hero like a door does (x, y), kill = set luck and kill the hero.
 fn run_cmds(tick: u32) {
-    let Ok(cmds) = std::env::var("FTA_CMD") else { return };
+    let Ok(cmds) = std::env::var("FTA_CMD") else {
+        return;
+    };
     for item in cmds.split(',') {
         let p: Vec<&str> = item.split(':').collect();
         if p.len() < 3 || p[0].parse::<u32>().ok() != Some(tick) {
@@ -428,10 +463,10 @@ fn run_script(d: &mut Display) {
         }
     }
     for (t, name, down) in d.script.clone() {
-        if t == tick {
-            if let Some(k) = sdl2::keyboard::Keycode::from_name(&name) {
-                super::input::key_event(k, down);
-            }
+        if t == tick
+            && let Some(k) = sdl2::keyboard::Keycode::from_name(&name)
+        {
+            super::input::key_event(k, down);
         }
     }
 }
@@ -446,7 +481,10 @@ unsafe extern "C" {
 fn test_hooks(d: &mut Display) {
     // FTA_STATE=file writes the game state as text at tick FTA_STATE_AFTER (then quits).
     if let Some(path) = std::env::var_os("FTA_STATE") {
-        let after: u32 = std::env::var("FTA_STATE_AFTER").ok().and_then(|s| s.parse().ok()).unwrap_or(1);
+        let after: u32 = std::env::var("FTA_STATE_AFTER")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(1);
         if d.ticks >= after {
             if let Ok(c) = std::ffi::CString::new(path.as_encoded_bytes()) {
                 unsafe { fta_dump_state(c.as_ptr()) };
@@ -455,7 +493,10 @@ fn test_hooks(d: &mut Display) {
         }
     }
     if let Some(path) = std::env::var_os("FTA_SHOT") {
-        let after: u32 = std::env::var("FTA_SHOT_AFTER").ok().and_then(|s| s.parse().ok()).unwrap_or(1);
+        let after: u32 = std::env::var("FTA_SHOT_AFTER")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(1);
         if d.ticks >= after {
             let mut out = format!("P6\n{WIDTH} {HEIGHT}\n255\n").into_bytes();
             for px in &d.frame {
@@ -466,11 +507,13 @@ fn test_hooks(d: &mut Display) {
             std::process::exit(0);
         }
     }
-    if let Some(secs) = std::env::var("FTA_SECONDS").ok().and_then(|s| s.parse::<u64>().ok()) {
-        if d.started.elapsed().as_secs() >= secs {
-            super::audio::dump();
-            std::process::exit(0);
-        }
+    if let Some(secs) = std::env::var("FTA_SECONDS")
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        && d.started.elapsed().as_secs() >= secs
+    {
+        super::audio::dump();
+        std::process::exit(0);
     }
 }
 
@@ -479,7 +522,10 @@ fn draw(d: &mut Display, view: *mut View) {
     compose(view, &mut d.frame);
     let bytes: &[u8] =
         unsafe { std::slice::from_raw_parts(d.frame.as_ptr() as *const u8, d.frame.len() * 4) };
-    if let Ok(mut texture) = d.creator.create_texture_streaming(PixelFormatEnum::ARGB8888, WIDTH, HEIGHT) {
+    if let Ok(mut texture) =
+        d.creator
+            .create_texture_streaming(PixelFormatEnum::ARGB8888, WIDTH, HEIGHT)
+    {
         let _ = texture.update(None, bytes, WIDTH as usize * 4);
         d.canvas.clear();
         let _ = d.canvas.copy(&texture, None, None);
@@ -524,7 +570,11 @@ pub fn wait_frame() {
         run_script(d);
         let now = Instant::now();
         let wait = d.next_tick.saturating_duration_since(now);
-        d.next_tick = if now > d.next_tick + TICK * 4 { now + TICK } else { d.next_tick + TICK };
+        d.next_tick = if now > d.next_tick + TICK * 4 {
+            now + TICK
+        } else {
+            d.next_tick + TICK
+        };
         Some(wait)
     });
     if let Some(w) = wait {

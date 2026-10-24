@@ -33,10 +33,16 @@ pub extern "C" fn TypeOfMem(_p: *mut c_void) -> ULONG {
 
 // ---- libraries and tasks ----
 
-static mut GFX_BASE: GfxBase = GfxBase { ActiView: null_mut(), DisplayFlags: 0 };
+static mut GFX_BASE: GfxBase = GfxBase {
+    ActiView: null_mut(),
+    DisplayFlags: 0,
+};
 static mut DUMMY_LIB: [u8; 64] = [0; 64];
 static mut THIS_TASK: Process = Process {
-    pr_Task: Task { tc_Node_pri: 0, tc_TrapCode: null_mut() },
+    pr_Task: Task {
+        tc_Node_pri: 0,
+        tc_TrapCode: null_mut(),
+    },
     pr_WindowPtr: null_mut(),
 };
 

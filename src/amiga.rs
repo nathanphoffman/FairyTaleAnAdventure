@@ -186,7 +186,10 @@ pub fn check_layout() {
     unsafe {
         assert_eq!(fta_sizes_count as usize, rust.len());
         for (i, (name, size)) in rust.iter().enumerate() {
-            assert_eq!(fta_sizes[i] as usize, *size, "struct {name} differs between C and Rust");
+            assert_eq!(
+                fta_sizes[i] as usize, *size,
+                "struct {name} differs between C and Rust"
+            );
         }
     }
 }

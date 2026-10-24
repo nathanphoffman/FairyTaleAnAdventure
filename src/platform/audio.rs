@@ -10,39 +10,99 @@
 //! low 6 bits index `NOTE_LENGTHS`; 128 = rest, 129 = set instrument, 0x90 = set tempo, 255 = end
 //! of track (value non-zero = loop).
 
-use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired};
 use sdl2::AudioSubsystem;
-use std::os::raw::c_void;
+use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired};
 use std::sync::{Arc, Mutex, OnceLock};
 
 /// (period, start offset in units of 4 bytes) for each note; high notes play a shorter copy of
 /// the waveform stored later in its 128 bytes.
 const NOTES: [(u16, u16); 78] = [
-    (1440, 0), (1356, 0), (1280, 0), (1208, 0), (1140, 0), (1076, 0),
-    (1016, 0), (960, 0), (906, 0), (856, 0), (808, 0), (762, 0),
-    (720, 0), (678, 0), (640, 0), (604, 0), (570, 0), (538, 0),
-    (508, 0), (480, 0), (453, 0), (428, 0), (404, 0), (381, 0),
-    (360, 0), (339, 0), (320, 0), (302, 0), (285, 0), (269, 0),
-    (508, 16), (480, 16), (453, 16), (428, 16), (404, 16), (381, 16),
-    (360, 16), (339, 16), (320, 16), (302, 16), (285, 16), (269, 16),
-    (508, 24), (480, 24), (453, 24), (428, 24), (404, 24), (381, 24),
-    (360, 24), (339, 24), (320, 24), (302, 24), (285, 24), (269, 24),
-    (508, 28), (480, 28), (453, 28), (428, 28), (404, 28), (381, 28),
-    (360, 28), (339, 28), (320, 28), (302, 28), (285, 28), (269, 28),
-    (254, 28), (240, 28), (226, 28), (214, 28), (202, 28), (190, 28),
-    (180, 28), (170, 28), (160, 28), (151, 28), (143, 28), (135, 28),
+    (1440, 0),
+    (1356, 0),
+    (1280, 0),
+    (1208, 0),
+    (1140, 0),
+    (1076, 0),
+    (1016, 0),
+    (960, 0),
+    (906, 0),
+    (856, 0),
+    (808, 0),
+    (762, 0),
+    (720, 0),
+    (678, 0),
+    (640, 0),
+    (604, 0),
+    (570, 0),
+    (538, 0),
+    (508, 0),
+    (480, 0),
+    (453, 0),
+    (428, 0),
+    (404, 0),
+    (381, 0),
+    (360, 0),
+    (339, 0),
+    (320, 0),
+    (302, 0),
+    (285, 0),
+    (269, 0),
+    (508, 16),
+    (480, 16),
+    (453, 16),
+    (428, 16),
+    (404, 16),
+    (381, 16),
+    (360, 16),
+    (339, 16),
+    (320, 16),
+    (302, 16),
+    (285, 16),
+    (269, 16),
+    (508, 24),
+    (480, 24),
+    (453, 24),
+    (428, 24),
+    (404, 24),
+    (381, 24),
+    (360, 24),
+    (339, 24),
+    (320, 24),
+    (302, 24),
+    (285, 24),
+    (269, 24),
+    (508, 28),
+    (480, 28),
+    (453, 28),
+    (428, 28),
+    (404, 28),
+    (381, 28),
+    (360, 28),
+    (339, 28),
+    (320, 28),
+    (302, 28),
+    (285, 28),
+    (269, 28),
+    (254, 28),
+    (240, 28),
+    (226, 28),
+    (214, 28),
+    (202, 28),
+    (190, 28),
+    (180, 28),
+    (170, 28),
+    (160, 28),
+    (151, 28),
+    (143, 28),
+    (135, 28),
 ];
 
 /// Note durations in sequencer clock units, indexed by the low 6 bits of the value byte.
 const NOTE_LENGTHS: [i32; 64] = [
-    26880, 13440, 6720, 3360, 1680, 840, 420, 210,
-    40320, 20160, 10080, 5040, 2520, 1260, 630, 315,
-    17920, 8960, 4480, 2240, 1120, 560, 280, 140,
-    26880, 13440, 6720, 3360, 1680, 840, 420, 210,
-    21504, 10752, 5376, 2688, 1344, 672, 336, 168,
-    32256, 16128, 8064, 4032, 2016, 1008, 504, 252,
-    23040, 11520, 5760, 2880, 1440, 720, 360, 180,
-    34560, 17280, 8640, 4320, 2160, 1080, 540, 270,
+    26880, 13440, 6720, 3360, 1680, 840, 420, 210, 40320, 20160, 10080, 5040, 2520, 1260, 630, 315,
+    17920, 8960, 4480, 2240, 1120, 560, 280, 140, 26880, 13440, 6720, 3360, 1680, 840, 420, 210,
+    21504, 10752, 5376, 2688, 1344, 672, 336, 168, 32256, 16128, 8064, 4032, 2016, 1008, 504, 252,
+    23040, 11520, 5760, 2880, 1440, 720, 360, 180, 34560, 17280, 8640, 4320, 2160, 1080, 540, 270,
 ];
 
 const PAULA_CLOCK: f64 = 3_546_895.0; // PAL; the period values are relative to this
@@ -84,7 +144,7 @@ impl Voice {
 struct Channel {
     data: Vec<i8>,
     phase: f64,
-    step: f64, // data bytes per output sample
+    step: f64,  // data bytes per output sample
     volume: u8, // 0-64
     active: bool,
     looping: bool,
@@ -92,7 +152,14 @@ struct Channel {
 
 impl Channel {
     fn new() -> Channel {
-        Channel { data: Vec::new(), phase: 0.0, step: 0.0, volume: 0, active: false, looping: true }
+        Channel {
+            data: Vec::new(),
+            phase: 0.0,
+            step: 0.0,
+            volume: 0,
+            active: false,
+            looping: true,
+        }
     }
 }
 
@@ -117,7 +184,12 @@ impl Sound {
     fn new(rate: f64) -> Sound {
         Sound {
             voices: [Voice::new(); 4],
-            chans: [Channel::new(), Channel::new(), Channel::new(), Channel::new()],
+            chans: [
+                Channel::new(),
+                Channel::new(),
+                Channel::new(),
+                Channel::new(),
+            ],
             tempo: 150,
             timeclock: 0,
             nosound: true,
@@ -233,10 +305,15 @@ impl Sound {
             return;
         }
         let (period, offset) = NOTES.get(cmd as usize).copied().unwrap_or((508, 0));
-        let wave = unsafe { self.wav.add(vc.wave_num as usize * 128 + offset as usize * 4) };
+        let wave = unsafe {
+            self.wav
+                .add(vc.wave_num as usize * 128 + offset as usize * 4)
+        };
         let words = 32 - offset as usize;
         let ch = &mut self.chans[v];
-        ch.data = (0..words * 2).map(|i| unsafe { *wave.add(i) } as i8).collect();
+        ch.data = (0..words * 2)
+            .map(|i| unsafe { *wave.add(i) } as i8)
+            .collect();
         ch.looping = true;
         ch.phase = 0.0;
         ch.volume = start_vol.min(64);
@@ -312,7 +389,9 @@ fn dump_enabled() -> bool {
 
 /// Writes the captured audio as a 16 bit stereo WAV (44100 Hz).
 pub fn dump() {
-    let Some(path) = std::env::var_os("FTA_AUDIO_DUMP") else { return };
+    let Some(path) = std::env::var_os("FTA_AUDIO_DUMP") else {
+        return;
+    };
     let samples = DUMP.lock().map(|d| d.clone()).unwrap_or_default();
     let data_len = (samples.len() * 2) as u32;
     let mut out = Vec::new();
@@ -343,10 +422,10 @@ impl AudioCallback for Callback {
             Ok(mut s) => s.mix(out),
             Err(_) => out.fill(0.0),
         }
-        if dump_enabled() {
-            if let Ok(mut d) = DUMP.lock() {
-                d.extend(out.iter().map(|x| (x * 32767.0) as i16));
-            }
+        if dump_enabled()
+            && let Ok(mut d) = DUMP.lock()
+        {
+            d.extend(out.iter().map(|x| (x * 32767.0) as i16));
         }
     }
 }
@@ -355,13 +434,18 @@ static SOUND: OnceLock<Arc<Mutex<Sound>>> = OnceLock::new();
 
 /// Opens the audio device. Without one the game runs silent.
 pub fn init(audio: &AudioSubsystem) {
-    let desired = AudioSpecDesired { freq: Some(44100), channels: Some(2), samples: Some(1024) };
+    let desired = AudioSpecDesired {
+        freq: Some(44100),
+        channels: Some(2),
+        samples: Some(1024),
+    };
     let mut shared = None;
-    let device: Result<AudioDevice<Callback>, String> = audio.open_playback(None, &desired, |spec| {
-        let sound = Arc::new(Mutex::new(Sound::new(spec.freq as f64)));
-        shared = Some(sound.clone());
-        Callback(sound)
-    });
+    let device: Result<AudioDevice<Callback>, String> =
+        audio.open_playback(None, &desired, |spec| {
+            let sound = Arc::new(Mutex::new(Sound::new(spec.freq as f64)));
+            shared = Some(sound.clone());
+            Callback(sound)
+        });
     match device {
         Ok(d) => {
             d.resume();
@@ -375,10 +459,10 @@ pub fn init(audio: &AudioSubsystem) {
 }
 
 fn with_sound(f: impl FnOnce(&mut Sound)) {
-    if let Some(s) = SOUND.get() {
-        if let Ok(mut s) = s.lock() {
-            f(&mut s);
-        }
+    if let Some(s) = SOUND.get()
+        && let Ok(mut s) = s.lock()
+    {
+        f(&mut s);
     }
 }
 
@@ -489,6 +573,3 @@ pub extern "C" fn stopsample() {
         s.voices[1].stat = 0;
     });
 }
-
-#[allow(dead_code)]
-fn _unused(_: *mut c_void) {}

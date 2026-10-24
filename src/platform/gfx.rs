@@ -59,7 +59,11 @@ const RASTER_PAD: usize = 256;
 pub extern "C" fn AllocRaster(width: ULONG, height: ULONG) -> PLANEPTR {
     let size = bytes_per_row(width as i32) * height as usize + 2 * RASTER_PAD;
     let base = unsafe { libc::calloc(1, size) as PLANEPTR };
-    if base.is_null() { base } else { unsafe { base.add(RASTER_PAD) } }
+    if base.is_null() {
+        base
+    } else {
+        unsafe { base.add(RASTER_PAD) }
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -246,7 +250,8 @@ pub extern "C" fn BltBitMap(
         for y in 0..h {
             for x in 0..w {
                 let (px, py) = (sx + x, sy + y);
-                buf[(y * w + x) as usize] = in_bounds(src, px, py) && unsafe { get_bit(src, p, px, py) };
+                buf[(y * w + x) as usize] =
+                    in_bounds(src, px, py) && unsafe { get_bit(src, p, px, py) };
             }
         }
         for y in 0..h {
@@ -349,7 +354,9 @@ pub extern "C" fn AreaEnd(rp: *mut RastPort) -> LONG {
         Some(l) => (l.x0, l.y0, l.x1, l.y1),
         None => (i32::MIN, i32::MIN, i32::MAX, i32::MAX),
     };
-    let (ymin, ymax) = pts.iter().fold((i32::MAX, i32::MIN), |(lo, hi), p| (lo.min(p.1), hi.max(p.1)));
+    let (ymin, ymax) = pts.iter().fold((i32::MAX, i32::MIN), |(lo, hi), p| {
+        (lo.min(p.1), hi.max(p.1))
+    });
     let (ymin, ymax) = (ymin.max(cy0), ymax.min(cy1));
     for y in ymin..=ymax {
         let mut xs = Vec::new();
@@ -395,7 +402,15 @@ pub extern "C" fn CreateUpfrontLayer(
     _super: *mut BitMap,
 ) -> *mut Layer {
     let layer = unsafe { libc::calloc(1, std::mem::size_of::<Layer>()) } as *mut Layer;
-    unsafe { *layer = Layer { rp_bitmap: bm, x0, y0, x1, y1 } };
+    unsafe {
+        *layer = Layer {
+            rp_bitmap: bm,
+            x0,
+            y0,
+            x1,
+            y1,
+        }
+    };
     layer
 }
 
@@ -427,12 +442,36 @@ enum FontData {
     Bitmap(BitmapFont),
 }
 
+/// Reads `N` bytes at offset `o`, or None when they run past the end of the data.
+fn be_bytes<const N: usize>(d: &[u8], o: usize) -> Option<[u8; N]> {
+    d.get(o..o + N)?.try_into().ok()
+}
+
 fn be16(d: &[u8], o: usize) -> Option<u16> {
-    Some(u16::from_be_bytes(d.get(o..o + 2)?.try_into().ok()?))
+    Some(u16::from_be_bytes(be_bytes(d, o)?))
 }
 
 fn be32(d: &[u8], o: usize) -> Option<u32> {
-    Some(u32::from_be_bytes(d.get(o..o + 4)?.try_into().ok()?))
+    Some(u32::from_be_bytes(be_bytes(d, o)?))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_big_endian_values() {
+        let data = [0x12, 0x34, 0x56, 0x78];
+        assert_eq!(be16(&data, 0), Some(0x1234));
+        assert_eq!(be32(&data, 0), Some(0x1234_5678));
+    }
+
+    #[test]
+    fn reading_past_the_end_gives_none() {
+        let data = [1, 2, 3];
+        assert_eq!(be16(&data, 2), None);
+        assert_eq!(be32(&data, 0), None);
+    }
 }
 
 /// Reads an Amiga disk font (fonts/Amber/9): an executable file whose only hunk holds a
@@ -460,7 +499,9 @@ fn load_disk_font(path: &std::path::Path) -> Option<BitmapFont> {
     let charspace = be32(seg, tf + 44)? as usize;
     let charkern = be32(seg, tf + 48)? as usize;
     let count = hi as usize - lo as usize + 2; // plus the "default" glyph at the end
-    let data = seg.get(chardata..chardata + modulo * height as usize)?.to_vec();
+    let data = seg
+        .get(chardata..chardata + modulo * height as usize)?
+        .to_vec();
     let mut loc = Vec::new();
     let (mut space, mut kern) = (Vec::new(), Vec::new());
     for i in 0..count {
@@ -468,7 +509,17 @@ fn load_disk_font(path: &std::path::Path) -> Option<BitmapFont> {
         space.push(be16(seg, charspace + i * 2)?);
         kern.push(be16(seg, charkern + i * 2)? as i16);
     }
-    Some(BitmapFont { height, baseline, lo, hi, modulo, data, loc, space, kern })
+    Some(BitmapFont {
+        height,
+        baseline,
+        lo,
+        hi,
+        modulo,
+        data,
+        loc,
+        space,
+        kern,
+    })
 }
 
 fn new_font(data: FontData, width: i32, height: i32, baseline: i32) -> *mut TextFont {
@@ -506,7 +557,9 @@ pub extern "C" fn SetFont(rp: *mut RastPort, f: *mut TextFont) {
 #[unsafe(no_mangle)]
 pub extern "C" fn LoadSeg(name: *const c_char) -> BPTR {
     let name = unsafe { CStr::from_ptr(name) }.to_string_lossy();
-    let Some(path) = super::dos::resolve(&name, false) else { return 0 };
+    let Some(path) = super::dos::resolve(&name, false) else {
+        return 0;
+    };
     let tf = match load_disk_font(&path) {
         Some(font) => {
             let (h, b) = (font.height, font.baseline);
@@ -514,7 +567,9 @@ pub extern "C" fn LoadSeg(name: *const c_char) -> BPTR {
         }
         None => new_font(FontData::Builtin, 8, 9, 7),
     };
-    let header = Box::into_raw(Box::new(DiskFontHeader { dfh_TF: unsafe { std::ptr::read(tf) } }));
+    let header = Box::into_raw(Box::new(DiskFontHeader {
+        dfh_TF: unsafe { std::ptr::read(tf) },
+    }));
     ((header as isize) - 8) >> 2
 }
 
@@ -551,7 +606,11 @@ pub extern "C" fn Text(rp: *mut RastPort, s: *const u8, len: LONG) -> LONG {
                 rp.cp_x += 8;
             }
             FontData::Bitmap(f) => {
-                let idx = if ch >= f.lo && ch <= f.hi { (ch - f.lo) as usize } else { (f.hi - f.lo) as usize + 1 };
+                let idx = if ch >= f.lo && ch <= f.hi {
+                    (ch - f.lo) as usize
+                } else {
+                    (f.hi - f.lo) as usize + 1
+                };
                 let (bit_off, bit_w) = f.loc[idx];
                 let advance = f.space[idx] as i32;
                 let kern = f.kern[idx] as i32;
@@ -566,7 +625,9 @@ pub extern "C" fn Text(rp: *mut RastPort, s: *const u8, len: LONG) -> LONG {
                         let bit = bit_off as usize + col as usize;
                         let byte = f.data[row as usize * f.modulo + bit / 8];
                         if byte & (0x80 >> (bit % 8)) != 0 {
-                            unsafe { plot(bm, rp.cp_x as i32 + kern + col, top + row, rp.FgPen, false) };
+                            unsafe {
+                                plot(bm, rp.cp_x as i32 + kern + col, top + row, rp.FgPen, false)
+                            };
                         }
                     }
                 }
@@ -606,7 +667,9 @@ pub extern "C" fn SetRGB4(vp: *mut ViewPort, n: LONG, r: ULONG, g: ULONG, b: ULO
     if cm.is_null() || n < 0 || n >= unsafe { (*cm).Count } as i32 {
         return;
     }
-    unsafe { *(*cm).ColorTable.add(n as usize) = ((r & 15) << 8 | (g & 15) << 4 | (b & 15)) as UWORD };
+    unsafe {
+        *(*cm).ColorTable.add(n as usize) = ((r & 15) << 8 | (g & 15) << 4 | (b & 15)) as UWORD
+    };
 }
 
 #[unsafe(no_mangle)]

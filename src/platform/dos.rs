@@ -37,9 +37,10 @@ fn find_ignore_case(base: &Path, name: &str) -> Option<PathBuf> {
             cur = exact;
             continue;
         }
-        let found = std::fs::read_dir(&cur).ok()?.flatten().find(|e| {
-            e.file_name().to_string_lossy().eq_ignore_ascii_case(part)
-        })?;
+        let found = std::fs::read_dir(&cur)
+            .ok()?
+            .flatten()
+            .find(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case(part))?;
         cur = found.path();
     }
     Some(cur)
@@ -48,18 +49,19 @@ fn find_ignore_case(base: &Path, name: &str) -> Option<PathBuf> {
 /// Maps an Amiga file name to a real path. `for_write` allows names that do not exist yet.
 pub fn resolve(name: &str, for_write: bool) -> Option<PathBuf> {
     // device prefix such as "df1:" or "df0:"
-    if let Some((dev, rest)) = name.split_once(':') {
-        if dev.len() == 3 && dev[..2].eq_ignore_ascii_case("df") {
-            if rest.is_empty() {
-                return Some(save_dir());
-            }
-            let dir = save_dir();
-            if for_write {
-                let _ = std::fs::create_dir_all(&dir);
-                return Some(dir.join(rest));
-            }
-            return find_ignore_case(&dir, rest);
+    if let Some((dev, rest)) = name.split_once(':')
+        && dev.len() == 3
+        && dev[..2].eq_ignore_ascii_case("df")
+    {
+        if rest.is_empty() {
+            return Some(save_dir());
         }
+        let dir = save_dir();
+        if for_write {
+            let _ = std::fs::create_dir_all(&dir);
+            return Some(dir.join(rest));
+        }
+        return find_ignore_case(&dir, rest);
     }
     // game saves (A.faery ...) go to the saves directory, not the data directory
     if name.to_ascii_lowercase().ends_with(".faery") {
@@ -87,9 +89,15 @@ unsafe fn cstr<'a>(p: *const c_char) -> &'a str {
 pub extern "C" fn Open(name: *const c_char, mode: LONG) -> BPTR {
     let name = unsafe { cstr(name) };
     let write = mode == MODE_NEWFILE;
-    let Some(path) = resolve(name, write) else { return 0 };
+    let Some(path) = resolve(name, write) else {
+        return 0;
+    };
     let file = if write {
-        OpenOptions::new().write(true).create(true).truncate(true).open(&path)
+        OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&path)
     } else {
         File::open(&path)
     };

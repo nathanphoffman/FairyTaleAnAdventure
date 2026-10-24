@@ -82,6 +82,10 @@ fn main() {
         let chunk = &data[start * BLOCK..end * BLOCK];
         let used = chunk.iter().filter(|&&b| b != 0).count();
         let pct = used * 100 / chunk.len();
-        println!("{start:5}-{:<5} {pct:3}% non-zero  {}", end - 1, label(start));
+        println!(
+            "{start:5}-{:<5} {pct:3}% non-zero  {}",
+            end - 1,
+            label(start)
+        );
     }
 }
