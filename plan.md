@@ -146,8 +146,8 @@ Superseded by `modern_engine_plan.md` (steps 2-4), which first cuts `main()` int
 gathers the state into structs, then ports the rules to Rust. Keep this list as a rough guide.
 The current approach is `rsrc/` (see section 4a of `modern_engine_plan.md`): `csrc/` stays untouched
 and each file is ported into `rsrc/`. Move modules one at a time, with the game runnable after each one. Rough order, easiest first:
-- [x] `asm_port.c`, `input.c`, `iffsubs.c`
-- [ ] `hdrive.c`, then `asm_*.c`
+- [x] `asm_port.c`, `input.c`, `iffsubs.c`, `hdrive.c`
+- [ ]  `asm_*.c`
 - [ ] `fmain2.c`
 - [ ] `fmain.c` (largest, split into modules as it moves)
 

@@ -108,9 +108,10 @@ that move must keep their C name. Leaf files first, `fmain.c` / `fmain2.c` last.
       `rsrc/iff_helpers.rs` (`ReadHeader`, `ReadLength`, `unpack_line`).
 - [x] `input.c` -> `rsrc/input.rs` (ring buffer, mouse, menu clicks, compass; pure parts unit tested).
 - [x] `iffsubs.c` -> `rsrc/iffsubs.rs` (`unpackbrush` and the shared IFF state; the unused `DEST` check and dead code were dropped).
-- [ ] Then `hdrive.c` (next), `asm_blit.c`, `asm_text.c`, `asm_map.c`, `asm_stubs.c`, `statedump.c`,
+- [x] `hdrive.c` -> `rsrc/hdrive.rs` (image-file reads plus the original trackdisk path).
+- [ ] Then (next: `asm_blit.c`) `asm_text.c`, `asm_map.c`, `asm_stubs.c`, `statedump.c`,
       `layout.c`, `narr_data.c` (keep as generated data), `fmain2.c`, `fmain.c`.
-Left off: `asm_port.c`, `input.c` and `iffsubs.c` are ported. `hdrive.c` is next.
+Left off: `asm_port.c`, `input.c` and `iffsubs.c` and `hdrive.c` are ported. `asm_blit.c` is next.
 Decision for `fmain.c`: cut `main()` into functions in `csrc/` first (step 2, the method above), then
 port the pieces to `rsrc/`. This is the one exception to "csrc is never edited": only step-2 cuts, with
 no behaviour change. Do the cuts before starting `fmain.c` in `rsrc/`; `fmain2.c` can be ported earlier.

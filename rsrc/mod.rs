@@ -3,5 +3,6 @@
 
 pub mod iff_helpers;
 pub mod iffsubs;
+pub mod hdrive;
 pub mod input;
 pub mod random;
