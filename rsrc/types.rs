@@ -1,5 +1,8 @@
 //! Rust mirrors of the game's own C structs (csrc/ftale.h and csrc/fmain.c).
 
+use crate::amiga::RasInfo;
+use std::ffi::c_void;
+
 /// One actor (`struct shape`).
 #[repr(C)]
 pub struct Shape {
@@ -57,6 +60,35 @@ pub struct Missile {
     pub archer: i8,
 }
 
+/// Where a sprite sequence is in memory (`struct seq_info`).
+#[repr(C)]
+pub struct SeqInfo {
+    pub width: i16,
+    pub height: i16,
+    pub count: i16,
+    pub location: *mut u8,
+    pub maskloc: *mut u8,
+    pub bytes: i16,
+    pub current_file: i16,
+}
+
+/// One of the two display pages being drawn and shown (`struct fpage`).
+#[repr(C)]
+pub struct FPage {
+    pub ri_page: *mut RasInfo,
+    pub savecop: *mut c_void,
+    pub isv_x: i32,
+    pub isv_y: i32,
+    pub obcount: i16,
+    pub shape_queue: *mut c_void,
+    pub backsave: *mut u8,
+    pub saveused: i32,
+    pub witchx: i16,
+    pub witchy: i16,
+    pub witchdir: i16,
+    pub wflag: i16,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -67,5 +99,7 @@ mod tests {
         assert_eq!(size_of::<Extent>(), 12);
         assert_eq!(size_of::<WorldObject>(), 6);
         assert_eq!(size_of::<Missile>(), 10);
+        assert_eq!(size_of::<SeqInfo>(), 32);
+        assert_eq!(size_of::<FPage>(), 64);
     }
 }

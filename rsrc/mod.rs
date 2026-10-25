@@ -9,6 +9,7 @@ pub mod asm_stubs;
 pub mod asm_text;
 pub mod hdrive;
 pub mod input;
+pub mod loading;
 pub mod messages;
 pub mod objects;
 pub mod random;

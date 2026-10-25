@@ -1,36 +1,14 @@
 //! Items lying in the world and the people standing around (from csrc/fmain2.c): turning the
 //! object lists of the current region into actors, and changing them.
 
-use super::types::{Shape, WorldObject};
-/// Mirror of `struct cfile_info` in csrc/fmain2.c: one loadable sprite file.
-#[repr(C)]
-struct CFileInfo {
-    width: u8,
-    height: u8,
-    count: u8,
-    numblocks: u8,
-    seq_num: u8,
-    file_id: u16,
-}
-
+use super::loading::cfiles;
+use super::types::{SeqInfo, Shape, WorldObject};
 /// Mirror of the `setfig_table` entries in csrc/fmain.c.
 #[repr(C)]
 struct SetFigEntry {
     cfile_entry: i8,
     image_base: i8,
     can_talk: i8,
-}
-
-/// Mirror of `struct seq_info`; only the location is used here.
-#[repr(C)]
-struct SeqInfo {
-    width: i16,
-    height: i16,
-    count: i16,
-    location: *mut u8,
-    maskloc: *mut u8,
-    bytes: i16,
-    current_file: i16,
 }
 
 unsafe extern "C" {
@@ -52,7 +30,6 @@ unsafe extern "C" {
     static mut dstobs: [i16; 10];
     static rand_treasure: [u8; 16];
     static setfig_table: [SetFigEntry; 0];
-    static cfiles: [CFileInfo; 0];
     static mut seq_list: [SeqInfo; 0];
 
     fn bitrand(mask: i32) -> i32;
@@ -192,8 +169,7 @@ unsafe fn distribute_treasure() {
 unsafe fn load_set_figure(id: i8) {
     unsafe {
         let entry = (*(&raw const setfig_table).cast::<SetFigEntry>().add(id as usize)).cfile_entry;
-        let files = (&raw const cfiles).cast::<CFileInfo>();
-        if (*files.add(entry as usize)).file_id != (*files.add(set_file as usize)).file_id {
+        if cfiles[entry as usize].file_id != cfiles[set_file as usize].file_id {
             set_file = entry as i16;
             nextshape = (*(&raw mut seq_list).cast::<SeqInfo>().add(SETFIG as usize)).location;
             read_shapes(entry as i32);
@@ -295,7 +271,6 @@ mod tests {
 
     #[test]
     fn struct_sizes_match_the_c_structs() {
-        assert_eq!(size_of::<CFileInfo>(), 8);
         assert_eq!(size_of::<SetFigEntry>(), 3);
     }
 

@@ -641,6 +641,7 @@ stillscreen()
 
 extern struct seq_info seq_list[];
 
+#ifndef RSRC_LOADING /* PORT: ported to rsrc/loading.rs */
 struct cfile_info {
 	UBYTE	width, height, count;	/* size of character set */
 	UBYTE	numblocks;				/* number of block to load in */
@@ -669,6 +670,7 @@ struct cfile_info {
 	{ 1,32, 8,  5,SETFIG,  946  }, /* witch */
 	{ 1,32, 8,  5,SETFIG,  951  }, /* ranger/begger */
 };
+#endif /* RSRC_LOADING */
 
 #define	SHAPE_SZ	(78000)			/* 73K for now */
 extern unsigned char *shape_mem, *nextshape;
@@ -676,6 +678,7 @@ extern unsigned short safe_r;
 
 extern short actor_file, set_file;
 
+#ifndef RSRC_LOADING /* PORT: ported to rsrc/loading.rs */
 shape_read()
 {	nextshape = shape_mem;
 	read_shapes(3); prep(OBJECTS);
@@ -707,6 +710,7 @@ read_shapes(num) register long num;
 		nextshape += size;
 	}
 }
+#endif /* RSRC_LOADING */
 
 #if 0
 extern struct IOExtTD *lastreq, diskreqs[10], *diskreq1;
@@ -733,6 +737,7 @@ motor_off()
 }
 #endif
 
+#ifndef RSRC_LOADING /* PORT: ported to rsrc/loading.rs */
 seekn()
 {	cpytest();
 	/* diskreqs[9] = *diskreq1 */ ;
@@ -857,6 +862,8 @@ UBYTE *into_chip(oldpointer,size) register UBYTE *oldpointer; long size;
 	for (i=0; i<size; i++) newpointer[i] = *oldpointer++;
 	return newpointer;
 }
+#endif /* RSRC_LOADING */
+
 
 char jtrans[] = { 0,3, 8,10, 11,15, 1,30, 2,45, 3,75, 13,20 };
 
@@ -1321,6 +1328,7 @@ short xx, yy;
 char *answers[] = {
 	"LIGHT","HEED","DEED","SIGHT","FLIGHT","CREED","BLIGHT","NIGHT" };
 
+#ifndef RSRC_LOADING /* PORT: ported to rsrc/loading.rs */
 copy_protect_junk()
 {	register char key; register long i, j;
 	register char *a, *b;
@@ -1352,6 +1360,7 @@ copy_protect_junk()
 	}
 	return TRUE;
 }
+#endif /* RSRC_LOADING */
 
 #ifdef AMIGA_ASM_68K /* PORT: 68000 inline assembly, rewritten in asm_stubs.c for now */
 
@@ -1426,10 +1435,13 @@ locktest(name,access) char *name; long access;
 }
 #endif /* RSRC_SAVEGAME */
 
+#ifndef RSRC_LOADING /* PORT: ported to rsrc/loading.rs */
 /* PORT: copy protection removed (original checked the disk's volume date) */
 cpytest()
 {	return 1;
 }
+#endif /* RSRC_LOADING */
+
 
 #ifdef AMIGA_ASM_68K /* PORT: 68000 inline assembly, rewritten in asm_stubs.c for now */
 
