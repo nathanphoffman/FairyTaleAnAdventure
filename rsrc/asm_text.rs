@@ -2,30 +2,9 @@
 //! inline #asm in fmain2.c; from csrc/asm_text.c). The story strings are in csrc/narr_data.c.
 
 use super::random::fta_rand;
+use super::types::Shape;
 use crate::amiga::RastPort;
 use std::ffi::{c_char, c_void};
-
-/// Mirror of `struct shape` in csrc/ftale.h: one actor.
-#[repr(C)]
-struct Shape {
-    abs_x: u16,
-    abs_y: u16,
-    rel_x: u16,
-    rel_y: u16,
-    kind: i8,
-    race: u8,
-    index: i8,
-    visible: i8,
-    weapon: i8,
-    environ: i8,
-    goal: i8,
-    tactic: i8,
-    state: i8,
-    facing: i8,
-    vitality: i16,
-    vel_x: i8,
-    vel_y: i8,
-}
 
 unsafe extern "C" {
     static mut rp: *mut RastPort;
@@ -339,11 +318,6 @@ pub extern "C" fn do_error(n: i32) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn size_of_actor_matches_the_c_struct() {
-        assert_eq!(size_of::<Shape>(), 22);
-    }
 
     #[test]
     fn steers_toward_a_target() {

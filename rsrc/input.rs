@@ -168,6 +168,14 @@ fn compass_direction(x: i32, y: i32) -> i16 {
     }
 }
 
+/// True (once) if a new disk was inserted since the last call.
+pub fn take_new_disk() -> bool {
+    unsafe {
+        let data = &mut *(&raw mut handler_data);
+        std::mem::replace(&mut data.newdisk, 0) != 0
+    }
+}
+
 /// Decides the walking direction from the mouse over the compass or from the keyboard direction
 /// keys, and redraws the compass when it changes.
 #[unsafe(no_mangle)]

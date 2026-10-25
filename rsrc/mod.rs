@@ -10,4 +10,7 @@ pub mod asm_text;
 pub mod hdrive;
 pub mod input;
 pub mod messages;
+pub mod objects;
 pub mod random;
+pub mod savegame;
+pub mod types;

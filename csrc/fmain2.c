@@ -1190,6 +1190,7 @@ short	mapobs[10] = { 3, 1, 5,12, 3, 5, 1, 1,61+16, 9 };	/* count */
 short	dstobs[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 1, 1 };	/* distributed */
 short	glbobs = 11;
 
+#ifndef RSRC_OBJECTS /* PORT: ported to rsrc/objects.rs */
 short j1;
 
 do_objects()
@@ -1218,6 +1219,7 @@ change_object(id,flag) register long id, flag;
 
 	if (ob->ob_id==CHEST) ob->ob_id = 0x1d; else ob->ob_stat = flag;
 }
+#endif /* RSRC_OBJECTS */
 
 extern struct {
 	BYTE	cfile_entry,image_base,can_talk;
@@ -1226,6 +1228,7 @@ extern struct {
 extern UBYTE *nextshape;
 extern char witchflag;
 
+#ifndef RSRC_OBJECTS /* PORT: ported to rsrc/objects.rs */
 set_objects(list,length,f) struct object *list; short length; long f;
 {	short xstart, ystart, i, k;
 	BYTE	cf, id;
@@ -1311,6 +1314,7 @@ set_objects(list,length,f) struct object *list; short length; long f;
 				 i++;
 	}
 }
+#endif /* RSRC_OBJECTS */
 
 char answr[10], i;
 short xx, yy;
@@ -1401,15 +1405,18 @@ _cursor
 			rts
 #endif
 
+#ifndef RSRC_SAVEGAME /* PORT: ported to rsrc/savegame.rs */
 BYTE	svflag;
 long	svfile, sverr;
 char	savename[] = "df1:A.faery";
+#endif
 
 extern char endload[2];
 
 extern struct in_work handler_data;
 extern struct  TextFont *tfont, *afont;
 /* struct FileLock *Lock(), *flock; */
+#ifndef RSRC_SAVEGAME /* PORT: ported to rsrc/savegame.rs */
 BPTR flock;
 
 locktest(name,access) char *name; long access;
@@ -1417,6 +1424,7 @@ locktest(name,access) char *name; long access;
 	if (flock) UnLock(flock);
 	return (int)flock;
 }
+#endif /* RSRC_SAVEGAME */
 
 /* PORT: copy protection removed (original checked the disk's volume date) */
 cpytest()
@@ -1430,6 +1438,7 @@ _cold	jmp		-4
 
 #endif
 
+#ifndef RSRC_SAVEGAME /* PORT: ported to rsrc/savegame.rs */
 waitnewdisk()
 {	short i;
 	for (i=0; i<300; i++)
@@ -1439,6 +1448,7 @@ waitnewdisk()
 	}
 	return FALSE;
 }
+#endif /* RSRC_SAVEGAME */
 
 extern short cheat1;
 extern char quitflag;
@@ -1462,6 +1472,7 @@ extern struct encounter {
 			file_id;
 } encounter_chart[5];
 
+#ifndef RSRC_SAVEGAME /* PORT: ported to rsrc/savegame.rs */
 savegame(hit) short hit;
 {	long	i;
 	char	*name;
@@ -1627,6 +1638,7 @@ sl_missile(m) struct missile *m;
 	sl_u8(&m->missile_type); sl_u8(&m->time_of_flight); sl_u8(&m->speed);
 	sl_u8(&m->direction); sl_u8(&m->archer);
 }
+#endif /* RSRC_SAVEGAME */
 
 move_extent(e,x,y) short e,x,y;
 {	register struct extent *ex;

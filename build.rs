@@ -37,6 +37,8 @@ fn main() {
         .flag("-Wno-implicit-fallthrough")
         // functions of fmain2.c that now live in rsrc/ (the C stays in the file, switched off)
         .define("RSRC_MESSAGES", None)
+        .define("RSRC_SAVEGAME", None)
+        .define("RSRC_OBJECTS", None)
         // the C file with the game's main() is called from Rust as fta_main()
         .define("main", "fta_main")
         .compile("fta_c");
