@@ -63,9 +63,10 @@ they move after each cut; the `/* ... */` comments in the loop mark most boundar
       `actor_ai`, `survival_tick`. State and pixel tests unchanged.
       Found: `cycle` (frame counter) was never initialised, so its start value was stack garbage and the
       cuts changed it. Now `short cycle = 0` at the top of `main()` (golden state still matches).
-- [ ] ~1478-1876 the per-actor motion loop `for (i=0; i<anix; i++)` (about 400 lines, has `goto`
-      labels such as `newloc`, `blocked`, `checkdev2`). Biggest and riskiest. Split it by actor
-      kind (hero, carrier/raft, setfig, enemy) only where the gotos stay inside one piece. Batch 3.
+- [x] Batch 3: the per-actor motion loop is now `move_actor(i, cycle, &j)`, the whole loop body moved
+      as one piece (its `goto`s cross the actor kinds, so it was not split further yet). `j` is passed by
+      pointer and `xtest`/`ytest` are static, because a dead actor reads them without setting them.
+      State and pixel tests unchanged. Splitting `move_actor` by actor kind can be done in the Rust port.
 - [x] Batch 2 (one commit, one test run): `melee_hits`, `move_missiles`, `queue_missiles`, `sort_actors`,
       `repair_map_and_witch`, `draw_sprites`. New scenarios `combat_graveyard` (kills) and `door_cave`
       (outdoor door, cave, dying). Still without scenarios: swan/turtle, key doors.
