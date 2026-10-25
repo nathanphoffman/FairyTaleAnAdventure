@@ -3,6 +3,7 @@
 
 pub mod iff_helpers;
 pub mod iffsubs;
+pub mod actors;
 pub mod asm_blit;
 pub mod asm_map;
 pub mod asm_stubs;

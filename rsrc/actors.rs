@@ -1,0 +1,475 @@
+//! Actor behaviour helpers (from csrc/fmain2.c): hits, collision against other actors, distances,
+//! enemy tactics, and a few story events.
+
+use super::asm_map::{newx, newy, prox};
+use super::asm_text::{event, placard, placard_text, prdec, set_course, speak};
+use super::messages::{name, print, print_cont};
+use super::random::{fta_rand, rand8, rand64, rand256, bitrand};
+use super::types::{Extent, Shape, WorldObject};
+use crate::amiga::{RastPort, TextFont};
+use std::ffi::c_char;
+
+unsafe extern "C" {
+    static mut anim_list: [Shape; 20];
+    static anix: i16;
+    static anix2: i16;
+    static stuff: *mut u8;
+    static xtype: u16;
+    static mut nearest: i16;
+    static leader: i16;
+    static hero_x: u16;
+    static hero_y: u16;
+    static mut hunger: i16;
+    static mut wealth: i16;
+    static mut princess: i16;
+    static mut encounter_x: u16;
+    static mut encounter_y: u16;
+    static mut extent_list: [Extent; 0];
+    static mut ob_list8: [WorldObject; 0];
+    static rp: *mut RastPort;
+    static afont: *mut TextFont;
+
+    fn effect(num: i16, speed: i32);
+    fn checkdead(i: i32, dtype: i32) -> i32;
+    fn get_turtle() -> i32;
+    fn xfer(xtest: u16, ytest: u16, flag: u16) -> i32;
+    fn map_message();
+    fn message_off();
+    fn SetFont(rp: *mut RastPort, font: *mut TextFont);
+    fn SetAPen(rp: *mut RastPort, pen: u32);
+    fn RectFill(rp: *mut RastPort, x0: i32, y0: i32, x1: i32, y1: i32);
+    fn Delay(ticks: i32);
+}
+
+// Actor kinds (csrc/ftale.h `enum sequences`, used for the `type` field).
+const OBJECTS: i8 = 1;
+const ENEMY: i8 = 2;
+const SETFIG: i8 = 4;
+/// Rafts and other carriers do not block movement.
+const RAFT_TYPE: i8 = 5;
+const DRAGON: i8 = 6;
+
+// Actor states.
+const WALKING: i8 = 12;
+const DEAD: i8 = 15;
+const SHOOT1: i8 = 24;
+
+// Goals.
+const ATTACK2: i8 = 2;
+const FLEE: i8 = 5;
+
+// Tactics.
+const PURSUE: i32 = 1;
+const FOLLOW: i32 = 2;
+const BUMBLE_SEEK: i32 = 3;
+const RANDOM: i32 = 4;
+const BACKUP: i32 = 5;
+const EVADE: i32 = 6;
+const SHOOT: i32 = 8;
+const EGG_SEEK: i32 = 10;
+
+// Races with special rules when hit.
+const RACE_WRAITH: u8 = 2;
+const RACE_SPIRIT: u8 = 9;
+const RACE_GHOST_KEEPER: u8 = 0x89;
+const RACE_UNHITTABLE: [u8; 2] = [0x8a, 0x8b];
+/// The weapon level needed to hurt spirits, and the item that also does.
+const MIN_HURT_WEAPON: i8 = 4;
+const SPIRIT_HURT_ITEM: usize = 7;
+const MESSAGE_NEEDS_WEAPON: i32 = 58;
+
+/// How far hit actors are pushed back.
+const KNOCKBACK: i16 = 2;
+const WORLD_DEAD_CHECK: i32 = 5;
+
+// Sound effects and their speeds.
+const EFFECT_ARROW_HIT: i16 = 2;
+const EFFECT_ROCK_HIT: i16 = 5;
+const EFFECT_HERO_HURT: i16 = 0;
+const EFFECT_FOE_HURT: i16 = 3;
+
+/// Message count shown after a fight only while the area is this peaceful (`xtype` below).
+const PEACEFUL_EXTENT: u16 = 50;
+const BRAVE_LOW_VITALITY: i16 = 5;
+
+/// Collision box around an actor.
+const BLOCK_HALF_WIDTH: i32 = 11;
+const BLOCK_HALF_HEIGHT: i32 = 9;
+/// Value `proxcheck` returns when another actor is in the way.
+const BLOCKED_BY_ACTOR: i32 = 16;
+/// Terrain types that never stop the hero.
+const SOFT_TERRAIN: [i32; 2] = [8, 9];
+const HERO: usize = 0;
+const RAFT_SLOT: usize = 1;
+
+/// Set when turtle eggs are in view; the slot of the eggs' actor.
+#[unsafe(no_mangle)]
+pub static mut turtle_eggs: i8 = 0;
+
+/// Actor `i`. A raw pointer, because the functions called while it is in use change actors too.
+fn actor(i: i32) -> *mut Shape {
+    (&raw mut anim_list).cast::<Shape>().wrapping_add(i as usize)
+}
+
+/// A hit from actor `i` (-1 arrow, -2 rock) on actor `j`, `wt` damage, pushing back in
+/// direction `fc`.
+#[unsafe(no_mangle)]
+pub extern "C" fn dohit(i: i32, j: i32, fc: i32, wt: i16) {
+    unsafe {
+        let target = actor(j);
+        if (*actor(HERO as i32)).weapon < MIN_HURT_WEAPON
+            && ((*target).race == RACE_SPIRIT
+                || ((*target).race == RACE_GHOST_KEEPER && *stuff.add(SPIRIT_HURT_ITEM) == 0))
+        {
+            speak(MESSAGE_NEEDS_WEAPON);
+            return;
+        }
+        if RACE_UNHITTABLE.contains(&(*target).race) {
+            return;
+        }
+        (*target).vitality = ((*target).vitality - wt).max(0);
+        match (i, j) {
+            (-1, _) => effect(EFFECT_ARROW_HIT, 500 + rand64()),
+            (-2, _) => effect(EFFECT_ROCK_HIT, 3200 + bitrand(511)),
+            (_, 0) => effect(EFFECT_HERO_HURT, 800 + bitrand(511)),
+            _ => effect(EFFECT_FOE_HURT, 400 + rand256()),
+        }
+        // push back the foe
+        if (*target).kind != DRAGON
+            && (*target).kind != SETFIG
+            && move_figure(j as i16, fc as i16, KNOCKBACK) != 0
+            && i >= 0
+        {
+            move_figure(i as i16, fc as i16, KNOCKBACK);
+        }
+        checkdead(j, WORLD_DEAD_CHECK);
+    }
+}
+
+/// After a fight: reports how many foes were defeated or fled.
+#[unsafe(no_mangle)]
+pub extern "C" fn aftermath() {
+    unsafe {
+        let (mut dead, mut fled) = (0, 0);
+        for i in 3..anix as i32 {
+            let a = actor(i);
+            if (*a).kind != ENEMY {
+                continue;
+            }
+            if (*a).state == DEAD {
+                dead += 1;
+            } else if (*a).goal == FLEE {
+                fled += 1;
+            }
+        }
+        let vitality = (*actor(HERO as i32)).vitality;
+        if vitality < 1 {
+            // dead, so no message
+        } else if vitality < BRAVE_LOW_VITALITY && dead != 0 {
+            print(c"Bravely done!".as_ptr());
+        } else if xtype < PEACEFUL_EXTENT {
+            if dead != 0 {
+                print(c"".as_ptr());
+                prdec(dead, 1);
+                print_cont(c"foes were defeated in battle.".as_ptr());
+            }
+            if fled != 0 {
+                print(c"".as_ptr());
+                prdec(fled, 1);
+                print_cont(c"foes fled in retreat.".as_ptr());
+            }
+        }
+        // check for presence of turtle eggs
+        if turtle_eggs != 0 {
+            get_turtle();
+        }
+    }
+}
+
+/// What blocks actor `i` at (x, y): a terrain type, 16 for another actor, or 0 if clear.
+#[unsafe(no_mangle)]
+pub extern "C" fn proxcheck(x: i16, y: i16, i: i16) -> i32 {
+    unsafe {
+        let me = actor(i as i32);
+        if (*me).kind != ENEMY || (*me).race != RACE_WRAITH {
+            let mut terrain = prox(x as i32, y as i32);
+            if i == 0 && SOFT_TERRAIN.contains(&terrain) {
+                terrain = 0;
+            }
+            if terrain != 0 {
+                return terrain;
+            }
+        }
+        for j in 0..anix as i32 {
+            let other = actor(j);
+            // dead actors and rafts can be walked over
+            if i as i32 != j && j != RAFT_SLOT as i32 && (*other).kind != RAFT_TYPE && (*other).state != DEAD {
+                let dx = x as i32 - (*other).abs_x as i32;
+                let dy = y as i32 - (*other).abs_y as i32;
+                if dx < BLOCK_HALF_WIDTH && dx > -BLOCK_HALF_WIDTH && dy < BLOCK_HALF_HEIGHT && dy > -BLOCK_HALF_HEIGHT {
+                    return BLOCKED_BY_ACTOR;
+                }
+            }
+        }
+        0
+    }
+}
+
+/// Finds the nearest actor to the hero closer than `dist`, setting `nearest`; returns the
+/// distance found. With `constraint` set, objects are ignored too.
+#[unsafe(no_mangle)]
+pub extern "C" fn nearest_fig(constraint: c_char, mut dist: i16) -> i32 {
+    /// Index of the "still" object type that always counts.
+    const ALWAYS_COUNTED_OBJECT: i8 = 0x1d;
+    unsafe {
+        nearest = 0;
+        for i in 1..anix2 as i32 {
+            let a = actor(i);
+            if (*a).kind == OBJECTS && (constraint != 0 || (*a).index == ALWAYS_COUNTED_OBJECT) {
+                continue;
+            }
+            let d = calc_dist(i, 0);
+            if d < dist as i32 {
+                nearest = i as i16;
+                dist = d as i16;
+            }
+        }
+        dist as i32
+    }
+}
+
+/// Distance between two actors, approximating the diagonal as (x + y) * 5 / 7.
+#[unsafe(no_mangle)]
+pub extern "C" fn calc_dist(a: i32, b: i32) -> i32 {
+    let (a, b) = unsafe { (&*actor(a), &*actor(b)) };
+    let x = (a.abs_x as i32 - b.abs_x as i32).abs();
+    let y = (a.abs_y as i32 - b.abs_y as i32).abs();
+    if x > y + y {
+        x
+    } else if y > x + x {
+        y
+    } else {
+        (x + y) * 5 / 7
+    }
+}
+
+/// Moves an actor `dist` in direction `dir` if nothing blocks it. Returns TRUE if it moved.
+#[unsafe(no_mangle)]
+pub extern "C" fn move_figure(fig: i16, dir: i16, dist: i16) -> i32 {
+    unsafe {
+        let a = actor(fig as i32);
+        let xtest = newx((*a).abs_x as i32, dir as i32, dist as i32) as u16;
+        let ytest = newy((*a).abs_y as i32, dir as i32, dist as i32) as u16;
+        if proxcheck(xtest as i16, ytest as i16, fig) != 0 {
+            return 0;
+        }
+        (*a).abs_x = xtest;
+        (*a).abs_y = ytest;
+        1
+    }
+}
+
+// How an enemy shooting at the hero lines up.
+const SHOOT_CLOSE: i16 = 8;
+const SHOOT_DIAGONAL_BELOW: i16 = 5;
+const SHOOT_DIAGONAL_ABOVE: i16 = 7;
+// `set_course` modes.
+const COURSE_TOWARD: i32 = 0;
+const COURSE_AWAY: i32 = 3;
+const COURSE_STRAIGHT: i32 = 4;
+const COURSE_TURN_ONLY: i32 = 5;
+const COURSE_WOBBLE_CLOSE: i32 = 2;
+/// The followers aim this far below the one they follow.
+const FOLLOW_OFFSET: i32 = 20;
+/// Where snakes go to find the eggs.
+const EGG_X: i32 = 23087;
+const EGG_Y: i32 = 5667;
+
+/// Runs one step of enemy `i`'s tactic.
+#[unsafe(no_mangle)]
+pub extern "C" fn do_tactic(i: i32, tactic: i32) {
+    unsafe {
+        let mut r = fta_rand() & 7 == 0;
+        let an = actor(i);
+        (*an).tactic = tactic as i8;
+        if (*an).goal == ATTACK2 {
+            r = fta_rand() & 3 == 0;
+        }
+        let (hx, hy) = (hero_x as i32, hero_y as i32);
+        match tactic {
+            PURSUE => {
+                if r {
+                    set_course(i, hx, hy, COURSE_TOWARD);
+                }
+            }
+            SHOOT => {
+                let hero = actor(HERO as i32);
+                let xd = ((*an).abs_x as i32 - (*hero).abs_x as i32) as i16;
+                let yd = ((*an).abs_y as i32 - (*hero).abs_y as i32) as i16;
+                let (xd, yd) = (xd.wrapping_abs(), yd.wrapping_abs());
+                let lined_up = xd < SHOOT_CLOSE
+                    || yd < SHOOT_CLOSE
+                    || (xd as i32 > yd as i32 - SHOOT_DIAGONAL_BELOW as i32 && (xd as i32) < yd as i32 + SHOOT_DIAGONAL_ABOVE as i32);
+                if fta_rand() & 1 != 0 && lined_up {
+                    set_course(i, hx, hy, COURSE_TURN_ONLY);
+                    if (*an).state < SHOOT1 {
+                        (*an).state = SHOOT1;
+                    }
+                } else {
+                    set_course(i, hx, hy, COURSE_TOWARD);
+                }
+            }
+            RANDOM => {
+                if r {
+                    (*an).facing = (fta_rand() & 7) as i8;
+                }
+                (*an).state = WALKING;
+            }
+            BUMBLE_SEEK => {
+                if r {
+                    set_course(i, hx, hy, COURSE_STRAIGHT);
+                }
+            }
+            BACKUP => {
+                if r {
+                    set_course(i, hx, hy, COURSE_AWAY);
+                }
+            }
+            FOLLOW => {
+                let f = leader as i32; // follow the leader
+                if i == f {
+                    (*an).tactic = RANDOM as i8; // can't follow self
+                }
+                if r {
+                    let target = actor(f);
+                    set_course(i, (*target).abs_x as i32, (*target).abs_y as i32 + FOLLOW_OFFSET, COURSE_TOWARD);
+                }
+            }
+            EVADE => {
+                let f = if i == anix as i32 { i - 1 } else { i + i };
+                if r {
+                    let target = actor(f);
+                    set_course(i, (*target).abs_x as i32, (*target).abs_y as i32 + FOLLOW_OFFSET, COURSE_WOBBLE_CLOSE);
+                }
+            }
+            EGG_SEEK => {
+                if r {
+                    set_course(i, EGG_X, EGG_Y, COURSE_TOWARD);
+                }
+                (*an).state = WALKING;
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Centres extent `e` on a point.
+#[unsafe(no_mangle)]
+pub extern "C" fn move_extent(e: i16, x: i16, y: i16) {
+    const HALF_WIDTH: i32 = 250;
+    const HALF_HEIGHT: i32 = 200;
+    unsafe {
+        let extent = &mut *(&raw mut extent_list).cast::<Extent>().add(e as usize);
+        extent.x1 = (x as i32 - HALF_WIDTH) as u16;
+        extent.y1 = (y as i32 - HALF_HEIGHT) as u16;
+        extent.x2 = (x as i32 + HALF_WIDTH) as u16;
+        extent.y2 = (y as i32 + HALF_HEIGHT) as u16;
+    }
+}
+
+// The rescue scene.
+const PLACARD_PEN: u32 = 24;
+const RESCUE_PAUSE: i32 = 380;
+const CLEAR_PAUSE: i32 = 10;
+const PLACARD_AREA: (i32, i32, i32, i32) = (13, 13, 271, 107);
+const PRINCESS_HOME: (u16, u16) = (5511, 33780);
+const PRINCESS_EXTENT: (i16, i16) = (22205, 21231);
+/// Entries of the interior object list (`ob_list8`) that change when the princess is rescued.
+const PRINCESS_OBJECT: usize = 2;
+const PRINCESS_OBJECT_ID: i8 = 4;
+const CAPTIVE_OBJECT: usize = 9;
+const PRINCESS_STUFF: usize = 28;
+/// Items 16 to 21 (the keys) get this many extra.
+const KEY_ITEMS: std::ops::Range<usize> = 16..22;
+const KEYS_REWARD: u8 = 3;
+const REWARD_MESSAGE: i32 = 18;
+const REWARD_GOLD: i16 = 100;
+
+/// The scene when a princess is rescued, and her reward.
+#[unsafe(no_mangle)]
+pub extern "C" fn rescue() {
+    unsafe {
+        map_message();
+        SetFont(rp, afont);
+        let line = princess as i32 * 3;
+        placard_text(8 + line);
+        name();
+        placard_text(9 + line);
+        name();
+        placard_text(10 + line);
+        placard();
+        Delay(RESCUE_PAUSE);
+        SetAPen(rp, 0);
+        let (x0, y0, x1, y1) = PLACARD_AREA;
+        RectFill(rp, x0, y0, x1, y1);
+        Delay(CLEAR_PAUSE);
+        SetAPen(rp, PLACARD_PEN);
+        placard_text(17);
+        name();
+        placard_text(18);
+        Delay(RESCUE_PAUSE);
+        message_off();
+
+        princess += 1;
+        xfer(PRINCESS_HOME.0, PRINCESS_HOME.1, 0); // do princess transfer
+        move_extent(0, PRINCESS_EXTENT.0, PRINCESS_EXTENT.1);
+        let objects = (&raw mut ob_list8).cast::<WorldObject>();
+        (*objects.add(PRINCESS_OBJECT)).ob_id = PRINCESS_OBJECT_ID;
+        *stuff.add(PRINCESS_STUFF) = 1;
+        speak(REWARD_MESSAGE);
+        wealth = wealth.wrapping_add(REWARD_GOLD);
+        (*objects.add(CAPTIVE_OBJECT)).ob_stat = 0;
+        for item in KEY_ITEMS {
+            *stuff.add(item) = (*stuff.add(item)).wrapping_add(KEYS_REWARD);
+        }
+    }
+}
+
+/// Eats: lowers hunger by `amt`.
+#[unsafe(no_mangle)]
+pub extern "C" fn eat(amt: i32) {
+    const HUNGER_FULL_MESSAGE: i32 = 13;
+    unsafe {
+        hunger = (hunger as i32 - amt) as i16;
+        if hunger < 0 {
+            hunger = 0;
+            event(HUNGER_FULL_MESSAGE);
+        } else {
+            print(c"Yum!".as_ptr());
+        }
+    }
+}
+
+// An encounter appears this far away: 150 plus up to 63.
+const ENCOUNTER_MIN_DISTANCE: i32 = 150;
+
+/// Picks where a new encounter appears: a random direction and distance from the hero.
+#[unsafe(no_mangle)]
+pub extern "C" fn set_loc() {
+    unsafe {
+        let direction = rand8();
+        let distance = ENCOUNTER_MIN_DISTANCE + rand64();
+        encounter_x = newx(hero_x as i32, direction, distance) as u16;
+        encounter_y = newy(hero_y as i32, direction, distance) as u16;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn struct_sizes() {
+        assert_eq!(size_of::<Extent>(), 12);
+    }
+}

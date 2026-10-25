@@ -228,6 +228,10 @@ _set_course
 
 extern char *stuff;
 
+extern short nearest;
+extern short xtype;
+
+#ifndef RSRC_ACTORS /* PORT: ported to rsrc/actors.rs */
 dohit(i,j,fc,wt) short wt; register long j,i,fc;
 {	if (anim_list[0].weapon < 4 &&
 		(anim_list[j].race == 9 ||
@@ -247,8 +251,6 @@ dohit(i,j,fc,wt) short wt; register long j,i,fc;
 	checkdead(j,5);
 }
 
-extern short nearest;
-extern short xtype;
 char	turtle_eggs;
 
 aftermath()
@@ -329,6 +331,7 @@ move_figure(fig,dir,dist) short fig,dir,dist;
 	anim_list[fig].abs_y = ytest;
 	return TRUE;
 }
+#endif /* RSRC_ACTORS */
 
 struct compvars {
 	UBYTE	xrect, yrect;
@@ -1652,6 +1655,7 @@ sl_missile(m) struct missile *m;
 }
 #endif /* RSRC_SAVEGAME */
 
+#ifndef RSRC_ACTORS /* PORT: ported to rsrc/actors.rs */
 move_extent(e,x,y) short e,x,y;
 {	register struct extent *ex;
 	ex = extent_list + e;
@@ -1660,6 +1664,7 @@ move_extent(e,x,y) short e,x,y;
 	ex->x2 = x + 250;
 	ex->y2 = y + 200;
 }
+#endif /* RSRC_ACTORS */
 
 short sun_colors[] = {
  0x000, 0x000, 0x001, 0x002, 0x002, 0x012, 0x112, 0x113,
@@ -1676,6 +1681,7 @@ extern short princess;
 
 extern struct TextFont *afont;
 
+#ifndef RSRC_ACTORS /* PORT: ported to rsrc/actors.rs */
 rescue()
 {	register long i;
 	map_message(); SetFont(rp,afont);
@@ -1696,6 +1702,7 @@ rescue()
 	ob_list8[9].ob_stat = 0;
 	for (i=16; i<22; i++) stuff[i] += 3;
 }
+#endif /* RSRC_ACTORS */
 
 win_colors()
 {	register long i, j;
@@ -1757,6 +1764,7 @@ day_fade()
 
 extern short leader;
 
+#ifndef RSRC_ACTORS /* PORT: ported to rsrc/actors.rs */
 do_tactic(i,tactic) register long i,tactic;
 {	register long r, f; register struct shape *an;
 	r = !(rand()&7);
@@ -1795,6 +1803,7 @@ do_tactic(i,tactic) register long i,tactic;
 	{	if (r) set_course(i,23087,5667,0); an->state = WALKING; }
 }
 
+#ifndef RSRC_ACTORS /* PORT: ported to rsrc/actors.rs */
 extern short hunger;
 
 eat(amt)
@@ -1802,11 +1811,14 @@ eat(amt)
 	if (hunger < 0) { hunger = 0; event(13); }
 	else print("Yum!");
 }
+#endif /* RSRC_ACTORS */
+#endif /* RSRC_ACTORS */
 
 short minimap[120];
 
 extern short encounter_x, encounter_y;
 
+#ifndef RSRC_ACTORS /* PORT: ported to rsrc/actors.rs */
 set_loc()
 {	register long d,j;
 	j = rand8();			/* direction */
@@ -1814,6 +1826,5 @@ set_loc()
 	encounter_x = newx(hero_x,j,d);
 	encounter_y = newy(hero_y,j,d);
 }
-
-
+#endif /* RSRC_ACTORS */
 

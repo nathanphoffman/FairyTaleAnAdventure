@@ -40,6 +40,7 @@ fn main() {
         .define("RSRC_SAVEGAME", None)
         .define("RSRC_OBJECTS", None)
         .define("RSRC_LOADING", None)
+        .define("RSRC_ACTORS", None)
         // the C file with the game's main() is called from Rust as fta_main()
         .define("main", "fta_main")
         .compile("fta_c");
