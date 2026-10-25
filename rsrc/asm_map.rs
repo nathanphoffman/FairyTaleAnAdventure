@@ -4,6 +4,8 @@
 //! World coordinates are 15 bit. A tile ("image") is 16 pixels wide and 32 tall; a sector is
 //! 16 x 8 tiles; the region map is 128 x 32 sectors, one byte each.
 
+use super::tables::minimap;
+
 unsafe extern "C" {
     static xreg: u16;
     static yreg: u16;
@@ -17,7 +19,6 @@ unsafe extern "C" {
     static sector_mem: *const u8;
     static terra_mem: *const u8;
     static image_mem: *const u8;
-    static mut minimap: [i16; 120];
     static planes: *mut *mut u8;
     static mut secx: i32;
     static mut secy: i32;

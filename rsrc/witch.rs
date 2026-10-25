@@ -1,7 +1,8 @@
 //! The witch's spinning beam (from csrc/fmain2.c): a filled quadrilateral drawn in XOR mode
 //! in a temporary layer, with the sign of the hero's side of each edge kept for hit tests.
-//! The work areas it uses are still defined in csrc/fmain2.c.
+//! 
 
+use super::tables::witchpoints;
 use super::types::FPage;
 use crate::amiga::{AreaInfo, BitMap, Layer, RastPort, TmpRas};
 
@@ -12,17 +13,6 @@ unsafe extern "C" {
     static map_y: u16;
     static mut rp_map: RastPort;
     static li: *mut std::ffi::c_void;
-    static witchpoints: [i8; 256];
-    static mut s1: i16;
-    static mut s2: i16;
-    static mut sg1: i16;
-    static mut sg2: i16;
-    static mut mytmp: TmpRas;
-    static mut myAreaInfo: AreaInfo;
-    static mut areabuffer: [i16; 20];
-    static mut myras: *mut u8;
-    static mut layer: *mut Layer;
-    static mut oldlayer: *mut Layer;
 
     fn CreateUpfrontLayer(
         li: *mut std::ffi::c_void,
@@ -44,6 +34,30 @@ unsafe extern "C" {
     fn AreaEnd(rp: *mut RastPort) -> i32;
     fn SetDrMd(rp: *mut RastPort, mode: u32);
 }
+
+/// Which side of each beam edge the hero is on (the cross product and whether it is not negative).
+/// Read by the witch's steering in csrc/fmain.c under the names `s1` and `s2`.
+#[unsafe(export_name = "s1")]
+pub static mut SIDE_1: i16 = 0;
+#[unsafe(export_name = "s2")]
+pub static mut SIDE_2: i16 = 0;
+static mut SIDE_FLAG_1: i16 = 0;
+static mut SIDE_FLAG_2: i16 = 0;
+
+// Work areas for filling the beam.
+static mut MY_TMP: TmpRas = TmpRas { RasPtr: std::ptr::null_mut(), Size: 0 };
+static mut MY_AREA_INFO: AreaInfo = AreaInfo {
+    VctrTbl: std::ptr::null_mut(),
+    VctrPtr: std::ptr::null_mut(),
+    FlagTbl: std::ptr::null_mut(),
+    FlagPtr: std::ptr::null_mut(),
+    Count: 0,
+    MaxCount: 0,
+};
+static mut AREA_BUFFER: [i16; 20] = [0; 20];
+static mut MY_RAS: *mut u8 = std::ptr::null_mut();
+static mut LAYER: *mut Layer = std::ptr::null_mut();
+static mut OLD_LAYER: *mut Layer = std::ptr::null_mut();
 
 const LAYER_SIMPLE: i32 = 1;
 const COMPLEMENT: u32 = 2;
@@ -67,8 +81,8 @@ fn raster_bytes(width: u32, height: u32) -> i32 {
 }
 
 /// The two points of the beam edge for direction `dir`, relative to the witch.
-unsafe fn edge(dir: i16, fp: &FPage) -> ((i16, i16), (i16, i16)) {
-    unsafe {
+fn edge(dir: i16, fp: &FPage) -> ((i16, i16), (i16, i16)) {
+    {
         let start = ((dir as i32 * POINT_BYTES) as u8) as usize;
         let w = &witchpoints[start..start + 4];
         (
@@ -95,35 +109,35 @@ pub extern "C" fn witch_fx(fp: *mut FPage) {
         let xh = hero_x.wrapping_sub(map_x & TILE_X_MASK) as i16;
         let yh = hero_y.wrapping_sub(map_y & TILE_Y_MASK) as i16;
 
-        layer = CreateUpfrontLayer(li, rp_map.BitMap, 0, 0, LAYER_WIDTH, LAYER_HEIGHT, LAYER_SIMPLE, std::ptr::null_mut());
+        LAYER = CreateUpfrontLayer(li, rp_map.BitMap, 0, 0, LAYER_WIDTH, LAYER_HEIGHT, LAYER_SIMPLE, std::ptr::null_mut());
         let r = &raw mut rp_map;
-        oldlayer = (*r).Layer;
-        (*r).Layer = layer;
+        OLD_LAYER = (*r).Layer;
+        (*r).Layer = LAYER;
 
         let (p1, p2) = edge(fp.witchdir.wrapping_add(DIRECTIONS_BEFORE as i16), fp);
         let (p3, p4) = edge(fp.witchdir.wrapping_add(DIRECTIONS_AFTER as i16), fp);
-        (s1, sg1) = side(p1, p2, xh, yh);
-        (s2, sg2) = side(p3, p4, xh, yh);
+        (SIDE_1, SIDE_FLAG_1) = side(p1, p2, xh, yh);
+        (SIDE_2, SIDE_FLAG_2) = side(p3, p4, xh, yh);
 
         SetDrMd(r, COMPLEMENT);
-        myras = AllocRaster(RASTER_SIZE, RASTER_SIZE);
-        if !myras.is_null() {
+        MY_RAS = AllocRaster(RASTER_SIZE, RASTER_SIZE);
+        if !MY_RAS.is_null() {
             let old_tmp = (*r).TmpRas;
             let old_area = (*r).AreaInfo;
-            (*r).TmpRas = InitTmpRas(&raw mut mytmp, myras, raster_bytes(RASTER_SIZE, RASTER_SIZE));
-            InitArea(&raw mut myAreaInfo, (&raw mut areabuffer).cast(), AREA_MAX_VECTORS);
-            (*r).AreaInfo = &raw mut myAreaInfo;
+            (*r).TmpRas = InitTmpRas(&raw mut MY_TMP, MY_RAS, raster_bytes(RASTER_SIZE, RASTER_SIZE));
+            InitArea(&raw mut MY_AREA_INFO, (&raw mut AREA_BUFFER).cast(), AREA_MAX_VECTORS);
+            (*r).AreaInfo = &raw mut MY_AREA_INFO;
             AreaMove(r, p1.0 as i32, p1.1 as i32);
             AreaDraw(r, p2.0 as i32, p2.1 as i32);
             AreaDraw(r, p4.0 as i32, p4.1 as i32);
             AreaDraw(r, p3.0 as i32, p3.1 as i32);
             AreaEnd(r);
-            FreeRaster(myras, RASTER_SIZE, RASTER_SIZE);
+            FreeRaster(MY_RAS, RASTER_SIZE, RASTER_SIZE);
             (*r).TmpRas = old_tmp;
             (*r).AreaInfo = old_area;
         }
-        (*r).Layer = oldlayer;
-        DeleteLayer(std::ptr::null_mut(), layer);
+        (*r).Layer = OLD_LAYER;
+        DeleteLayer(std::ptr::null_mut(), LAYER);
     }
 }
 

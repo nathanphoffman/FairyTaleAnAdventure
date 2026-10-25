@@ -148,7 +148,7 @@ The current approach is `rsrc/` (see section 4a of `modern_engine_plan.md`): `cs
 and each file is ported into `rsrc/`. Move modules one at a time, with the game runnable after each one. Rough order, easiest first:
 - [x] `asm_port.c`, `input.c`, `iffsubs.c`, `hdrive.c`
 - [x] `asm_blit.c`, `asm_text.c`, `asm_map.c`, `asm_stubs.c`
-- [x] `fmain2.c` functions (data tables still in C)
+- [x] `fmain2.c` (functions and data tables)
 - [ ] `fmain.c` (largest, split into modules as it moves)
 
 ### Phase 8 - Polish

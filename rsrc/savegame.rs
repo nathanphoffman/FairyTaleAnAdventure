@@ -4,6 +4,7 @@
 use super::input::take_new_disk;
 use super::asm_text::prq;
 use super::messages::print;
+use super::tables::{dstobs, glbobs, mapobs, ob_listg, ob_table};
 use super::types::{Extent, Missile, Shape, WorldObject};
 use crate::amiga::{BPTR, RastPort, TextFont};
 use std::ffi::{c_char, c_void};
@@ -14,11 +15,6 @@ unsafe extern "C" {
     static afont: *mut TextFont;
     static mut anim_list: [Shape; 20];
     static mut extent_list: [Extent; 0];
-    static mut ob_listg: [WorldObject; 0];
-    static mut ob_table: [*mut WorldObject; 10];
-    static mut mapobs: [i16; 10];
-    static mut dstobs: [i16; 10];
-    static glbobs: i16;
     static mut wt: i16;
     static mut encounter_number: u8;
     static mut encounter_type: u16;

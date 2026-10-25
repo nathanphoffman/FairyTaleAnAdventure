@@ -1,30 +1,17 @@
 //! Screen colour effects and panel updates (from csrc/fmain2.c): the compass, fading the page
 //! colours with the time of day, the teleport flash, the print queue and the win sequence.
-//! The colour tables and view ports they use are still defined in csrc/fmain2.c.
+//! The colour tables live in `tables`; the view ports are still defined in csrc/fmain.c.
 
 use super::asm_text::{move_to, placard, placard_text, prdec, text};
 use super::iffsubs::unpackbrush;
 use super::messages::{name, print};
 use super::random::bitrand;
+use super::tables::{comptable, fader, pagecolors, pplay, prec, print_que, sun_colors};
 use super::types::{FPage, Shape};
 use crate::amiga::{BitMap, RastPort, ViewPort};
-use std::ffi::c_char;
-
-/// Mirror of `struct compvars` in csrc/fmain2.c: where a compass direction is lit.
-#[repr(C)]
-struct CompassPart {
-    xrect: u8,
-    yrect: u8,
-    xsize: u8,
-    ysize: u8,
-}
 
 unsafe extern "C" {
-    static mut fader: [u16; 32];
-    static mut pagecolors: [u16; 32];
-    static sun_colors: [i16; 53];
     static blackcolors: [i16; 32];
-    static comptable: [CompassPart; 10];
     static mut vp_page: ViewPort;
     static mut vp_text: ViewPort;
     static mut rp: *mut RastPort;
@@ -52,9 +39,6 @@ unsafe extern "C" {
     #[link_name = "kind"]
     static hero_kind: i16;
     static wealth: i16;
-    static print_que: [c_char; 32];
-    static mut pplay: i16;
-    static prec: i16;
 
     fn BltBitMap(
         src: *mut BitMap,
@@ -221,7 +205,7 @@ pub extern "C" fn ppick() {
             Delay(1);
             return;
         }
-        let request = print_que[pplay as usize] as i32;
+        let request = (*(&raw const print_que))[pplay as usize] as i32;
         pplay = (pplay + 1) & QUEUE_MASK;
         match request {
             REQUEST_DEBUG_COORDS => {
@@ -423,7 +407,7 @@ mod tests {
 
     #[test]
     fn compass_part_is_four_bytes() {
-        assert_eq!(size_of::<CompassPart>(), 4);
+        assert_eq!(size_of::<super::super::tables::CompassPart>(), 4);
     }
 
     #[test]

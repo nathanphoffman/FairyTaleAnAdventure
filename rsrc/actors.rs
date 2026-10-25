@@ -5,6 +5,7 @@ use super::asm_map::{newx, newy, prox};
 use super::asm_text::{event, placard, placard_text, prdec, set_course, speak};
 use super::messages::{name, print, print_cont};
 use super::random::{fta_rand, rand8, rand64, rand256, bitrand};
+use super::tables::ob_list8;
 use super::types::{Extent, Shape, WorldObject};
 use crate::amiga::{RastPort, TextFont};
 use std::ffi::c_char;
@@ -25,7 +26,6 @@ unsafe extern "C" {
     static mut encounter_x: u16;
     static mut encounter_y: u16;
     static mut extent_list: [Extent; 0];
-    static mut ob_list8: [WorldObject; 0];
     static rp: *mut RastPort;
     static afont: *mut TextFont;
 

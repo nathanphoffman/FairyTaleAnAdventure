@@ -114,8 +114,8 @@ that move must keep their C name. Leaf files first, `fmain.c` / `fmain2.c` last.
 - [ ] Then `statedump.c`, `layout.c` (both stay C until the end: layout checks Rust against the C
       compiler's struct sizes, statedump reads game globals), `narr_data.c` (keep as generated data),
       `fmain2.c`, `fmain.c`.
-Left off: every function in `fmain2.c` is ported (data tables remain). `fmain.c` is next.
-#### `fmain2.c` split (done for all functions)
+Left off: `fmain2.c` is fully ported and out of the build. `fmain.c` is next.
+#### `fmain2.c` split (done)
 All functions are ported as groups, each into its own `rsrc/` file. The old C stays in `fmain2.c`
 inside `#ifndef RSRC_<GROUP>` (the macros are defined in `build.rs`), so the original is still
 readable there and a group can be switched back to C for a bisect.
@@ -128,10 +128,11 @@ readable there and a group can be switched back to C for a bisect.
       `rescue`, `eat`, `set_loc`.
 - [x] `screen_fx.rs`: compass, `fade_page`, `ppick`, `map_message`, `win_colors`, `day_fade`.
 - [x] `witch.rs`: `witch_fx` (only about 40 lines; the first estimate counted the data tables).
-- [ ] What is left in `fmain2.c` is data only (about 380 lines): colour tables (`pagecolors`,
-      `sun_colors`), the object lists (`ob_list0`-`ob_list9`, `ob_table`, `mapobs`), `witchpoints`,
-      `itrans`, the bow tables and the witch/layer work areas. Next: move them into `rsrc/tables.rs`
-      (or generate them) and drop `fmain2.c`.
+- [x] The data tables moved to `tables.rs` (colour tables, object lists and `ob_table`, `witchpoints`,
+      bow and loot tables, `minimap`, print queue). `fmain2.c` is no longer compiled; the file stays
+      as the reference (with its `RSRC_*` guards, which are off, so it reads as the original).
+      `cargo build` is the check that catches a symbol the remaining C still needs (it found `s1`
+      and `s2`); `cargo test` alone does not link the C.
 Not covered by the regression scenarios yet: `win_colors`, `rescue`, `witch_fx`, the trackdisk
 path in `hdrive`. They were ported line by line; a scenario for each would be worth adding.
 

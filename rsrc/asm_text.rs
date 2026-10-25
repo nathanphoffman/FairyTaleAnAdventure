@@ -2,6 +2,7 @@
 //! inline #asm in fmain2.c; from csrc/asm_text.c). The story strings are in csrc/narr_data.c.
 
 use super::random::fta_rand;
+use super::tables::{answr, pplay, prec, print_que, xx, yy};
 use super::types::Shape;
 use crate::amiga::RastPort;
 use std::ffi::{c_char, c_void};
@@ -11,12 +12,6 @@ unsafe extern "C" {
     static mut rp_map: RastPort;
     static mut anim_list: [Shape; 20];
     static stuff: *const u8;
-    static answr: [c_char; 10];
-    static xx: i16;
-    static yy: i16;
-    static mut print_que: [c_char; 32];
-    static mut prec: i16;
-    static pplay: i16;
     static mut numbuf: [c_char; 11];
     static event_msg: [c_char; 0];
     static speeches: [c_char; 0];
@@ -164,7 +159,7 @@ pub extern "C" fn cursor(len: i32, pen: i32) {
     unsafe {
         SetBPen(rp, 0);
         Move(rp, xx as i32, yy as i32);
-        Text(rp, answr.as_ptr(), len);
+        Text(rp, (&raw const answr).cast(), len);
         SetBPen(rp, pen as u32);
         Text(rp, space, 1);
         SetBPen(rp, 0);

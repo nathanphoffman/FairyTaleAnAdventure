@@ -2,6 +2,7 @@
 //! object lists of the current region into actors, and changing them.
 
 use super::loading::cfiles;
+use super::tables::{CHEST, TURTLE, dstobs, glbobs, mapobs, ob_listg, ob_table, rand_treasure};
 use super::types::{SeqInfo, Shape, WorldObject};
 /// Mirror of the `setfig_table` entries in csrc/fmain.c.
 #[repr(C)]
@@ -23,12 +24,6 @@ unsafe extern "C" {
     static mut witchflag: i8;
     static mut turtle_eggs: i8;
     static mut nextshape: *mut u8;
-    static glbobs: i16;
-    static mut ob_listg: [WorldObject; 0];
-    static mut ob_table: [*mut WorldObject; 10];
-    static mut mapobs: [i16; 10];
-    static mut dstobs: [i16; 10];
-    static rand_treasure: [u8; 16];
     static setfig_table: [SetFigEntry; 0];
     static mut seq_list: [SeqInfo; 0];
 
@@ -45,9 +40,6 @@ const SETFIG: i8 = 4;
 const STILL: i8 = 13;
 const DEAD: i8 = 15;
 
-// Item ids with special meaning (enum obytes in csrc/fmain2.c).
-const CHEST: i8 = 15;
-const TURTLE: i8 = 102;
 /// What a chest turns into when opened.
 const OPENED_CHEST: i8 = 0x1d;
 /// The witch's set figure id.
@@ -131,7 +123,7 @@ pub extern "C" fn change_object(id: i32, flag: i32) {
         } else {
             ob_table[region_num as usize].add(index)
         };
-        if (*object).ob_id == CHEST {
+        if (*object).ob_id == CHEST as i8 {
             (*object).ob_id = OPENED_CHEST;
         } else {
             (*object).ob_stat = flag as i8;
@@ -239,7 +231,7 @@ pub extern "C" fn set_objects(mut list: *mut WorldObject, mut length: i16, f: i3
                         anix2 = j1;
                     }
                 } else {
-                    if object.ob_id == TURTLE {
+                    if object.ob_id == TURTLE as i8 {
                         turtle_eggs = anix2 as i8;
                     }
                     actor = &mut (*(&raw mut anim_list))[anix2 as usize];

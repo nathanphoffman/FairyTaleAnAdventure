@@ -4,7 +4,6 @@
 fn main() {
     let files = [
         "fmain.c",
-        "fmain2.c",
         "layout.c",
         "narr_data.c",
         "statedump.c",
@@ -35,13 +34,6 @@ fn main() {
         .flag("-Wno-missing-parameter-type")
         .flag("-Wno-unused-but-set-variable")
         .flag("-Wno-implicit-fallthrough")
-        // functions of fmain2.c that now live in rsrc/ (the C stays in the file, switched off)
-        .define("RSRC_MESSAGES", None)
-        .define("RSRC_SAVEGAME", None)
-        .define("RSRC_OBJECTS", None)
-        .define("RSRC_LOADING", None)
-        .define("RSRC_ACTORS", None)
-        .define("RSRC_SCREEN_FX", None)
         // the C file with the game's main() is called from Rust as fta_main()
         .define("main", "fta_main")
         .compile("fta_c");
