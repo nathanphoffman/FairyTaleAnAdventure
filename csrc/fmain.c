@@ -1288,9 +1288,386 @@ static void update_hero(cycle) short cycle;
 	anim_list[0].state = inum;
 }
 
+/* PORT: split out of main(): how close the hero is to the raft or turtle
+   (raftprox 1 = near, 2 = very near); riding the turtle sets the hero's environ. */
+static void raft_proximity()
+{	short xstart, ystart;
+
+	raftprox = turtleprox = FALSE;
+	if (active_carrier) wcarry = 3; else wcarry = 1;
+	xstart = anim_list[0].abs_x - anim_list[wcarry].abs_x - 4;
+	ystart = anim_list[0].abs_y - anim_list[wcarry].abs_y - 4;
+	if (xstart < 16 && xstart > -16 && ystart < 16 && ystart > -16)
+		raftprox = 1;
+	if (xstart < 9 && xstart > -9 && ystart < 9 && ystart > -9)
+		raftprox = 2;
+
+	if (riding==11) anim_list[0].environ = -2;
+}
+
+/* PORT: split out of main(): copies the hero's position and handles sleeping on a bed
+   (indoors, standing on a bed tile for 30 ticks). */
+static void check_bed()
+{	long i;
+
+	if (anim_list[0].state != STILL) sleepwait = 0;
+	hero_x = anim_list[0].abs_x;
+	hero_y = anim_list[0].abs_y;
+
+	if (region_num == 8)	/* inside buildings */
+	{	i = *(mapxy(hero_x>>4,hero_y>>5));
+		/* if we're on a sleeping spot */
+		if (i == 161 || i == 52 || i == 162 || i == 53)
+		{	sleepwait++;
+			if (sleepwait == 30)
+			{	if (fatigue < 50) event(25);
+				else
+				{	event(26);
+					hero_y = (anim_list[0].abs_y |= 0x1f);
+					anim_list[0].state = SLEEP;
+				}
+			}
+		}
+		else sleepwait = 0;
+	}
+}
+
+/* PORT: split out of main(): is the hero standing at a door (binary search outdoors, linear search
+   indoors)? If so, transfer to the other side. Riding disables doors. */
+static void check_door()
+{	long i;
+	short j, k;
+	unsigned short xtest, ytest;
+
+	i = 0;
+	k = DOORCOUNT - 1;
+
+	xtest = hero_x & 0xfff0;
+	ytest = hero_y & 0xffe0;
+	
+	if (riding) return;
+	if (region_num < 8)
+	{	while (k >= i)
+		{	struct door *d;
+			j = (k + i)/2;
+			d = doorlist + j;
+
+			if (d->xc1 > xtest) k = j-1;
+			else if (d->xc1+16 < xtest) i = j+1;
+			else if ((d->xc1 < xtest) &&
+				((d->type & 1) == 0)) /* door not Horiz. */
+					i = j+1;
+			else if (d->yc1 > ytest) k = j-1;
+			else if (d->yc1 < ytest) i = j+1;
+			else 
+			{	if (d->type & 1)
+				{	if (hero_y & 0x10) goto nodoor; }
+				else if ((hero_x & 15) >6 ) goto nodoor;
+
+				if (d->type == DESERT && (stuff[STATBASE]<5)) break;
+				if (d->type == CAVE)
+				{	xtest = d->xc2 + 24; ytest = d->yc2 + 16; }
+				else if (d->type & 1)
+				{	xtest = d->xc2 + 16; ytest = d->yc2; }
+				else { xtest = d->xc2-1; ytest = d->yc2 + 16; }
+
+				if (d->secs == 1) new_region = 8; else new_region = 9;
+				xfer(xtest,ytest,FALSE);
+				find_place(2);
+				fade_page(100,100,100,TRUE,pagecolors);
+			nodoor:	break;
+			}
+			if (i >= DOORCOUNT || k < 0) break;
+		}
+	}
+	else 
+	{	for (j=0; j<DOORCOUNT; j++)
+		{	struct door *d; d = &(doorlist[j]);
+			if (d->yc2==ytest && 
+				( d->xc2==xtest || (d->xc2==xtest-16 && d->type & 1)))
+			{	if (d->type & 1)
+				{	if ((hero_y & 0x10)==0) goto nodoor2; }
+				else if ((hero_x & 15) < 2) goto nodoor2;
+
+				if (d->type == CAVE)
+				{	xtest = d->xc1 - 4; ytest = d->yc1 + 16; }
+				else if (d->type & 1)
+				{	xtest = d->xc1 + 16; ytest = d->yc1 + 34; }
+				else { xtest = d->xc1 + 20; ytest = d->yc1 + 16; }
+
+				xfer(xtest,ytest,TRUE);
+				find_place(FALSE);
+			nodoor2: break;
+			}
+		}
+	}
+}
+
+/* PORT: split out of main(): puts back the background under last frame's sprites, then undoes
+   the witch effect on that page. */
+static void undo_sprites()
+{	long i;
+
+
+	bm_draw = fp_drawing->ri_page->BitMap;
+	planes = bm_draw->Planes;
+
+	OwnBlitter();
+	for (i=fp_drawing->obcount; i>0; i--)
+	{	shp = &(fp_drawing->shape_queue[i-1]);
+		rest_blit(shp->backsave);
+	}
+	DisownBlitter();
+
+	/* undo witch fx */
+
+	rp_map.BitMap = fp_drawing->ri_page->BitMap;
+	if (fp_drawing->wflag) witch_fx(fp_drawing);
+}
+
+/* PORT: split out of main(): sleeping, the day/night clock, light level, day period messages,
+   day_fade and the slow healing. */
+static void day_night_tick()
+{	long i;
+
+	if (anim_list[0].state == SLEEP)
+	{	daynight += 63;
+		if (fatigue) fatigue--;
+		if (fatigue == 0 ||
+			(fatigue < 30 && daynight > 9000 && daynight < 10000) ||
+			(battleflag && (rand64() == 0)) )
+		{	anim_list[0].state = STILL;
+			hero_y = (anim_list[0].abs_y &= 0xffe0);
+		}
+	}
+	if (!freeze_timer) /* no time in timestop */
+		if ((daynight++) >= 24000) daynight = 0;
+	lightlevel = daynight/40;
+	if (lightlevel >= 300) lightlevel = 600 - lightlevel;
+	if (lightlevel < 40) ob_listg[5].ob_stat = 3;
+	else ob_listg[5].ob_stat = 2;
+	i = (daynight / 2000);
+	if (i != dayperiod)
+	{	switch (dayperiod = i) {
+		case 0: event(28); break;
+		case 4: event(29); break;
+		case 6: event(30); break;
+		case 9: event(31); break;
+		}
+	}
+
+	day_fade();
+
+	if ((daynight & 0x3ff) == 0)
+	{	if (anim_list[0].vitality < (15+brave/4) && anim_list[0].state != DEAD)
+		{	anim_list[0].vitality++;
+			prq(4);
+		}
+	}
+}
+
+/* PORT: split out of main(): find_place, finishing an actor load, placing waiting encounters
+   and starting a new random encounter. */
+static void spawn_encounters()
+{	long i;
+	short k;
+
+	find_place(2);
+
+	if (actors_loading == TRUE && CheckDiskIO(8))
+		/* CheckIO((struct IORequest *)&diskreqs[8]) ) */
+	{	prep(ENEMY); motor_off();
+		actors_loading = FALSE;
+		anix = 3;
+	}
+	if ((daynight & 15)==0 && encounter_number && !actors_loading)
+	{	mixflag = rand(); if (xtype > 49) mixflag = 0; wt = rand4();
+		if ((xtype & 3) == 0) mixflag = 0;
+		for (k=1; k<10; k++) /* try to place encounter 10 times */
+		{	set_loc();
+			if (px_to_im(encounter_x,encounter_y) == 0)
+			{	while (encounter_number && anix < 7)
+				{	if (set_encounter(anix,63)) anix++;
+					encounter_number--;
+				}
+				for (i=3; (i<7) && encounter_number; i++)
+				{	if (anim_list[i].state == DEAD &&
+					   (!anim_list[i].visible ||
+						anim_list[i].race == 2))
+						{	set_encounter(i,63);
+							encounter_number--;
+						}
+				}
+				break;
+			}
+		}
+	}
+	if ((daynight & 31) == 0 && !actors_on_screen &&
+		!actors_loading && !active_carrier && xtype < 50)
+	{	if (region_num > 7) danger_level = 5 + xtype;
+		else danger_level = 2 + xtype;
+
+		if (rand64() <= danger_level)
+		{	encounter_type = rand4();
+			if (xtype == 7 && encounter_type == 2)
+				encounter_type = 4;
+			if (xtype == 8) { encounter_type = 6; mixflag = 0; }
+			if (xtype == 49) { encounter_type = 2; mixflag = 0; }
+			load_actors();
+		}
+	}
+}
+
+/* PORT: split out of main(): the nearest person speaks when they change. */
+static void speak_nearby()
+{	short k;
+
+	k = anim_list[nearest_person].race;
+	if (nearest_person && k != last_person)
+	{	switch(k) {
+		case 0x8d: speak(23); break; /* beggar */
+		case 0x89: speak(46); break; /* witch */
+		case 0x84: if (ob_list8[9].ob_stat) speak(16); break; /* princess */
+		case    9: speak(43); break; /* necromancer */
+		case    7: speak(41); break; /* dknight */
+		}
+		last_person = k;
+	}
+}
+
+/* PORT: split out of main(): decides each enemy's goal and tactic, and starts or ends battle mood. */
+static void actor_ai()
+{	long i;
+	short battle2;
+	struct shape *an;
+
+	actors_on_screen = FALSE;
+	leader = 0;
+	battle2 = battleflag;
+	battleflag = FALSE;
+	for (i=2; i<anix; i++) /* skip raft */
+	{	short xd, yd, mode, tactic, r;
+
+		if (goodfairy && goodfairy < 120) break;
+		an = &(anim_list[i]);					
+		if (an->type == CARRIER)
+		{	if ((daynight & 15) == 0)
+				set_course(i,hero_x,hero_y,5);
+			continue;
+		}
+		else if (an->type == SETFIG) continue;
+		mode = an->goal;
+		tactic = an->tactic;
+
+		xd = an->abs_x-hero_x;
+		yd = an->abs_y-hero_y;
+		if (xd < 0) xd = -xd;
+		if (yd < 0) yd = -yd;
+		if (xd < 300 && yd < 300)
+		{	actors_on_screen = TRUE;
+			if (anim_list[i].vitality < 1) continue;
+			if (an->visible || battle2) battleflag = TRUE;
+		}
+		r = !bitrand(15);
+		if (anim_list[0].state == DEAD || anim_list[0].state == FALL)
+		{	if (leader == 0) mode = FLEE;
+			else mode = FOLLOWER;
+		}
+/* special encounters don't flee with 60 xtype */
+		else if (an->vitality < 2 ||
+				(xtype > 59 && an->race != extn->v3))
+					mode = FLEE;
+		if (tactic == FRUST || tactic == SHOOTFRUST)
+		{	if (an->weapon & 4) do_tactic(i,rand4()+2);
+			else do_tactic(i,rand2()+3);
+		}
+		else if (an->state == SHOOT1) an->state = SHOOT3;
+		else if (mode <= ARCHER2) /* hostile character */
+		{	char thresh;
+			if ((mode & 2) == 0) r = !rand4();
+			if (r)
+			{	if (an->race==4 && turtle_eggs) tactic = EGG_SEEK;
+				else if (an->weapon < 1)
+				{	mode = CONFUSED; tactic = RANDOM; }
+				else if (an->vitality < 6 && rand2())
+					tactic = EVADE;
+				else if (mode >= ARCHER1)
+				{	if (xd < 40 && yd < 30) tactic = BACKUP;
+					else if (xd < 70 && yd < 70) tactic = SHOOT;
+					else tactic = PURSUE;
+				}
+				else tactic = PURSUE;
+			}
+			thresh = 14 - mode;
+			if (an->race == 7) thresh = 16;
+			if ((an->weapon & 4)==0 && xd < thresh && yd < thresh)
+			{	set_course(i,hero_x,hero_y,0);
+				if (an->state >= WALKING) an->state = FIGHTING;
+			}
+			else if (an->race == 7 && an->vitality)
+			{	an->state = STILL; an->facing = 5;	}
+			else do_tactic(i,tactic);
+		}
+		else if (mode == FLEE) { do_tactic(i,BACKUP); }
+		else if (mode == FOLLOWER) { do_tactic(i,FOLLOW); }
+		else if (mode == STAND)
+		{	set_course(i,hero_x,hero_y,0);
+			an->state = STILL;
+		}
+		else if (mode == WAIT) { an->state = STILL; }
+
+		/* no set_course for sinking characters unless swimmable */
+
+		an->goal = mode;
+		if (leader == 0) leader = i;
+	}
+	if ((battle2==0) && battleflag) setmood(1);
+	if (battleflag==0 && battle2)
+	{	prq(7); prq(4); aftermath(); }
+}
+
+/* PORT: split out of main(): safe zone, music mood, hunger and fatigue. */
+static void survival_tick()
+{	
+	if ((daynight & 127) == 0 &&
+		!actors_on_screen && /* set safe zone */
+		!actors_loading && !witchflag &&
+		anim_list[0].environ == 0 && safe_flag == 0 &&
+		anim_list[0].state != DEAD)
+		{	safe_r = region_num; 
+			safe_x = hero_x; safe_y = hero_y;
+			if (hunger > 30 && stuff[24])
+			{	stuff[24]--; hunger -= 30; event(37);  }
+		}
+	if ((daynight & 7) == 0 && !battleflag) setmood(0);
+	if ((daynight & 127) == 0 && anim_list[0].vitality &&
+			anim_list[0].state != SLEEP)
+	{	hunger++;
+		fatigue++;
+		if (hunger == 35) event(0);
+		else if (hunger == 60) event(1);
+		else if ((hunger & 7)==0)
+		{	if (anim_list[0].vitality > 5)
+			{	if (hunger > 100 || fatigue > 160)
+				{	anim_list[0].vitality-=2; prq(4); }
+				if (hunger > 90) event(2);
+			}
+			else if (fatigue > 170)
+			{	event(12); anim_list[0].state = SLEEP; }
+			else if (hunger > 140)
+			{	event(24); hunger = 130;
+				anim_list[0].state = SLEEP;
+			}
+		}
+		if (fatigue == 70) event(3);
+		else if (hunger == 90) event(4);
+	}
+}
+
 void main(int argc,char argv[])
 {	register long i;
 	short j, k; char key;
+	short cycle = 0;	/* PORT: frame counter; was declared inside the loop and started uninitialised */
 	short dif_x, dif_y, xstart, ystart, xstop, ystop;
 	unsigned short	xtest, ytest;
 	struct shape *an;
@@ -1430,7 +1807,7 @@ no_intro:
 
 	cheat1 = quitflag = FALSE;
 	while (!quitflag)
-	{	short cycle, atype, inum, notpause;
+	{	short atype, inum, notpause;
 		extern unsigned char fta_pia;
 		BYTE *pia = (BYTE *)&fta_pia;	/* PORT: was the CIA register at 0xbfe001 */
 		unsigned char *backalloc, crack;
@@ -1464,16 +1841,7 @@ no_intro:
 		update_hero(cycle);
 
 		/* determine the monster and character motion effects */
-		raftprox = turtleprox = FALSE;
-		if (active_carrier) wcarry = 3; else wcarry = 1;
-		xstart = anim_list[0].abs_x - anim_list[wcarry].abs_x - 4;
-		ystart = anim_list[0].abs_y - anim_list[wcarry].abs_y - 4;
-		if (xstart < 16 && xstart > -16 && ystart < 16 && ystart > -16)
-			raftprox = 1;
-		if (xstart < 9 && xstart > -9 && ystart < 9 && ystart > -9)
-			raftprox = 2;
-
-		if (riding==11) anim_list[0].environ = -2;
+		raft_proximity();
 
 		for (i=0; i<anix; i++)
 		{	short d, e, s, dex, nvx, nvy, nvx1, nvy1;
@@ -1878,92 +2246,11 @@ no_intro:
 
 		/* update map position */
 
-		if (anim_list[0].state != STILL) sleepwait = 0;
-		hero_x = anim_list[0].abs_x;
-		hero_y = anim_list[0].abs_y;
-
-		if (region_num == 8)	/* inside buildings */
-		{	i = *(mapxy(hero_x>>4,hero_y>>5));
-			/* if we're on a sleeping spot */
-			if (i == 161 || i == 52 || i == 162 || i == 53)
-			{	sleepwait++;
-				if (sleepwait == 30)
-				{	if (fatigue < 50) event(25);
-					else
-					{	event(26);
-						hero_y = (anim_list[0].abs_y |= 0x1f);
-						anim_list[0].state = SLEEP;
-					}
-				}
-			}
-			else sleepwait = 0;
-		}
+		check_bed();
 
 		/* check for door */
 
-		i = 0;
-		k = DOORCOUNT - 1;
-
-		xtest = hero_x & 0xfff0;
-		ytest = hero_y & 0xffe0;
-		
-		if (riding) goto nodoor3;
-		if (region_num < 8)
-		{	while (k >= i)
-			{	struct door *d;
-				j = (k + i)/2;
-				d = doorlist + j;
-
-				if (d->xc1 > xtest) k = j-1;
-				else if (d->xc1+16 < xtest) i = j+1;
-				else if ((d->xc1 < xtest) &&
-					((d->type & 1) == 0)) /* door not Horiz. */
-						i = j+1;
-				else if (d->yc1 > ytest) k = j-1;
-				else if (d->yc1 < ytest) i = j+1;
-				else 
-				{	if (d->type & 1)
-					{	if (hero_y & 0x10) goto nodoor; }
-					else if ((hero_x & 15) >6 ) goto nodoor;
-
-					if (d->type == DESERT && (stuff[STATBASE]<5)) break;
-					if (d->type == CAVE)
-					{	xtest = d->xc2 + 24; ytest = d->yc2 + 16; }
-					else if (d->type & 1)
-					{	xtest = d->xc2 + 16; ytest = d->yc2; }
-					else { xtest = d->xc2-1; ytest = d->yc2 + 16; }
-
-					if (d->secs == 1) new_region = 8; else new_region = 9;
-					xfer(xtest,ytest,FALSE);
-					find_place(2);
-					fade_page(100,100,100,TRUE,pagecolors);
-				nodoor:	break;
-				}
-				if (i >= DOORCOUNT || k < 0) break;
-			}
-		}
-		else 
-		{	for (j=0; j<DOORCOUNT; j++)
-			{	struct door *d; d = &(doorlist[j]);
-				if (d->yc2==ytest && 
-					( d->xc2==xtest || (d->xc2==xtest-16 && d->type & 1)))
-				{	if (d->type & 1)
-					{	if ((hero_y & 0x10)==0) goto nodoor2; }
-					else if ((hero_x & 15) < 2) goto nodoor2;
-
-					if (d->type == CAVE)
-					{	xtest = d->xc1 - 4; ytest = d->yc1 + 16; }
-					else if (d->type & 1)
-					{	xtest = d->xc1 + 16; ytest = d->yc1 + 34; }
-					else { xtest = d->xc1 + 20; ytest = d->yc1 + 16; }
-
-					xfer(xtest,ytest,TRUE);
-					find_place(FALSE);
-				nodoor2: break;
-				}
-			}
-		}
-		nodoor3:
+		check_door();
 
 		/* update map position */
 
@@ -1971,21 +2258,7 @@ no_intro:
 		hero_y = anim_list[0].abs_y;
 
 		/* generate map */
-
-		bm_draw = fp_drawing->ri_page->BitMap;
-		planes = bm_draw->Planes;
-
-		OwnBlitter();
-		for (i=fp_drawing->obcount; i>0; i--)
-		{	shp = &(fp_drawing->shape_queue[i-1]);
-			rest_blit(shp->backsave);
-		}
-		DisownBlitter();
-
-		/* undo witch fx */
-
-		rp_map.BitMap = fp_drawing->ri_page->BitMap;
-		if (fp_drawing->wflag) witch_fx(fp_drawing);
+		undo_sprites();
 
 		img_x = map_x>>4;
 		img_y = map_y>>5;
@@ -2020,214 +2293,14 @@ no_intro:
 
 				viewchange:
 
-				if (anim_list[0].state == SLEEP)
-				{	daynight += 63;
-					if (fatigue) fatigue--;
-					if (fatigue == 0 ||
-						(fatigue < 30 && daynight > 9000 && daynight < 10000) ||
-						(battleflag && (rand64() == 0)) )
-					{	anim_list[0].state = STILL;
-						hero_y = (anim_list[0].abs_y &= 0xffe0);
-					}
-				}
-				if (!freeze_timer) /* no time in timestop */
-					if ((daynight++) >= 24000) daynight = 0;
-				lightlevel = daynight/40;
-				if (lightlevel >= 300) lightlevel = 600 - lightlevel;
-				if (lightlevel < 40) ob_listg[5].ob_stat = 3;
-				else ob_listg[5].ob_stat = 2;
-				i = (daynight / 2000);
-				if (i != dayperiod)
-				{	switch (dayperiod = i) {
-					case 0: event(28); break;
-					case 4: event(29); break;
-					case 6: event(30); break;
-					case 9: event(31); break;
-					}
-				}
-
-				day_fade();
-
-				if ((daynight & 0x3ff) == 0)
-				{	if (anim_list[0].vitality < (15+brave/4) && anim_list[0].state != DEAD)
-					{	anim_list[0].vitality++;
-						prq(4);
-					}
-				}
+				day_night_tick();
 
 				if (freeze_timer) goto stasis;
 
-				find_place(2);
-
-				if (actors_loading == TRUE && CheckDiskIO(8))
-					/* CheckIO((struct IORequest *)&diskreqs[8]) ) */
-				{	prep(ENEMY); motor_off();
-					actors_loading = FALSE;
-					anix = 3;
-				}
-				if ((daynight & 15)==0 && encounter_number && !actors_loading)
-				{	mixflag = rand(); if (xtype > 49) mixflag = 0; wt = rand4();
-					if ((xtype & 3) == 0) mixflag = 0;
-					for (k=1; k<10; k++) /* try to place encounter 10 times */
-					{	set_loc();
-						if (px_to_im(encounter_x,encounter_y) == 0)
-						{	while (encounter_number && anix < 7)
-							{	if (set_encounter(anix,63)) anix++;
-								encounter_number--;
-							}
-							for (i=3; (i<7) && encounter_number; i++)
-							{	if (anim_list[i].state == DEAD &&
-								   (!anim_list[i].visible ||
-									anim_list[i].race == 2))
-									{	set_encounter(i,63);
-										encounter_number--;
-									}
-							}
-							break;
-						}
-					}
-				}
-				if ((daynight & 31) == 0 && !actors_on_screen &&
-					!actors_loading && !active_carrier && xtype < 50)
-				{	if (region_num > 7) danger_level = 5 + xtype;
-					else danger_level = 2 + xtype;
-
-					if (rand64() <= danger_level)
-					{	encounter_type = rand4();
-						if (xtype == 7 && encounter_type == 2)
-							encounter_type = 4;
-						if (xtype == 8) { encounter_type = 6; mixflag = 0; }
-						if (xtype == 49) { encounter_type = 2; mixflag = 0; }
-						load_actors();
-					}
-				}
-				k = anim_list[nearest_person].race;
-				if (nearest_person && k != last_person)
-				{	switch(k) {
-					case 0x8d: speak(23); break; /* beggar */
-					case 0x89: speak(46); break; /* witch */
-					case 0x84: if (ob_list8[9].ob_stat) speak(16); break; /* princess */
-					case    9: speak(43); break; /* necromancer */
-					case    7: speak(41); break; /* dknight */
-					}
-					last_person = k;
-				}
-				actors_on_screen = FALSE;
-				leader = 0;
-				battle2 = battleflag;
-				battleflag = FALSE;
-				for (i=2; i<anix; i++) /* skip raft */
-				{	short xd, yd, mode, tactic, r;
-
-					if (goodfairy && goodfairy < 120) break;
-					an = &(anim_list[i]);					
-					if (an->type == CARRIER)
-					{	if ((daynight & 15) == 0)
-							set_course(i,hero_x,hero_y,5);
-						continue;
-					}
-					else if (an->type == SETFIG) continue;
-					mode = an->goal;
-					tactic = an->tactic;
-
-					xd = an->abs_x-hero_x;
-					yd = an->abs_y-hero_y;
-					if (xd < 0) xd = -xd;
-					if (yd < 0) yd = -yd;
-					if (xd < 300 && yd < 300)
-					{	actors_on_screen = TRUE;
-						if (anim_list[i].vitality < 1) continue;
-						if (an->visible || battle2) battleflag = TRUE;
-					}
-					r = !bitrand(15);
-					if (anim_list[0].state == DEAD || anim_list[0].state == FALL)
-					{	if (leader == 0) mode = FLEE;
-						else mode = FOLLOWER;
-					}
-/* special encounters don't flee with 60 xtype */
-					else if (an->vitality < 2 ||
-							(xtype > 59 && an->race != extn->v3))
-								mode = FLEE;
-					if (tactic == FRUST || tactic == SHOOTFRUST)
-					{	if (an->weapon & 4) do_tactic(i,rand4()+2);
-						else do_tactic(i,rand2()+3);
-					}
-					else if (an->state == SHOOT1) an->state = SHOOT3;
-					else if (mode <= ARCHER2) /* hostile character */
-					{	char thresh;
-						if ((mode & 2) == 0) r = !rand4();
-						if (r)
-						{	if (an->race==4 && turtle_eggs) tactic = EGG_SEEK;
-							else if (an->weapon < 1)
-							{	mode = CONFUSED; tactic = RANDOM; }
-							else if (an->vitality < 6 && rand2())
-								tactic = EVADE;
-							else if (mode >= ARCHER1)
-							{	if (xd < 40 && yd < 30) tactic = BACKUP;
-								else if (xd < 70 && yd < 70) tactic = SHOOT;
-								else tactic = PURSUE;
-							}
-							else tactic = PURSUE;
-						}
-						thresh = 14 - mode;
-						if (an->race == 7) thresh = 16;
-						if ((an->weapon & 4)==0 && xd < thresh && yd < thresh)
-						{	set_course(i,hero_x,hero_y,0);
-							if (an->state >= WALKING) an->state = FIGHTING;
-						}
-						else if (an->race == 7 && an->vitality)
-						{	an->state = STILL; an->facing = 5;	}
-						else do_tactic(i,tactic);
-					}
-					else if (mode == FLEE) { do_tactic(i,BACKUP); }
-					else if (mode == FOLLOWER) { do_tactic(i,FOLLOW); }
-					else if (mode == STAND)
-					{	set_course(i,hero_x,hero_y,0);
-						an->state = STILL;
-					}
-					else if (mode == WAIT) { an->state = STILL; }
-
-					/* no set_course for sinking characters unless swimmable */
-
-					an->goal = mode;
-					if (leader == 0) leader = i;
-				}
-				if ((battle2==0) && battleflag) setmood(1);
-				if (battleflag==0 && battle2)
-				{	prq(7); prq(4); aftermath(); }
-				if ((daynight & 127) == 0 &&
-					!actors_on_screen && /* set safe zone */
-					!actors_loading && !witchflag &&
-					anim_list[0].environ == 0 && safe_flag == 0 &&
-					anim_list[0].state != DEAD)
-					{	safe_r = region_num; 
-						safe_x = hero_x; safe_y = hero_y;
-						if (hunger > 30 && stuff[24])
-						{	stuff[24]--; hunger -= 30; event(37);  }
-					}
-				if ((daynight & 7) == 0 && !battleflag) setmood(0);
-				if ((daynight & 127) == 0 && anim_list[0].vitality &&
-						anim_list[0].state != SLEEP)
-				{	hunger++;
-					fatigue++;
-					if (hunger == 35) event(0);
-					else if (hunger == 60) event(1);
-					else if ((hunger & 7)==0)
-					{	if (anim_list[0].vitality > 5)
-						{	if (hunger > 100 || fatigue > 160)
-							{	anim_list[0].vitality-=2; prq(4); }
-							if (hunger > 90) event(2);
-						}
-						else if (fatigue > 170)
-						{	event(12); anim_list[0].state = SLEEP; }
-						else if (hunger > 140)
-						{	event(24); hunger = 130;
-							anim_list[0].state = SLEEP;
-						}
-					}
-					if (fatigue == 70) event(3);
-					else if (hunger == 90) event(4);
-				}
+				spawn_encounters();
+				speak_nearby();
+				actor_ai();
+				survival_tick();
 				stasis: ;
 			}
 			else { dif_x = dif_y = 0; map_draw(); }

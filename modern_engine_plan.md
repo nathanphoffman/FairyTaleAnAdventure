@@ -58,15 +58,15 @@ Input, hero update, actor update, combat, spawning, render, menus. Run tests aft
 - [x] `update_hero` (timers, dead/fairy, shoot/ride/fight/walk state). Tests unchanged.
 Remaining blocks inside the `main()` loop of `csrc/fmain.c` (line numbers as of commit 184cc37,
 they move after each cut; the `/* ... */` comments in the loop mark most boundaries):
-- [ ] ~1466 raft/turtle proximity setup (10 lines). Do together with the next one.
+- [x] Batch 1 (one commit, one test run): `raft_proximity`, `check_bed`, `check_door`, `undo_sprites`,
+      and the world update split into `day_night_tick`, `spawn_encounters`, `speak_nearby`,
+      `actor_ai`, `survival_tick`. State and pixel tests unchanged.
+      Found: `cycle` (frame counter) was never initialised, so its start value was stack garbage and the
+      cuts changed it. Now `short cycle = 0` at the top of `main()` (golden state still matches).
 - [ ] ~1478-1876 the per-actor motion loop `for (i=0; i<anix; i++)` (about 400 lines, has `goto`
       labels such as `newloc`, `blocked`, `checkdev2`). Biggest and riskiest. Split it by actor
-      kind (hero, carrier/raft, setfig, enemy) only where the gotos stay inside one piece.
-- [ ] ~1877 "check for bed" and "update map position"
-- [ ] ~1902 "check for door" (about 65 lines)
-- [ ] ~1968 "update map position" and "generate map", ~1985 "undo witch fx"
-- [ ] ~1990-2245 map scroll/redraw (`scrollmap`, `map_draw`, `viewchange:`) and the per-tick
-      world updates: day/night, encounter spawning (~2068), mood/music (~2195-2208)
+      kind (hero, carrier/raft, setfig, enemy) only where the gotos stay inside one piece. Batch 3.
+Batch 2:
 - [ ] ~2248-2315 combat hit detection loop (weapon reach, `newx`/`newy`, damage)
 - [ ] ~2316 flying missiles, ~2337 sprite sort (bubble sort), ~2340 `drawnow:`
 - [ ] ~2371 finish map repair, ~2376 "do witch fx"
