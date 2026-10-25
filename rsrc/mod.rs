@@ -15,4 +15,6 @@ pub mod messages;
 pub mod objects;
 pub mod random;
 pub mod savegame;
+pub mod screen_fx;
 pub mod types;
+pub mod witch;

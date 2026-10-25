@@ -352,6 +352,7 @@ struct compvars {
 extern UBYTE *nhinor, *nhivar;
 extern struct BitMap *bm_text, *bm_source;
 
+#ifndef RSRC_SCREEN_FX /* PORT: ported to rsrc/screen_fx.rs and rsrc/witch.rs */
 drawcompass(dir) short dir;
 {	register long xr, yr, xs, ys;
 	xr = comptable[dir].xrect;
@@ -365,6 +366,7 @@ drawcompass(dir) short dir;
 		BltBitMap(bm_source,xr,yr,bm_text,567+xr,15+yr,xs,ys,0xC0,4,NULL);
 	}
 }
+#endif /* RSRC_SCREEN_FX */
 
 USHORT fader[32];
 
@@ -378,6 +380,7 @@ extern short secret_timer, light_timer, freeze_timer;
 struct ViewPort vp_page;
 extern UWORD region_num, new_region;
 
+#ifndef RSRC_SCREEN_FX /* PORT: ported to rsrc/screen_fx.rs and rsrc/witch.rs */
 fade_page(r,g,b,limit,colors) short r,g,b,limit; USHORT *colors;
 {	register long r1,b1,g1,g2;
 	short i;
@@ -421,11 +424,13 @@ fade_page(r,g,b,limit,colors) short r,g,b,limit; USHORT *colors;
 	}
 	LoadRGB4(&vp_page,fader,32);
 }
+#endif /* RSRC_SCREEN_FX */
 
 extern struct RastPort *rp;
 
 /* asm */
 
+#ifndef RSRC_SCREEN_FX /* PORT: ported to rsrc/screen_fx.rs and rsrc/witch.rs */
 colorplay() /* teleport effect */
 {	register long i,j;
 	for (j=0; j<32; j++)
@@ -434,6 +439,7 @@ colorplay() /* teleport effect */
 		Delay(1);
 	}
 }
+#endif /* RSRC_SCREEN_FX */
 
 char print_que[32];
 short prec=0, pplay=0;
@@ -443,6 +449,7 @@ SHORT sg1, sg2;
 
 short db1, db2;
 
+#ifndef RSRC_SCREEN_FX /* PORT: ported to rsrc/screen_fx.rs and rsrc/witch.rs */
 ppick()
 {	register long p;
 	if (prec == pplay) Delay(1);
@@ -472,6 +479,7 @@ ppick()
 		}
 	}
 }
+#endif /* RSRC_SCREEN_FX */
 
 #ifdef AMIGA_ASM_68K /* PORT: 68000 inline assembly, rewritten in asm_stubs.c for now */
 		public	_prec,_pplay,_print_que,_prq
@@ -607,6 +615,7 @@ extern struct BitMap *bm_draw;
 extern struct fpage *fp_drawing, *fp_viewing;
 extern char	viewstatus;
 
+#ifndef RSRC_SCREEN_FX /* PORT: ported to rsrc/screen_fx.rs and rsrc/witch.rs */
 map_message()
 {	fade_down();
 	rp = &rp_map;
@@ -641,6 +650,7 @@ stillscreen()
 {	fp_drawing->ri_page->RxOffset = fp_drawing->ri_page->RyOffset = 0;
 	pagechange();
 }
+#endif /* RSRC_SCREEN_FX */
 
 extern struct seq_info seq_list[];
 
@@ -935,6 +945,7 @@ struct Layer *layer, templayer, *oldlayer /*, *CreateUpfrontLayer() */ ;
 extern struct Layer_Info *li;
 SHORT	s1,s2;
 
+#ifndef RSRC_SCREEN_FX /* PORT: ported to rsrc/screen_fx.rs and rsrc/witch.rs */
 witch_fx(fp) register struct fpage *fp;
 {	UBYTE	w1; register BYTE *w;
 	register struct RastPort *r;
@@ -984,6 +995,7 @@ witch_fx(fp) register struct fpage *fp;
 	r->Layer = oldlayer;
 	DeleteLayer(NULL,layer);
 }
+#endif /* RSRC_SCREEN_FX */
 
 enum obytes {
 	QUIVER=11,
@@ -1704,6 +1716,7 @@ rescue()
 }
 #endif /* RSRC_ACTORS */
 
+#ifndef RSRC_SCREEN_FX /* PORT: ported to rsrc/screen_fx.rs and rsrc/witch.rs */
 win_colors()
 {	register long i, j;
 	placard_text(6); name(); placard_text(7); placard(); Delay(80);
@@ -1736,6 +1749,7 @@ win_colors()
 	Delay(30);
 	LoadRGB4(&vp_page,(void *)blackcolors,32);
 }
+#endif /* RSRC_SCREEN_FX */
 
 #ifdef AMIGA_ASM_68K /* PORT: 68000 inline assembly, rewritten in asm_stubs.c for now */
 		public	_stuff_flag,_stuff
@@ -1752,6 +1766,7 @@ _stuff_flag
 extern USHORT daynight, lightlevel;
 extern short light_timer;
 
+#ifndef RSRC_SCREEN_FX /* PORT: ported to rsrc/screen_fx.rs and rsrc/witch.rs */
 day_fade()
 {	register long ll;
 	if (light_timer) ll = 200; else ll = 0;
@@ -1761,6 +1776,7 @@ day_fade()
 		else fade_page(100,100,100,TRUE,pagecolors);
 	}
 }
+#endif /* RSRC_SCREEN_FX */
 
 extern short leader;
 
