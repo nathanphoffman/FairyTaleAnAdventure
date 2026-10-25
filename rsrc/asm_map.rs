@@ -3,6 +3,15 @@
 //!
 //! World coordinates are 15 bit. A tile ("image") is 16 pixels wide and 32 tall; a sector is
 //! 16 x 8 tiles; the region map is 128 x 32 sectors, one byte each.
+//!
+//! Looking up the ground under a pixel goes: pixel -> tile column/row -> which sector (from the
+//! region map `map_mem`) -> which tile (from that sector in `sector_mem`) -> the terrain table
+//! `terra_mem` for that tile. The odd wrap-around tricks (`wrap_secx`, `clamp_secy`) copy what the
+//! assembly did when the position is outside the loaded region.
+//!
+//! Drawing: the screen shows 19 x 6 tiles. `genmini` fills `minimap` with the tile numbers for the
+//! visible area, and `map_draw`, `strip_draw`, `row_draw` copy the tile graphics to the screen.
+//! `scrollmap` shifts the picture by one tile so only a new edge has to be drawn.
 
 use super::tables::minimap;
 
@@ -56,12 +65,16 @@ fn clamp_secy(v: i16) -> u16 {
     v.clamp(0, SECTOR_ROWS_IN_REGION - 1) as u16
 }
 
-/// The sector byte for a sector column and row.
+/// The sector number for a sector column and row of the region map.
 unsafe fn sector_at(col: u16, row: u16) -> u8 {
     unsafe { *map_mem.add((row as usize * MAP_ROW_BYTES + col as usize + xreg as usize) as u16 as usize) }
 }
 
 /// Terrain type (0-15) at a pixel position, 0 if that sub-area is clear.
+///
+/// Each tile is divided into 8 sub-areas (2 across, 4 down); the terrain table has a bit mask
+/// saying which of them are solid, so a tile can be partly walkable (a tree trunk in the middle of
+/// a clearing, say). The bit is picked from pixel bits 3 (x), 3 and 4 (y).
 #[unsafe(no_mangle)]
 pub extern "C" fn px_to_im(x: i32, y: i32) -> i32 {
     let (ux, uy) = (x as u16, y as u16);
@@ -88,8 +101,9 @@ pub extern "C" fn px_to_im(x: i32, y: i32) -> i32 {
     }
 }
 
-/// Collision test with two probes either side of the character. Returns the blocking terrain
-/// type, 0 if the way is clear.
+/// Collision test with two probes either side of the character (4 pixels right and left, 2 down).
+/// Returns the blocking terrain type, 0 if the way is clear. Type 1 always blocks; the right-hand
+/// probe is blocked by 10 and above, the left-hand one by 8 and above.
 #[unsafe(no_mangle)]
 pub extern "C" fn prox(x: i32, y: i32) -> i32 {
     let t = px_to_im(x + 4, y + 2);
@@ -155,13 +169,16 @@ const Y_STEPS: [i16; 10] = [-2, -3, -2, 0, 2, 3, 2, 0, 0, 0];
 /// Directions above this mean "no move".
 const MAX_DIRECTION: i32 = 7;
 
-/// Moves `v` one step; the result stays within 15 bits.
+/// Moves `v` one step in direction `dir` at `speed`; the result stays within 15 bits.
+/// The step is table value * speed / 2, so speed 2 moves the table's amount in pixels.
 fn step(v: i32, dir: i32, speed: i32, table: &[i16; 10]) -> i32 {
     let product = table[(dir & 0xff) as usize] as i32 * speed as i16 as i32;
     let half = (product as u16 >> 1) as i32;
     (v.wrapping_add(half) as u16 as i32) & COORD_MASK
 }
 
+/// The x position after one step in direction `dir` (0-7) at `speed`. Directions above 7 mean
+/// "no move". Directions go clockwise from north-west.
 #[unsafe(no_mangle)]
 pub extern "C" fn newx(x: i32, dir: i32, speed: i32) -> i32 {
     if dir & 0xff > MAX_DIRECTION {
@@ -170,7 +187,7 @@ pub extern "C" fn newx(x: i32, dir: i32, speed: i32) -> i32 {
     step(x, dir, speed, &X_STEPS)
 }
 
-/// Like `newx`, but keeps bit 15 of y.
+/// Like `newx`, but for y; it keeps bit 15 of y (a flag the game stores there).
 #[unsafe(no_mangle)]
 pub extern "C" fn newy(y: i32, dir: i32, speed: i32) -> i32 {
     if dir & 0xff > MAX_DIRECTION {
@@ -179,7 +196,7 @@ pub extern "C" fn newy(y: i32, dir: i32, speed: i32) -> i32 {
     step(y, dir, speed, &Y_STEPS) | (y & COORD_SIGN)
 }
 
-/// Copies bit 14 into bit 15, giving a signed 15 bit value.
+/// Copies bit 14 into bit 15, giving a signed 15 bit value (the world wraps around at the edges).
 #[unsafe(no_mangle)]
 pub extern "C" fn wrap(x: i32) -> i32 {
     let mut low = x as u32 & 0xffff;
@@ -200,13 +217,14 @@ const CAMERA_JUMP_UP: i16 = 24;
 const CAMERA_JUMP_DOWN: i16 = 44;
 const CAMERA_CREEP_Y: i16 = 10;
 
-/// Sign-extends a 15 bit difference.
+/// Sign-extends a 15 bit difference to 16 bits.
 fn sign_extend_15(v: i16) -> i16 {
     ((v as i32) << 1) as i16 >> 1
 }
 
 /// Where the camera goes for a hero position: it creeps along once the hero is 20 pixels (10
-/// vertically) off, and jumps once the hero is 70 (24 up, 44 down) off.
+/// vertically) off centre, and jumps once the hero is 70 (24 up, 44 down) off. The hero is kept
+/// at about (144, 70) on screen.
 fn camera_after(cam_x: u16, cam_y: u16, x: i32, y: i32) -> (u16, u16) {
     let cx = (x - CAMERA_CENTER_X) as i16;
     let cy = (y - CAMERA_CENTER_Y) as i16;
@@ -244,7 +262,8 @@ pub extern "C" fn map_adjust(x: i32, y: i32) {
     unsafe { (map_x, map_y) = camera_after(map_x, map_y, x, y) };
 }
 
-/// Small lookup used by the page-turn animation.
+/// Small lookup used by the page-turn animation: how far in from the top and bottom a strip of
+/// the curling page starts, given its distance from the fold.
 #[unsafe(no_mangle)]
 pub extern "C" fn page_det(x: i32) -> i32 {
     const SMALL: [i32; 11] = [9, 9, 8, 7, 6, 5, 5, 5, 4, 4, 4];
@@ -261,7 +280,7 @@ pub extern "C" fn page_det(x: i32) -> i32 {
 
 // ---- drawing the map into the play field bitmaps (planes[0..4]) ----
 
-/// Draws one tile at byte offset `dst` in each of the five planes.
+/// Draws one tile at byte offset `dst` in each of the five planes (2 bytes wide, 32 lines).
 unsafe fn draw_tile(tile: i32, dst: usize) {
     unsafe {
         for p in 0..PLANE_COUNT {
@@ -338,6 +357,7 @@ const SCROLL_MODES: [ScrollMode; 8] = [
 ];
 
 /// Shifts the map one tile in one of 8 directions (the blitter did this on the Amiga).
+/// Moving down copies from the bottom up, so lines are not overwritten before they are read.
 #[unsafe(no_mangle)]
 pub extern "C" fn scrollmap(dir: i32) {
     let m = &SCROLL_MODES[dir as usize & 7];
@@ -388,8 +408,9 @@ fn overview_origin(mx: i32, my: i32, region_x: u16, region_y: u16) -> (i16, i16)
     )
 }
 
-/// Draws the overview map. Each pixel's colour is the tile's overview colour (terra byte 3).
-/// `secx` / `secy` tell the caller which sector is at the top left.
+/// Draws the overview map (the magic map spell): each sector is one 16 by 8 block of pixels drawn
+/// twice as tall, 18 x 9 sectors across the screen. Each pixel's colour is the tile's overview
+/// colour (terrain table byte 3). `secx` / `secy` tell the caller which sector is at the top left.
 #[unsafe(no_mangle)]
 pub extern "C" fn bigdraw(mx: i32, my: i32) {
     unsafe {

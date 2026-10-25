@@ -1,5 +1,10 @@
 //! Printing messages in the text panel (from csrc/fmain2.c): scrolling a line in, continuing it,
 //! word-wrapping story text and the "found ..." announcements.
+//!
+//! The text panel at the bottom of the screen shows the last few lines of messages. `print` scrolls
+//! the panel up one line and writes a new line at the bottom; `print_cont` adds more text to the
+//! line that is already there. `extract` is the general routine: it takes a message string from the
+//! story tables, breaks it into lines that fit the panel and prints each one.
 
 use super::asm_text::{move_to, text};
 use crate::amiga::RastPort;
@@ -36,6 +41,7 @@ pub static mut mbuf: *mut c_char = std::ptr::null_mut();
 #[unsafe(no_mangle)]
 pub static mut mesbuf: [c_char; 200] = [0; 200];
 
+/// Length of a C string.
 unsafe fn length(s: *const c_char) -> i32 {
     unsafe { CStr::from_ptr(s).to_bytes().len() as i32 }
 }
@@ -46,6 +52,7 @@ unsafe fn brother_name() -> *const c_char {
 }
 
 /// Starts a new line in the panel and prints `s` on it.
+/// The old lines scroll up by one text line (10 pixels) inside the message area.
 #[unsafe(no_mangle)]
 pub extern "C" fn print(s: *const c_char) {
     unsafe {
@@ -63,6 +70,10 @@ pub extern "C" fn print_cont(s: *const c_char) {
 
 /// Prints message text, wrapping it into lines at spaces. A carriage return (13) starts a new
 /// line and a `%` is replaced by the current brother's name.
+///
+/// How it works: characters are copied into `mesbuf`, remembering where the last space was. When
+/// a line reaches 37 characters it is cut at that space (the space becomes the end of the string)
+/// and printed, and the leftover characters start the next line. The message ends at a zero byte.
 #[unsafe(no_mangle)]
 pub extern "C" fn extract(mut start: *const c_char) {
     unsafe {
@@ -126,6 +137,7 @@ pub extern "C" fn extract(mut start: *const c_char) {
     }
 }
 
+/// Prints "<Brother> found <container> containing ", ready for the contents to be added.
 #[unsafe(no_mangle)]
 pub extern "C" fn announce_container(s: *const c_char) {
     unsafe {
@@ -136,6 +148,7 @@ pub extern "C" fn announce_container(s: *const c_char) {
     }
 }
 
+/// Prints "<Brother> found <treasure>".
 #[unsafe(no_mangle)]
 pub extern "C" fn announce_treasure(s: *const c_char) {
     unsafe {
@@ -145,6 +158,7 @@ pub extern "C" fn announce_treasure(s: *const c_char) {
     }
 }
 
+/// Adds the current brother's name to the line being printed.
 #[unsafe(no_mangle)]
 pub extern "C" fn name() {
     unsafe { print_cont(brother_name()) };

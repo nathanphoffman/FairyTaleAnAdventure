@@ -1,5 +1,9 @@
 //! IFF picture file helpers (from fsubs.asm via csrc/asm_port.c). The state they work on lives
 //! in `iffsubs`.
+//!
+//! `ReadHeader` and `ReadLength` read the two fields at the start of every IFF chunk;
+//! `unpack_line` unpacks one row of picture data, which is compressed with "ByteRun1" (the usual
+//! run-length scheme on the Amiga).
 
 use super::iffsubs::{blocklength, bytecount, compress, file_length, header, myfile, packdata};
 use crate::amiga::BPTR;
@@ -20,7 +24,7 @@ pub extern "C" fn ReadHeader() {
     }
 }
 
-/// Reads a big-endian chunk length.
+/// Reads a big-endian chunk length and updates how many bytes of the file are left.
 #[unsafe(no_mangle)]
 pub extern "C" fn ReadLength() {
     unsafe {
@@ -32,6 +36,9 @@ pub extern "C" fn ReadLength() {
 
 /// Unpacks one ByteRun1 scan line from `src` into `dest`, stopping after `width` bytes.
 /// Returns how many source bytes were used.
+///
+/// ByteRun1: a control byte `n` from 0 to 127 means the next n+1 bytes are copied as they are;
+/// from -127 to -1 means the next byte is repeated 1-n times.
 unsafe fn unpack_byte_run(mut src: *const i8, mut dest: *mut u8, width: i32) -> usize {
     let start = src;
     let mut written = 0;

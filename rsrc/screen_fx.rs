@@ -1,6 +1,10 @@
 //! Screen colour effects and panel updates (from csrc/fmain2.c): the compass, fading the page
 //! colours with the time of day, the teleport flash, the print queue and the win sequence.
 //! The colour tables live in `tables`; the view ports are still defined in csrc/fmain.c.
+//!
+//! Colours: the Amiga screen has 32 colours, each 12 bits (4 bits red, green, blue). The game
+//! fades the whole picture by scaling those components (`fade_page`) and loads them with
+//! `LoadRGB4`. Night is a darker, bluer scaling; indoors it is always full brightness.
 
 use super::asm_text::{move_to, placard, placard_text, prdec, text};
 use super::iffsubs::unpackbrush;
@@ -75,7 +79,8 @@ const COMPASS_HEIGHT: i32 = 24;
 /// Compass directions below this are lit; the rest mean "not walking".
 const COMPASS_DIRECTIONS: i16 = 9;
 
-/// Redraws the compass with direction `dir` lit.
+/// Redraws the compass with direction `dir` lit. First the unlit compass is copied, then the lit
+/// part for that direction (if any) is copied on top from a second image.
 #[unsafe(no_mangle)]
 pub extern "C" fn drawcompass(dir: i16) {
     unsafe {
@@ -118,7 +123,9 @@ const COLOR_COUNT: usize = 32;
 const MAX_COMPONENT: i32 = 15;
 
 /// Fades the page colours to the levels `r`, `g`, `b` (percent). With `limit` the night limits
-/// apply and some blue is mixed in.
+/// apply (red never below 10%, green 25%, blue 60%) and some blue is mixed in from green, which gives
+/// the bluish moonlight. The light spell (`light_timer`) makes reds as bright as greens.
+/// Colour 31 is changed first because it depends on where the hero is (swamp, secret room).
 #[unsafe(no_mangle)]
 pub extern "C" fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: *const u16) {
     unsafe {
@@ -172,7 +179,7 @@ pub extern "C" fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: *const u
     }
 }
 
-/// The teleport effect: random colours flicker for a moment.
+/// The teleport effect: random colours flicker for a moment (32 flashes).
 #[unsafe(no_mangle)]
 pub extern "C" fn colorplay() {
     unsafe {
@@ -198,6 +205,8 @@ const VITALITY_POSITION: (i32, i32) = (245, 52);
 const STATS_Y: i32 = 52;
 
 /// Handles one request from the print queue (or waits a tick if there is none).
+/// Requests: 2 and 3 debug information, 4 the vitality figure, 5 the menu, 7 the stats line
+/// (bravery, luck, kindness, wealth), 10 "Take What?".
 #[unsafe(no_mangle)]
 pub extern "C" fn ppick() {
     unsafe {
@@ -294,7 +303,7 @@ pub extern "C" fn stillscreen() {
     }
 }
 
-/// Switches to the map page for a message (the text panel is hidden).
+/// Switches to the map page for a message (the text panel is hidden) and fades in.
 #[unsafe(no_mangle)]
 pub extern "C" fn map_message() {
     unsafe {
@@ -333,7 +342,8 @@ const SUNRISE_COLORS: std::ops::Range<usize> = 2..28;
 const SUN_GLOW_UNTIL: i32 = -14;
 const WIN_SCREEN_SIZE: i32 = 156;
 
-/// The win screen: shows the picture and brings the sun up behind it.
+/// The win screen: shows the picture and brings the sun up behind it by cycling the sky colours
+/// through `sun_colors`, with two glowing colours that fade out near the end.
 #[unsafe(no_mangle)]
 pub extern "C" fn win_colors() {
     unsafe {
@@ -384,7 +394,8 @@ const FIRST_INDOOR_REGION: u16 = 8;
 /// `viewstatus` above this means the screen has to be rebuilt.
 const VIEW_REBUILD: i8 = 97;
 
-/// Updates the page colours for the time of day, every fourth tick.
+/// Updates the page colours for the time of day, every fourth tick. `lightlevel` follows the sun;
+/// inside buildings (regions 8 and 9) it is always bright.
 #[unsafe(no_mangle)]
 pub extern "C" fn day_fade() {
     unsafe {

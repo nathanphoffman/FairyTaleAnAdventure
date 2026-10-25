@@ -1,5 +1,12 @@
 //! Loads IFF ILBM pictures ("brushes") into a bitmap (from csrc/iffsubs.c). It also holds the
 //! state shared with the chunk and line helpers in `iff_helpers`.
+//!
+//! An IFF file is a `FORM` containing chunks. Each chunk is a 4-letter id, a big-endian length and
+//! the data. This loader understands `BMHD` (picture size and compression), skips `CMAP`, `GRAB`,
+//! `CAMG` and `CRNG` (colours and display modes, which the game does not use) and unpacks `BODY`
+//! (the pixels). The pixels are stored one bitplane row at a time, which is also how the Amiga's
+//! screen memory is laid out, so each row is unpacked straight into the matching plane of the
+//! destination bitmap.
 
 use crate::amiga::{BPTR, BitMap};
 use std::ffi::c_char;
@@ -15,7 +22,7 @@ unsafe extern "C" {
     static shape_mem: *mut i8;
 }
 
-// State shared with iff_helpers; the names are the C ones.
+// State shared with iff_helpers; the names are the C ones (the C code and iff_helpers use them).
 /// Bytes left in the FORM being read.
 #[unsafe(no_mangle)]
 pub static mut file_length: i32 = 0;
@@ -56,7 +63,9 @@ const BMHD: i32 = chunk_id(b"BMHD");
 const BODY: i32 = chunk_id(b"BODY");
 const SKIPPED_CHUNKS: [i32; 4] = [chunk_id(b"CAMG"), chunk_id(b"CRNG"), chunk_id(b"CMAP"), chunk_id(b"GRAB")];
 
-/// The ILBM bitmap header chunk; the file is big-endian.
+/// The ILBM bitmap header chunk; the file is big-endian. Only `width`, `height` and
+/// `compression` matter. (The C struct is 22 bytes although the IFF standard says 20; the
+/// difference is harmless because the file's own length is used when reading it.)
 #[repr(C)]
 #[derive(Default)]
 struct BitMapHeader {
@@ -75,7 +84,7 @@ struct BitMapHeader {
     page_height: i16,
 }
 
-/// Reads the BMHD chunk whose length was just read.
+/// Reads the BMHD chunk whose length was just read, and converts the sizes from big-endian.
 unsafe fn read_bitmap_header() -> BitMapHeader {
     let mut bmhd = BitMapHeader::default();
     unsafe {
@@ -88,6 +97,9 @@ unsafe fn read_bitmap_header() -> BitMapHeader {
 }
 
 /// Unpacks the BODY chunk into the bitmap, starting `offset` bytes into each plane.
+///
+/// The compressed body is first read into `shape_mem` (a scratch area), then each picture row is
+/// unpacked once per bitplane (up to 5, fewer if the bitmap is shallower).
 unsafe fn read_body(bmhd: &BitMapHeader, bitmap: &BitMap, offset: usize) {
     unsafe {
         packdata = shape_mem;
@@ -109,6 +121,7 @@ unsafe fn read_body(bmhd: &BitMapHeader, bitmap: &BitMap, offset: usize) {
 }
 
 /// Loads the picture `filename` into `bitmap` at byte column `x`, row `y`. Returns TRUE/FALSE.
+/// Used for the title pages, the story pictures, the text panel background and the winning picture.
 #[unsafe(no_mangle)]
 pub extern "C" fn unpackbrush(filename: *const c_char, bitmap: *mut BitMap, x: i16, y: i16) -> i32 {
     unsafe {

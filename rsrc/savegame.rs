@@ -1,5 +1,14 @@
 //! Saving and loading the game (from csrc/fmain2.c). The save file is written field by field in
 //! big-endian order, so it does not depend on how the C compiler laid out the variables.
+//!
+//! The same code does saving and loading: each `sl_*` function writes a value when `svflag` is set
+//! and reads it back when it is clear. So the order of the calls in `save_all` is the file format:
+//! the misc variables, the region, the actors, the inventories and missiles, the extents and the
+//! object lists.
+//!
+//! The original asked for a floppy disk with a free drive (df1: or df0:). When a file named `image`
+//! exists (always, on Linux) the save is just named `A.faery`, `B.faery` ... (one letter per menu
+//! choice) and the platform layer puts the files in the `saves/` folder.
 
 use super::input::take_new_disk;
 use super::asm_text::prq;
@@ -115,7 +124,7 @@ pub static mut savename: [u8; 12] = *b"df1:A.faery\0";
 #[unsafe(no_mangle)]
 pub static mut flock: BPTR = 0;
 
-/// Non-zero if `name` can be locked with the given access.
+/// Non-zero if `name` can be locked with the given access (AmigaDOS's way of asking "does this exist / is it writable").
 #[unsafe(no_mangle)]
 pub extern "C" fn locktest(name: *const c_char, access: i32) -> i32 {
     unsafe {
@@ -127,7 +136,7 @@ pub extern "C" fn locktest(name: *const c_char, access: i32) -> i32 {
     }
 }
 
-/// Waits (about 30 seconds) for a disk to be inserted.
+/// Waits (about 30 seconds) for a disk to be inserted. Returns 1 if one was, 0 if not.
 #[unsafe(no_mangle)]
 pub extern "C" fn waitnewdisk() -> i32 {
     for _ in 0..DISK_POLL_COUNT {
@@ -199,7 +208,11 @@ unsafe fn save_all() {
     }
 }
 
-/// Saves the game (`svflag` set) or loads it into slot `hit`.
+/// Saves the game (`svflag` set) or loads it into slot `hit` (0 = A ...).
+///
+/// Steps: find a place to save (asking for a disk on a real Amiga), open the file, run `save_all`,
+/// close it. When loading, afterwards the sprites are reloaded for the loaded game and the
+/// status lines are redrawn.
 #[unsafe(no_mangle)]
 pub extern "C" fn savegame(hit: i16) {
     unsafe {
@@ -265,7 +278,7 @@ pub extern "C" fn savegame(hit: i16) {
     }
 }
 
-/// Writes or reads `length` bytes of the save file.
+/// Writes or reads `length` bytes of the save file, remembering an error.
 #[unsafe(no_mangle)]
 pub extern "C" fn saveload(buffer: *mut c_void, length: i32) {
     unsafe {
@@ -281,11 +294,13 @@ pub extern "C" fn saveload(buffer: *mut c_void, length: i32) {
     }
 }
 
+/// Saves or loads one byte.
 #[unsafe(no_mangle)]
 pub extern "C" fn sl_u8(v: *mut u8) {
     saveload(v.cast(), 1);
 }
 
+/// Saves or loads a 16-bit number, always stored big-endian (as the Amiga's 68000 kept it).
 #[unsafe(no_mangle)]
 pub extern "C" fn sl_u16(v: *mut u16) {
     unsafe {
@@ -300,7 +315,9 @@ pub extern "C" fn sl_u16(v: *mut u16) {
     }
 }
 
-/// The 40 variables the original saved as one 80 byte block, in that order.
+/// The 40 variables the original saved as one 80 byte block, in that order: the map and hero
+/// positions, the stats (bravery, luck, kindness, wealth, hunger, fatigue), which brother is
+/// playing, the day/night clock, the magic timers and so on. The order is the file format.
 fn save_variables() {
     let variables: [*mut u16; MISC_VARIABLES] = [
         &raw mut map_x,
@@ -349,6 +366,7 @@ fn save_variables() {
     }
 }
 
+/// Saves or loads one actor.
 #[unsafe(no_mangle)]
 pub extern "C" fn sl_shape(a: *mut Shape) {
     unsafe {
@@ -368,6 +386,7 @@ pub extern "C" fn sl_shape(a: *mut Shape) {
     }
 }
 
+/// Saves or loads one extent (a special rectangle of the world).
 #[unsafe(no_mangle)]
 pub extern "C" fn sl_extent(e: *mut Extent) {
     unsafe {
@@ -383,6 +402,7 @@ pub extern "C" fn sl_extent(e: *mut Extent) {
     }
 }
 
+/// Saves or loads one object (an item or person in the world).
 #[unsafe(no_mangle)]
 pub extern "C" fn sl_object(o: *mut WorldObject) {
     unsafe {
@@ -394,6 +414,7 @@ pub extern "C" fn sl_object(o: *mut WorldObject) {
     }
 }
 
+/// Saves or loads one missile (arrow, rock, fireball). Called from `mod1save` in csrc/fmain.c.
 #[unsafe(no_mangle)]
 pub extern "C" fn sl_missile(m: *mut Missile) {
     unsafe {

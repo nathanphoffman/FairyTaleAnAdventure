@@ -1,29 +1,51 @@
 //! Keyboard and mouse input, replacing the Amiga input handler in fsubs.asm (HandlerInterface,
 //! getkey, decode_mouse; from csrc/input.c). The platform layer (src/platform/input) translates
 //! SDL events and calls the `fta_*` functions below.
+//!
+//! How input reaches the game:
+//! - Keys go into a 128-byte ring buffer (`keybuf`). The game's main loop pops them with `getkey`.
+//!   A key code with bit 7 set means the key was released.
+//! - The mouse pointer position is kept inside the text panel, where the menus and the compass are.
+//!   A left click on the menu column is turned into a menu key press ('a' for the first row, 'b' for
+//!   the second column of the first row, and so on).
+//! - `decode_mouse` works out which way the hero walks, from the mouse over the compass or from the
+//!   direction keys, and redraws the compass.
+//!
+//! Directions are numbered 0-7 clockwise starting at north-west: 0 NW, 1 N, 2 NE, 3 E, 4 SE, 5 S,
+//! 6 SW, 7 W. The value 9 means "not walking".
 
 use std::ffi::c_void;
 
 /// Mirror of `struct in_work` in csrc/ftale.h, the input handler's data area.
 #[repr(C)]
 struct InWork {
+    // Pointer position, in lores pixels (x) and screen lines (y).
     xsprite: i16,
     ysprite: i16,
+    // Which mouse buttons are down (bit 0x4000 left, 0x2000 right).
     qualifier: i16,
+    // Ring buffer write position (where the next key goes).
     laydown: u8,
+    // Ring buffer read position (the next key `getkey` returns).
     pickup: u8,
+    // Set when a disk was inserted (only the Amiga needs this).
     newdisk: i8,
+    // The last menu key sent, so its release can be sent with the same code.
     lastmenu: i8,
+    // Amiga library pointers the original handler kept; unused now.
     gbase: *mut c_void,
     pbase: *mut c_void,
     vbase: *mut c_void,
+    // The key ring buffer.
     keybuf: [u8; KEY_BUFFER_SIZE],
     ticker: i16,
 }
 
 unsafe extern "C" {
     static mut handler_data: InWork;
+    // The direction key currently held (set by the key handling in csrc/fmain.c).
     static mut keydir: i16;
+    // The direction last shown on the compass.
     static mut oldir: i16;
     fn drawcompass(dir: i16);
 }
@@ -67,6 +89,9 @@ const KEYDIR_BASE: i16 = 20;
 const DIRECTION_COUNT: i16 = 10;
 
 /// Appends a key to the ring buffer; the key is dropped if the buffer is full.
+///
+/// The buffer is full when moving the write position forward would make it equal the read
+/// position (one slot is always left empty, which is how a full buffer is told from an empty one).
 fn push_key(code: i32) {
     unsafe {
         let data = &mut *(&raw mut handler_data);
@@ -85,7 +110,7 @@ pub extern "C" fn fta_key(code: i32) {
     push_key(code);
 }
 
-/// Pops the next key code, 0 if none.
+/// Pops the next key code from the ring buffer, or 0 if there is none.
 #[unsafe(no_mangle)]
 pub extern "C" fn getkey() -> i32 {
     unsafe {
@@ -99,7 +124,9 @@ pub extern "C" fn getkey() -> i32 {
     }
 }
 
-/// Pointer position in lores pixels (x 0-319) and screen lines (y 0-199), kept in the text panel.
+/// Pointer position in lores pixels (x 0-319) and screen lines (y 0-199).
+/// The pointer is kept inside the text panel (the bottom of the screen), where the menus and
+/// the compass are, because that is the only place the mouse is used.
 #[unsafe(no_mangle)]
 pub extern "C" fn fta_mouse_move(x: i32, y: i32) {
     unsafe {
@@ -109,7 +136,8 @@ pub extern "C" fn fta_mouse_move(x: i32, y: i32) {
     }
 }
 
-/// The menu key ('a' + row, +1 for the right-hand column) under the pointer, if any.
+/// The menu key under the pointer, if any: 'a' plus twice the row number, plus one for the
+/// right-hand column. The menu is two columns of rows 9 lines high, starting at line 144.
 fn menu_key_at(x: i32, y: i32) -> Option<i32> {
     if !(MENU_MIN_X..=MENU_MAX_X).contains(&x) || y < MENU_TOP_Y {
         return None;
@@ -120,7 +148,8 @@ fn menu_key_at(x: i32, y: i32) -> Option<i32> {
 }
 
 /// Mouse button change. A left click in the menu column becomes a menu key on press and the same
-/// key with bit 7 set on release.
+/// key with bit 7 set on release, as if it had been typed. The right button only sets a flag
+/// (it makes the hero fight, see `decode_mouse`).
 #[unsafe(no_mangle)]
 pub extern "C" fn fta_mouse_button(left: i32, right: i32) {
     let new_qualifier =
@@ -148,6 +177,9 @@ pub extern "C" fn fta_mouse_button(left: i32, right: i32) {
 }
 
 /// Walking direction (0-7, 9 = none) for a pointer position over the on-screen compass.
+///
+/// The compass is split into three columns and three rows; the middle square means no direction.
+/// Left of the compass nothing is selected.
 fn compass_direction(x: i32, y: i32) -> i16 {
     if x <= COMPASS_MIN_X {
         return DIR_NONE;
@@ -178,6 +210,9 @@ pub fn take_new_disk() -> bool {
 
 /// Decides the walking direction from the mouse over the compass or from the keyboard direction
 /// keys, and redraws the compass when it changes.
+///
+/// While a mouse button is down the pointer position decides; otherwise the direction key
+/// (numbered from 20, the keypad digits) does. Anything outside 20-29 means no direction.
 #[unsafe(no_mangle)]
 pub extern "C" fn decode_mouse() {
     unsafe {

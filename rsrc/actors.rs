@@ -1,5 +1,9 @@
 //! Actor behaviour helpers (from csrc/fmain2.c): hits, collision against other actors, distances,
 //! enemy tactics, and a few story events.
+//!
+//! Actors live in `anim_list`: slot 0 is the hero, slot 1 the raft (or other carrier), slots 3 and
+//! up the monsters, and people and objects after them. Positions are in world pixels. Directions
+//! are numbered 0-7 clockwise from north-west (0 NW, 1 N, 2 NE, 3 E, 4 SE, 5 S, 6 SW, 7 W).
 
 use super::asm_map::{newx, newy, prox};
 use super::asm_text::{event, placard, placard_text, prdec, set_course, speak};
@@ -102,7 +106,7 @@ const SOFT_TERRAIN: [i32; 2] = [8, 9];
 const HERO: usize = 0;
 const RAFT_SLOT: usize = 1;
 
-/// Set when turtle eggs are in view; the slot of the eggs' actor.
+/// Set when turtle eggs are in view; the slot of the eggs' actor (see `aftermath`).
 #[unsafe(no_mangle)]
 pub static mut turtle_eggs: i8 = 0;
 
@@ -111,8 +115,13 @@ fn actor(i: i32) -> *mut Shape {
     (&raw mut anim_list).cast::<Shape>().wrapping_add(i as usize)
 }
 
-/// A hit from actor `i` (-1 arrow, -2 rock) on actor `j`, `wt` damage, pushing back in
-/// direction `fc`.
+/// A hit from actor `i` on actor `j`: `wt` damage, then the target is pushed back in direction `fc`.
+/// `i` is -1 or -2 for hits by missiles (which have different sounds).
+///
+/// Special cases, as in the original: creatures of race 9 and the witch (race 0x89, a person of
+/// kind 9) cannot be hurt by weak weapons (weapon below 4); the witch can be hurt anyway if the hero
+/// holds the item in inventory slot 7 (the sun stone). Races 0x8a and 0x8b (the spectre and the
+/// ghost brothers) are never hurt. Dragons and people are not pushed back.
 #[unsafe(no_mangle)]
 pub extern "C" fn dohit(i: i32, j: i32, fc: i32, wt: i16) {
     unsafe {
@@ -146,7 +155,8 @@ pub extern "C" fn dohit(i: i32, j: i32, fc: i32, wt: i16) {
     }
 }
 
-/// After a fight: reports how many foes were defeated or fled.
+/// After a fight: reports how many foes were defeated or fled, or "Bravely done!" if the hero is
+/// nearly dead. Then, if turtle eggs are around, the turtle story event is checked.
 #[unsafe(no_mangle)]
 pub extern "C" fn aftermath() {
     unsafe {
@@ -187,6 +197,11 @@ pub extern "C" fn aftermath() {
 }
 
 /// What blocks actor `i` at (x, y): a terrain type, 16 for another actor, or 0 if clear.
+///
+/// Terrain is checked first (wraiths float, so they ignore it; the hero ignores terrain types 8
+/// and 9). Then every other actor is checked: it blocks if it is within 10 pixels sideways and
+/// 8 pixels up or down.
+/// Dead actors and the raft can be walked over.
 #[unsafe(no_mangle)]
 pub extern "C" fn proxcheck(x: i16, y: i16, i: i16) -> i32 {
     unsafe {
@@ -238,7 +253,8 @@ pub extern "C" fn nearest_fig(constraint: c_char, mut dist: i16) -> i32 {
     }
 }
 
-/// Distance between two actors, approximating the diagonal as (x + y) * 5 / 7.
+/// Distance between two actors. The game avoids a square root: if one axis is more than twice
+/// the other it is used alone, otherwise (x + y) * 5 / 7 approximates the diagonal.
 #[unsafe(no_mangle)]
 pub extern "C" fn calc_dist(a: i32, b: i32) -> i32 {
     let (a, b) = unsafe { (&*actor(a), &*actor(b)) };
@@ -285,7 +301,13 @@ const FOLLOW_OFFSET: i32 = 20;
 const EGG_X: i32 = 23087;
 const EGG_Y: i32 = 5667;
 
-/// Runs one step of enemy `i`'s tactic.
+/// Runs one step of enemy `i`'s tactic. Most tactics only act on some ticks (1 in 8, or 1 in 4
+/// for clever enemies), which makes them look less robotic.
+///
+/// - PURSUE: head toward the hero.  - SHOOT: line up with the hero (same row, column or
+///   diagonal) and aim, else approach.  - RANDOM: wander.  - BUMBLE_SEEK: head toward the hero
+///   without smart steering.  - BACKUP: head away from the hero.  - FOLLOW: stay near the leader.
+/// - EVADE: keep away from another enemy.  - EGG_SEEK: go to the turtle eggs.
 #[unsafe(no_mangle)]
 pub extern "C" fn do_tactic(i: i32, tactic: i32) {
     unsafe {
@@ -363,7 +385,7 @@ pub extern "C" fn do_tactic(i: i32, tactic: i32) {
     }
 }
 
-/// Centres extent `e` on a point.
+/// Centres extent `e` on a point (it covers 500 by 400 pixels around it).
 #[unsafe(no_mangle)]
 pub extern "C" fn move_extent(e: i16, x: i16, y: i16) {
     const HALF_WIDTH: i32 = 250;
@@ -396,6 +418,10 @@ const REWARD_MESSAGE: i32 = 18;
 const REWARD_GOLD: i16 = 100;
 
 /// The scene when a princess is rescued, and her reward.
+///
+/// Shows the story pages, moves the hero to the princess's home, repositions the extent for the
+/// next princess, changes the princess object, gives 100 gold and three of each key, and bumps
+/// the `princess` count (each rescue shows different story pages).
 #[unsafe(no_mangle)]
 pub extern "C" fn rescue() {
     unsafe {
@@ -435,7 +461,8 @@ pub extern "C" fn rescue() {
     }
 }
 
-/// Eats: lowers hunger by `amt`.
+/// Eats: lowers hunger by `amt`. If that would go below zero the hero is simply full
+/// (message 13); otherwise "Yum!".
 #[unsafe(no_mangle)]
 pub extern "C" fn eat(amt: i32) {
     const HUNGER_FULL_MESSAGE: i32 = 13;
@@ -453,7 +480,8 @@ pub extern "C" fn eat(amt: i32) {
 // An encounter appears this far away: 150 plus up to 63.
 const ENCOUNTER_MIN_DISTANCE: i32 = 150;
 
-/// Picks where a new encounter appears: a random direction and distance from the hero.
+/// Picks where a new encounter appears: a random direction and distance from the hero
+/// (150 to 213 pixels).
 #[unsafe(no_mangle)]
 pub extern "C" fn set_loc() {
     unsafe {

@@ -5,8 +5,20 @@
 //! "minterm" saying how the bits combine. `blit` does the same in software for the modes the
 //! game uses, so each routine here sets up the same values as its assembly original and the
 //! drawing comes out the same. Words are big-endian in memory (leftmost pixels in the first byte).
+//!
+//! How a sprite gets onto the screen (see the main loop in csrc/fmain.c):
+//! 1. `save_blit` copies the background under the sprite's rectangle to a save area.
+//! 2. `maskit` copies, for every scenery tile that should hide the sprite (trees, walls ...), the
+//!    tile's mask into a screen-sized scenery mask.
+//! 3. `mask_blit` combines the sprite's own mask with that: the sprite is visible only where it is
+//!    opaque and nothing is in front of it.
+//! 4. `shape_blit` draws the sprite's pixels through that mask into the 5 bitplanes of the screen.
+//! 5. Next frame `rest_blit` puts the saved background back, which erases the sprite.
+//! `make_mask` builds each frame's own mask once, when the sprite sheet is loaded.
 
-/// Mirror of `struct sshape` in csrc/ftale.h: where a sprite's background is saved.
+/// Mirror of `struct sshape` in csrc/ftale.h: how one sprite is drawn this frame and where its
+/// background is saved. `coff` is the byte offset of the sprite in a bitplane and `cmod` the bytes
+/// to skip to the next line; `blitsize` is the blitter size word (height * 64 + width in words).
 #[repr(C)]
 pub struct SShape {
     backsave: *mut u8,
@@ -98,11 +110,12 @@ impl Blit {
     }
 }
 
-/// BLTSIZE: height in the top 10 bits, width in words in the low 6 (0 means 64).
+/// BLTSIZE: height in the top 10 bits ...
 fn blit_height(size: i16) -> i32 {
     (size as i32 >> 6) & 0x3ff
 }
 
+/// ... and the width in words in the low 6 bits (0 means 64).
 fn blit_width(size: i16) -> i32 {
     match size as i32 & 0x3f {
         0 => 64,
@@ -110,10 +123,12 @@ fn blit_width(size: i16) -> i32 {
     }
 }
 
+/// Reads a big-endian 16-bit word.
 unsafe fn read_word(p: *const u8) -> u32 {
     unsafe { ((*p as u32) << 8) | *p.add(1) as u32 }
 }
 
+/// Writes a big-endian 16-bit word.
 unsafe fn write_word(p: *mut u8, v: u32) {
     unsafe {
         *p = (v >> 8) as u8;
@@ -122,6 +137,10 @@ unsafe fn write_word(p: *mut u8, v: u32) {
 }
 
 /// One 16 bit word of the minterm: for every bit, the result is picked by the A, B and C bits.
+///
+/// The minterm is a table of 8 result bits, one for each combination of the A, B and C bits
+/// (bit number = A*4 + B*2 + C). For example 0xCA means "if A then B else C", which is how a mask
+/// (A) selects between sprite pixels (B) and the screen behind (C).
 fn minterm_word(minterm: u32, a: u32, b: u32, c: u32) -> u32 {
     let pick = |word: u32, set: bool| if set { word } else { !word };
     let mut result = 0;
@@ -134,6 +153,10 @@ fn minterm_word(minterm: u32, a: u32, b: u32, c: u32) -> u32 {
 }
 
 /// Ascending blit (all the game's blits go left to right, top to bottom).
+///
+/// For each line it reads a word from each channel in use, shifts A and B (the shifted-out bits
+/// of the previous word carry into the next, which lets a sprite sit at any pixel position, not
+/// just on 16-pixel boundaries), combines them with the minterm and writes the result to D.
 unsafe fn blit(t: &mut Blit) {
     unsafe {
         for _ in 0..t.height {
@@ -213,7 +236,7 @@ pub extern "C" fn save_blit(savemem: *mut u8) {
     }
 }
 
-/// Puts the saved background back.
+/// Puts the saved background back (this erases the sprite).
 #[unsafe(no_mangle)]
 pub extern "C" fn rest_blit(savemem: *mut u8) {
     unsafe {
@@ -243,6 +266,7 @@ pub extern "C" fn mask_blit() {
 }
 
 /// Draws the sprite into the planes through the mask: D = mask ? shape : screen.
+/// The first and last word masks stop the sprite's shifted edges leaking into neighbouring pixels.
 #[unsafe(no_mangle)]
 pub extern "C" fn shape_blit() {
     unsafe {
@@ -293,7 +317,7 @@ pub extern "C" fn maskit(x: i32, y: i32, mod_words: i32, tile: i32) {
 }
 
 /// For every sprite frame builds a one plane mask: all 5 planes ANDed then inverted, so colour
-/// 31 (all bits set) is transparent.
+/// 31 (all bits set) is transparent. The masks are stored right after the frames.
 #[unsafe(no_mangle)]
 pub extern "C" fn make_mask(src: *const u8, dest: *mut u8, words: i32, scans: i32, chars: i32) {
     let plane_bytes = (words * scans) as u16 as usize * 2;

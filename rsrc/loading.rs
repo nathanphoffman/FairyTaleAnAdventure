@@ -1,4 +1,13 @@
 //! Loading sprite files, songs and the intro pictures (from csrc/fmain2.c).
+//!
+//! Sprites: every kind of character (the three brothers, monsters, people, the raft, the turtle ...)
+//! is stored on the disk image as a block of frames. `cfiles` lists them. `read_shapes` copies one
+//! into `shape_mem`, a big scratch area, and `prep` builds a transparency mask for it so the
+//! blitter knows which pixels to leave alone. Each loaded sprite sequence takes its frames (5
+//! bitplanes) plus one mask plane, in memory order.
+//!
+//! Also here: reading the music scores (`read_score`) and the story book page-turn animation
+//! (`copypage`, `flipscan`).
 
 use super::asm_blit::make_mask;
 use super::hdrive::{
@@ -71,7 +80,8 @@ const SIZE_WITHOUT_MASK: usize = 5;
 /// Drive request used when loading sprite files.
 const SPRITE_REQUEST: i16 = 8;
 
-/// Mirror of `struct cfile_info`: one loadable sprite file.
+/// Mirror of `struct cfile_info`: one loadable sprite file (a character set).
+/// `width` is in 16-pixel words, `height` in lines, `count` the number of frames.
 #[repr(C)]
 pub struct CFileInfo {
     pub width: u8,
@@ -88,6 +98,12 @@ const fn cfile(width: u8, height: u8, count: u8, numblocks: u8, seq_num: u8, fil
     CFileInfo { width, height, count, numblocks, seq_num, file_id }
 }
 
+/// The sprite files on the disk image. Index 0-2 are the three brothers, 3 the objects, 4 the raft,
+/// 5 the turtle, 6-9 and 12 monster sets, 10 the dragon, 11 the bird, 13-17 the people (wizard,
+/// royal court, bartender, witch, ranger). `file_id` is the first disk block.
+///
+/// Entry 12 (snake and salamander) uses the same block as entry 0, which looks like a leftover
+/// placeholder in the original; it is copied as it was.
 #[unsafe(no_mangle)]
 pub static cfiles: [CFileInfo; 18] = [
     cfile(1, 32, 67, 42, PHIL, 1376),    // julian
@@ -137,11 +153,15 @@ pub extern "C" fn shape_read() {
     }
 }
 
+/// The `seq_list` entry for a sprite slot (PHIL, OBJECTS, ENEMY ...).
 unsafe fn sequence(slot: u8) -> &'static mut SeqInfo {
     unsafe { &mut *(&raw mut seq_list).cast::<SeqInfo>().add(slot as usize) }
 }
 
 /// Starts loading sprite file `num` into the next free shape memory, if it fits.
+///
+/// Each sequence is stored as 5 planes of `size` bytes followed by a one-plane mask (`size` bytes).
+/// The check makes sure that all of it, with room to spare, fits in the scratch area.
 #[unsafe(no_mangle)]
 pub extern "C" fn read_shapes(num: i32) {
     unsafe {
@@ -162,12 +182,14 @@ pub extern "C" fn read_shapes(num: i32) {
     }
 }
 
-/// Was the copy protection check; the protection is gone, so it only passes.
+/// Was the copy protection check (the original checked the disk's volume date); the protection is
+/// removed, so it always passes.
 #[unsafe(no_mangle)]
 pub extern "C" fn cpytest() -> i32 {
     1
 }
 
+/// Was part of the copy protection; now just the (always passing) check.
 #[unsafe(no_mangle)]
 pub extern "C" fn seekn() {
     cpytest();
@@ -184,7 +206,8 @@ pub extern "C" fn prep(slot: i16) {
     }
 }
 
-/// Loads the next region once the previous disk read is done.
+/// Loads the next region once the previous disk read is done. On the Amiga the disk was slow, so
+/// the game kept playing while a region loaded in the background and called this to check.
 #[unsafe(no_mangle)]
 pub extern "C" fn load_next() {
     if IsReadLastDiskIO() == 0 || CheckLastDiskIO() != 0 {
@@ -197,6 +220,10 @@ const TRACK_COUNT: usize = 4 * 7;
 const SCORE_MEMORY: i32 = 5900;
 
 /// Reads the song tracks from the file `songs` into `scoremem`.
+///
+/// The file is a list of tracks, each a 4 byte big-endian length (counted in 16-bit words) and
+/// then that many words. There are up to 28 tracks (4 voices times 7 songs). Reading stops early
+/// if they would not fit in the 5900 bytes of score memory.
 #[unsafe(no_mangle)]
 pub extern "C" fn read_score() {
     unsafe {
@@ -246,6 +273,7 @@ const PICTURE_Y: i16 = 24;
 const PAGE_DELAY: i32 = 350;
 
 /// Shows two pictures on the story page, then turns it over.
+/// The new pictures are drawn onto `pageb` while `pagea` keeps the old page for the turn.
 #[unsafe(no_mangle)]
 pub extern "C" fn copypage(br1: *const c_char, br2: *const c_char, x: i16, y: i16) {
     unsafe {
@@ -273,11 +301,17 @@ const FIRST_HALF: usize = 11;
 const PAGE_HALF_WIDTH: i32 = 135;
 const PAGE_STRIP_END: i16 = 136;
 
+/// Copies a rectangle between bitmaps (all five planes, plain copy).
 unsafe fn copy_rect(src: *mut BitMap, sx: i32, sy: i32, dst: *mut BitMap, dx: i32, dy: i32, w: i32, h: i32) {
     unsafe { BltBitMap(src, sx, sy, dst, dx, dy, w, h, BLIT_COPY, ALL_PLANES, std::ptr::null_mut()) };
 }
 
-/// The page turn animation.
+/// The page turn animation, 22 frames.
+///
+/// The first 11 frames lift the right page: the old page is drawn as thin vertical strips that
+/// get narrower and shorter (using `page_det` for the curl), on top of the new page. The last 11
+/// frames lay the curling page down on the left. `FLIP_RATE`, `FLIP_WIDE` and `FLIP_DELAY` give
+/// the strip step, strip width and pause for each frame.
 #[unsafe(no_mangle)]
 pub extern "C" fn flipscan() {
     unsafe {
@@ -326,7 +360,7 @@ pub extern "C" fn flipscan() {
     }
 }
 
-/// Copies `oldpointer` into chip memory if it is not there already.
+/// Copies `oldpointer` into chip memory (memory the Amiga's graphics chips can see) if it is not there already.
 #[unsafe(no_mangle)]
 pub extern "C" fn into_chip(oldpointer: *mut u8, size: i32) -> *mut u8 {
     unsafe {
@@ -339,7 +373,7 @@ pub extern "C" fn into_chip(oldpointer: *mut u8, size: i32) -> *mut u8 {
     }
 }
 
-/// Was the manual-lookup riddle (copy protection); it is skipped.
+/// Was the manual-lookup riddle (copy protection, typing a word from the manual); it is skipped.
 #[unsafe(no_mangle)]
 pub extern "C" fn copy_protect_junk() -> i32 {
     1

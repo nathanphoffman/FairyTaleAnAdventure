@@ -1,10 +1,21 @@
 //! Items lying in the world and the people standing around (from csrc/fmain2.c): turning the
 //! object lists of the current region into actors, and changing them.
+//!
+//! How the world's objects work: each region has a list of objects (`ob_table`) and there is one
+//! global list (`ob_listg`) for things that follow the story, like the dead brothers' bags and the
+//! spectre. Each entry has a position, an id and a state. Only the entries near the screen become
+//! actors in `anim_list`, so the game never handles more than 20 actors at once:
+//! - people (state 3 or 4) go in slots starting at 2, counted by `j1`;
+//! - ordinary items go after the monsters, counted by `anix2`.
+//! The actor's `vitality` field is borrowed to remember which list entry it came from (the entry
+//! number, plus 0x80 for the global list), so `change_object` can find the entry again later.
 
 use super::loading::cfiles;
 use super::tables::{CHEST, TURTLE, dstobs, glbobs, mapobs, ob_listg, ob_table, rand_treasure};
 use super::types::{SeqInfo, Shape, WorldObject};
-/// Mirror of the `setfig_table` entries in csrc/fmain.c.
+/// Mirror of the `setfig_table` entries in csrc/fmain.c: for each kind of person (wizard, priest,
+/// guard, princess, king, noble, sorceress, bartender, witch, ranger ...), which sprite file
+/// holds them, which image to start from, and whether they can talk.
 #[repr(C)]
 struct SetFigEntry {
     cfile_entry: i8,
@@ -81,11 +92,13 @@ const PERSON_RACE_BASE: i32 = 0x80;
 #[unsafe(no_mangle)]
 pub static mut j1: i16 = 0;
 
+/// Whether `value` is strictly between the two limits.
 fn inside(value: i16, (low, high): (i16, i16)) -> bool {
     value > low && value < high
 }
 
 /// Turns the global and current region's object lists into actors.
+/// Called when the screen changes (new region, scrolling far, after loading a game).
 #[unsafe(no_mangle)]
 pub extern "C" fn do_objects() {
     unsafe {
@@ -99,6 +112,7 @@ pub extern "C" fn do_objects() {
 }
 
 /// Drops `object` where actor `i` stands (slot 0 of the global list is used for this).
+/// That slot is reused for each item the hero or a monster leaves behind.
 #[unsafe(no_mangle)]
 pub extern "C" fn leave_item(i: i16, object: i16) {
     unsafe {
@@ -112,7 +126,7 @@ pub extern "C" fn leave_item(i: i16, object: i16) {
 }
 
 /// Changes the object that actor `id` stands for: `flag` 1 = show, 2 = take. A chest opens
-/// instead.
+/// instead (its id changes to the opened chest, rather than its state).
 #[unsafe(no_mangle)]
 pub extern "C" fn change_object(id: i32, flag: i32) {
     unsafe {
@@ -131,7 +145,9 @@ pub extern "C" fn change_object(id: i32, flag: i32) {
     }
 }
 
-/// Scatters random treasure over a region the first time it is visited.
+/// Scatters random treasure over a region the first time it is visited: 10 items at random
+/// spots, retrying until the spot is not blocked (terrain type 0 means clear), with the item picked
+/// from `rand_treasure`. `dstobs` remembers that it has been done.
 unsafe fn distribute_treasure() {
     unsafe {
         let region = region_num as usize;
@@ -157,7 +173,8 @@ unsafe fn distribute_treasure() {
     }
 }
 
-/// Makes sure the sprite file for set figure `id` is loaded.
+/// Makes sure the sprite file for the kind of person `id` is loaded. Several kinds share one
+/// file, so it is only reloaded when the needed file differs from the loaded one.
 unsafe fn load_set_figure(id: i8) {
     unsafe {
         let entry = (*(&raw const setfig_table).cast::<SetFigEntry>().add(id as usize)).cfile_entry;
@@ -173,6 +190,11 @@ unsafe fn load_set_figure(id: i8) {
 
 /// Turns the objects of one list into actors if they are close enough to the screen. `f` is
 /// added to the object's number to make the actor's `vitality` (0x80 marks the global list).
+///
+/// For each entry: work out where it is on screen (the sprite is 16 wide, so 8 is subtracted to
+/// centre it); people are only loaded if within about 100-400 pixels, and shown if within the
+/// screen; items that are hidden or taken are skipped. A person already in the actor list at the
+/// same place is not added twice (and is marked dead if its actor died).
 #[unsafe(no_mangle)]
 pub extern "C" fn set_objects(mut list: *mut WorldObject, mut length: i16, f: i32) {
     unsafe {
@@ -191,6 +213,7 @@ pub extern "C" fn set_objects(mut list: *mut WorldObject, mut length: i16, f: i3
                 let object = &mut *list;
                 let xstart = (object.xc as i32 - map_x as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
                 let mut ystart = (object.yc as i32 - map_y as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
+                // States 3 and 4 are people; everything else is an item.
                 let is_person = object.ob_stat == STAT_PERSON || object.ob_stat == STAT_DEAD_PERSON;
                 let id = object.ob_id;
                 if is_person {
@@ -225,6 +248,7 @@ pub extern "C" fn set_objects(mut list: *mut WorldObject, mut length: i16, f: i3
                     actor.goal = i as i8;
                     actor.environ = 0;
                     actor.state = if object.ob_stat == STAT_DEAD_PERSON { DEAD } else { STILL };
+                    // A person's race is 0x80 plus their kind, so they can be told from monsters.
                     actor.race = (id as i32 + PERSON_RACE_BASE) as u8;
                     ystart -= PERSON_RAISE;
                     if j1 > anix2 {

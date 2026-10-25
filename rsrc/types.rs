@@ -1,9 +1,17 @@
 //! Rust mirrors of the game's own C structs (csrc/ftale.h and csrc/fmain.c).
+//!
+//! The layout must match the C exactly (`#[repr(C)]`), because the C code that is left reads and
+//! writes the same memory. The unit tests at the bottom check the sizes.
 
 use crate::amiga::RasInfo;
 use std::ffi::c_void;
 
-/// One actor (`struct shape`).
+/// One actor (`struct shape`): the hero, a monster, a person or an object lying around.
+///
+/// Positions are world coordinates in pixels; `rel_x`/`rel_y` are the position on screen.
+/// `kind` says what sort of thing it is (see the sequence numbers in csrc/ftale.h) and `race` its
+/// species. `state` is what it is doing now (walking, fighting, dead ...), `goal` and `tactic` are
+/// what an enemy is trying to do and how. `facing` is a direction 0-7.
 #[repr(C)]
 pub struct Shape {
     pub abs_x: u16,
@@ -25,8 +33,8 @@ pub struct Shape {
     pub vel_y: i8,
 }
 
-/// A rectangle of the world with a special meaning, e.g. where a monster type appears
-/// (`struct extent`).
+/// A rectangle of the world with a special meaning, for example where a kind of monster appears
+/// (`struct extent`). `etype` says what it is; `v1`-`v3` are extra values for that type.
 #[repr(C)]
 pub struct Extent {
     pub x1: u16,
@@ -39,7 +47,9 @@ pub struct Extent {
     pub v3: u8,
 }
 
-/// An item lying in the world (`struct object`).
+/// An item or person standing in the world (`struct object`).
+/// `ob_stat` is its state: 0 does not exist, 1 on the ground, 2 taken, 3 a person, 4 a dead
+/// person, 5 hidden until looked for.
 #[repr(C)]
 pub struct WorldObject {
     pub xc: u16,
@@ -60,7 +70,8 @@ pub struct Missile {
     pub archer: i8,
 }
 
-/// Where a sprite sequence is in memory (`struct seq_info`).
+/// Where a sprite sequence (all the frames of one kind of character) is in memory (`struct seq_info`),
+/// and where its transparency mask is.
 #[repr(C)]
 pub struct SeqInfo {
     pub width: i16,
@@ -72,7 +83,9 @@ pub struct SeqInfo {
     pub current_file: i16,
 }
 
-/// One of the two display pages being drawn and shown (`struct fpage`).
+/// One of the two display pages being drawn and shown (`struct fpage`). The game draws on one
+/// while the other is on screen, then swaps them. It also remembers what is drawn there so it can
+/// be erased later, and the witch's beam position.
 #[repr(C)]
 pub struct FPage {
     pub ri_page: *mut RasInfo,

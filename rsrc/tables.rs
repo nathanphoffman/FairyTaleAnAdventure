@@ -2,6 +2,9 @@
 //! csrc/fmain2.c): item ids, per-region object lists, colours, the witch's beam points, bow
 //! offsets and loot probabilities. Names and element types match the C originals, because the C
 //! that is left reads many of them.
+//!
+//! The names stay as in the C source for now (the C that is left refers to them); they are
+//! renamed in the cleanup pass after the port.
 
 // The names stay as in the C source for now (the C that is left refers to them); they are
 // renamed in the cleanup pass after the port.
@@ -39,13 +42,17 @@ pub const GREEN_KEY: u8 = 153;
 pub const WHITE_KEY: u8 = 154;
 pub const RED_KEY: u8 = 242;
 
-/// Menu choice to (item number, price) pairs for the buy menu.
+/// What the bartender sells: pairs of (inventory item number, price). Item 0 is food (eaten
+/// at once), item 8 is a bundle of 10 arrows, the others are single items. The buy menu choice
+/// (from 5) picks the pair.
 #[unsafe(no_mangle)]
 pub static jtrans: [i8; 14] = [
     0,3, 8,10, 11,15, 1,30, 2,45, 3,75, 13,20
 ];
 
-/// Loot an enemy drops: 8 entries per treasure class.
+/// What a dead enemy drops: 8 entries per treasure class (the enemy's class times 8, plus a
+/// random 0-7 picks the entry). The entry is an inventory item number (gold amounts for the high
+/// numbers) or 0 for nothing.
 #[unsafe(no_mangle)]
 pub static treasure_probs: [i8; 40] = [
     0, 0, 0, 0, 0, 0, 0, 0, // no treasure
@@ -55,7 +62,8 @@ pub static treasure_probs: [i8; 40] = [
     15,21,0,0,0,0,0,0 // jade skull and white key
 ];
 
-/// Weapon an enemy carries: 4 entries per weapon class.
+/// The weapon an enemy carries: 4 entries per weapon class (the enemy type's `arms` times 4, plus
+/// a random 0-3). 1 dirk, 2 mace, 3 sword, 4 bow, 5 magic wand, 8 touch attack, 0 none.
 #[unsafe(no_mangle)]
 pub static weapon_probs: [i8; 32] = [
     0,0,0,0, // no weapons
@@ -68,7 +76,7 @@ pub static weapon_probs: [i8; 32] = [
     3,3,3,3, // swords only
 ];
 
-/// Sprite frames for the falling and dying animations, 6 per brother.
+/// Sprite frames for the falling animation: 6 per brother, picked by how far into the fall the actor is.
 #[unsafe(no_mangle)]
 pub static fallstates: [u8; 24] = [
     0,0,0,0,0,0,
@@ -77,39 +85,40 @@ pub static fallstates: [u8; 24] = [
     0x37,0x38,0x3d,0x6f,0x70,0x71
 ];
 
-/// Where the bow is drawn relative to the hero, x, per frame.
+/// Where the bow is drawn relative to the shooter, x, for each of the 32 shooting animation frames.
 #[unsafe(no_mangle)]
 pub static bow_x: [i8; 32] = [
     1,2,3,4,3,2,1,0, 3,2,0,-2,-3,-2,0,2,
     -3,-3,-3,-3,-3,-3,-3,-2, 0,1,1,1,0,-2,-3,-2
 ];
 
-/// Where the bow is drawn relative to the hero, y, per frame.
+/// Where the bow is drawn relative to the shooter, y, for each of the 32 shooting animation frames.
 #[unsafe(no_mangle)]
 pub static bow_y: [i8; 32] = [
     8,8,8,7,8,8,8,8, 11,12,13,13,13,13,13,12,
     8,7,6,5,6,7,8,9, 12,12,12,12,12,12,11,12
 ];
 
-/// Where an arrow starts relative to the shooter, x, per facing.
+/// Where an arrow starts relative to the shooter, x, for each of the 8 facings.
 #[unsafe(no_mangle)]
 pub static bowshotx: [i8; 8] = [
     0, 0, 3, 6,-3,-3,-3,-6
 ];
 
-/// Where an arrow starts relative to the shooter, y, per facing.
+/// Where an arrow starts relative to the shooter, y, for each of the 8 facings.
 #[unsafe(no_mangle)]
 pub static bowshoty: [i8; 8] = [
     -6,-6,-1, 0, 6, 8, 0,-1
 ];
 
-/// Where a fireball starts relative to the shooter, y, per facing.
+/// Where a fireball (non-bow missile) starts relative to the shooter, y, for each of the 8 facings.
 #[unsafe(no_mangle)]
 pub static gunshoty: [i8; 8] = [
     2, 0, 4, 7, 9, 4, 7, 8
 ];
 
-/// The witch beam: 64 directions of 4 numbers (x1, y1, x2, y2).
+/// The witch beam: 64 directions of 4 numbers (x1, y1, x2, y2), the near and far end of each edge,
+/// going around a circle of radius 100. See `witch_fx`.
 pub static witchpoints: [i8; 256] = [
     // 64 points - 256 entries
     0,100,0,10, 9,99,0,9, 19,98,1,9, 29,95,2,9,
@@ -130,7 +139,7 @@ pub static witchpoints: [i8; 256] = [
     -39,92,-4,9, -30,95,-3,9, -20,98,-2,9, -10,99,-1,9,
 ];
 
-/// Colours of the sky as the sun rises in the win sequence.
+/// Colours of the sky as the sun rises in the win sequence (53 steps from night to day).
 pub static sun_colors: [i16; 53] = [
     0x000, 0x000, 0x001, 0x002, 0x002, 0x012, 0x112, 0x113,
     0x113, 0x214, 0x224, 0x225, 0x326, 0x326, 0x337, 0x338,
@@ -142,6 +151,7 @@ pub static sun_colors: [i16; 53] = [
 ];
 
 /// The 32 page colours at full brightness (colour 31 changes with the region).
+/// Each is 12 bits: red, green and blue in 4 bits each.
 #[unsafe(no_mangle)]
 pub static mut pagecolors: [u16; 32] = [
     0x0000,0x0FFF,0x0E96,0x0B63,0x0631,0x07BF,0x0333,0x0DB8,
@@ -150,7 +160,8 @@ pub static mut pagecolors: [u16; 32] = [
     0x0C00,0x0F50,0x0FA0,0x0FF6,0x0EB6,0x0EA5,0x000F,0x0BDF
 ];
 
-/// Item id to inventory slot pairs, ended by 0, 0.
+/// Item translation: pairs of (object id in the world, inventory slot). When the hero picks up
+/// an object, the pair with its id says which inventory count to raise. Ended by 0, 0.
 #[unsafe(no_mangle)]
 pub static itrans: [u8; 64] = [
     QUIVER, 35,
@@ -187,7 +198,7 @@ pub static itrans: [u8; 64] = [
     0, 0,
 ];
 
-/// Random treasure scattered over a region, picked with 4 random bits.
+/// Random treasure scattered over a region on first visit, picked with 4 random bits.
 pub static rand_treasure: [u8; 16] = [
     SACKS, SACKS, SACKS, SACKS, CHEST, MONEY, GOLD_KEY, QUIVER, GREY_KEY, GREY_KEY, GREY_KEY, RED_KEY, B_TOTEM, VIAL, WHITE_KEY, CHEST,
 ];
@@ -220,7 +231,7 @@ pub static comptable: [CompassPart; 10] = [
 ];
 
 
-/// Builds an object list entry.
+/// Builds an object list entry: position, item id and state.
 const fn obj(x: u16, y: u16, id: u8, stat: i8) -> WorldObject {
     WorldObject { xc: x, yc: y, ob_id: id as i8, ob_stat: stat }
 }
@@ -450,7 +461,7 @@ pub static mut ob_table: [*mut WorldObject; 10] = [
 
 /// How many entries of each region's list are in use.
 pub static mut mapobs: [i16; 10] = [3, 1, 5, 12, 3, 5, 1, 1, 61 + 16, 9];
-/// Whether random treasure has been scattered over each region yet.
+/// Whether random treasure has been scattered over each region yet (1 = done).
 pub static mut dstobs: [i16; 10] = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1];
 /// Entries in the global object list.
 pub static glbobs: i16 = 11;
@@ -458,7 +469,7 @@ pub static glbobs: i16 = 11;
 
 // ---- shared work areas ----
 
-/// The 32 colours being faded to.
+/// The 32 colours being faded to (scratch space for `fade_page`).
 pub static mut fader: [u16; 32] = [0; 32];
 
 /// The print queue: requests for the text panel, filled by `prq` and emptied by `ppick`.

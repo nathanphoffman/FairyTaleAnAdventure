@@ -1,6 +1,10 @@
 //! The witch's spinning beam (from csrc/fmain2.c): a filled quadrilateral drawn in XOR mode
 //! in a temporary layer, with the sign of the hero's side of each edge kept for hit tests.
-//! 
+//!
+//! The beam is the area between two of 64 directions around the witch (`witchpoints` lists the near
+//! and far end of each). `witch_fx` draws it with the exclusive-or drawing mode, so drawing it a
+//! second time erases it. It also records, in `s1` and `s2`, on which side of each edge the hero
+//! stands, which csrc/fmain.c uses to decide whether the beam hits the hero.
 
 use super::tables::witchpoints;
 use super::types::FPage;
@@ -102,6 +106,7 @@ fn side(p1: (i16, i16), p2: (i16, i16), xh: i16, yh: i16) -> (i16, i16) {
 }
 
 /// Draws the witch's beam on page `fp` and records on which side of its edges the hero is.
+/// The drawing is clipped to a temporary layer covering just the map area.
 #[unsafe(no_mangle)]
 pub extern "C" fn witch_fx(fp: *mut FPage) {
     unsafe {

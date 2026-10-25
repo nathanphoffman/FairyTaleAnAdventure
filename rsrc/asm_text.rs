@@ -1,5 +1,14 @@
 //! Text, story and enemy-steering routines that were 68000 assembly (fsubs.asm, narr.asm and
 //! inline #asm in fmain2.c; from csrc/asm_text.c). The story strings are in csrc/narr_data.c.
+//!
+//! Three groups of routines live here:
+//! - Printing: numbers (`ion`, `prdec`), strings with position escapes (`ssp`), and the lists of
+//!   messages and speeches (`event`, `speak`, `msg`, `placard_text`, `question`).
+//! - The print queue and the typing cursor (`prq`, `cursor`) and the story page border (`placard`).
+//! - Enemy steering (`set_course`): turn an actor toward or away from a target and start it walking.
+//!
+//! Message lists are zero-terminated strings stored one after another; picking message `n` means
+//! skipping `n` zero bytes.
 
 use super::random::fta_rand;
 use super::tables::{answr, pplay, prec, print_que, xx, yy};
@@ -39,6 +48,7 @@ const WALKING: i8 = 12;
 const STILL: i8 = 13;
 
 /// Right-aligned decimal in the first 10 characters of `numbuf`, leading positions blank.
+/// (The 11th character is a space, which `prdec` prints after the number.)
 #[unsafe(no_mangle)]
 pub extern "C" fn ion(mut value: u32) -> i32 {
     unsafe {
@@ -65,11 +75,13 @@ pub extern "C" fn prdec(value: i32, len: i32) {
 }
 
 // `move` is a Rust keyword, so this one is exported under the C name.
+/// Moves the text position (the C name is `move`, a keyword in Rust).
 #[unsafe(export_name = "move")]
 pub extern "C" fn move_to(x: i32, y: i32) {
     unsafe { Move(rp, x, y) };
 }
 
+/// Prints `len` characters at the text position.
 #[unsafe(no_mangle)]
 pub extern "C" fn text(s: *const c_char, len: i32) {
     unsafe { Text(rp, s, len) };
@@ -77,6 +89,7 @@ pub extern "C" fn text(s: *const c_char, len: i32) {
 
 /// Prints a string that may hold XY escapes (128, x/2, y) to move the text position. A string
 /// ends at a zero byte; bytes of 128 and above end each plain run of text.
+/// (The x position is stored halved so it fits in a byte.)
 #[unsafe(no_mangle)]
 pub extern "C" fn ssp(mut s: *const u8) {
     unsafe {
@@ -99,11 +112,13 @@ pub extern "C" fn ssp(mut s: *const u8) {
     }
 }
 
+/// Prints story page text number `n` (the strings use position escapes, see `ssp`).
 #[unsafe(no_mangle)]
 pub extern "C" fn placard_text(n: i32) {
     unsafe { ssp((*(&raw const placard_msgs).cast::<*const c_char>().offset(n as isize)).cast()) };
 }
 
+/// Prints riddle question `n` (the copy protection riddles, skipped now).
 #[unsafe(no_mangle)]
 pub extern "C" fn question(n: i32) {
     unsafe { print_cont((*(&raw const question_msgs).cast::<*const c_char>().offset(n as isize)).cast()) };
@@ -123,23 +138,26 @@ unsafe fn skip_strings(mut p: *const c_char, mut n: i32) -> *const c_char {
     p
 }
 
-/// Shows the `num`-th string of a list of messages.
+/// Shows the `num`-th string of a list of messages, word-wrapped (see `extract`).
 #[unsafe(no_mangle)]
 pub extern "C" fn msg(start: *const c_char, num: i32) {
     unsafe { extract(skip_strings(start, num)) };
 }
 
+/// Shows event message `n` (things that happen to the hero, such as hunger).
 #[unsafe(no_mangle)]
 pub extern "C" fn event(n: i32) {
     msg((&raw const event_msg).cast(), n);
 }
 
+/// Shows speech number `n` (what people say).
 #[unsafe(no_mangle)]
 pub extern "C" fn speak(n: i32) {
     msg((&raw const speeches).cast(), n);
 }
 
-/// Adds a request to the print queue (ignored if the queue is full).
+/// Adds a request to the print queue (ignored if the queue is full). `ppick` handles them one
+/// per tick, which spreads the redrawing work over several frames.
 #[unsafe(no_mangle)]
 pub extern "C" fn prq(x: i32) {
     unsafe {
@@ -152,7 +170,7 @@ pub extern "C" fn prq(x: i32) {
     }
 }
 
-/// Redraws the typed answer and a block cursor after it.
+/// Redraws the typed answer and a block cursor after it (the riddle input).
 #[unsafe(no_mangle)]
 pub extern "C" fn cursor(len: i32, pen: i32) {
     let space = b" ".as_ptr().cast::<c_char>();
@@ -168,6 +186,7 @@ pub extern "C" fn cursor(len: i32, pen: i32) {
 }
 
 // The decorative border drawn on story pages.
+// The border is a closed path made of 16 small steps repeated with changing offsets.
 const BORDER_X_STEPS: [i32; 16] = [-4, -4, -4, 0, 0, 0, 4, 4, 0, -4, 0, 4, 4, 0, 0, 0];
 const BORDER_Y_STEPS: [i32; 16] = [0, 0, 0, 4, 4, 4, 0, 0, -4, 0, -4, 0, 0, 4, 4, 4];
 const BORDER_START_X: i32 = 12;
@@ -179,6 +198,7 @@ const BORDER_HIGHLIGHT_PEN: u32 = 24;
 /// Strokes per step; the last one is drawn in the highlight pen.
 const STROKES_PER_STEP: i32 = 5;
 
+/// Draws a line from (x0, y0) to (x1, y1).
 unsafe fn line(r: *mut RastPort, x0: i32, y0: i32, x1: i32, y1: i32) {
     unsafe {
         Move(r, x0, y0);
@@ -186,6 +206,8 @@ unsafe fn line(r: *mut RastPort, x0: i32, y0: i32, x1: i32, y1: i32) {
     }
 }
 
+/// Draws the decorative border around a story page: many short strokes, five each with the last in
+/// a highlight colour, winding around the four edges. The first passes also draw the top and bottom.
 #[unsafe(no_mangle)]
 pub extern "C" fn placard() {
     unsafe {
@@ -211,7 +233,7 @@ pub extern "C" fn placard() {
     }
 }
 
-/// Menu state for an item: 10 if the player has item `n`, otherwise 8.
+/// Menu state for an item: 10 if the player has item `n`, otherwise 8 (a menu item state).
 #[unsafe(no_mangle)]
 pub extern "C" fn stuff_flag(n: i32) -> i32 {
     if unsafe { *stuff.offset(n as isize) } != 0 { 10 } else { 8 }
@@ -236,6 +258,11 @@ fn sign(v: i16) -> i32 {
 /// Works out the direction toward (or away from) a target. `xdif`/`ydif` are actor minus target
 /// (or the offset itself in mode 6). Modes: 0 toward, 1 and 2 toward with a sideways wobble when
 /// close, 3 away, 4 straight toward (no smart steering), 5 turn only, 6 the offset is given.
+///
+/// Method: take the sign of each axis, then ignore an axis if the other is more than twice as
+/// far (so mostly-horizontal targets give a pure left/right move, not a diagonal). The two signs
+/// pick one of 8 directions from a table; if both are zero the actor is on the target and stops.
+/// The wobble adds or subtracts one direction step at random when the target is close.
 fn steer(xdif: i16, ydif: i16, mode: i32, random_bit: impl FnOnce() -> bool) -> Course {
     let xabs = (xdif as i32).abs() as u16;
     let yabs = (ydif as i32).abs() as u16;
@@ -272,6 +299,8 @@ fn steer(xdif: i16, ydif: i16, mode: i32, random_bit: impl FnOnce() -> bool) -> 
 }
 
 /// Points an actor toward (or away from) a target and sets it walking (see `steer` for modes).
+/// The random number is only drawn when the actor moves, as in the original, so recorded games
+/// stay in step.
 #[unsafe(no_mangle)]
 pub extern "C" fn set_course(object: i32, target_x: i32, target_y: i32, mode: i32) {
     let mode = mode & 0xff;
@@ -299,7 +328,7 @@ const ERROR_SCREEN_Y: i32 = 90;
 /// Error number meaning graphics are not open, so nothing can be printed.
 const ERROR_NO_GRAPHICS: i32 = 2;
 
-/// Shows "ERROR n" on the text panel (startup failures).
+/// Shows "ERROR n" on the text panel (startup failures). Error 2 (no graphics) cannot be shown.
 #[unsafe(no_mangle)]
 pub extern "C" fn do_error(n: i32) {
     if n == ERROR_NO_GRAPHICS {
