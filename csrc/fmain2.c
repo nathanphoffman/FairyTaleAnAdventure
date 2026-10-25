@@ -488,6 +488,10 @@ prqx	movem.l	(sp)+,d0/d1/a1
 		rts
 #endif
 
+extern char *datanames[];
+extern short brother;
+
+#ifndef RSRC_MESSAGES /* PORT: ported to rsrc/messages.rs */
 #define TXMIN	16
 #define TXMAX	400
 #define	TYMIN	5
@@ -509,8 +513,6 @@ print_cont(str) register char *str;
 
 #define MLEN 35
 char *mbuf, mesbuf[200];
-extern char *datanames[];
-extern short brother;
 
 extract(start) register char *start;
 {	register char *ss, *lbreak;
@@ -547,7 +549,8 @@ extract(start) register char *start;
 		}
 	}
 }
-			
+#endif /* RSRC_MESSAGES */
+
 #ifdef AMIGA_ASM_68K /* PORT: 68000 inline assembly, rewritten in asm_stubs.c for now */
 ;msg(start,num) register char *start; register long num;
 ;{	while (num) if (*start++ == 0) num--;
@@ -577,6 +580,7 @@ msgx	move.l	a0,4(sp)
 
 #endif
 
+#ifndef RSRC_MESSAGES /* PORT: ported to rsrc/messages.rs */
 announce_container(s) char *s;
 {	print(datanames[brother-1]);
 	print_cont(" found ");
@@ -592,6 +596,7 @@ announce_treasure(s) char *s;
 
 name()
 {	print_cont(datanames[brother-1]); }
+#endif /* RSRC_MESSAGES */
 
 extern struct RastPort rp_map, rp_text;
 extern struct ViewPort vp_page, vp_text;
