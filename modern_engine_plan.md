@@ -115,6 +115,25 @@ that move must keep their C name. Leaf files first, `fmain.c` / `fmain2.c` last.
       compiler's struct sizes, statedump reads game globals), `narr_data.c` (keep as generated data),
       `fmain2.c`, `fmain.c`.
 Left off: everything except `fmain.c`, `fmain2.c` and the files that stay C is ported. `fmain2.c` is next.
+#### `fmain2.c` split (1790 lines, about 50 functions)
+Port it as groups, one commit per group, each into its own `rsrc/` file (K&R functions keep their
+C names; globals defined in `fmain2.c` move with their group and keep their names). Order is leaf
+groups first:
+1. `messages.rs`: `print`, `print_cont`, `extract`, `announce_container`, `announce_treasure`,
+   `name`, `map_message`, `message_off`, plus `mesbuf`/`mbuf`. Text only, easy to check by eye.
+2. `savegame.rs`: `savegame`, `saveload`, `sl_*` (already big-endian field by field), `locktest`,
+   `waitnewdisk`. Checked by the save/load round trip in `tests/regress.sh`.
+3. `objects.rs`: `do_objects`, `leave_item`, `change_object`, `set_objects`.
+4. `loading.rs`: `shape_read`, `read_shapes`, `seekn`, `prep`, `load_next`, `read_score`,
+   `copypage`, `flipscan`, `skipint`, `into_chip`, `cpytest`, `copy_protect_junk`.
+5. `actors.rs`: `dohit`, `aftermath`, `proxcheck`, `nearest_fig`, `calc_dist`, `move_figure`,
+   `do_tactic`, `move_extent`, `rescue`, `eat`, `set_loc`, `turtle_eggs`.
+6. `screen_fx.rs`: `drawcompass` (+ `comptable`), `fade_page`, `colorplay`, `ppick`, `fade_down`,
+   `fade_normal`, `stillscreen`, `win_colors`, `day_fade`.
+7. `witch.rs`: `witch_fx` alone (about 270 lines, the riskiest; split into steps inside).
+Dead code stays behind: the `AMIGA_ASM_68K` blocks and `#if 0` sections are not ported.
+The `static` helpers and globals stay private to their file unless `fmain.c` names them.
+
 Decision for `fmain.c`: cut `main()` into functions in `csrc/` first (step 2, the method above), then
 port the pieces to `rsrc/`. This is the one exception to "csrc is never edited": only step-2 cuts, with
 no behaviour change. Do the cuts before starting `fmain.c` in `rsrc/`; `fmain2.c` can be ported earlier.
