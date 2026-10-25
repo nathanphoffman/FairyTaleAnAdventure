@@ -1664,6 +1664,412 @@ static void survival_tick()
 	}
 }
 
+/* PORT: split out of main(): swings and bites: each actor that is not walking hits whatever is within
+   reach of its weapon (dohit), or makes a miss sound. */
+static void melee_hits()
+{	long i;
+	short j;
+
+	for (i=0; i<anix; i++)
+	{	short xs,ys,wt,fc,bv,xd,yd;
+		if (i > 0 && freeze_timer) break;
+		if (i==1 || anim_list[i].state >= WALKING) continue;
+		wt = anim_list[i].weapon;
+		fc = anim_list[i].facing;
+		if (!(wt & 4))
+		{	if (wt >= 8) wt = 5; /* tone down touch attack! */
+			wt += bitrand(2); 	 /* sometimes extended */
+			xs = newx(anim_list[i].abs_x,fc,wt+wt) + rand8()-3;
+			ys = newy(anim_list[i].abs_y,fc,wt+wt) + rand8()-3;
+			if (i==0) bv = (brave/20)+5; else bv = 2 + rand4(); /* 3 */
+			if (bv > 14) bv = 15;		/* bravery limit */
+			/* check for sword proximity */
+			for (j=0; j<anix; j++)
+			{	if (j==1 || j==i || anim_list[j].state == DEAD ||
+					anim_list[i].type == CARRIER) continue;
+				xd = anim_list[j].abs_x-xs;
+				yd = anim_list[j].abs_y-ys;
+				if (xd<0) xd = -xd;
+				if (yd<0) yd = -yd;
+				if (xd > yd) yd = xd; /* the max of them */
+				if ((i==0 || rand256()>brave) && yd < bv && !freeze_timer)
+				{ dohit(i,j,fc,wt); break; }
+				else if ((yd<bv+2) && wt !=5) effect(1,150+rand256());
+			}
+		}
+	}
+}
+
+/* PORT: split out of main(): moves the 6 flying missiles (arrows and fireballs), hitting actors
+   on the way. Nothing moves while time is frozen. */
+static void move_missiles()
+{	long i;
+	short j;
+
+	if (!freeze_timer) for (i=0; i<6; i++)
+	{	short xs,ys,fc,xd,yd,mt,bv,s; struct missile *ms;
+
+		ms = missile_list + i;
+		s = ms->speed*2;
+		if (ms->missile_type == 0 || ms->missile_type == 3 ||
+			s == 0 || ms->time_of_flight++ > 40)
+		{	ms->missile_type = 0; continue; }
+
+		j = px_to_im( xs=ms->abs_x , ys=ms->abs_y );
+		if (j==1 || j==15) { ms->missile_type = 0; s = 0; }
+		fc = ms->direction;
+		mt = 6;
+		if (ms->missile_type==2) mt = 9;
+
+		for (j=0; j<anix; j++)
+		{	if (j==0) bv = brave; else bv = 20; /* really?? */
+			if (j == 1 || ms->archer == j || /* don't shoot self!! */
+				anim_list[j].state == DEAD ||
+				anim_list[j].type == CARRIER) continue;
+			xd = anim_list[j].abs_x-xs; yd = anim_list[j].abs_y-ys;
+			if (xd<0) xd = -xd;
+			if (yd<0) yd = -yd;
+			if (xd > yd) yd = xd; /* the max of them */
+			if ((i != 0 || bitrand(512)>bv ) && yd < mt)
+			{	if (ms->missile_type == 2) dohit(-2,j,fc,rand8()+4);
+				else dohit(-1,j,fc,rand8()+4);
+				ms->speed = 0;
+				if (ms->missile_type == 2) ms->missile_type = 3;
+				break;
+			}
+		}
+		ms->abs_x = newx(ms->abs_x,fc,s);
+		ms->abs_y = newy(ms->abs_y,fc,s);
+	}
+}
+
+/* PORT: split out of main(): adds the visible missiles to the end of anim_list as objects so the
+   drawing loop draws them. Stops when the list is full (20). */
+static void queue_missiles()
+{	long i;
+	short xstart, ystart;
+
+	for (i=0; i<6; i++)
+	{	short t; struct shape *an; struct missile *ms;
+		ms = missile_list + i;
+		if (!(t = ms->missile_type)) continue;
+		xstart = ms->abs_x - map_x - 9;
+		ystart = ms->abs_y - map_y - 26;
+		if (xstart > -20 && xstart < 340 && ystart > -20 && ystart < 190)
+		{	an = anim_list + anix2;
+			an->abs_x = ms->abs_x; an->abs_y = ms->abs_y;
+			an->rel_x = xstart; an->rel_y = ystart;
+			an->type = OBJECTS; an->weapon = 0;
+			an->index = ms->direction;
+			an->race = 0xff;
+			if (t==3) an->index = 0x58;
+			else if (t==2) an->index += 0x59;
+			anix2++; if (anix2 >= 20) return;
+		}
+	}
+}
+
+/* PORT: split out of main(): finds the nearest person and sorts anim_index by y so that actors lower
+   on the screen are drawn later. */
+static void sort_actors()
+{	long i;
+	short j;
+	struct shape *an;
+
+	nearest_person = 0;
+	perdist = 50;
+	for (i=0; i<anix2; i++) anim_index[i] = i;
+	for (i=0; i<anix2; i++)
+	{	short k1, k2, y1, y2;
+		an = anim_list + i;
+		if (i && an->type!=OBJECTS && an->state!=DEAD && riding != 11)
+		{	j = calc_dist(i,0);
+			if (j < perdist) { perdist = j; nearest_person = i; }
+		}
+
+		for (j=1; j<anix2; j++)
+		{	k1 = anim_index[j-1];
+			k2 = anim_index[j];
+			y1 = anim_list[k1].abs_y;
+			y2 = anim_list[k2].abs_y;
+			if (anim_list[k1].state==DEAD || (k2==0 && riding) || k1==1)
+				y1 -= 32;
+			if (anim_list[k2].state==DEAD || (k1==0 && riding) || k2==1)
+				y2 -= 32;
+			if (anim_list[k1].environ > 25) y1 += 32;
+			if (anim_list[k2].environ > 25) y2 += 32;
+			if (y2 < y1)
+			{	anim_index[j-1] = k2;
+				anim_index[j] = k1;
+			}
+		}
+	}
+}
+
+/* PORT: split out of main(): finishes the scrolled map edge (dif_x, dif_y = scroll step) and runs
+   the witch effect and her damage. */
+static void repair_map_and_witch(dif_x, dif_y) short dif_x, dif_y;
+{	
+	if (dif_x == 1) strip_draw(36); else if (dif_x == -1) strip_draw(0);
+	if (dif_y == 1)	row_draw(10); else if (dif_y == -1) row_draw(0);
+
+	/* do witch fx */
+	fp_drawing->witchx = anim_list[2].abs_x - (map_x & 0xfff0);
+	fp_drawing->witchy = (anim_list[2].abs_y - 15) - (map_y & 0xffe0);
+	if (rand4()==0) { if (s1>0) wdir = 1; else wdir = -1; }
+	fp_drawing->witchdir = (witchindex += wdir);
+	fp_drawing->wflag=witchflag;
+	if (witchflag)
+	{	witch_fx(fp_drawing);
+		if (s1 > 0 && s2 < 0 && (calc_dist(2,0) < 100))
+			dohit(-1,0,anim_list[2].facing,rand2()+1);
+	}
+}
+
+/* PORT: split out of main(): draws every actor, and its weapon, into the page: clipping, masking
+   against the scenery, and saving the background (backsave) so it can be undone next frame. */
+static void draw_sprites(cycle) short cycle;
+{	long i;
+	short j, k;
+	struct shape *an;
+	short atype, inum;
+	unsigned char *backalloc, crack;
+	short xstart, ystart, xstop, ystop;
+
+	fp_drawing->obcount = crack = fp_drawing->saveused = 0;
+	backalloc = fp_drawing->backsave;
+
+	for (j=0; j<anix2; j++)
+	{	short	ground, cm;
+		BYTE	xsize,ysize,xbw,xew,xoff,yoff;
+		BYTE	blithigh, blitwide, cwide;
+		UBYTE 	xm, ym, ym1, ym2;
+		short	xstart1, ystart1, xstop1, ystop1;
+
+		/* passmodes: 0=char, 1=weapon */
+		passmode = pass = 0;
+
+		i = anim_index[j];
+		an = anim_list + i;
+		an->visible = 0;
+
+		newpass:
+		inum = an->index;		/* which character */
+
+		/* if offscreen, should we skip?? */
+
+		if (an->weapon>0 && an->weapon<8 && 
+			(an->state<DEAD || an->state>=SHOOT1 || xtype>80))
+		{	if ((an->facing - 2) & 4) passmode = (pass^1);
+			else passmode = pass;
+			if (an->weapon == 4 && an->state < SHOOT1)
+			{	if ((an->facing & 4) == 0) passmode = (pass ^ 1);
+				else passmode = pass;
+			}
+			pass++;
+		}
+
+		xstart = an->rel_x;
+		ystart = an->rel_y;
+		ground = ystart + 32;	/* location of ground */
+
+		/* as good a place to do this as any? */
+		OwnBlitter();
+		WaitBlit(); clear_blit(bmask_mem,CBK_SIZE);
+		DisownBlitter();
+
+		if (passmode)
+		{	k = an->weapon;
+			if (k==4 && inum < 32)
+			{	xstart += bow_x[inum]; ystart += bow_y[inum]; }
+			else
+			{	xstart += statelist[inum].wpn_x;
+				ystart += statelist[inum].wpn_y;
+			}
+
+			if (k == 4 && inum < 32) /* bow */
+			{	inum = inum/8;
+				if (inum&1) inum = 30;
+				else if (inum&2) inum = 0x53;
+				else inum = 0x51;
+			}
+			else if (k == 5)
+			{	inum = an->facing + 103;
+				if (an->facing == 2) ystart -= 6;
+			}
+			else /* hand weapons */
+			{	if (k == 2) k = 32;
+				else if (k == 3) k = 48;
+				else if (k == 1) k = 64;
+				else if (k == 4) k = 0;
+				inum = statelist[inum].wpn_no + k;
+			}
+			atype = OBJECTS;
+		}
+		else
+		{	atype = an->type;
+			if ((atype == ENEMY && an->race != 8) || atype == PHIL)
+			{	if (fiery_death && an->environ > 0)
+				{	if (an->state == DEAD) goto offscreen;
+					else if (an->state == DYING)
+						{ atype = OBJECTS; inum = 0x58; goto rte; }
+				}
+				else if (an->state == FALL)
+				{	if (an->tactic<16) atype=ENEMY; else atype=OBJECTS; }
+				else inum = statelist[inum].figure;
+				if (an->race == 4) { if (an->state<DYING) inum+=0x24; }
+				else if (i>0) { if (an->race&1) inum|=1; else inum&=0xfffe; }
+			}
+			if (atype == OBJECTS && an->race == 0) goto offscreen;
+			if (atype == CARRIER && riding == 0 && actor_file == 11)
+			{	atype = RAFT; inum = 1; }
+		}
+		rte:
+
+		xstart += (map_x & 15);
+		ystart += (map_y & 31);
+		ground += (map_y & 31);
+
+		xsize = (seq_list[atype].width)<<4;
+		ysize = seq_list[atype].height;
+
+		/* do shape calculations */
+
+		if (atype == OBJECTS)
+		{	if (inum==0x1b || (inum>=8 && inum<=12) || inum==25 || inum == 26 ||
+			(inum>0x10 && inum<0x18) || (inum & 128)) ysize = 8;
+		}
+
+		/* calculate width in bytes */
+		cwide = xsize/8;
+
+		/* calculate stop pixels */
+		xstop = xstart + xsize - 1;
+		ystop = ystart + ysize - 1;
+
+		if (passmode == 0 && atype != OBJECTS)
+		{	if (i==0 && riding==11) ystop -=16;
+			else if (an->environ == 2) ystop -= 10;
+			else if (an->environ > 29)
+			{	if (an->state == DEAD) goto offscreen;
+				ystart += 27;
+				ystop = ystart + 7;
+				atype = OBJECTS;
+				inum = 97 + ((cycle+i)&1);
+			}
+			else if (an->environ > 2)
+			{	ystart += an->environ; }
+		}
+		else
+		{	if (an->environ > 29) goto offscreen; /* no weapon */
+			if (an->environ > 2)
+			{	ystart += an->environ;
+				ystop += an->environ;
+				if (ystop > ground) ystop = ground;
+				if (ystart >= ground) goto offscreen;
+				ground += an->environ;
+			}
+		}
+
+		if (xstart > 319 || ystart > 173 || xstop < 0 || ystop < 0)
+			goto offscreen;
+
+		/* clip shape */
+		xstart1 = xstart; if (xstart < 0) xstart1 = 0;
+		ystart1 = ystart; if (ystart < 0) ystart1 = 0;
+		xstop1 = xstop; if (xstop > 319) xstop1 = 319;
+		ystop1 = ystop; if (ystop > 173) ystop1 = 173;
+		xoff = xstart1 - xstart;
+		yoff = ystart1 - ystart;
+
+		if (atype==OBJECTS && (inum&128)) { inum &= 0x7f; yoff += 8; }
+
+		/* calculate word offsets */
+		xbw = xstart1>>4;
+		xew = xstop1>>4;
+
+		blitwide = xew - xbw + 1;
+		blithigh = ystop1 - ystart1 + 1;
+
+		if (xoff & 15) blitwide += 1;
+
+		shp = &fp_drawing->shape_queue[fp_drawing->obcount];
+		planesize = seq_list[atype].bytes;
+		shp->savesize = blitwide * blithigh * 2;
+		shp->blitsize = (blithigh<<6) + blitwide;
+
+		shapedata = seq_list[atype].location + (planesize * 5 * inum);
+		mask_buffer = seq_list[atype].maskloc + (planesize * inum);
+		if (shp->savesize < 64 && crack < 5)
+		{	shp->backsave = planes[crack++] + (192*40); }
+		else
+		{	shp->backsave = backalloc;
+			backalloc += 5 * shp->savesize;
+			fp_drawing->saveused += 5 * shp->savesize;
+			if (fp_drawing->saveused >= (74*80)) break;
+				/* no more blits if no room */
+		}
+
+		aoff = ((ystart1)&31) * blitwide * 2;
+		boff = (xoff>>4)*2 + cwide*yoff;
+		shp->Coff = xbw*2 + ystart1 * 40;
+		shift = xstart & 15;
+		if (xoff & 15) { shp->Coff -=2; wmask = 0; } else wmask = -1;
+		bmod = cwide - (blitwide * 2);
+		shp->Cmod = 40 - (blitwide * 2);
+
+		OwnBlitter();
+		save_blit(shp->backsave);
+
+			/* if it's an arrow or a weapon */
+		if (atype == CARRIER || (i==0 && (riding==11 || xtype == 84
+			|| ( hero_x>22833 && hero_x<26428 &&
+				 hero_y>26425 && hero_y<26527))))
+			goto nomask;
+		if (atype == OBJECTS && inum > 99 && inum < 102) goto nomask;
+		if (an->race == 0x85 || an->race == 0x87) goto nomask;
+		if ((atype == OBJECTS && inum < 8) || passmode) blithigh = 32;
+		ym1 = ystart1>>5;
+		ym2 = (ystop1>>5) - ym1;
+		for (xm=0; xm<blitwide; xm++)
+		{	for (ym = 0; ym <= ym2; ym++)
+			{	/* ystop = (ystart1 & 31) + blithigh - (ym<<5); */
+				ystop = ground - ((ym + ym1)<<5);
+				cm = ((xm + xbw) * 6) + ym + ym1;
+				cm = minimap[cm] * 4;
+				k = terra_mem[cm+1] & 15;
+				if (an->state == FALL)
+				{	if (cm <= (220*4)) goto skip1;
+					else k = 3;
+				}
+				switch(k)
+				{	case 0: goto skip1;
+					case 1: if (xm==0) goto skip1; break;
+					case 2: if (ystop > 35) goto skip1; break;
+					case 3: if (hero_sector==48 && i != 1) goto skip1; /* bridge */
+							break;
+					case 4: if (xm==0 || ystop > 35) goto skip1; break;
+					case 5: if (xm==0 && ystop > 35) goto skip1; break;
+					case 6: if (ym!=0) cm = (64*4); break; /* full if above */
+					case 7: if (ystop > 20) goto skip1; break;
+				}
+				maskit(xm,ym,blitwide,terra_mem[cm]);
+				skip1: ;
+			}
+		}
+		nomask:
+
+		mask_blit();
+		shape_blit();
+		an->visible = TRUE;
+		DisownBlitter();
+
+		fp_drawing->obcount++;
+
+		offscreen: if (pass == 1) goto newpass;
+	}
+}
+
 void main(int argc,char argv[])
 {	register long i;
 	short j, k; char key;
@@ -1807,10 +2213,9 @@ no_intro:
 
 	cheat1 = quitflag = FALSE;
 	while (!quitflag)
-	{	short atype, inum, notpause;
+	{	short inum, notpause;
 		extern unsigned char fta_pia;
 		BYTE *pia = (BYTE *)&fta_pia;	/* PORT: was the CIA register at 0xbfe001 */
-		unsigned char *backalloc, crack;
 
 		cycle++;
 		flasher++;
@@ -2318,378 +2723,29 @@ no_intro:
 
 		SetAPen(&rp_map,31);
 
-		for (i=0; i<anix; i++)
-		{	short xs,ys,wt,fc,bv,xd,yd;
-			if (i > 0 && freeze_timer) break;
-			if (i==1 || anim_list[i].state >= WALKING) continue;
-			wt = anim_list[i].weapon;
-			fc = anim_list[i].facing;
-			if (!(wt & 4))
-			{	if (wt >= 8) wt = 5; /* tone down touch attack! */
-				wt += bitrand(2); 	 /* sometimes extended */
-				xs = newx(anim_list[i].abs_x,fc,wt+wt) + rand8()-3;
-				ys = newy(anim_list[i].abs_y,fc,wt+wt) + rand8()-3;
-				if (i==0) bv = (brave/20)+5; else bv = 2 + rand4(); /* 3 */
-				if (bv > 14) bv = 15;		/* bravery limit */
-				/* check for sword proximity */
-				for (j=0; j<anix; j++)
-				{	if (j==1 || j==i || anim_list[j].state == DEAD ||
-						anim_list[i].type == CARRIER) continue;
-					xd = anim_list[j].abs_x-xs;
-					yd = anim_list[j].abs_y-ys;
-					if (xd<0) xd = -xd;
-					if (yd<0) yd = -yd;
-					if (xd > yd) yd = xd; /* the max of them */
-					if ((i==0 || rand256()>brave) && yd < bv && !freeze_timer)
-					{ dohit(i,j,fc,wt); break; }
-					else if ((yd<bv+2) && wt !=5) effect(1,150+rand256());
-				}
-			}
-		}
+		melee_hits();
 
-		if (!freeze_timer) for (i=0; i<6; i++)
-		{	short xs,ys,fc,xd,yd,mt,bv,s; struct missile *ms;
-
-			ms = missile_list + i;
-			s = ms->speed*2;
-			if (ms->missile_type == 0 || ms->missile_type == 3 ||
-				s == 0 || ms->time_of_flight++ > 40)
-			{	ms->missile_type = 0; continue; }
-
-			j = px_to_im( xs=ms->abs_x , ys=ms->abs_y );
-			if (j==1 || j==15) { ms->missile_type = 0; s = 0; }
-			fc = ms->direction;
-			mt = 6;
-			if (ms->missile_type==2) mt = 9;
-
-			for (j=0; j<anix; j++)
-			{	if (j==0) bv = brave; else bv = 20; /* really?? */
-				if (j == 1 || ms->archer == j || /* don't shoot self!! */
-					anim_list[j].state == DEAD ||
-					anim_list[j].type == CARRIER) continue;
-				xd = anim_list[j].abs_x-xs; yd = anim_list[j].abs_y-ys;
-				if (xd<0) xd = -xd;
-				if (yd<0) yd = -yd;
-				if (xd > yd) yd = xd; /* the max of them */
-				if ((i != 0 || bitrand(512)>bv ) && yd < mt)
-				{	if (ms->missile_type == 2) dohit(-2,j,fc,rand8()+4);
-					else dohit(-1,j,fc,rand8()+4);
-					ms->speed = 0;
-					if (ms->missile_type == 2) ms->missile_type = 3;
-					break;
-				}
-			}
-			ms->abs_x = newx(ms->abs_x,fc,s);
-			ms->abs_y = newy(ms->abs_y,fc,s);
-		}
+		move_missiles();
 
 		anix2 = anix;
 		do_objects();
 
 		/* now stuff the flying missiles */
 
-		for (i=0; i<6; i++)
-		{	short t; struct shape *an; struct missile *ms;
-			ms = missile_list + i;
-			if (!(t = ms->missile_type)) continue;
-			xstart = ms->abs_x - map_x - 9;
-			ystart = ms->abs_y - map_y - 26;
-			if (xstart > -20 && xstart < 340 && ystart > -20 && ystart < 190)
-			{	an = anim_list + anix2;
-				an->abs_x = ms->abs_x; an->abs_y = ms->abs_y;
-				an->rel_x = xstart; an->rel_y = ystart;
-				an->type = OBJECTS; an->weapon = 0;
-				an->index = ms->direction;
-				an->race = 0xff;
-				if (t==3) an->index = 0x58;
-				else if (t==2) an->index += 0x59;
-				anix2++; if (anix2 >= 20) goto drawnow;
-			}
-		}
+		queue_missiles();
 
 		/* now sort the animation list by coordinate */
 		/* YUCKY AWFUL WASTEFUL BUBBLE SORT!! YUCK!! */
 
-		drawnow:
 
-		nearest_person = 0;
-		perdist = 50;
-		for (i=0; i<anix2; i++) anim_index[i] = i;
-		for (i=0; i<anix2; i++)
-		{	short k1, k2, y1, y2;
-			an = anim_list + i;
-			if (i && an->type!=OBJECTS && an->state!=DEAD && riding != 11)
-			{	j = calc_dist(i,0);
-				if (j < perdist) { perdist = j; nearest_person = i; }
-			}
-
-			for (j=1; j<anix2; j++)
-			{	k1 = anim_index[j-1];
-				k2 = anim_index[j];
-				y1 = anim_list[k1].abs_y;
-				y2 = anim_list[k2].abs_y;
-				if (anim_list[k1].state==DEAD || (k2==0 && riding) || k1==1)
-					y1 -= 32;
-				if (anim_list[k2].state==DEAD || (k1==0 && riding) || k2==1)
-					y2 -= 32;
-				if (anim_list[k1].environ > 25) y1 += 32;
-				if (anim_list[k2].environ > 25) y2 += 32;
-				if (y2 < y1)
-				{	anim_index[j-1] = k2;
-					anim_index[j] = k1;
-				}
-			}
-		}
+		sort_actors();
 
 		/* now that scroll blit is done, finish repairing the map */
 
-		if (dif_x == 1) strip_draw(36); else if (dif_x == -1) strip_draw(0);
-		if (dif_y == 1)	row_draw(10); else if (dif_y == -1) row_draw(0);
+		repair_map_and_witch(dif_x, dif_y);
 
-		/* do witch fx */
-		fp_drawing->witchx = anim_list[2].abs_x - (map_x & 0xfff0);
-		fp_drawing->witchy = (anim_list[2].abs_y - 15) - (map_y & 0xffe0);
-		if (rand4()==0) { if (s1>0) wdir = 1; else wdir = -1; }
-		fp_drawing->witchdir = (witchindex += wdir);
-		fp_drawing->wflag=witchflag;
-		if (witchflag)
-		{	witch_fx(fp_drawing);
-			if (s1 > 0 && s2 < 0 && (calc_dist(2,0) < 100))
-				dohit(-1,0,anim_list[2].facing,rand2()+1);
-		}
-
-		fp_drawing->obcount = crack = fp_drawing->saveused = 0;
-		backalloc = fp_drawing->backsave;
-
-		for (j=0; j<anix2; j++)
-		{	short	ground, cm;
-			BYTE	xsize,ysize,xbw,xew,xoff,yoff;
-			BYTE	blithigh, blitwide, cwide;
-			UBYTE 	xm, ym, ym1, ym2;
-			short	xstart1, ystart1, xstop1, ystop1;
-
-			/* passmodes: 0=char, 1=weapon */
-			passmode = pass = 0;
-
-			i = anim_index[j];
-			an = anim_list + i;
-			an->visible = 0;
-
-			newpass:
-			inum = an->index;		/* which character */
-
-			/* if offscreen, should we skip?? */
-
-			if (an->weapon>0 && an->weapon<8 && 
-				(an->state<DEAD || an->state>=SHOOT1 || xtype>80))
-			{	if ((an->facing - 2) & 4) passmode = (pass^1);
-				else passmode = pass;
-				if (an->weapon == 4 && an->state < SHOOT1)
-				{	if ((an->facing & 4) == 0) passmode = (pass ^ 1);
-					else passmode = pass;
-				}
-				pass++;
-			}
-
-			xstart = an->rel_x;
-			ystart = an->rel_y;
-			ground = ystart + 32;	/* location of ground */
-
-			/* as good a place to do this as any? */
-			OwnBlitter();
-			WaitBlit(); clear_blit(bmask_mem,CBK_SIZE);
-			DisownBlitter();
-
-			if (passmode)
-			{	k = an->weapon;
-				if (k==4 && inum < 32)
-				{	xstart += bow_x[inum]; ystart += bow_y[inum]; }
-				else
-				{	xstart += statelist[inum].wpn_x;
-					ystart += statelist[inum].wpn_y;
-				}
-
-				if (k == 4 && inum < 32) /* bow */
-				{	inum = inum/8;
-					if (inum&1) inum = 30;
-					else if (inum&2) inum = 0x53;
-					else inum = 0x51;
-				}
-				else if (k == 5)
-				{	inum = an->facing + 103;
-					if (an->facing == 2) ystart -= 6;
-				}
-				else /* hand weapons */
-				{	if (k == 2) k = 32;
-					else if (k == 3) k = 48;
-					else if (k == 1) k = 64;
-					else if (k == 4) k = 0;
-					inum = statelist[inum].wpn_no + k;
-				}
-				atype = OBJECTS;
-			}
-			else
-			{	atype = an->type;
-				if ((atype == ENEMY && an->race != 8) || atype == PHIL)
-				{	if (fiery_death && an->environ > 0)
-					{	if (an->state == DEAD) goto offscreen;
-						else if (an->state == DYING)
-							{ atype = OBJECTS; inum = 0x58; goto rte; }
-					}
-					else if (an->state == FALL)
-					{	if (an->tactic<16) atype=ENEMY; else atype=OBJECTS; }
-					else inum = statelist[inum].figure;
-					if (an->race == 4) { if (an->state<DYING) inum+=0x24; }
-					else if (i>0) { if (an->race&1) inum|=1; else inum&=0xfffe; }
-				}
-				if (atype == OBJECTS && an->race == 0) goto offscreen;
-				if (atype == CARRIER && riding == 0 && actor_file == 11)
-				{	atype = RAFT; inum = 1; }
-			}
-			rte:
-
-			xstart += (map_x & 15);
-			ystart += (map_y & 31);
-			ground += (map_y & 31);
-
-			xsize = (seq_list[atype].width)<<4;
-			ysize = seq_list[atype].height;
-
-			/* do shape calculations */
-
-			if (atype == OBJECTS)
-			{	if (inum==0x1b || (inum>=8 && inum<=12) || inum==25 || inum == 26 ||
-				(inum>0x10 && inum<0x18) || (inum & 128)) ysize = 8;
-			}
-
-			/* calculate width in bytes */
-			cwide = xsize/8;
-
-			/* calculate stop pixels */
-			xstop = xstart + xsize - 1;
-			ystop = ystart + ysize - 1;
-
-			if (passmode == 0 && atype != OBJECTS)
-			{	if (i==0 && riding==11) ystop -=16;
-				else if (an->environ == 2) ystop -= 10;
-				else if (an->environ > 29)
-				{	if (an->state == DEAD) goto offscreen;
-					ystart += 27;
-					ystop = ystart + 7;
-					atype = OBJECTS;
-					inum = 97 + ((cycle+i)&1);
-				}
-				else if (an->environ > 2)
-				{	ystart += an->environ; }
-			}
-			else
-			{	if (an->environ > 29) goto offscreen; /* no weapon */
-				if (an->environ > 2)
-				{	ystart += an->environ;
-					ystop += an->environ;
-					if (ystop > ground) ystop = ground;
-					if (ystart >= ground) goto offscreen;
-					ground += an->environ;
-				}
-			}
-
-			if (xstart > 319 || ystart > 173 || xstop < 0 || ystop < 0)
-				goto offscreen;
-
-			/* clip shape */
-			xstart1 = xstart; if (xstart < 0) xstart1 = 0;
-			ystart1 = ystart; if (ystart < 0) ystart1 = 0;
-			xstop1 = xstop; if (xstop > 319) xstop1 = 319;
-			ystop1 = ystop; if (ystop > 173) ystop1 = 173;
-			xoff = xstart1 - xstart;
-			yoff = ystart1 - ystart;
-
-			if (atype==OBJECTS && (inum&128)) { inum &= 0x7f; yoff += 8; }
-
-			/* calculate word offsets */
-			xbw = xstart1>>4;
-			xew = xstop1>>4;
-
-			blitwide = xew - xbw + 1;
-			blithigh = ystop1 - ystart1 + 1;
-
-			if (xoff & 15) blitwide += 1;
-
-			shp = &fp_drawing->shape_queue[fp_drawing->obcount];
-			planesize = seq_list[atype].bytes;
-			shp->savesize = blitwide * blithigh * 2;
-			shp->blitsize = (blithigh<<6) + blitwide;
-
-			shapedata = seq_list[atype].location + (planesize * 5 * inum);
-			mask_buffer = seq_list[atype].maskloc + (planesize * inum);
-			if (shp->savesize < 64 && crack < 5)
-			{	shp->backsave = planes[crack++] + (192*40); }
-			else
-			{	shp->backsave = backalloc;
-				backalloc += 5 * shp->savesize;
-				fp_drawing->saveused += 5 * shp->savesize;
-				if (fp_drawing->saveused >= (74*80)) break;
-					/* no more blits if no room */
-			}
-
-			aoff = ((ystart1)&31) * blitwide * 2;
-			boff = (xoff>>4)*2 + cwide*yoff;
-			shp->Coff = xbw*2 + ystart1 * 40;
-			shift = xstart & 15;
-			if (xoff & 15) { shp->Coff -=2; wmask = 0; } else wmask = -1;
-			bmod = cwide - (blitwide * 2);
-			shp->Cmod = 40 - (blitwide * 2);
-
-			OwnBlitter();
-			save_blit(shp->backsave);
-
-				/* if it's an arrow or a weapon */
-			if (atype == CARRIER || (i==0 && (riding==11 || xtype == 84
-				|| ( hero_x>22833 && hero_x<26428 &&
-					 hero_y>26425 && hero_y<26527))))
-				goto nomask;
-			if (atype == OBJECTS && inum > 99 && inum < 102) goto nomask;
-			if (an->race == 0x85 || an->race == 0x87) goto nomask;
-			if ((atype == OBJECTS && inum < 8) || passmode) blithigh = 32;
-			ym1 = ystart1>>5;
-			ym2 = (ystop1>>5) - ym1;
-			for (xm=0; xm<blitwide; xm++)
-			{	for (ym = 0; ym <= ym2; ym++)
-				{	/* ystop = (ystart1 & 31) + blithigh - (ym<<5); */
-					ystop = ground - ((ym + ym1)<<5);
-					cm = ((xm + xbw) * 6) + ym + ym1;
-					cm = minimap[cm] * 4;
-					k = terra_mem[cm+1] & 15;
-					if (an->state == FALL)
-					{	if (cm <= (220*4)) goto skip1;
-						else k = 3;
-					}
-					switch(k)
-					{	case 0: goto skip1;
-						case 1: if (xm==0) goto skip1; break;
-						case 2: if (ystop > 35) goto skip1; break;
-						case 3: if (hero_sector==48 && i != 1) goto skip1; /* bridge */
-								break;
-						case 4: if (xm==0 || ystop > 35) goto skip1; break;
-						case 5: if (xm==0 && ystop > 35) goto skip1; break;
-						case 6: if (ym!=0) cm = (64*4); break; /* full if above */
-						case 7: if (ystop > 20) goto skip1; break;
-					}
-					maskit(xm,ym,blitwide,terra_mem[cm]);
-					skip1: ;
-				}
-			}
-			nomask:
-
-			mask_blit();
-			shape_blit();
-			an->visible = TRUE;
-			DisownBlitter();
-
-			fp_drawing->obcount++;
-
-			offscreen: if (pass == 1) goto newpass;
-		}
+		draw_sprites(cycle);
+		j = anix2;	/* PORT: the drawing loop left j here; the next frame's actor loop reads j for dead actors */
 		WaitBlit();
 		fp_drawing->ri_page->RxOffset = (map_x & 15);	/* modulus 16 */
 		fp_drawing->ri_page->RyOffset = (map_y & 31);	/* modulus 32 */

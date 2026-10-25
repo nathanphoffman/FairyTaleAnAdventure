@@ -14,3 +14,5 @@ shop_buy     | 1060 |  | 900:250:157,950:250:166,1000:250:175 | 700:tp:9640:3897
 inn_inside   | 900  |  |  | 700:tp:9640:38975
 die_fairy    | 1500 |  |  | 700:kill:50
 die_brother  | 1500 |  |  | 700:kill:0
+combat_graveyard | 3200 | 720:LCtrl:60,820:LCtrl:60,920:LCtrl:60,1020:LCtrl:60,1120:LCtrl:60,1220:LCtrl:60,1320:LCtrl:60,1420:LCtrl:60,1520:LCtrl:60,1620:LCtrl:60,1720:LCtrl:60,1820:LCtrl:60,1920:LCtrl:60,2020:LCtrl:60,2120:LCtrl:60,2220:LCtrl:60,2320:LCtrl:60,2420:LCtrl:60,2520:LCtrl:60,2620:LCtrl:60,2720:LCtrl:60,2820:LCtrl:60,2920:LCtrl:60 |  | 700:tp:19700:17250
+door_cave    | 1200 |  |  | 700:tp:5008:7010

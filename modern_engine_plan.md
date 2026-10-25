@@ -47,7 +47,7 @@ games/  original  improved  remastered  reimagined
 - [x] Targeted scenarios (`FTA_CMD="tick:tp:x:y,tick:kill:luck"` teleports like a door or kills the
       hero; applied by `fta_test_hook()` at the top of the main loop): `talk_beggar`, `shop_buy`
       (inn, bartender), `inn_inside` (region 8), `die_fairy` (revived), `die_brother` (brother 2).
-- [ ] Still without scenarios: caves/underground, swan/turtle, key doors, combat kills.
+- [ ] Still without scenarios: swan/turtle, key doors. (`combat_graveyard`, `door_cave` added.)
 - [x] Record and replay: `FTA_RECORD=file` logs keys and mouse; `FTA_REPLAY=file` repeats them.
       Checked: replay gives an identical state file.
 - [x] `regress.sh` golden pixel hashes were stale (they failed on the previous commit too); screens checked by eye, hashes updated. `soak.sh` passes.
@@ -66,11 +66,11 @@ they move after each cut; the `/* ... */` comments in the loop mark most boundar
 - [ ] ~1478-1876 the per-actor motion loop `for (i=0; i<anix; i++)` (about 400 lines, has `goto`
       labels such as `newloc`, `blocked`, `checkdev2`). Biggest and riskiest. Split it by actor
       kind (hero, carrier/raft, setfig, enemy) only where the gotos stay inside one piece. Batch 3.
-Batch 2:
-- [ ] ~2248-2315 combat hit detection loop (weapon reach, `newx`/`newy`, damage)
-- [ ] ~2316 flying missiles, ~2337 sprite sort (bubble sort), ~2340 `drawnow:`
-- [ ] ~2371 finish map repair, ~2376 "do witch fx"
-- [ ] ~2395-2626 sprite drawing loop (masking, `passmode`, `blithigh`; about 230 lines)
+- [x] Batch 2 (one commit, one test run): `melee_hits`, `move_missiles`, `queue_missiles`, `sort_actors`,
+      `repair_map_and_witch`, `draw_sprites`. New scenarios `combat_graveyard` (kills) and `door_cave`
+      (outdoor door, cave, dying). Still without scenarios: swan/turtle, key doors.
+      `draw_sprites` used to leave `j = anix2`, which the next frame's actor loop reads for dead
+      actors, so `main()` sets `j = anix2` after the call.
 - Not planned: start-up (before the loop) and shutdown (`quit_all:`).
 
 How to do one cut (the method used for `handle_key` and `update_hero`):
