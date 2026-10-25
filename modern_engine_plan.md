@@ -136,6 +136,16 @@ readable there and a group can be switched back to C for a bisect.
 Not covered by the regression scenarios yet: `win_colors`, `rescue`, `witch_fx`, the trackdisk
 path in `hdrive`. They were ported line by line; a scenario for each would be worth adding.
 
+Status (summary): ported to `rsrc/` and out of the build: every C file except `fmain.c`,
+`layout.c`, `statedump.c` and `narr_data.c` (generated data). All `rsrc/` files have explanatory
+comments (file summaries, function docs, game rules); that pass changed no code (checked by comparing
+the code with comments stripped against the previous commit).
+Exceptions to "csrc is never edited": `#ifndef RSRC_*` guards in `csrc/fmain2.c` (preprocessor only,
+off now, so the file reads as the original) and the `main()` cuts planned for `fmain.c`.
+After the port (cleanup pass): give the Rust functions readable names with thin wrappers that keep
+the C names for any C that is left, then delete the wrappers; replace the `static mut` globals and
+raw pointers with proper structs; add test scenarios for `win_colors`, `rescue`, `witch_fx` and the
+trackdisk path.
 Decision for `fmain.c`: cut `main()` into functions in `csrc/` first (step 2, the method above), then
 port the pieces to `rsrc/`. This is the one exception to "csrc is never edited": only step-2 cuts, with
 no behaviour change. Do the cuts before starting `fmain.c` in `rsrc/`; `fmain2.c` can be ported earlier.
