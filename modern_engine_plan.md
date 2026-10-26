@@ -138,8 +138,12 @@ readable there and a group can be switched back to C for a bisect.
 `main()` is already cut into functions (step 2, done). Groups are ported the same way as `fmain2.c`: the C
 stays in `fmain.c` inside `#ifndef RSRC_<GROUP>` (macro defined in `build.rs`).
 - [x] `regions.rs`: `gen_mini`, `load_all`, `load_new_region` (+ `Need` struct in `types.rs`).
-- [ ] Small leftovers: `get_turtle`, `set_options`, `gomenu`, `mod1save`, `pagechange`, `add_device`,
-      `wrap_device`, `effect`, `read_sample`.
+- [x] Small leftovers: `menus.rs` (`set_options`, `gomenu`), `loading.rs` (`read_sample`, `effect`),
+      `actors.rs` (`get_turtle`), `savegame.rs` (`mod1save`), `display.rs` (`pagechange`,
+      `add_device`, `wrap_device`). `Menu` and `Bro` structs added to `types.rs`.
+- [ ] More functions found in `fmain.c` that were missing from this list: `doorfind`, `xfer`,
+      `find_place`, `set_encounter`, `checkdead`, `load_carrier`, `revive`, `screen_size`, `setmood`,
+      `propt`, `do_option`, `handle_key`, `update_hero`.
 - [ ] `open_all`, `close_all`, `load_actors`, `print_options`.
 - [ ] The `main()` pieces: `move_actor`, `draw_sprites`, world update, combat, and so on.
 Not covered by the regression scenarios yet: `win_colors`, `rescue`, `witch_fx`, the trackdisk

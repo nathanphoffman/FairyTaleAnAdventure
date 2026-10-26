@@ -1011,6 +1011,7 @@ extern long myfile, header, blocklength;
 
 /* reads an IFF sample - shorten file format later */
 
+#ifndef RSRC_SOUND /* PORT: ported to rsrc/loading.rs */
 read_sample()
 {	long ifflen; register unsigned char *num, *smem; register long i;
 	register long sp_load, sp_count;
@@ -1031,6 +1032,7 @@ read_sample()
 		smem += ifflen;
 	}
 }
+#endif /* RSRC_SOUND */
 
 /* subroutine for opening doors */
 
@@ -3144,6 +3146,7 @@ gen_mini()
 }
 #endif /* RSRC_REGIONS */
 
+#ifndef RSRC_DISPLAY /* PORT: ported to rsrc/display.rs */
 pagechange()
 {	register struct fpage *temp;
 
@@ -3158,6 +3161,7 @@ pagechange()
 
 	WaitBOVP(&vp_text);
 }
+#endif /* RSRC_DISPLAY */
 
 struct MsgPort *inputDevPort;
 struct IOStdReq *inputRequestBlock;
@@ -3168,6 +3172,7 @@ extern struct IOStdReq *CreateStdIO();
 
 extern int HandlerInterface();
 
+#ifndef RSRC_DISPLAY /* PORT: ported to rsrc/display.rs */
 add_device()
 {	SHORT error;
 
@@ -3189,7 +3194,9 @@ add_device()
 	DoIO((struct IORequest *)inputRequestBlock);
 	return TRUE;
 }
+#endif /* RSRC_DISPLAY */
 
+#ifndef RSRC_DISPLAY /* PORT: ported to rsrc/display.rs */
 wrap_device()
 {	inputRequestBlock->io_Command = IND_REMHANDLER;
 	inputRequestBlock->io_Data = (APTR)&handlerStuff;
@@ -3198,6 +3205,7 @@ wrap_device()
 	DeleteStdIO(inputRequestBlock);
 	DeletePort(inputDevPort);
 }
+#endif /* RSRC_DISPLAY */
 
 print_options()
 {	short i,j,x,y;
@@ -3663,6 +3671,7 @@ do_option(hit) short hit;
 	set_options();
 }
 
+#ifndef RSRC_CARRIER /* PORT: ported to rsrc/actors.rs */
 get_turtle()
 {	for (i=0; i<25; i++)
 	{	set_loc();
@@ -3672,14 +3681,18 @@ get_turtle()
 	move_extent(1,encounter_x,encounter_y);
 	load_carrier(5);
 }
+#endif /* RSRC_CARRIER */
 
+#ifndef RSRC_MENUS /* PORT: ported to rsrc/menus.rs */
 gomenu(mode) short mode;
 {	if (menus[GAME].enabled[5] & 1) return;
 	cmode = mode;
 	handler_data.lastmenu = 0;
 	print_options();
 }
+#endif /* RSRC_MENUS */
 
+#ifndef RSRC_MENUS /* PORT: ported to rsrc/menus.rs */
 set_options()
 {	register long i,j;
 	for (i=0; i<7; i++)
@@ -3697,6 +3710,7 @@ set_options()
 	menus[GIVE].enabled[7] = stuff_flag(28); /* writ */
 	menus[GIVE].enabled[8] = stuff_flag(29); /* bone */
 }
+#endif /* RSRC_MENUS */
 
 #ifndef RSRC_REGIONS /* PORT: ported to rsrc/regions.rs */
 load_all()
@@ -3771,11 +3785,14 @@ load_new_region()
 }
 #endif /* RSRC_REGIONS */
 
+#ifndef RSRC_SOUND /* PORT: ported to rsrc/loading.rs */
 effect(num,speed) short num; long speed;
 {	if (menus[GAME].enabled[7] & 1)
 	{	playsample(sample[num],sample_size[num]/2,speed); }
 }
+#endif /* RSRC_SOUND */
 
+#ifndef RSRC_SAVE /* PORT: ported to rsrc/savegame.rs */
 mod1save()
 {	short i;
 	/* save stuff */
@@ -3788,3 +3805,4 @@ mod1save()
 	/* save missile list - mdex already saved */
 	for (i=0; i<6; i++) sl_missile(&missile_list[i]);
 }
+#endif /* RSRC_SAVE */

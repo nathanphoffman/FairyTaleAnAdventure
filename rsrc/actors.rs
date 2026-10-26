@@ -5,7 +5,7 @@
 //! up the monsters, and people and objects after them. Positions are in world pixels. Directions
 //! are numbered 0-7 clockwise from north-west (0 NW, 1 N, 2 NE, 3 E, 4 SE, 5 S, 6 SW, 7 W).
 
-use super::asm_map::{newx, newy, prox};
+use super::asm_map::{newx, newy, prox, px_to_im};
 use super::asm_text::{event, placard, placard_text, prdec, set_course, speak};
 use super::messages::{name, print, print_cont};
 use super::random::{fta_rand, rand8, rand64, rand256, bitrand};
@@ -35,7 +35,9 @@ unsafe extern "C" {
 
     fn effect(num: i16, speed: i32);
     fn checkdead(i: i32, dtype: i32) -> i32;
-    fn get_turtle() -> i32;
+    fn load_carrier(n: i16) -> i32;
+    #[link_name = "i"]
+    static mut c_i: i32;
     fn xfer(xtest: u16, ytest: u16, flag: u16) -> i32;
     fn map_message();
     fn message_off();
@@ -382,6 +384,32 @@ pub extern "C" fn do_tactic(i: i32, tactic: i32) {
             }
             _ => {}
         }
+    }
+}
+
+/// Places the turtle: tries up to 25 random spots around the hero for one on water (terrain 5),
+/// then moves the turtle extent there and loads the turtle as the carrier. Called when turtle
+/// eggs are in view. Leaves the loop count in C's global `i`, as the original did.
+#[unsafe(no_mangle)]
+pub extern "C" fn get_turtle() {
+    const TRIES: i32 = 25;
+    const WATER: i32 = 5;
+    const TURTLE_EXTENT: i16 = 1;
+    const TURTLE_CARRIER: i16 = 5;
+    unsafe {
+        c_i = 0;
+        while c_i < TRIES {
+            set_loc();
+            if px_to_im(encounter_x as i32, encounter_y as i32) == WATER {
+                break;
+            }
+            c_i += 1;
+        }
+        if c_i == TRIES {
+            return;
+        }
+        move_extent(TURTLE_EXTENT, encounter_x as i16, encounter_y as i16);
+        load_carrier(TURTLE_CARRIER);
     }
 }
 

@@ -115,6 +115,27 @@ pub struct Need {
     pub setchar: u16,
 }
 
+/// One of the game's menus (`struct menu`): the text labels, how many entries it has, the colour
+/// of the entries, and for each entry whether it is enabled. In `enabled`, bit 0 means selected,
+/// and the value (2 = plain, 3 = on, 8-10 = from an item the hero has) says how it is drawn.
+#[repr(C)]
+pub struct Menu {
+    pub label_list: *const std::ffi::c_char,
+    pub num: i8,
+    pub color: i8,
+    pub enabled: [i8; 12],
+}
+
+/// The brothers' starting stats and their item lists (`struct bro`).
+#[repr(C)]
+pub struct Bro {
+    pub brave: i8,
+    pub luck: i8,
+    pub kind: i8,
+    pub wealth: i8,
+    pub stuff: *mut u8,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -128,5 +149,7 @@ mod tests {
         assert_eq!(size_of::<SeqInfo>(), 32);
         assert_eq!(size_of::<FPage>(), 64);
         assert_eq!(size_of::<Need>(), 18);
+        assert_eq!(size_of::<Menu>(), 24);
+        assert_eq!(size_of::<Bro>(), 16);
     }
 }

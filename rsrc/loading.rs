@@ -15,7 +15,8 @@ use super::hdrive::{
 };
 use super::iffsubs::unpackbrush;
 use super::input::getkey;
-use super::types::{FPage, SeqInfo};
+use super::display::pagechange;
+use super::types::{FPage, Menu, SeqInfo};
 use crate::amiga::{BPTR, BitMap};
 use std::ffi::c_char;
 
@@ -53,7 +54,11 @@ unsafe extern "C" {
         mask: u32,
         temp: *mut u8,
     ) -> i32;
-    fn pagechange();
+    fn playsample(data: *const u8, len: i32, period: i32);
+    static sample_mem: *mut u8;
+    static mut sample: [*mut u8; 6];
+    static mut sample_size: [u64; 6];
+    static menus: [Menu; 10];
     fn load_all();
     fn load_new_region();
 }
@@ -394,5 +399,47 @@ mod tests {
     fn flip_tables_have_one_entry_per_frame() {
         assert_eq!(FLIP_RATE.len(), FLIP_WIDE.len());
         assert_eq!(FLIP_RATE.len(), FLIP_DELAY.len());
+    }
+}
+
+/// Where the sound effects are on the disk (block) and how many blocks they take.
+const SAMPLE_BLOCK: i16 = 920;
+const SAMPLE_BLOCKS: i16 = 11;
+/// The disk request number used for sound samples.
+const SAMPLE_REQUEST: i16 = 8;
+/// There are 6 sound effects.
+const SAMPLE_COUNT: usize = 6;
+/// The game menu entry that switches sound effects on and off.
+const GAME_MENU: usize = 4;
+const SOUND_ENTRY: usize = 7;
+
+/// Reads the sound effects from the disk into `sample_mem`. Each one is a 4 byte big-endian
+/// length followed by that many bytes of sound; `sample` and `sample_size` point at them.
+#[unsafe(no_mangle)]
+pub extern "C" fn read_sample() {
+    unsafe {
+        load_track_range(SAMPLE_BLOCK, SAMPLE_BLOCKS, sample_mem.cast(), SAMPLE_REQUEST);
+        WaitDiskIO(SAMPLE_REQUEST as i32);
+        InvalidDiskIO(SAMPLE_REQUEST as i32);
+
+        let mut at = sample_mem;
+        for i in 0..SAMPLE_COUNT {
+            let length = u32::from_be_bytes([*at, *at.add(1), *at.add(2), *at.add(3)]);
+            at = at.add(4);
+            sample[i] = at;
+            sample_size[i] = length as u64;
+            at = at.add(length as usize);
+        }
+    }
+}
+
+/// Plays sound effect `num` at the pitch `speed`, unless sound effects are switched off.
+#[unsafe(no_mangle)]
+pub extern "C" fn effect(num: i16, speed: i64) {
+    unsafe {
+        if menus[GAME_MENU].enabled[SOUND_ENTRY] & 1 != 0 {
+            let n = num as usize;
+            playsample(sample[n], (sample_size[n] / 2) as i32, speed as i32);
+        }
     }
 }

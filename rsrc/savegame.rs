@@ -14,7 +14,7 @@ use super::input::take_new_disk;
 use super::asm_text::prq;
 use super::messages::print;
 use super::tables::{dstobs, glbobs, mapobs, ob_listg, ob_table};
-use super::types::{Extent, Missile, Shape, WorldObject};
+use super::types::{Bro, Extent, Missile, Shape, WorldObject};
 use crate::amiga::{BPTR, RastPort, TextFont};
 use std::ffi::{c_char, c_void};
 
@@ -57,6 +57,12 @@ unsafe extern "C" {
     static mut hunger: i16;
     static mut fatigue: i16;
     static mut brother: i16;
+    static mut stuff: *mut u8;
+    static mut julstuff: [u8; 35];
+    static mut philstuff: [u8; 35];
+    static mut kevstuff: [u8; 35];
+    static blist: [Bro; 3];
+    static mut missile_list: [Missile; 6];
     static mut princess: i16;
     static mut hero_sector: i16;
     static mut hero_place: u16;
@@ -86,8 +92,6 @@ unsafe extern "C" {
     fn SetFont(rp: *mut RastPort, font: *mut TextFont);
     fn shape_read();
     fn set_options();
-    /// Saves the three inventories and the missile list (csrc/fmain.c).
-    fn mod1save();
 }
 
 const ACCESS_READ: i32 = -2;
@@ -423,6 +427,24 @@ pub extern "C" fn sl_missile(m: *mut Missile) {
         sl_u16(&mut m.abs_y);
         for byte in [&mut m.missile_type, &mut m.time_of_flight, &mut m.speed, &mut m.direction, &mut m.archer] {
             sl_u8((byte as *mut i8).cast());
+        }
+    }
+}
+
+/// Size of one brother's item list.
+const STUFF_SIZE: i32 = 35;
+
+/// Saves or loads the three brothers' item lists and the 6 missiles (the count `mdex` is saved
+/// elsewhere). After loading, `stuff` points at the current brother's list.
+#[unsafe(no_mangle)]
+pub extern "C" fn mod1save() {
+    unsafe {
+        saveload((&raw mut julstuff).cast(), STUFF_SIZE);
+        saveload((&raw mut philstuff).cast(), STUFF_SIZE);
+        saveload((&raw mut kevstuff).cast(), STUFF_SIZE);
+        stuff = blist[brother as usize - 1].stuff;
+        for i in 0..6 {
+            sl_missile((&raw mut missile_list).cast::<Missile>().add(i));
         }
     }
 }

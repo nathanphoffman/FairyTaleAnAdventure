@@ -35,6 +35,11 @@ fn main() {
         .flag("-Wno-unused-but-set-variable")
         .flag("-Wno-implicit-fallthrough")
         .define("RSRC_REGIONS", None)
+        .define("RSRC_SOUND", None)
+        .define("RSRC_DISPLAY", None)
+        .define("RSRC_CARRIER", None)
+        .define("RSRC_MENUS", None)
+        .define("RSRC_SAVE", None)
         // the C file with the game's main() is called from Rust as fta_main()
         .define("main", "fta_main")
         .compile("fta_c");

@@ -110,6 +110,22 @@ pub extern "C" fn fta_key(code: i32) {
     push_key(code);
 }
 
+/// Empties the key buffer (used when the input handler is installed).
+pub fn reset_key_buffer() {
+    unsafe {
+        let data = &mut *(&raw mut handler_data);
+        data.laydown = 0;
+        data.pickup = 0;
+    }
+}
+
+/// Forgets the last menu key sent, so its release is not sent (used when a menu is switched).
+pub fn forget_last_menu() {
+    unsafe {
+        (*(&raw mut handler_data)).lastmenu = 0;
+    }
+}
+
 /// Pops the next key code from the ring buffer, or 0 if there is none.
 #[unsafe(no_mangle)]
 pub extern "C" fn getkey() -> i32 {
