@@ -37,3 +37,7 @@ swan_no_lasso    | 1000 | 800:Right:60 |  | 700:tp:2370:27440
 turtle_shell     | 1100 | 760:U:3,800:7:3,900:Right:40 |  | 700:tp:23000:5700,710:give:6:1
 door_locked      | 1000 | 800:Up:80 |  | 700:tp:7792:15230
 door_wood        | 1000 | 800:Up:80 |  | 700:tp:9344:13230
+
+# Freeze (F6) and fear (F7) spells, cast in the graveyard once enemies are out.
+spell_freeze     | 1250 | 1100:F6:3 |  | 710:give:14:1,800:tp:19700:17250
+spell_fear       | 1200 | 1100:F7:3 |  | 710:give:15:1,800:tp:19700:17250

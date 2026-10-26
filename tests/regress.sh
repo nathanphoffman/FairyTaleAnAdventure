@@ -12,10 +12,10 @@ mkdir -p tests/out
 update=0; [ "$1" = "--update" ] && update=1
 new=tests/golden.new; : > $new
 fail=0
-while IFS='|' read -r name tick inject clicks; do
+while IFS='|' read -r name tick inject clicks cmds; do
     name=$(echo $name); [[ -z "$name" || "$name" == \#* ]] && continue
-    inject=$(echo $inject); clicks=$(echo $clicks); tick=$(echo $tick)
-    FTA_SAVES=$(mktemp -d) FTA_INJECT="$inject" FTA_CLICK="$clicks" FTA_SHOT=tests/out/$name.ppm \
+    inject=$(echo $inject); clicks=$(echo $clicks); tick=$(echo $tick); cmds=$(echo $cmds)
+    FTA_SAVES=$(mktemp -d) FTA_INJECT="$inject" FTA_CLICK="$clicks" FTA_CMD="$cmds" FTA_SHOT=tests/out/$name.ppm \
         FTA_SHOT_AFTER=$tick timeout -s KILL 120 $BIN >/dev/null 2>tests/out/$name.err
     if [ ! -s tests/out/$name.ppm ]; then echo "FAIL  $name (no screenshot, see tests/out/$name.err)"; fail=1; continue; fi
     echo "$name $(sha256sum < tests/out/$name.ppm | cut -d' ' -f1)" >> $new

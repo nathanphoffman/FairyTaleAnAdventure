@@ -10,3 +10,10 @@ menu_game    | 800  |                                  | 700:225:166
 menu_items   | 800  | 700:I:3                          |
 magic_keys   | 900  | 700:F1:3,760:F2:3                |
 pause        | 900  | 700:Space:3                      |
+
+# Added for the cleanup pass. Fifth column: test commands (as in state_scenarios.txt).
+# The witch's beam (witch_fx), the princess rescue scene, and the ending (win_colors).
+witch_beam    | 900  |                |  | 700:tp:11000:36795
+rescue_scene  | 1500 |                |  | 700:tp:10840:35655
+win_ending    | 1200 | 760:T:3        |  | 700:tp:19298:16128,710:give:22:1
+

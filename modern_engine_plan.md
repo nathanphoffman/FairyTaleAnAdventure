@@ -151,8 +151,12 @@ Done files: `random`, `iff_helpers`, `input`, `iffsubs`, `hdrive`, `asm_blit`, `
 **Tests and scenarios.** `tests/state_scenarios.txt` has the scenarios (name | tick | keys | clicks |
 test commands: `tp:x:y`, `kill:luck`, `give:slot:count`, `stat:0|1|2:value`, `slay`; only one command
 can run per tick); a new scenario's golden hash is appended to `tests/state_golden.txt`
-after confirming two runs give the same state. `tests/regress.sh` compares screen hashes. Not covered
-yet: swan/turtle, key doors, searching a body, the freeze and fear spells, `win_colors`, `rescue`, `witch_fx`, the trackdisk path in `hdrive`.
+after confirming two runs give the same state. `tests/regress.sh` compares screen hashes. Rows in
+`scenarios.txt` may have a fifth column of test commands; `regress.sh` (pixels) and `state_regress.sh`
+(state) both run them. Not covered yet: the freeze and fear spells, and the trackdisk path in `hdrive`
+(only used when the `image` file is missing; the platform layer has no trackdisk device, so it cannot
+run). Covered since the port: swan/turtle, key doors, `win_ending`, `rescue_scene`, `witch_beam`
+(the last three were checked against a build of the C versions, identical).
 
 **Playing it.** `cargo run` (skips the intro; `-- --intro` plays it). Needs the original game data in
 `faery-tale-amiga/game/` (git-ignored). See README.
@@ -208,7 +212,8 @@ The port is finished. What remains afterwards (optional, no firm end) is the cle
 - Give the Rust functions readable names with thin wrappers that keep the C names for any C still
   left (`layout.c`, `statedump.c`), then delete the wrappers.
 - Replace the `static mut` globals and raw pointers with proper structs (this is step 3).
-- Add scenarios for `win_colors`, `rescue`, `witch_fx`, the trackdisk path, swan/turtle, key doors.
+- Scenarios: done for swan/turtle, key doors, `win_colors`, `rescue`, `witch_fx` (see above); the freeze and
+  fear spells are still open.
 - See the note below on keeping an all-C "original" build possible while doing this.
 
 ### Keeping an all-C "original" build possible
