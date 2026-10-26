@@ -102,7 +102,7 @@ against the C compiler, `statedump.c` reads game globals, `narr_data.c` is gener
 Done files: `random`, `iff_helpers`, `input`, `iffsubs`, `hdrive`, `asm_blit`, `asm_text`,
 `asm_map`, `asm_stubs`, `messages`, `savegame`, `objects`, `loading`, `actors`, `screen_fx`,
 `witch`, `tables`, `types`, and from `fmain.c`: `regions`, `menus`, `display`, `doors`, `places`,
-`encounters`, `revive`, `mood`. All have explanatory comments.
+`encounters`, `revive`, `mood`, `menus` (with `propt`), `options`, `items_menu`, `magic`, `keys`. All have explanatory comments.
 
 #### HANDOFF: how to port the next group (read this first)
 **Method (what every group so far followed).**
@@ -146,10 +146,11 @@ yet: swan/turtle, key doors, `win_colors`, `rescue`, `witch_fx`, the trackdisk p
 #### Roadmap: what is left in `csrc/fmain.c`
 About 2,300 lines of functions plus the data tables at the top. Six groups, in this order.
 Sizes are the C line counts.
-- [ ] **A. Menus and keys (~600).** `propt` (~30), `do_option` (~400, the menu actions: use items, talk,
-      buy, save/load; touches many globals), `handle_key` (~85), `update_hero` (~80). `handle_key`
-      and `update_hero` are `static` in C. New file `rsrc/menus.rs` already exists (`set_options`,
-      `gomenu`); put the menu ones there or in a new `rsrc/keys.rs`.
+- [x] **A. Menus and keys (~600).** Done: `propt` in `menus.rs`; `do_option` in `options.rs`
+      (talk, buy, game, use, keys, save, give) with the Items menu in `items_menu.rs` and the Magic
+      menu in `magic.rs`; `handle_key` and `update_hero` in `keys.rs` (guards `RSRC_MENUS`,
+      `RSRC_OPTIONS`, `RSRC_KEYS`). The two `static` functions have non-static prototypes in the C
+      `#else` branch. `secx`/`secy` (always 0) stay defined in C.
 - [ ] **B. World update (~460).** The small pieces cut from `main()`: `raft_proximity` (12),
       `check_bed` (22), `check_door` (68), `undo_sprites` (17), `day_night_tick` (36),
       `spawn_encounters` (47), `speak_nearby` (13), `actor_ai` (89), `survival_tick` (34),

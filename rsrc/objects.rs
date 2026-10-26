@@ -17,10 +17,10 @@ use super::types::{SeqInfo, Shape, WorldObject};
 /// guard, princess, king, noble, sorceress, bartender, witch, ranger ...), which sprite file
 /// holds them, which image to start from, and whether they can talk.
 #[repr(C)]
-struct SetFigEntry {
-    cfile_entry: i8,
-    image_base: i8,
-    can_talk: i8,
+pub struct SetFigEntry {
+    pub cfile_entry: i8,
+    pub image_base: i8,
+    pub can_talk: i8,
 }
 
 unsafe extern "C" {

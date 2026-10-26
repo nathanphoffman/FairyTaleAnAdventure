@@ -32,6 +32,14 @@ pub mod revive;
 pub mod display;
 // The text-panel menus.
 pub mod menus;
+// What choosing a menu entry does: talk, buy, use, keys, save, give.
+pub mod options;
+// The Items menu: the item list, taking things, looking.
+pub mod items_menu;
+// The Magic menu: the spells.
+pub mod magic;
+// Key presses and the hero's controls.
+pub mod keys;
 // Hits, collision between actors, enemy tactics.
 pub mod actors;
 // The sprite blitter, done in software.

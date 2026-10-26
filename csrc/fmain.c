@@ -1127,6 +1127,7 @@ found:
 
 extern char titletext[];
 
+#ifndef RSRC_KEYS /* PORT: ported to rsrc/keys.rs */
 /* PORT: split out of main(): handles one key code from the key buffer (menus, direction keys,
    fight key, debug keys). notpause is TRUE unless the game is paused. */
 static void handle_key(key, notpause) char key; short notpause;
@@ -1297,6 +1298,10 @@ static void update_hero(cycle) short cycle;
 	}
 	anim_list[0].state = inum;
 }
+#else
+void handle_key();
+void update_hero();
+#endif /* RSRC_KEYS */
 
 /* PORT: split out of main(): how close the hero is to the raft or turtle
    (raftprox 1 = near, 2 = very near); riding the turtle sets the hero's environ. */
@@ -3253,6 +3258,7 @@ print_options()
 	}
 }
 
+#ifndef RSRC_MENUS /* PORT: ported to rsrc/menus.rs */
 propt(j,pena) short j,pena;
 {	register long x,y,k,penb;
 
@@ -3276,6 +3282,7 @@ propt(j,pena) short j,pena;
 	else if (k<25) Text(&rp_text2,label1+k,5);
 	else Text(&rp_text2,menus[cmode].label_list+(k-25),5);
 }
+#endif /* RSRC_MENUS */
 
 long secx, secy;
 extern BYTE svflag;
@@ -3285,6 +3292,7 @@ extern char jtrans[];
 
 LONG	dbg;
 
+#ifndef RSRC_OPTIONS /* PORT: ported to rsrc/options.rs, items_menu.rs and magic.rs */
 do_option(hit) short hit;
 {	short dist;
 	USHORT y;
@@ -3694,6 +3702,7 @@ do_option(hit) short hit;
 	}
 	set_options();
 }
+#endif /* RSRC_OPTIONS */
 
 #ifndef RSRC_CARRIER /* PORT: ported to rsrc/actors.rs */
 get_turtle()

@@ -136,6 +136,28 @@ pub struct Bro {
     pub stuff: *mut u8,
 }
 
+/// One kind of item the hero can carry (`struct inv_item`): where its picture is, how it is
+/// stacked on the item list screen, and its name.
+#[repr(C)]
+pub struct InvItem {
+    pub image_number: u8,
+    pub xoff: u8,
+    pub yoff: u8,
+    pub ydelta: u8,
+    pub img_off: u8,
+    pub img_height: u8,
+    pub maxshown: u8,
+    pub name: *const std::ffi::c_char,
+}
+
+/// A keyboard shortcut for a menu entry (`struct letters`).
+#[repr(C)]
+pub struct Letter {
+    pub letter: i8,
+    pub menu: i8,
+    pub choice: i8,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -151,5 +173,7 @@ mod tests {
         assert_eq!(size_of::<Need>(), 18);
         assert_eq!(size_of::<Menu>(), 24);
         assert_eq!(size_of::<Bro>(), 16);
+        assert_eq!(size_of::<InvItem>(), 16);
+        assert_eq!(size_of::<Letter>(), 3);
     }
 }

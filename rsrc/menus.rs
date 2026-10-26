@@ -7,13 +7,23 @@
 use super::asm_text::stuff_flag;
 use super::input::forget_last_menu;
 use super::types::Menu;
+use crate::amiga::RastPort;
+use std::ffi::c_char;
 
 unsafe extern "C" {
     static mut menus: [Menu; 10];
     static mut cmode: i16;
     static wealth: i16;
+    static mut rp_text2: RastPort;
+    static real_options: [i8; 12];
+    static keycolors: [i8; 6];
+    static label1: [c_char; 0];
 
     fn print_options() -> i32;
+    fn SetAPen(rp: *mut RastPort, pen: u32);
+    fn SetBPen(rp: *mut RastPort, pen: u32);
+    fn Move(rp: *mut RastPort, x: i32, y: i32);
+    fn Text(rp: *mut RastPort, s: *const c_char, len: i32) -> i32;
 }
 
 // Menu numbers (`enum cmodes` in csrc/fmain.c).
@@ -22,6 +32,8 @@ const GAME: usize = 4;
 const KEYS: usize = 6;
 const GIVE: usize = 7;
 const USE: usize = 8;
+const FILE: usize = 9;
+const SAVEX: usize = 5;
 
 /// An entry that is shown but cannot be used, and one that can.
 const GREYED: i8 = 8;
@@ -74,5 +86,64 @@ pub extern "C" fn gomenu(mode: i16) {
         cmode = mode;
         forget_last_menu();
         print_options();
+    }
+}
+
+// Where the menu entries are drawn in the text panel: two columns, a row every 9 pixels.
+const LEFT_COLUMN_X: i32 = 430;
+const RIGHT_COLUMN_X: i32 = 482;
+const FIRST_ROW_Y: i32 = 8;
+const ROW_HEIGHT: i32 = 9;
+/// The entry's text is inset from the edge of its coloured box by this much.
+const TEXT_INSET: i32 = 4;
+/// Each label is 5 characters; the box behind it is 6 wide.
+const LABEL_LEN: i32 = 5;
+const BOX: &[u8; 6] = b"      ";
+/// The first 5 entries of every menu are the main menu names, taken from `label1`.
+const MAIN_ENTRIES: i32 = 5;
+const FILE_PEN: u32 = 13;
+const USE_PEN: u32 = 14;
+const MAIN_PEN: u32 = 4;
+
+/// Draws entry slot `j` (0-11) of the current menu in the panel. `pena` is the text colour:
+/// 1 for a selected entry, 0 for a plain one. The box colour depends on the menu.
+#[unsafe(no_mangle)]
+pub extern "C" fn propt(j: i16, pena: i16) {
+    unsafe {
+        let r = &raw mut rp_text2;
+        let entry = real_options[j as usize] as i32;
+        let box_pen = if cmode as usize == USE {
+            USE_PEN
+        } else if cmode as usize == FILE {
+            FILE_PEN
+        } else if entry < MAIN_ENTRIES {
+            MAIN_PEN
+        } else if cmode as usize == KEYS {
+            keycolors[(entry - MAIN_ENTRIES) as usize] as u32
+        } else if cmode as usize == SAVEX {
+            entry as u32
+        } else {
+            menus[cmode as usize].color as u32
+        };
+        SetAPen(r, pena as u32);
+        SetBPen(r, box_pen);
+
+        let offset = entry * LABEL_LEN as i32;
+        let x = if j & 1 != 0 { RIGHT_COLUMN_X } else { LEFT_COLUMN_X };
+        let y = (j as i32 / 2) * ROW_HEIGHT + FIRST_ROW_Y;
+        Move(r, x, y);
+        Text(r, BOX.as_ptr().cast(), BOX.len() as i32);
+        Move(r, x + TEXT_INSET, y);
+        let labels = menus[cmode as usize].label_list;
+        // The main names come from `label1`; the other menus have their own list, which for the
+        // first 5 slots is skipped over.
+        let label = if cmode as usize >= USE {
+            labels.offset(offset as isize)
+        } else if offset < MAIN_ENTRIES * LABEL_LEN {
+            (&raw const label1).cast::<c_char>().offset(offset as isize)
+        } else {
+            labels.offset((offset - MAIN_ENTRIES * LABEL_LEN) as isize)
+        };
+        Text(r, label, LABEL_LEN);
     }
 }

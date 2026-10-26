@@ -119,6 +119,11 @@ pub fn reset_key_buffer() {
     }
 }
 
+/// The mouse buttons held (bit 0x4000 left, 0x2000 right).
+pub fn handler_qualifier() -> i16 {
+    unsafe { (*(&raw const handler_data)).qualifier }
+}
+
 /// Forgets the last menu key sent, so its release is not sent (used when a menu is switched).
 pub fn forget_last_menu() {
     unsafe {

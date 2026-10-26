@@ -37,13 +37,13 @@ unsafe extern "C" {
 /// One kind of monster (`struct encounter`): hit points, how aggressive, which weapon row it uses,
 /// how clever, what treasure it drops, and which sprite file it needs.
 #[repr(C)]
-struct Encounter {
-    hitpoints: i8,
-    agressive: i8,
-    arms: i8,
-    cleverness: i8,
-    treasure: i8,
-    file_id: i8,
+pub struct Encounter {
+    pub hitpoints: i8,
+    pub agressive: i8,
+    pub arms: i8,
+    pub cleverness: i8,
+    pub treasure: i8,
+    pub file_id: i8,
 }
 
 // Actor kinds (`type`), states and goals (see csrc/ftale.h).
