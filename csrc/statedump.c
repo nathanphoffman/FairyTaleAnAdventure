@@ -42,10 +42,18 @@ void fta_queue_cmd(int kind, int a, int b)
 
 extern short luck;
 void fta_test_hook(void)
-{	int kind = cmd_kind;
+{	int kind = cmd_kind, i;
 	if (!kind) return;
 	cmd_kind = 0;
 	if (kind == 1) xfer((unsigned short)cmd_a, (unsigned short)cmd_b, 1);	/* teleport, like a door */
+	else if (kind == 3) stuff[cmd_a] = cmd_b;							/* give: stuff[slot] = count */
+	else if (kind == 4)													/* set a stat: 0 hunger, 1 fatigue, 2 wealth */
+	{	if (cmd_a == 0) hunger = cmd_b; else if (cmd_a == 1) fatigue = cmd_b; else wealth = cmd_b;
+	}
+	else if (kind == 5)													/* kill every enemy that is out */
+	{	for (i = 3; i < anix; i++)
+			if (anim_list[i].type == ENEMY) { anim_list[i].vitality = 0; checkdead(i, 0); }
+	}
 	else if (kind == 2)													/* kill the hero with the given luck */
 	{	luck = cmd_a; anim_list[0].vitality = 0; checkdead(0, 5);
 	}

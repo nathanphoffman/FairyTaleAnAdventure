@@ -17,6 +17,9 @@ const CLICK_HOLD_TICKS: u32 = 3;
 /// `fta_queue_cmd` kinds.
 const CMD_TELEPORT: i32 = 1;
 const CMD_KILL: i32 = 2;
+const CMD_GIVE: i32 = 3;
+const CMD_SET_STAT: i32 = 4;
+const CMD_SLAY: i32 = 5;
 /// A test command has at least tick, name and one number.
 const MIN_CMD_FIELDS: usize = 3;
 const LORES_TO_FRAME: i32 = 2;
@@ -121,7 +124,9 @@ fn replay_events(tick: u32) {
 }
 
 /// FTA_CMD="900:tp:18310:15969,1200:kill:0" runs test commands at those ticks: tp = teleport the
-/// hero like a door does (x, y), kill = set luck and kill the hero.
+/// hero like a door does (x, y), kill = set luck and kill the hero, give = set an inventory count
+/// (slot, count), stat = set hunger (0), fatigue (1) or wealth (2) to a value, slay = kill every
+/// enemy that is out.
 fn run_cmds(tick: u32) {
     let Ok(cmds) = std::env::var("FTA_CMD") else {
         return;
@@ -136,6 +141,9 @@ fn run_cmds(tick: u32) {
         match p[1] {
             "tp" => unsafe { fta_queue_cmd(CMD_TELEPORT, a, b) },
             "kill" => unsafe { fta_queue_cmd(CMD_KILL, a, b) },
+            "give" => unsafe { fta_queue_cmd(CMD_GIVE, a, b) },
+            "slay" => unsafe { fta_queue_cmd(CMD_SLAY, a, b) },
+            "stat" => unsafe { fta_queue_cmd(CMD_SET_STAT, a, b) },
             _ => {}
         }
     }

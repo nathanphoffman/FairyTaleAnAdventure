@@ -47,7 +47,14 @@ games/  original  improved  remastered  reimagined
 - [x] Targeted scenarios (`FTA_CMD="tick:tp:x:y,tick:kill:luck"` teleports like a door or kills the
       hero; applied by `fta_test_hook()` at the top of the main loop): `talk_beggar`, `shop_buy`
       (inn, bartender), `inn_inside` (region 8), `die_fairy` (revived), `die_brother` (brother 2).
-- [ ] Still without scenarios: swan/turtle, key doors. (`combat_graveyard` and `door_cave` were added later.)
+- [x] Later additions: `combat_graveyard`, `door_cave`, and 11 scenarios added with ports A and B
+      (`sleep_bed`, `take_chest`, `take_sacks`, `loot_graveyard`, `stone_jump`, `spells`, `spells_2`,
+      `desert_no_statues`, `desert_statues`, `hunger_events`, `hunger_fruit`). More test commands:
+      `give:slot:count`, `stat:0|1|2:value` (hunger, fatigue, wealth), `slay` (kill all enemies out).
+      Total: 36 state scenarios plus the 10 pixel tests.
+- [ ] Still without scenarios: swan/turtle, key doors. `loot_graveyard` never reached a body close
+      enough to search, and in `spells` the freeze and fear spells did not fire (`spells_2` was added
+      for them but is not checked either), so body search, freeze and fear are weakly covered.
 - [x] Record and replay: `FTA_RECORD=file` logs keys and mouse; `FTA_REPLAY=file` repeats them.
       Checked: replay gives an identical state file.
 - [x] `regress.sh` golden pixel hashes were stale (they failed on the previous commit too); screens checked by eye, hashes updated. `soak.sh` passes.
@@ -96,13 +103,15 @@ function names, bugs included), written to the cleanup rules (short functions, n
 small files, tests). `rsrc/` is a module of the main crate (`#[path = "../rsrc/mod.rs"]` in
 `src/main.rs`), not a separate crate.
 
-**Status.** Every C file is ported except `fmain.c` (about 60% of it is done), and `layout.c`,
+**Status.** Every C file is ported except `fmain.c` (about 85% of its functions are done; groups C to F
+below are left), and `layout.c`,
 `statedump.c` and `narr_data.c`, which stay C on purpose (`layout.c` checks the Rust struct sizes
 against the C compiler, `statedump.c` reads game globals, `narr_data.c` is generated text).
 Done files: `random`, `iff_helpers`, `input`, `iffsubs`, `hdrive`, `asm_blit`, `asm_text`,
 `asm_map`, `asm_stubs`, `messages`, `savegame`, `objects`, `loading`, `actors`, `screen_fx`,
 `witch`, `tables`, `types`, and from `fmain.c`: `regions`, `menus`, `display`, `doors`, `places`,
-`encounters`, `revive`, `mood`, `menus` (with `propt`), `options`, `items_menu`, `magic`, `keys`, `world`, `combat`, `ai`. All have explanatory comments.
+`encounters`, `revive`, `mood`, and (groups A and B) `options`, `items_menu`, `magic`, `keys`, `world`,
+`combat`, `ai`, with `propt` added to `menus`. All have explanatory comments.
 
 #### HANDOFF: how to port the next group (read this first)
 **Method (what every group so far followed).**
@@ -117,7 +126,11 @@ Done files: `random`, `iff_helpers`, `input`, `iffsubs`, `hdrive`, `asm_blit`, `
 3. `cargo build` (this is the real check: `cargo test` does not link the C; a missing guard shows up as
    "duplicate symbol", a missing function as an undefined symbol). Then `cargo test`, then
    `tests/regress.sh` and `tests/state_regress.sh`. Run them in the background, about 10 minutes together.
-   All 10 pixel tests and all 25 state scenarios must say `ok`; any `DIFF` means fix or undo.
+   All 10 pixel tests and all 36 state scenarios must say `ok`; any `DIFF` means fix or undo.
+   Extra check that worked well for A and B: for new scenarios, build the commit before the port in a
+   `git worktree` (symlink `faery-tale-amiga/` into it, copy over the test-only files), run the same
+   scenarios there, and compare the state hashes with the Rust build. Identical hashes mean the port
+   matches the original C on those paths, not just that it matches itself.
 4. Update this plan. **Do not commit: the user makes the commits.** Leave the changes in the working
    tree, say what changed, and suggest a one-line commit message (one commit per group is the idea).
 
@@ -136,31 +149,35 @@ Done files: `random`, `iff_helpers`, `input`, `iffsubs`, `hdrive`, `asm_blit`, `
 - A state test that differs between two runs of the same binary means an uninitialised variable.
 
 **Tests and scenarios.** `tests/state_scenarios.txt` has the scenarios (name | tick | keys | clicks |
-`tp:x:y` / `kill:luck` commands); a new scenario's golden hash is appended to `tests/state_golden.txt`
+test commands: `tp:x:y`, `kill:luck`, `give:slot:count`, `stat:0|1|2:value`, `slay`; only one command
+can run per tick); a new scenario's golden hash is appended to `tests/state_golden.txt`
 after confirming two runs give the same state. `tests/regress.sh` compares screen hashes. Not covered
-yet: swan/turtle, key doors, `win_colors`, `rescue`, `witch_fx`, the trackdisk path in `hdrive`.
+yet: swan/turtle, key doors, searching a body, the freeze and fear spells, `win_colors`, `rescue`, `witch_fx`, the trackdisk path in `hdrive`.
 
 **Playing it.** `cargo run` (skips the intro; `-- --intro` plays it). Needs the original game data in
 `faery-tale-amiga/game/` (git-ignored). See README.
 
 #### Roadmap: what is left in `csrc/fmain.c`
-About 2,300 lines of functions plus the data tables at the top. Six groups, in this order.
-Sizes are the C line counts.
+About 1,300 lines of functions (A and B are done) plus the data tables at the top. Six groups, in this
+order; four are left. Sizes are the C line counts.
 - [x] **A. Menus and keys (~600).** Done: `propt` in `menus.rs`; `do_option` in `options.rs`
       (talk, buy, game, use, keys, save, give) with the Items menu in `items_menu.rs` and the Magic
       menu in `magic.rs`; `handle_key` and `update_hero` in `keys.rs` (guards `RSRC_MENUS`,
       `RSRC_OPTIONS`, `RSRC_KEYS`). The two `static` functions have non-static prototypes in the C
-      `#else` branch. `secx`/`secy` (always 0) stay defined in C.
+      `#else` branch. `secx`/`secy` (always 0) stay defined in C. Struct mirrors `InvItem`, `Letter`
+      added to `types.rs`.
 - [x] **B. World update (~460).** Done: `world.rs` (`raft_proximity`, `check_bed`, `check_door`,
       `undo_sprites`, `day_night_tick`, `spawn_encounters`, `speak_nearby`, `survival_tick`,
       `sort_actors`), `combat.rs` (`melee_hits`, `move_missiles`, `queue_missiles`) and `ai.rs`
       (`actor_ai`). One C guard, `RSRC_WORLD`, with prototypes in the `#else`. `doorlist` stays in C
-      until group F.
+      until group F (`Door` mirror added to `types.rs`). Two original quirks are kept on purpose: the
+      missile dodge test uses the missile's own index, and the melee carrier test looks at the attacker.
 - [ ] **C. `move_actor` (~400).** The riskiest: moves and animates every actor (hero, raft, carriers,
       people, enemies), with many `goto` labels (`statc`, `raise`, `cpx`, `newloc`, `blocked`,
       `checkdev1/2`). Port it as one function first, using a loop plus `match` for the jumps, then
       split by actor kind only after it passes. Remember the stale-`j`/`xtest`/`ytest` rule (step 2).
-      Add scenarios for swan/turtle and key doors before this one, since it covers those paths.
+      Add scenarios for swan/turtle and key doors before this one, since it covers those paths (this
+      is the next thing to do; use the worktree comparison from step 3 above).
 - [ ] **D. Drawing (~260).** `draw_sprites` (~230: clipping, weapon pass, masking against scenery,
       background save) and `repair_map_and_witch` (~20). Uses the blitter already in `asm_blit.rs`.
       `main()` sets `j = anix2` after the call (see step 2); keep that.

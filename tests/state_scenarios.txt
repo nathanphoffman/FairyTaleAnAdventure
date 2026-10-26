@@ -16,3 +16,17 @@ die_fairy    | 1500 |  |  | 700:kill:50
 die_brother  | 1500 |  |  | 700:kill:0
 combat_graveyard | 3200 | 720:LCtrl:60,820:LCtrl:60,920:LCtrl:60,1020:LCtrl:60,1120:LCtrl:60,1220:LCtrl:60,1320:LCtrl:60,1420:LCtrl:60,1520:LCtrl:60,1620:LCtrl:60,1720:LCtrl:60,1820:LCtrl:60,1920:LCtrl:60,2020:LCtrl:60,2120:LCtrl:60,2220:LCtrl:60,2320:LCtrl:60,2420:LCtrl:60,2520:LCtrl:60,2620:LCtrl:60,2720:LCtrl:60,2820:LCtrl:60,2920:LCtrl:60 |  | 700:tp:19700:17250
 door_cave    | 1200 |  |  | 700:tp:5008:7010
+
+# Added with the menu/key/world ports: these cover bed sleeping, containers, searching bodies, the
+# stone ring, spells, the desert door statue check and hunger. cmds: give:slot:count, stat:0/1/2:value
+sleep_bed        | 790  |  |  | 700:tp:9536:39024,710:stat:1:100
+take_chest       | 1000 | 760:T:3,800:T:3 |  | 700:tp:19298:16128
+take_sacks       | 1000 | 777:T:3,830:T:3 |  | 700:tp:24185:9840
+loot_graveyard   | 1800 | 1610:T:3,1640:T:3,1670:T:3,1700:T:3,1730:T:3 |  | 700:tp:19700:17250,1600:slay:0
+stone_jump       | 1000 | 800:F1:3 |  | 700:tp:21626:15456,710:give:9:1
+spells           | 1500 | 900:F2:3,960:F3:3,1020:F4:3,1080:F5:3,1140:Space:3,1200:F6:3,1260:F7:3 |  | 710:give:10:1,711:give:11:1,712:give:12:1,713:give:13:1,714:give:14:1,715:give:15:1
+desert_no_statues| 900  |  |  | 700:tp:6820:19360
+desert_statues   | 900  |  |  | 690:give:25:5,700:tp:6820:19360
+hunger_events    | 1400 |  |  | 700:stat:0:143
+hunger_fruit     | 1400 |  |  | 700:give:24:1,710:stat:0:40
+spells_2         | 1200 | 900:F6:3,960:F7:3 |  | 710:give:14:1,711:give:15:1,800:tp:19700:17250
