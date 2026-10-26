@@ -159,7 +159,7 @@ yet: swan/turtle, key doors, searching a body, the freeze and fear spells, `win_
 
 #### Roadmap: what is left in `csrc/fmain.c`
 About 1,300 lines of functions (A and B are done) plus the data tables at the top. Six groups, in this
-order; one is left. Sizes are the C line counts.
+order; all six are done. Sizes are the C line counts.
 - [x] **A. Menus and keys (~600).** Done: `propt` in `menus.rs`; `do_option` in `options.rs`
       (talk, buy, game, use, keys, save, give) with the Items menu in `items_menu.rs` and the Magic
       menu in `magic.rs`; `handle_key` and `update_hero` in `keys.rs` (guards `RSRC_MENUS`,
@@ -193,14 +193,18 @@ order; one is left. Sizes are the C line counts.
       `long` is 32 bit in this port (`#define long int` in `csrc/amiga.h`), so C `long` is `i32`
       (`move_actor`'s `i` was changed to `i32` for that). The game and the `--intro` path both run; the
       pixel and state tests cover the main loop, the intro is only checked by running it.
-- [ ] **F. Data tables, then drop `fmain.c` from the build.** Move the tables at the top of `fmain.c`
-      to `rsrc/tables.rs` (or a new file): `setfig_table`, `doorlist`, `extent_list`, `inv_list`, the
-      `menus` array and its labels, `blist`, `file_index`, `open_list`-style tables, `introcolors`,
-      `new_wave`, `encounter_chart`, and so on. Keep each variable's C name and layout. Then remove
-      `fmain.c` from the file list in `build.rs`. The file stays in the repo as the reference.
-      `cargo build` will report any symbol the remaining C (`layout.c`, `statedump.c`) still needs.
+- [x] **F. Data tables, then drop `fmain.c` from the build.** Done: the tables are in
+      `game_tables.rs` (`setfig_table`, `encounter_chart`, `trans_list`, `statelist`, `doorlist`,
+      `extent_list`, `stone_list`, `inv_list`, `menus`, `letter_list`, `file_index`, colours, labels,
+      ...) and every variable `fmain.c` defined is in `globals.rs` (zeroed). Names and layouts are the
+      C ones. `fmain.c` is out of the file list in `build.rs` (it stays in the repo as the reference),
+      and the `-Dmain=fta_main` define is gone. The table bytes were compared with the old C object
+      file (all identical; pointer fields excluded). Moving the variables exposed one old bug: `loading.rs`
+      declared `sample_size` as 64 bit entries but C `long` is 32 bit, so it overflowed into the next
+      variable (harmless in C's layout); fixed, and `secx`/`secy` in `magic.rs` the same.
+      The `RSRC_*` defines in `build.rs` do nothing now; they only matter if `fmain.c` is built again.
 
-When F is done the port is finished. What remains afterwards (optional, no firm end) is the cleanup pass:
+The port is finished. What remains afterwards (optional, no firm end) is the cleanup pass:
 - Give the Rust functions readable names with thin wrappers that keep the C names for any C still
   left (`layout.c`, `statedump.c`), then delete the wrappers.
 - Replace the `static mut` globals and raw pointers with proper structs (this is step 3).

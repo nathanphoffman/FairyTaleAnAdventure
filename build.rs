@@ -3,7 +3,6 @@
 // except the ones still listed in csrc/asm_stubs.c.
 fn main() {
     let files = [
-        "fmain.c",
         "layout.c",
         "narr_data.c",
         "statedump.c",
@@ -34,6 +33,7 @@ fn main() {
         .flag("-Wno-missing-parameter-type")
         .flag("-Wno-unused-but-set-variable")
         .flag("-Wno-implicit-fallthrough")
+        // fmain.c is no longer compiled; the RSRC_* guards only matter if it is built again
         .define("RSRC_REGIONS", None)
         .define("RSRC_SOUND", None)
         .define("RSRC_DISPLAY", None)
@@ -52,8 +52,6 @@ fn main() {
         .define("RSRC_MOVE_ACTOR", None)
         .define("RSRC_DRAW", None)
         .define("RSRC_STARTUP", None)
-        // the C file with the game's main() is called from Rust as fta_main()
-        .define("main", "fta_main")
         .compile("fta_c");
     for f in ["amiga.h", "ftale.h", "protos.h", "asm_protos.h"] {
         println!("cargo:rerun-if-changed=csrc/{f}");

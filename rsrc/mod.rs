@@ -52,6 +52,10 @@ pub mod move_actor;
 pub mod draw;
 // Opening and closing everything, the title and intro, and the main loop.
 pub mod startup;
+// The game's constant tables: people, monsters, doors, items, menus.
+pub mod game_tables;
+// The game's variables.
+pub mod globals;
 // Hits, collision between actors, enemy tactics.
 pub mod actors;
 // The sprite blitter, done in software.

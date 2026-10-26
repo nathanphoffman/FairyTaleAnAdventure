@@ -57,7 +57,7 @@ unsafe extern "C" {
     fn playsample(data: *const u8, len: i32, period: i32);
     static sample_mem: *mut u8;
     static mut sample: [*mut u8; 6];
-    static mut sample_size: [u64; 6];
+    static mut sample_size: [u32; 6];
     static menus: [Menu; 10];
     fn load_all();
     fn load_new_region();
@@ -427,7 +427,7 @@ pub extern "C" fn read_sample() {
             let length = u32::from_be_bytes([*at, *at.add(1), *at.add(2), *at.add(3)]);
             at = at.add(4);
             sample[i] = at;
-            sample_size[i] = length as u64;
+            sample_size[i] = length as u32;
             at = at.add(length as usize);
         }
     }

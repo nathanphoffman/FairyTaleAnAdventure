@@ -38,8 +38,8 @@ unsafe extern "C" {
     static hero_sector: i16;
     static xreg: u16;
     static yreg: u16;
-    static secx: i64;
-    static secy: i64;
+    static secx: i32;
+    static secy: i32;
     static mut viewstatus: i8;
     static anix: i16;
 
@@ -149,8 +149,8 @@ unsafe fn show_map() {
         planes = (*bm_draw).Planes.as_mut_ptr();
         bigdraw(map_x as i32, map_y as i32);
 
-        let x = ((hero_x >> 4) as i64 - ((secx + xreg as i64) << 4) - MARK_X_OFFSET) as u32;
-        let y = ((hero_y >> 4) as i64 - ((secy + yreg as i64) << 4) + MARK_Y_OFFSET) as u32;
+        let x = ((hero_x >> 4) as i64 - ((secx as i64 + xreg as i64) << 4) - MARK_X_OFFSET) as u32;
+        let y = ((hero_y >> 4) as i64 - ((secy as i64 + yreg as i64) << 4) + MARK_Y_OFFSET) as u32;
         rp_map.BitMap = bm_draw;
         SetDrMd(&raw mut rp_map, JAM1);
         SetAPen(&raw mut rp_map, MAP_MARK_PEN);
