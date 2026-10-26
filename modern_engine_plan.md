@@ -102,7 +102,7 @@ against the C compiler, `statedump.c` reads game globals, `narr_data.c` is gener
 Done files: `random`, `iff_helpers`, `input`, `iffsubs`, `hdrive`, `asm_blit`, `asm_text`,
 `asm_map`, `asm_stubs`, `messages`, `savegame`, `objects`, `loading`, `actors`, `screen_fx`,
 `witch`, `tables`, `types`, and from `fmain.c`: `regions`, `menus`, `display`, `doors`, `places`,
-`encounters`, `revive`, `mood`, `menus` (with `propt`), `options`, `items_menu`, `magic`, `keys`. All have explanatory comments.
+`encounters`, `revive`, `mood`, `menus` (with `propt`), `options`, `items_menu`, `magic`, `keys`, `world`, `combat`, `ai`. All have explanatory comments.
 
 #### HANDOFF: how to port the next group (read this first)
 **Method (what every group so far followed).**
@@ -151,12 +151,11 @@ Sizes are the C line counts.
       menu in `magic.rs`; `handle_key` and `update_hero` in `keys.rs` (guards `RSRC_MENUS`,
       `RSRC_OPTIONS`, `RSRC_KEYS`). The two `static` functions have non-static prototypes in the C
       `#else` branch. `secx`/`secy` (always 0) stay defined in C.
-- [ ] **B. World update (~460).** The small pieces cut from `main()`: `raft_proximity` (12),
-      `check_bed` (22), `check_door` (68), `undo_sprites` (17), `day_night_tick` (36),
-      `spawn_encounters` (47), `speak_nearby` (13), `actor_ai` (89), `survival_tick` (34),
-      `melee_hits` (31), `move_missiles` (38), `queue_missiles` (21), `sort_actors` (32). Suggested
-      files: `world.rs` (time, spawning, hunger), `combat.rs` (melee, missiles), `ai.rs` (`actor_ai`).
-      All are `static` in C, called only from `main()`.
+- [x] **B. World update (~460).** Done: `world.rs` (`raft_proximity`, `check_bed`, `check_door`,
+      `undo_sprites`, `day_night_tick`, `spawn_encounters`, `speak_nearby`, `survival_tick`,
+      `sort_actors`), `combat.rs` (`melee_hits`, `move_missiles`, `queue_missiles`) and `ai.rs`
+      (`actor_ai`). One C guard, `RSRC_WORLD`, with prototypes in the `#else`. `doorlist` stays in C
+      until group F.
 - [ ] **C. `move_actor` (~400).** The riskiest: moves and animates every actor (hero, raft, carriers,
       people, enemies), with many `goto` labels (`statc`, `raise`, `cpx`, `newloc`, `blocked`,
       `checkdev1/2`). Port it as one function first, using a loop plus `match` for the jumps, then

@@ -40,6 +40,12 @@ pub mod items_menu;
 pub mod magic;
 // Key presses and the hero's controls.
 pub mod keys;
+// Per-frame world bookkeeping: doors, beds, the clock, spawning, hunger, draw order.
+pub mod world;
+// Melee swings and missiles in flight.
+pub mod combat;
+// What each enemy decides to do.
+pub mod ai;
 // Hits, collision between actors, enemy tactics.
 pub mod actors;
 // The sprite blitter, done in software.

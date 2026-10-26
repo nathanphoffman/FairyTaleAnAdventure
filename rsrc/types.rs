@@ -150,6 +150,19 @@ pub struct InvItem {
     pub name: *const std::ffi::c_char,
 }
 
+/// A door between the outdoors and an inside (`struct door`): `xc1`/`yc1` is where it is outside,
+/// `xc2`/`yc2` where it leads inside. `kind` is the sort of door (bit 0 set = horizontal) and
+/// `secs` says which map section it joins.
+#[repr(C)]
+pub struct Door {
+    pub xc1: u16,
+    pub yc1: u16,
+    pub xc2: u16,
+    pub yc2: u16,
+    pub kind: i8,
+    pub secs: i8,
+}
+
 /// A keyboard shortcut for a menu entry (`struct letters`).
 #[repr(C)]
 pub struct Letter {
@@ -175,5 +188,6 @@ mod tests {
         assert_eq!(size_of::<Bro>(), 16);
         assert_eq!(size_of::<InvItem>(), 16);
         assert_eq!(size_of::<Letter>(), 3);
+        assert_eq!(size_of::<Door>(), 10);
     }
 }

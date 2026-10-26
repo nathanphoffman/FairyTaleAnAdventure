@@ -1303,6 +1303,7 @@ void handle_key();
 void update_hero();
 #endif /* RSRC_KEYS */
 
+#ifndef RSRC_WORLD /* PORT: ported to rsrc/world.rs, combat.rs and ai.rs */
 /* PORT: split out of main(): how close the hero is to the raft or turtle
    (raftprox 1 = near, 2 = very near); riding the turtle sets the hero's environ. */
 static void raft_proximity()
@@ -1820,6 +1821,21 @@ static void sort_actors()
 		}
 	}
 }
+#else
+void raft_proximity();
+void check_bed();
+void check_door();
+void undo_sprites();
+void day_night_tick();
+void spawn_encounters();
+void speak_nearby();
+void actor_ai();
+void survival_tick();
+void melee_hits();
+void move_missiles();
+void queue_missiles();
+void sort_actors();
+#endif /* RSRC_WORLD */
 
 /* PORT: split out of main(): finishes the scrolled map edge (dif_x, dif_y = scroll step) and runs
    the witch effect and her damage. */

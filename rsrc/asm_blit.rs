@@ -21,7 +21,7 @@
 /// to skip to the next line; `blitsize` is the blitter size word (height * 64 + width in words).
 #[repr(C)]
 pub struct SShape {
-    backsave: *mut u8,
+    pub backsave: *mut u8,
     savesize: i16,
     blitsize: i16,
     coff: i16,
