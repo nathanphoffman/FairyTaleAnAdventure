@@ -169,7 +169,8 @@ unsafe fn load_set_figure(id: i8) {
             .cast::<SetFigEntry>()
             .add(id as usize))
         .cfile_entry;
-        if sprite_files[entry as usize].file_id != sprite_files[loaded_setfig_file as usize].file_id {
+        if sprite_files[entry as usize].file_id != sprite_files[loaded_setfig_file as usize].file_id
+        {
             loaded_setfig_file = entry as i16;
             nextshape = (*(&raw mut seq_list).cast::<SeqInfo>().add(SETFIG as usize)).location;
             load_sprite_file(entry as i32);
@@ -193,89 +194,116 @@ pub fn add_objects_near(mut list: *mut WorldObject, mut length: i16, f: i32) {
         if dstobs[region_num as usize] == 0 && new_region >= NO_REGION {
             distribute_treasure();
         }
-        let mut i: i16 = 0;
+        let mut index: i16 = 0;
         while length > 0 {
             length -= 1;
             if drawn_actor_count >= MAX_ACTORS {
                 return;
             }
-            'object: {
-                let object = &mut *list;
-                let xstart = (object.xc as i32 - map_x as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
-                let mut ystart =
-                    (object.yc as i32 - map_y as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
-                // States 3 and 4 are people; everything else is an item.
-                let is_person = object.ob_stat == STAT_PERSON || object.ob_stat == STAT_DEAD_PERSON;
-                let id = object.ob_id;
-                if is_person {
-                    if !(inside(xstart, PERSON_LOAD_X) && inside(ystart, PERSON_LOAD_Y)) {
-                        break 'object;
-                    }
-                    load_set_figure(id);
-                    if object.ob_id == WITCH && object.ob_stat == STAT_PERSON {
-                        witch_on_screen = 1;
-                    }
-                }
-                if object.ob_stat == STAT_TAKEN || object.ob_stat == STAT_HIDDEN {
-                    break 'object;
-                }
-                if !(inside(xstart, SHOWN_X) && inside(ystart, SHOWN_Y)) {
-                    break 'object;
-                }
-                let actor: &mut Shape;
-                if is_person {
-                    actor = &mut (*(&raw mut actor_list))[J1 as usize];
-                    J1 += 1;
-                    if actor.abs_x == object.xc && actor.abs_y == object.yc {
-                        if actor.state == DEAD {
-                            object.ob_stat = STAT_DEAD_PERSON;
-                        }
-                        break 'object;
-                    }
-                    actor.kind = SETFIG;
-                    actor.index = (*(&raw const setfig_table)
-                        .cast::<SetFigEntry>()
-                        .add(id as usize))
-                    .image_base;
-                    actor.weapon = 0;
-                    actor.vitality = 2 + id as i16 + id as i16;
-                    actor.goal = i as i8;
-                    actor.environ = 0;
-                    actor.state = if object.ob_stat == STAT_DEAD_PERSON {
-                        DEAD
-                    } else {
-                        STILL
-                    };
-                    // A person's race is 0x80 plus their kind, so they can be told from monsters.
-                    actor.race = (id as i32 + PERSON_RACE_BASE) as u8;
-                    ystart -= PERSON_RAISE;
-                    if J1 > drawn_actor_count {
-                        drawn_actor_count = J1;
-                    }
-                } else {
-                    if object.ob_id == TURTLE as i8 {
-                        turtle_eggs = drawn_actor_count as i8;
-                    }
-                    actor = &mut (*(&raw mut actor_list))[drawn_actor_count as usize];
-                    drawn_actor_count += 1;
-                    actor.kind = OBJECTS;
-                    actor.index = object.ob_id;
-                    actor.weapon = 0;
-                    actor.vitality = (i as i32 + f) as i16;
-                    actor.race = match object.ob_stat {
-                        STAT_SECOND_ITEM => 2,
-                        STAT_RAFT_ITEM => 0,
-                        _ => 1,
-                    };
-                }
-                actor.abs_x = object.xc;
-                actor.abs_y = object.yc;
-                actor.rel_x = xstart as u16;
-                actor.rel_y = ystart as u16;
-            }
+            add_object(&mut *list, index, f);
             list = list.add(1); // next object
-            i += 1;
+            index += 1;
         }
+    }
+}
+
+/// Adds one object of a list as an actor, if it is near enough and not hidden or taken.
+unsafe fn add_object(object: &mut WorldObject, index: i16, f: i32) {
+    unsafe {
+        let xstart = (object.xc as i32 - map_x as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
+        let ystart = (object.yc as i32 - map_y as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
+        // States 3 and 4 are people; everything else is an item.
+        let is_person = object.ob_stat == STAT_PERSON || object.ob_stat == STAT_DEAD_PERSON;
+        let id = object.ob_id;
+        if is_person {
+            if !(inside(xstart, PERSON_LOAD_X) && inside(ystart, PERSON_LOAD_Y)) {
+                return;
+            }
+            load_set_figure(id);
+            if object.ob_id == WITCH && object.ob_stat == STAT_PERSON {
+                witch_on_screen = 1;
+            }
+        }
+        if object.ob_stat == STAT_TAKEN || object.ob_stat == STAT_HIDDEN {
+            return;
+        }
+        if !(inside(xstart, SHOWN_X) && inside(ystart, SHOWN_Y)) {
+            return;
+        }
+        let (actor, ystart) = if is_person {
+            match add_person_actor(object, index, ystart) {
+                Some(placed) => placed,
+                None => return,
+            }
+        } else {
+            (add_item_actor(object, index, f), ystart)
+        };
+        actor.abs_x = object.xc;
+        actor.abs_y = object.yc;
+        actor.rel_x = xstart as u16;
+        actor.rel_y = ystart as u16;
+    }
+}
+
+/// Makes a person (a set figure) out of a world object. Returns the actor and the screen row to use
+/// (people stand a little higher than the object's spot), or `None` if the person is already
+/// there as an actor (the object is then marked dead if the actor died).
+unsafe fn add_person_actor(
+    object: &mut WorldObject,
+    index: i16,
+    ystart: i16,
+) -> Option<(&'static mut Shape, i16)> {
+    unsafe {
+        let id = object.ob_id;
+        let actor = &mut (*(&raw mut actor_list))[J1 as usize];
+        J1 += 1;
+        if actor.abs_x == object.xc && actor.abs_y == object.yc {
+            if actor.state == DEAD {
+                object.ob_stat = STAT_DEAD_PERSON;
+            }
+            return None;
+        }
+        actor.kind = SETFIG;
+        actor.index = (*(&raw const setfig_table)
+            .cast::<SetFigEntry>()
+            .add(id as usize))
+        .image_base;
+        actor.weapon = 0;
+        actor.vitality = 2 + id as i16 + id as i16;
+        actor.goal = index as i8;
+        actor.environ = 0;
+        actor.state = if object.ob_stat == STAT_DEAD_PERSON {
+            DEAD
+        } else {
+            STILL
+        };
+        // A person's race is 0x80 plus their kind, so they can be told from monsters.
+        actor.race = (id as i32 + PERSON_RACE_BASE) as u8;
+        if J1 > drawn_actor_count {
+            drawn_actor_count = J1;
+        }
+        Some((actor, ystart - PERSON_RAISE))
+    }
+}
+
+/// Makes an item lying about (or the turtle's eggs, a raft...) out of a world object.
+unsafe fn add_item_actor(object: &WorldObject, index: i16, f: i32) -> &'static mut Shape {
+    unsafe {
+        if object.ob_id == TURTLE as i8 {
+            turtle_eggs = drawn_actor_count as i8;
+        }
+        let actor = &mut (*(&raw mut actor_list))[drawn_actor_count as usize];
+        drawn_actor_count += 1;
+        actor.kind = OBJECTS;
+        actor.index = object.ob_id;
+        actor.weapon = 0;
+        actor.vitality = (index as i32 + f) as i16;
+        actor.race = match object.ob_stat {
+            STAT_SECOND_ITEM => 2,
+            STAT_RAFT_ITEM => 0,
+            _ => 1,
+        };
+        actor
     }
 }
 

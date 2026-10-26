@@ -201,22 +201,54 @@ unsafe fn has_flag(flag: u16) -> bool {
 
 /// Opens everything the game needs. Returns 0, or the error number `show_error` shows.
 pub fn open_all() -> i32 {
+    match unsafe { open_everything() } {
+        Ok(()) => 0,
+        Err(error) => error,
+    }
+}
+
+/// The start-up steps in order; the first one that fails gives the error number.
+unsafe fn open_everything() -> Result<(), i32> {
     unsafe {
         openflags = 0;
+        open_libraries_and_text_screen()?;
+        allocate_bitmap_headers()?;
+        match open_disk() {
+            0 => {}
+            error => return Err(error),
+        }
+        open_fonts()?;
+        install_input()?;
+        set_up_view_ports();
+        set_up_bitmaps_and_rasinfos();
+        allocate_page_planes()?;
+        share_text_bitmap_memory();
+        open_audio();
+        allocate_music_memory()?;
+        allocate_game_memory()?;
+        load_music_waveforms();
+        set_up_pointer_sprite_and_fonts_data();
+        Ok(())
+    }
+}
 
+/// Opens the graphics libraries and sets up the rast ports, with the text rast port as the current
+/// one.
+unsafe fn open_libraries_and_text_screen() -> Result<(), i32> {
+    unsafe {
         gfx_base = OpenLibrary(c"graphics.library".as_ptr(), 0).cast();
         if gfx_base.is_null() {
-            return 2;
+            return Err(2);
         }
         layers_base = OpenLibrary(c"layers.library".as_ptr(), 0);
         if layers_base.is_null() {
-            return 2;
+            return Err(2);
         }
         set_flag(AL_GBASE);
         oldview = (*gfx_base).ActiView;
 
         if MakeBitMap(&raw mut work_bm, 2, 640, 200) == 0 {
-            return 2;
+            return Err(2);
         }
 
         li = NewLayerInfo();
@@ -230,27 +262,34 @@ pub fn open_all() -> i32 {
         SetBPen(current_rastport, 0);
         SetDrMd(current_rastport, JAM2 as u32);
         SetRast(current_rastport, 0);
+        Ok(())
+    }
+}
 
+/// Allocates the five bitmap headers (two pages, text, source, limit) in one block.
+unsafe fn allocate_bitmap_headers() -> Result<(), i32> {
+    unsafe {
         bm_page1 = AllocMem(
             BITMAP_COUNT * size_of::<BitMap>() as u32,
             MEMF_CHIP | MEMF_CLEAR,
         )
         .cast();
         if bm_page1.is_null() {
-            return 1;
+            return Err(1);
         }
         set_flag(AL_BMAP);
+        Ok(())
+    }
+}
 
-        let err = open_disk();
-        if err != 0 {
-            return err;
-        }
-
+/// Loads the story font and opens the panel font, and gives all the rast ports the panel font.
+unsafe fn open_fonts() -> Result<(), i32> {
+    unsafe {
         seg = LoadSeg(c"fonts/Amber/9".as_ptr());
         if seg == 0 {
-            return 15;
+            return Err(15);
         }
-        // The Amiga hands out a BPTR (address / 4); the font current_chunk_id sits 8 bytes in.
+        // The Amiga hands out a BPTR (address / 4); the font header sits 8 bytes in.
         font = ((seg << 2) + 8) as *mut DiskFontHeader;
         set_flag(AL_FONT);
 
@@ -259,14 +298,19 @@ pub fn open_all() -> i32 {
         SetFont(&raw mut rp_text2, panel_font);
         SetFont(&raw mut rp_map, panel_font);
         story_font = &raw mut (*font).dfh_TF;
+        Ok(())
+    }
+}
 
-        // the input handler
+/// Installs the keyboard and mouse handler, and takes over the pointer sprite.
+unsafe fn install_input() -> Result<(), i32> {
+    unsafe {
         handler_data.xsprite = 320;
         handler_data.ysprite = 320;
         handler_data.gbase = gfx_base.cast();
         handler_data.pbase = std::ptr::null_mut();
         if install_input_handler() == 0 {
-            return 4;
+            return Err(4);
         }
 
         thistask = FindTask(std::ptr::null());
@@ -276,7 +320,13 @@ pub fn open_all() -> i32 {
         set_flag(AL_HANDLE);
         FreeSprite(0);
         GetSprite(&raw mut pointer_sprite, 0);
+        Ok(())
+    }
+}
 
+/// Sets up the view and its two view ports: the text panel (hi-res) and the play field (lo-res).
+unsafe fn set_up_view_ports() {
+    unsafe {
         InitView(&raw mut v);
         InitVPort(&raw mut vp_page);
         InitVPort(&raw mut vp_text);
@@ -297,8 +347,12 @@ pub fn open_all() -> i32 {
         vp_text.DHeight = TEXT_HEIGHT as i16;
 
         vp_text.Modes = HIRES | SPRITES | VP_HIDE;
+    }
+}
 
-        // the bit maps (for the rasinfo and the rastports)
+/// Splits the bitmap block into its five bitmaps, and sets up the rast infos and the two pages.
+unsafe fn set_up_bitmaps_and_rasinfos() {
+    unsafe {
         bm_page2 = bm_page1.add(1);
         bm_text = bm_page1.add(2);
         bm_source = bm_page1.add(3);
@@ -314,7 +368,6 @@ pub fn open_all() -> i32 {
 
         rp_text2.BitMap = bm_text;
 
-        // the RasInfos
         ri_page1.BitMap = bm_page1;
         ri_page2.BitMap = bm_page2;
         ri_page1.RxOffset = 0;
@@ -336,11 +389,14 @@ pub fn open_all() -> i32 {
         drawing_page = &raw mut fp_page1;
         viewing_page = &raw mut fp_page2;
 
-        // the colour tables
         vp_page.ColorMap = GetColorMap(32);
         vp_text.ColorMap = GetColorMap(20);
+    }
+}
 
-        // reset all plane pointers, then allocate the pages
+/// Allocates the five bit planes of each of the two pages.
+unsafe fn allocate_page_planes() -> Result<(), i32> {
+    unsafe {
         for i in 0..PAGE_DEPTH as usize {
             (*bm_page1).Planes[i] = std::ptr::null_mut();
             (*bm_page2).Planes[i] = std::ptr::null_mut();
@@ -348,16 +404,21 @@ pub fn open_all() -> i32 {
         for i in 0..PAGE_DEPTH as usize {
             (*bm_page1).Planes[i] = AllocRaster(PHANTA_WIDTH as u32, RAST_HEIGHT as u32);
             if (*bm_page1).Planes[i].is_null() {
-                return 4;
+                return Err(4);
             }
             (*bm_page2).Planes[i] = AllocRaster(PHANTA_WIDTH as u32, RAST_HEIGHT as u32);
             if (*bm_page2).Planes[i].is_null() {
-                return 5;
+                return Err(5);
             }
         }
+        Ok(())
+    }
+}
 
-        // The text bitmap borrows the "workbench" planes; the shape queue and the mask buffer sit
-        // behind them.
+/// The text bitmap borrows the "workbench" planes; the shape queue and the mask buffer sit behind
+/// them.
+unsafe fn share_text_bitmap_memory() {
+    unsafe {
         let text_plane_bytes = TEXT_HEIGHT as usize * TEXT_ROW_BYTES;
         (*bm_text).Planes[0] = (*wb_bmap).Planes[0];
         (*bm_text).Planes[1] = (*wb_bmap).Planes[1];
@@ -375,54 +436,58 @@ pub fn open_all() -> i32 {
 
         vp_text.RasInfo = &raw mut ri_text;
         MakeVPort(&raw mut v, &raw mut vp_text);
+    }
+}
 
-        open_audio();
-
+/// Allocates the waveform/volume buffers and the score memory, and starts the music player.
+unsafe fn allocate_music_memory() -> Result<(), i32> {
+    unsafe {
         wavmem = AllocMem(VOICE_SZ, MEMF_CHIP);
         if wavmem.is_null() {
-            return 16;
+            return Err(16);
         }
         scoremem = AllocMem(SCORE_SZ, 0);
         if scoremem.is_null() {
-            return 17;
+            return Err(17);
         }
         volmem = wavmem.add(S_WAVBUF as usize);
         init_music((&raw const instrument_waves).cast(), wavmem, volmem);
         set_flag(AL_MUSIC);
+        Ok(())
+    }
+}
 
-        image_mem = AllocMem(IMAGE_SZ, MEMF_CHIP);
-        if image_mem.is_null() {
-            return 6;
-        }
+/// Allocates one chip memory area; `error` is the number shown if there is no memory.
+unsafe fn allocate_chip_area(size: u32, error: i32) -> Result<*mut u8, i32> {
+    unsafe {
+        let area = AllocMem(size, MEMF_CHIP);
+        if area.is_null() { Err(error) } else { Ok(area) }
+    }
+}
+
+/// Allocates the picture, sector, shape, shadow-mask, sample and terrain areas.
+unsafe fn allocate_game_memory() -> Result<(), i32> {
+    unsafe {
+        image_mem = allocate_chip_area(IMAGE_SZ, 6)?;
         set_flag(AL_IMAGE);
-        sector_mem = AllocMem(SECTOR_SZ, MEMF_CHIP);
-        if sector_mem.is_null() {
-            return 7;
-        }
+        sector_mem = allocate_chip_area(SECTOR_SZ, 7)?;
         map_mem = sector_mem.add(SECTOR_OFF);
         set_flag(AL_SECTOR);
-        shape_mem = AllocMem(SHAPE_SZ, MEMF_CHIP);
-        if shape_mem.is_null() {
-            return 8;
-        }
+        shape_mem = allocate_chip_area(SHAPE_SZ, 8)?;
         set_flag(AL_SHAPE);
-        shadow_mem = AllocMem(SHADOW_SZ, MEMF_CHIP);
-        if shadow_mem.is_null() {
-            return 10;
-        }
+        shadow_mem = allocate_chip_area(SHADOW_SZ, 10)?;
         set_flag(AL_SHADOW);
-        sample_mem = AllocMem(SAMPLE_SZ, MEMF_CHIP);
-        if sample_mem.is_null() {
-            return 11;
-        }
+        sample_mem = allocate_chip_area(SAMPLE_SZ, 11)?;
         set_flag(AL_SAMPLE);
-        terrain_mem = AllocMem(TERRA_SZ, MEMF_CHIP);
-        if terrain_mem.is_null() {
-            return 34;
-        }
+        terrain_mem = allocate_chip_area(TERRA_SZ, 34)?;
         set_flag(AL_TERR);
+        Ok(())
+    }
+}
 
-        // the waveforms and volume envelopes for the music
+/// Reads the waveforms and volume envelopes for the music from the file `v6`.
+unsafe fn load_music_waveforms() {
+    unsafe {
         let file = Open(c"v6".as_ptr(), MODE_OLDFILE);
         if file != 0 {
             Read(file, wavmem, S_WAVBUF);
@@ -430,7 +495,13 @@ pub fn open_all() -> i32 {
             Read(file, volmem, S_VOLBUF);
             Close(file);
         }
+    }
+}
 
+/// Last set-up: the scrolling text uses the first text plane, the pointer sprite is installed, and
+/// the two high-bit font tables are copied to chip memory.
+unsafe fn set_up_pointer_sprite_and_fonts_data() {
+    unsafe {
         bm_scroll.Planes[0] = (*bm_text).Planes[0];
 
         sprite_data = into_chip((&raw mut pointer_sprite_data).cast(), SPRITE_DATA_SZ);
@@ -440,7 +511,6 @@ pub fn open_all() -> i32 {
 
         nhinor = into_chip((&raw mut hinor).cast(), NORM_HIGH_SZ);
         nhivar = into_chip((&raw mut hivar).cast(), NORM_HIGH_SZ);
-        0
     }
 }
 
@@ -474,31 +544,51 @@ unsafe fn open_audio() {
 /// Gives back everything `open_all` took, then ends the program.
 pub fn close_all() {
     unsafe {
-        if has_flag(AL_TERR) {
-            FreeMem(terrain_mem.cast(), TERRA_SZ);
+        free_game_memory();
+        free_pointer_and_font_data();
+        free_view_resources();
+        free_page_planes();
+        close_audio();
+        close_input_and_fonts();
+        close_disk();
+        close_libraries_and_bitmaps();
+        openflags = 0;
+
+        if origDir != 0 {
+            CurrentDir(origDir);
         }
-        if has_flag(AL_SAMPLE) {
-            FreeMem(sample_mem.cast(), SAMPLE_SZ);
-        }
-        if has_flag(AL_SHADOW) {
-            FreeMem(shadow_mem.cast(), SHADOW_SZ);
-        }
-        if has_flag(AL_SHAPE) {
-            FreeMem(shape_mem.cast(), SHAPE_SZ);
-        }
-        if has_flag(AL_SECTOR) {
-            FreeMem(sector_mem.cast(), SECTOR_SZ);
-        }
-        if has_flag(AL_IMAGE) {
-            FreeMem(image_mem.cast(), IMAGE_SZ);
+
+        exit(0);
+    }
+}
+
+/// Frees the areas `allocate_game_memory` and `allocate_music_memory` made (those that were).
+unsafe fn free_game_memory() {
+    unsafe {
+        let areas = [
+            (AL_TERR, terrain_mem, TERRA_SZ),
+            (AL_SAMPLE, sample_mem, SAMPLE_SZ),
+            (AL_SHADOW, shadow_mem, SHADOW_SZ),
+            (AL_SHAPE, shape_mem, SHAPE_SZ),
+            (AL_SECTOR, sector_mem, SECTOR_SZ),
+            (AL_IMAGE, image_mem, IMAGE_SZ),
+        ];
+        for (flag, area, size) in areas {
+            if has_flag(flag) {
+                FreeMem(area.cast(), size);
+            }
         }
         if has_flag(AL_MUSIC) {
             wrap_music();
             FreeMem(wavmem.cast(), VOICE_SZ);
             FreeMem(scoremem.cast(), SCORE_SZ);
         }
+    }
+}
 
-        // Memory that `into_chip` copied is freed; if it handed back the original, nothing is.
+/// Memory that `into_chip` copied is freed; if it handed back the original, nothing is.
+unsafe fn free_pointer_and_font_data() {
+    unsafe {
         free_chip(
             sprite_data,
             (&raw mut pointer_sprite_data).cast(),
@@ -506,6 +596,12 @@ pub fn close_all() {
         );
         free_chip(nhinor, (&raw mut hinor).cast(), NORM_HIGH_SZ as u32);
         free_chip(nhivar, (&raw mut hivar).cast(), NORM_HIGH_SZ as u32);
+    }
+}
+
+/// Puts the old view back and frees the view ports' copper lists and colour maps.
+unsafe fn free_view_resources() {
+    unsafe {
         LoadView(oldview);
         FreeVPortCopLists(&raw mut vp_page);
         FreeVPortCopLists(&raw mut vp_text);
@@ -519,6 +615,12 @@ pub fn close_all() {
         if !vp_text.ColorMap.is_null() {
             FreeColorMap(vp_text.ColorMap);
         }
+    }
+}
+
+/// Frees the bit planes of both pages.
+unsafe fn free_page_planes() {
+    unsafe {
         for bm in [bm_page1, bm_page2] {
             for i in 0..PAGE_DEPTH as usize {
                 if !(*bm).Planes[i].is_null() {
@@ -526,7 +628,12 @@ pub fn close_all() {
                 }
             }
         }
+    }
+}
 
+/// Closes the audio device, its request and its port.
+unsafe fn close_audio() {
+    unsafe {
         if audio_open != 0 {
             CloseDevice((&raw mut (*ioaudio).ioa_request).cast());
         }
@@ -536,7 +643,12 @@ pub fn close_all() {
         if !audioport.is_null() {
             DeletePort(audioport);
         }
+    }
+}
 
+/// Takes the input handler down and closes the fonts.
+unsafe fn close_input_and_fonts() {
+    unsafe {
         if has_flag(AL_HANDLE) {
             remove_input_handler();
         }
@@ -544,9 +656,12 @@ pub fn close_all() {
             UnLoadSeg(seg);
             CloseFont(panel_font);
         }
+    }
+}
 
-        close_disk();
-
+/// Closes the graphics libraries and frees the bitmap headers, the layer info and the sprite.
+unsafe fn close_libraries_and_bitmaps() {
+    unsafe {
         if has_flag(AL_GBASE) {
             CloseLibrary(gfx_base.cast());
             CloseLibrary(layers_base);
@@ -557,13 +672,6 @@ pub fn close_all() {
         }
         DisposeLayerInfo(li);
         FreeSprite(0);
-        openflags = 0;
-
-        if origDir != 0 {
-            CurrentDir(origDir);
-        }
-
-        exit(0);
     }
 }
 
@@ -672,19 +780,45 @@ unsafe fn quit_all() {
 unsafe fn start_up() -> bool {
     unsafe {
         stopscore();
+        show_title_screen();
+        prepare_intro_pages_and_music();
 
-        vp_page.RasInfo = &raw mut ri_page1;
-        fp_page2.ri_page = &raw mut ri_page2;
+        if intro_skipped() == 0 {
+            play_intro();
+        }
+
+        copy_protection_check();
+        show_play_screen_background();
+        if copy_protection_riddle() == 0 {
+            return false;
+        }
+        Delay(PLACARD_WAIT);
+        start_first_brother();
+        true
+    }
+}
+
+/// Blanks both pages.
+unsafe fn clear_both_pages() {
+    unsafe {
         rp_map.BitMap = (*(*viewing_page).ri_page).BitMap;
         SetRast(&raw mut rp_map, 0);
         rp_map.BitMap = (*(*drawing_page).ri_page).BitMap;
         SetRast(&raw mut rp_map, 0);
+    }
+}
+
+/// The legal title text on a blue page, then the music and the sound effects are read in.
+unsafe fn show_title_screen() {
+    unsafe {
+        vp_page.RasInfo = &raw mut ri_page1;
+        fp_page2.ri_page = &raw mut ri_page2;
+        clear_both_pages();
         current_rastport = &raw mut rp_map;
         set_intro_zoom(ZOOM_NORMAL);
         SetRGB4(&raw mut vp_page, 0, 0, 0, 6);
         SetRGB4(&raw mut vp_page, 1, 15, 15, 15);
 
-        // show the legal text
         let pen = (*current_rastport).FgPen as u32;
         SetAPen(current_rastport, TITLE_PEN);
         print_positioned(titletext.as_ptr());
@@ -702,7 +836,13 @@ unsafe fn start_up() -> bool {
         read_sample();
 
         Delay(TITLE_WAIT);
+    }
+}
 
+/// Points the picture loader at the page memory, starts the intro tune, and flips the pages twice
+/// so both show the same thing.
+unsafe fn prepare_intro_pages_and_music() {
+    unsafe {
         current_viewport = &raw mut vp_page; // so that the IFF routines can communicate
         vp_page.RasInfo = &raw mut ri_page1;
 
@@ -725,18 +865,15 @@ unsafe fn start_up() -> bool {
 
         flip_pages(); // "prime the pump"
         flip_pages();
+    }
+}
 
-        if intro_skipped() == 0 {
-            play_intro();
-        }
-
-        copy_protection_check();
-        // go to the normal (playing) screen mode
+/// Switches to the normal playing screen: loads the shadow masks and the panel picture, and shows
+/// the copyright placard.
+unsafe fn show_play_screen_background() {
+    unsafe {
         fp_page2.ri_page = &raw mut ri_page2;
-        rp_map.BitMap = (*(*viewing_page).ri_page).BitMap;
-        SetRast(&raw mut rp_map, 0);
-        rp_map.BitMap = (*(*drawing_page).ri_page).BitMap;
-        SetRast(&raw mut rp_map, 0);
+        clear_both_pages();
 
         LoadRGB4(
             &raw mut vp_text,
@@ -761,11 +898,12 @@ unsafe fn start_up() -> bool {
         placard_text(PLACARD_COPYRIGHT);
         handler_data.laydown = 0;
         handler_data.pickup = 0;
-        if copy_protection_riddle() == 0 {
-            return false;
-        }
-        Delay(PLACARD_WAIT);
+    }
+}
 
+/// Starts the first brother and sets up the text page and the colours for play.
+unsafe fn start_first_brother() {
+    unsafe {
         ri_page1.RxOffset = 0;
         ri_page2.RxOffset = 0;
         ri_page1.RyOffset = 0;
@@ -775,7 +913,6 @@ unsafe fn start_up() -> bool {
         revive(1);
         rp_map.BitMap = (*(*drawing_page).ri_page).BitMap;
 
-        // establish the text page
         vp_text.DyOffset = PAGE_HEIGHT;
         vp_text.DHeight = TEXT_HEIGHT as i16;
         vp_page.DHeight = PAGE_VIEW_HEIGHT;
@@ -799,7 +936,6 @@ unsafe fn start_up() -> bool {
 
         current_menu = 0;
         print_options();
-        true
     }
 }
 
@@ -860,165 +996,264 @@ unsafe fn scroll_step() -> (i16, i16) {
     unsafe {
         tile_x = map_x >> 4;
         tile_y = map_y >> 5;
-        let mut dif_x = (tile_x as i32 - (*drawing_page).isv_x) as i16;
+        let dif_x = (tile_x as i32 - (*drawing_page).isv_x) as i16;
         let dif_y = (tile_y as i32 - (*drawing_page).isv_y) as i16;
-        if dif_x as i32 & DIF_SIGN_BIT != 0 {
-            dif_x = (dif_x as i32 | DIF_SIGN_EXTEND) as i16;
-        } else {
-            dif_x = (dif_x as i32 & DIF_MASK) as i16;
-        }
-        (dif_x, dif_y)
+        (wrap_scroll_difference(dif_x), dif_y)
     }
+}
+
+/// The map's horizontal step as a 10 bit signed number (the map wraps round at the edges).
+fn wrap_scroll_difference(difference: i16) -> i16 {
+    if difference as i32 & DIF_SIGN_BIT != 0 {
+        (difference as i32 | DIF_SIGN_EXTEND) as i16
+    } else {
+        (difference as i32 & DIF_MASK) as i16
+    }
+}
+
+/// What the frame loop carries from one frame to the next.
+struct FrameState {
+    /// The frame counter (the C left it uninitialised).
+    cycle: i16,
+    /// The terrain of the last actor moved. It carries over to the next actor (a dead actor reads
+    /// it without setting it, see `move_actor`), and from the drawing loop to the next frame.
+    last_terrain: i16,
 }
 
 /// The main loop: one pass per frame until the player quits.
 unsafe fn main_loop() {
     unsafe {
-        // `j` is the terrain of the last actor moved; it carries over to the next (see `move_actor`).
-        let mut j: i16 = 0;
-        let mut cycle: i16 = 0; // the frame counter (the C left it uninitialised)
-
+        let mut state = FrameState {
+            cycle: 0,
+            last_terrain: 0,
+        };
         cheat_enabled = 0;
         quit_requested = 0;
         while quit_requested == 0 {
-            cycle = cycle.wrapping_add(1);
-            flasher = flasher.wrapping_add(1);
-            fta_test_hook(); // test commands, does nothing normally
+            run_frame(&mut state);
+        }
+    }
+}
 
-            let key = next_key() as i8;
+/// One frame: input, moving everything, updating the map and the world, then drawing.
+unsafe fn run_frame(state: &mut FrameState) {
+    unsafe {
+        state.cycle = state.cycle.wrapping_add(1);
+        flasher = flasher.wrapping_add(1);
+        fta_test_hook(); // test commands, does nothing normally
 
-            let notpause = menus[GAME_MENU].enabled[PAUSE_ENTRY] & 1 == 0;
-            if key != 0 {
-                handle_key(key as i32, notpause as i32);
-            }
+        read_keyboard();
+        if handle_view_status() {
+            return;
+        }
 
-            if view_status == VIEW_PAUSED {
-                Delay(PAUSE_WAIT);
-                view_status = VIEW_REDRAW;
-            } else if view_status == VIEW_BIG || view_status == VIEW_BIG_STILL {
-                if flasher & 16 != 0 && view_status == VIEW_BIG {
-                    SetRGB4(&raw mut vp_page, 31, FLASH_COLOR, FLASH_COLOR, FLASH_COLOR);
-                } else {
-                    SetRGB4(&raw mut vp_page, 31, 0, 0, 0);
-                }
-                handle_print_request();
-                continue; // go no further
-            }
+        read_walk_direction();
+        if menus[GAME_MENU].enabled[PAUSE_ENTRY] & 1 != 0 {
+            Delay(1);
+            return;
+        }
 
-            read_walk_direction();
+        update_hero(state.cycle);
+        move_everything(state);
+        check_bed();
+        check_door();
 
-            if menus[GAME_MENU].enabled[PAUSE_ENTRY] & 1 != 0 {
-                Delay(1);
-                continue;
-            }
+        hero_x = actor_list[0].abs_x;
+        hero_y = actor_list[0].abs_y;
 
-            update_hero(cycle);
+        undo_sprites();
+        let (scroll_x, scroll_y, world_update) = update_map_view();
+        if world_update {
+            run_world_update();
+        }
+        draw_frame(state, scroll_x, scroll_y);
+    }
+}
 
-            // the monsters' and the hero's movement
-            raft_proximity();
-            let mut i = 0;
-            while i < active_actor_count as i32 {
-                move_actor(i, cycle, &mut j);
-                i += 1;
-            }
+/// Reads one key and handles it.
+unsafe fn read_keyboard() {
+    unsafe {
+        let key = next_key() as i8;
+        let notpause = menus[GAME_MENU].enabled[PAUSE_ENTRY] & 1 == 0;
+        if key != 0 {
+            handle_key(key as i32, notpause as i32);
+        }
+    }
+}
 
-            check_bed();
-            check_door();
-
-            hero_x = actor_list[0].abs_x;
-            hero_y = actor_list[0].abs_y;
-
-            // generate the map
-            undo_sprites();
-
-            let (mut dif_x, mut dif_y) = scroll_step();
-
-            if new_region < NO_REGION {
-                load_pending_region();
-            }
-
-            let mut world_update = false;
-            if view_status == VIEW_REDRAW
-                || view_status == VIEW_REDRAW_2
-                || view_status == VIEW_CHANGED
-            {
-                refresh_minimap();
-                draw_map();
-                dif_x = 0;
-                dif_y = 0;
-                if view_status == VIEW_REDRAW {
-                    view_status = VIEW_REDRAW_2;
-                } else if view_status == VIEW_REDRAW_2 {
-                    view_status = VIEW_NORMAL;
-                }
-                world_update = true;
+/// The screen modes that stop a normal frame. Returns true if this frame ends here (the item list
+/// and the like only flash the pointer and handle the print queue).
+unsafe fn handle_view_status() -> bool {
+    unsafe {
+        if view_status == VIEW_PAUSED {
+            Delay(PAUSE_WAIT);
+            view_status = VIEW_REDRAW;
+        } else if view_status == VIEW_BIG || view_status == VIEW_BIG_STILL {
+            if flasher & 16 != 0 && view_status == VIEW_BIG {
+                SetRGB4(&raw mut vp_page, 31, FLASH_COLOR, FLASH_COLOR, FLASH_COLOR);
             } else {
-                if dif_x != 0 || dif_y != 0 {
-                    refresh_minimap();
-                }
-                let scroll = match (dif_x, dif_y) {
-                    (1, 1) => Some(SCROLL_UP_LEFT),
-                    (1, 0) => Some(SCROLL_LEFT),
-                    (1, -1) => Some(SCROLL_DOWN_LEFT),
-                    (0, 1) => Some(SCROLL_UP),
-                    (0, -1) => Some(SCROLL_DOWN),
-                    (-1, 1) => Some(SCROLL_UP_RIGHT),
-                    (-1, 0) => Some(SCROLL_RIGHT),
-                    (-1, -1) => Some(SCROLL_DOWN_RIGHT),
-                    _ => None,
-                };
-                if let Some(dir) = scroll {
-                    scroll_map(dir);
-                } else if dif_x == 0 && dif_y == 0 {
-                    // no motion: the world gets its turn here
-                    handle_print_request();
-                    world_update = true;
-                } else {
-                    // moved too far to scroll: redraw the whole map
-                    dif_x = 0;
-                    dif_y = 0;
-                    draw_map();
-                }
+                SetRGB4(&raw mut vp_page, 31, 0, 0, 0);
             }
+            handle_print_request();
+            return true;
+        }
+        false
+    }
+}
 
-            if world_update {
-                day_night_tick();
-                if freeze_timer == 0 {
-                    spawn_encounters();
-                    speak_nearby();
-                    update_enemy_goals();
-                    survival_tick();
-                }
-            }
+/// Moves the hero, the raft and every monster and person (the actor count is read each time round,
+/// as in the original).
+unsafe fn move_everything(state: &mut FrameState) {
+    unsafe {
+        raft_proximity();
+        let mut i = 0;
+        while i < active_actor_count as i32 {
+            move_actor(i, state.cycle, &mut state.last_terrain);
+            i += 1;
+        }
+    }
+}
 
-            (*drawing_page).isv_x = tile_x as i32;
-            (*drawing_page).isv_y = tile_y as i32;
+/// The scroll direction `scroll_map` takes for the map moving one tile by (x, y), if it can scroll.
+fn scroll_direction(scroll_x: i16, scroll_y: i16) -> Option<i32> {
+    match (scroll_x, scroll_y) {
+        (1, 1) => Some(SCROLL_UP_LEFT),
+        (1, 0) => Some(SCROLL_LEFT),
+        (1, -1) => Some(SCROLL_DOWN_LEFT),
+        (0, 1) => Some(SCROLL_UP),
+        (0, -1) => Some(SCROLL_DOWN),
+        (-1, 1) => Some(SCROLL_UP_RIGHT),
+        (-1, 0) => Some(SCROLL_RIGHT),
+        (-1, -1) => Some(SCROLL_DOWN_RIGHT),
+        _ => None,
+    }
+}
 
-            SetAPen(&raw mut rp_map, SPRITE_PEN);
+/// Brings the map in line with the camera: loads a waiting region, then redraws the whole map or
+/// scrolls it by one tile. Returns the scroll step used and whether the world gets its turn this
+/// frame (it does when the map is redrawn from scratch, or did not move at all).
+unsafe fn update_map_view() -> (i16, i16, bool) {
+    unsafe {
+        let (mut scroll_x, mut scroll_y) = scroll_step();
 
-            resolve_melee();
-            advance_missiles();
+        if new_region < NO_REGION {
+            load_pending_region();
+        }
 
-            drawn_actor_count = active_actor_count;
-            spawn_object_actors();
-
-            // the flying missiles, then sort the actors by position
-            queue_missile_sprites();
-            sort_actors();
-
-            // now that the scroll blit is done, finish repairing the map
-            repair_map_and_witch(dif_x, dif_y);
-
-            draw_sprites(cycle);
-            j = drawn_actor_count; // the drawing loop used to leave j here; the next frame's actor loop reads it
-            WaitBlit();
-            (*(*drawing_page).ri_page).RxOffset = (map_x & 15) as i16; // modulus 16
-            (*(*drawing_page).ri_page).RyOffset = (map_y & 31) as i16; // modulus 32
-            flip_pages();
-            if view_status == VIEW_CHANGED {
-                fade_normal();
+        if view_status == VIEW_REDRAW || view_status == VIEW_REDRAW_2 || view_status == VIEW_CHANGED
+        {
+            refresh_minimap();
+            draw_map();
+            if view_status == VIEW_REDRAW {
+                view_status = VIEW_REDRAW_2;
+            } else if view_status == VIEW_REDRAW_2 {
                 view_status = VIEW_NORMAL;
             }
+            return (0, 0, true);
         }
+
+        if scroll_x != 0 || scroll_y != 0 {
+            refresh_minimap();
+        }
+        if let Some(direction) = scroll_direction(scroll_x, scroll_y) {
+            scroll_map(direction);
+            return (scroll_x, scroll_y, false);
+        }
+        if scroll_x == 0 && scroll_y == 0 {
+            // no motion: the world gets its turn here
+            handle_print_request();
+            return (scroll_x, scroll_y, true);
+        }
+        // moved too far to scroll: redraw the whole map
+        scroll_x = 0;
+        scroll_y = 0;
+        draw_map();
+        (scroll_x, scroll_y, false)
+    }
+}
+
+/// The once-per-frame world update: the clock, then (unless time is frozen) new monsters, talking,
+/// what the monsters want to do, and hunger.
+unsafe fn run_world_update() {
+    unsafe {
+        day_night_tick();
+        if freeze_timer == 0 {
+            spawn_encounters();
+            speak_nearby();
+            update_enemy_goals();
+            survival_tick();
+        }
+    }
+}
+
+/// Fights, missiles and drawing, then shows the page that was just drawn.
+unsafe fn draw_frame(state: &mut FrameState, scroll_x: i16, scroll_y: i16) {
+    unsafe {
+        (*drawing_page).isv_x = tile_x as i32;
+        (*drawing_page).isv_y = tile_y as i32;
+
+        SetAPen(&raw mut rp_map, SPRITE_PEN);
+
+        resolve_melee();
+        advance_missiles();
+
+        drawn_actor_count = active_actor_count;
+        spawn_object_actors();
+
+        // the flying missiles, then sort the actors by position
+        queue_missile_sprites();
+        sort_actors();
+
+        // now that the scroll blit is done, finish repairing the map
+        repair_map_and_witch(scroll_x, scroll_y);
+
+        draw_sprites(state.cycle);
+        // The drawing loop used to leave `j` here; the next frame's actor loop reads it.
+        state.last_terrain = drawn_actor_count;
+        WaitBlit();
+        (*(*drawing_page).ri_page).RxOffset = (map_x & 15) as i16; // modulus 16
+        (*(*drawing_page).ri_page).RyOffset = (map_y & 31) as i16; // modulus 32
+        flip_pages();
+        if view_status == VIEW_CHANGED {
+            fade_normal();
+            view_status = VIEW_NORMAL;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn small_scroll_steps_stay_as_they_are() {
+        assert_eq!(wrap_scroll_difference(0), 0);
+        assert_eq!(wrap_scroll_difference(1), 1);
+        assert_eq!(wrap_scroll_difference(-1), -1);
+    }
+
+    #[test]
+    fn scroll_steps_wrap_at_ten_bits() {
+        // 1023 is one step the other way round the wrapped map; 1024 is no step at all
+        assert_eq!(wrap_scroll_difference(0x3ff), -1);
+        assert_eq!(wrap_scroll_difference(0x400), 0);
+        assert_eq!(wrap_scroll_difference(0x201), -511);
+    }
+
+    #[test]
+    fn the_map_scrolls_one_tile_in_each_direction() {
+        assert_eq!(scroll_direction(1, 0), Some(SCROLL_LEFT));
+        assert_eq!(scroll_direction(-1, 0), Some(SCROLL_RIGHT));
+        assert_eq!(scroll_direction(0, 1), Some(SCROLL_UP));
+        assert_eq!(scroll_direction(0, -1), Some(SCROLL_DOWN));
+        assert_eq!(scroll_direction(1, 1), Some(SCROLL_UP_LEFT));
+        assert_eq!(scroll_direction(-1, -1), Some(SCROLL_DOWN_RIGHT));
+    }
+
+    #[test]
+    fn no_motion_and_big_jumps_do_not_scroll() {
+        assert_eq!(scroll_direction(0, 0), None);
+        assert_eq!(scroll_direction(2, 0), None);
+        assert_eq!(scroll_direction(0, -3), None);
     }
 }

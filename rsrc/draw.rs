@@ -211,211 +211,150 @@ unsafe fn weapon_passmode(an: *const Shape, pass: &mut u8) -> bool {
     }
 }
 
+/// Which image to draw for an actor, and where on the screen it goes.
+struct Sprite {
+    /// The kind of sprite sheet the image is in (`PHIL`, `OBJECTS`, ...).
+    atype: i16,
+    /// The image number in that sheet.
+    inum: i16,
+    xstart: i16,
+    ystart: i16,
+    xstop: i16,
+    ystop: i16,
+    /// The line the actor stands on; things hidden behind scenery are cut against it.
+    ground: i16,
+}
+
+/// The part of a sprite that is on the screen.
+struct Clip {
+    xstart: i16,
+    ystart: i16,
+    xstop: i16,
+    ystop: i16,
+    /// How many pixels of the left edge, and lines of the top, are cut off.
+    xoff: i8,
+    yoff: i8,
+}
+
 /// Draws one actor (or its weapon) for the current pass.
 unsafe fn draw_one(frame: &mut Frame, an: *mut Shape, i: i32, cycle: i16, passmode: bool) -> Drawn {
     unsafe {
-        let page = drawing_page;
-        let mut inum = (*an).index as i16;
-        let mut xstart = (*an).rel_x as i16;
-        let mut ystart = (*an).rel_y as i16;
-        let mut ground = ystart.wrapping_add(32);
-        let mut atype: i16;
+        clear_scenery_mask();
 
-        OwnBlitter();
-        WaitBlit();
-        clear_memory(bmask_mem, MASK_CLEAR_SIZE);
-        DisownBlitter();
+        let Some(mut sprite) = choose_image(an, i, passmode) else {
+            return Drawn::Done;
+        };
+        sprite.xstart += (map_x & 15) as i16;
+        sprite.ystart += (map_y & 31) as i16;
+        sprite.ground += (map_y & 31) as i16;
 
-        if passmode {
-            let mut k = (*an).weapon as i16;
-            if k == WEAPON_BOW as i16 && inum < BOW_FRAMES {
-                xstart += byte_of(&bow_x, inum);
-                ystart += byte_of(&bow_y, inum);
-            } else {
-                let entry = state_entry(inum);
-                xstart += entry.wpn_x as i16;
-                ystart += entry.wpn_y as i16;
-            }
-            if k == WEAPON_BOW as i16 && inum < BOW_FRAMES {
-                inum /= 8;
-                inum = if inum & 1 != 0 {
-                    OBJ_BOW_UP
-                } else if inum & 2 != 0 {
-                    OBJ_BOW_MID
-                } else {
-                    OBJ_BOW_DOWN
-                };
-            } else if k == WEAPON_FIREBALL as i16 {
-                inum = (*an).facing as i16 + OBJ_ARROW_BASE;
-                if (*an).facing == 2 {
-                    ystart -= 6;
-                }
-            } else {
-                // hand weapons: each kind has its own block of images
-                if let Some(&(_, base)) = WEAPON_SPRITE_BASE.iter().find(|(w, _)| *w as i16 == k) {
-                    k = base;
-                }
-                inum = state_entry(inum).wpn_no as i16 + k;
-            }
-            atype = OBJECTS;
-        } else {
-            atype = (*an).kind as i16;
-            let mut burning = false;
-            if (atype == ENEMY && (*an).race != RACE_SPECTRE) || atype == PHIL {
-                if fiery_death != 0 && (*an).environ > 0 {
-                    if (*an).state == DEAD {
-                        return Drawn::Done;
-                    } else if (*an).state == DYING {
-                        atype = OBJECTS;
-                        inum = OBJ_BURNING;
-                        burning = true;
-                    }
-                } else if (*an).state == FALL {
-                    atype = if (*an).tactic < 16 { ENEMY } else { OBJECTS };
-                } else {
-                    inum = state_entry(inum).figure as i16;
-                }
-                if !burning {
-                    if (*an).race == RACE_SNAKE {
-                        if (*an).state < DYING {
-                            inum += 0x24;
-                        }
-                    } else if i > 0 {
-                        if (*an).race & 1 != 0 {
-                            inum |= 1;
-                        } else {
-                            inum &= 0xfffeu16 as i16;
-                        }
-                    }
-                }
-            }
-            if !burning {
-                if atype == OBJECTS && (*an).race == 0 {
-                    return Drawn::Done;
-                }
-                if atype == CARRIER && riding == 0 && loaded_actor_file == 11 {
-                    atype = RAFT;
-                    inum = 1;
-                }
-            }
-        }
-
-        xstart += (map_x & 15) as i16;
-        ystart += (map_y & 31) as i16;
-        ground += (map_y & 31) as i16;
-
-        let seq = &*(&raw const seq_list)
-            .cast::<SeqInfo>()
-            .offset(atype as isize);
+        let seq = sprite_sheet(sprite.atype);
         let xsize = (seq.width << 4) as i8;
-        let mut ysize = seq.height as i8;
-
-        if atype == OBJECTS {
-            let n = inum;
-            if n == 0x1b
-                || (8..=12).contains(&n)
-                || n == 25
-                || n == 26
-                || (n > 0x10 && n < 0x18)
-                || (n & 128) != 0
-            {
-                ysize = 8;
-            }
-        }
-
+        let ysize = image_height(sprite.atype, sprite.inum, seq.height as i8);
         let cwide = xsize / 8;
-        let xstop = xstart.wrapping_add(xsize as i16).wrapping_sub(1);
-        let mut ystop = ystart.wrapping_add(ysize as i16).wrapping_sub(1);
+        sprite.xstop = sprite.xstart.wrapping_add(xsize as i16).wrapping_sub(1);
+        sprite.ystop = sprite.ystart.wrapping_add(ysize as i16).wrapping_sub(1);
 
-        if !passmode && atype != OBJECTS {
-            if i == 0 && riding == 11 {
-                ystop -= 16;
-            } else if (*an).environ == 2 {
-                ystop -= 10;
-            } else if (*an).environ > 29 {
-                if (*an).state == DEAD {
-                    return Drawn::Done;
-                }
-                ystart += 27;
-                ystop = ystart + 7;
-                atype = OBJECTS;
-                inum = OBJ_SUNK + ((cycle as i32 + i) & 1) as i16;
-            } else if (*an).environ > 2 {
-                ystart += (*an).environ as i16;
-            }
-        } else {
-            if (*an).environ > 29 {
-                return Drawn::Done; // no weapon
-            }
-            if (*an).environ > 2 {
-                ystart += (*an).environ as i16;
-                ystop += (*an).environ as i16;
-                if ystop > ground {
-                    ystop = ground;
-                }
-                if ystart >= ground {
-                    return Drawn::Done;
-                }
-                ground += (*an).environ as i16;
-            }
+        if !adjust_for_depth(an, i, cycle, passmode, &mut sprite) {
+            return Drawn::Done;
         }
-
-        if xstart > SCREEN_RIGHT || ystart > SCREEN_BOTTOM || xstop < 0 || ystop < 0 {
+        if sprite.xstart > SCREEN_RIGHT
+            || sprite.ystart > SCREEN_BOTTOM
+            || sprite.xstop < 0
+            || sprite.ystop < 0
+        {
             return Drawn::Done;
         }
 
-        // clip the shape to the screen
-        let xstart1 = xstart.max(0);
-        let ystart1 = ystart.max(0);
-        let xstop1 = xstop.min(SCREEN_RIGHT);
-        let ystop1 = ystop.min(SCREEN_BOTTOM);
-        let xoff = (xstart1 - xstart) as i8;
-        let mut yoff = (ystart1 - ystart) as i8;
-
-        if atype == OBJECTS && (inum & 128) != 0 {
-            inum &= 0x7f;
-            yoff = yoff.wrapping_add(8);
-        }
-
+        let clip = clip_to_screen(&mut sprite);
         // word offsets
-        let xbw = (xstart1 >> 4) as i8;
-        let xew = (xstop1 >> 4) as i8;
+        let xbw = (clip.xstart >> 4) as i8;
+        let xew = (clip.xstop >> 4) as i8;
         let mut blitwide = (xew as i16 - xbw as i16 + 1) as i8;
-        let blithigh = (ystop1 - ystart1 + 1) as i8;
-        if xoff & 15 != 0 {
+        let blithigh = (clip.ystop - clip.ystart + 1) as i8;
+        if clip.xoff & 15 != 0 {
             blitwide = blitwide.wrapping_add(1);
         }
 
-        shp = (*page)
+        if !set_up_blit(frame, &sprite, &clip, cwide, xbw, blitwide, blithigh) {
+            return Drawn::OutOfRoom; // no more blits if no room
+        }
+
+        OwnBlitter();
+        save_background((*shp).backsave);
+
+        if !drawn_in_front(an, i, sprite.atype, sprite.inum) {
+            mask_against_scenery(an, i, sprite.ground, xbw, clip.ystart, clip.ystop, blitwide);
+        }
+
+        combine_masks();
+        draw_shape();
+        (*an).visible = 1;
+        DisownBlitter();
+        (*drawing_page).obcount += 1;
+        Drawn::Done
+    }
+}
+
+/// Cuts the sprite to the screen. Also notes in the image number whether the sprite is drawn from
+/// the middle of its picture (bit 7).
+fn clip_to_screen(sprite: &mut Sprite) -> Clip {
+    let xstart = sprite.xstart.max(0);
+    let ystart = sprite.ystart.max(0);
+    let mut clip = Clip {
+        xstart,
+        ystart,
+        xstop: sprite.xstop.min(SCREEN_RIGHT),
+        ystop: sprite.ystop.min(SCREEN_BOTTOM),
+        xoff: (xstart - sprite.xstart) as i8,
+        yoff: (ystart - sprite.ystart) as i8,
+    };
+    if sprite.atype == OBJECTS && (sprite.inum & 128) != 0 {
+        sprite.inum &= 0x7f;
+        clip.yoff = clip.yoff.wrapping_add(8);
+    }
+    clip
+}
+
+/// Fills in the blitter's registers and the queue entry for this sprite: sizes, where the image,
+/// its mask and the saved background are, and the shifts. Returns false when the save buffer is
+/// full.
+unsafe fn set_up_blit(
+    frame: &mut Frame,
+    sprite: &Sprite,
+    clip: &Clip,
+    cwide: i8,
+    xbw: i8,
+    blitwide: i8,
+    blithigh: i8,
+) -> bool {
+    unsafe {
+        // The sheet is looked up again: a sunk actor is drawn from the objects sheet, but is as wide
+        // and high as its own.
+        let seq = sprite_sheet(sprite.atype);
+        shp = (*drawing_page)
             .shape_queue
             .cast::<SShape>()
-            .offset((*page).obcount as isize);
+            .offset((*drawing_page).obcount as isize);
         planesize = seq.bytes;
         (*shp).savesize = (blitwide as i32 * blithigh as i32 * 2) as i16;
         (*shp).blitsize = (((blithigh as i32) << 6) + blitwide as i32) as i16;
 
         shapedata = seq
             .location
-            .offset(planesize as isize * PLANES as isize * inum as isize);
-        mask_buffer = seq.maskloc.offset(planesize as isize * inum as isize);
-        if (*shp).savesize < SMALL_SAVE && frame.crack < SPARE_SAVES {
-            (*shp).backsave = (*planes.add(frame.crack as usize)).add(SPARE_PLANE_OFFSET);
-            frame.crack += 1;
-        } else {
-            (*shp).backsave = frame.backalloc;
-            let bytes = PLANES * (*shp).savesize as i32;
-            frame.backalloc = frame.backalloc.offset(bytes as isize);
-            (*page).saveused += bytes;
-            if (*page).saveused >= SAVE_LIMIT {
-                return Drawn::OutOfRoom; // no more blits if no room
-            }
+            .offset(planesize as isize * PLANES as isize * sprite.inum as isize);
+        mask_buffer = seq
+            .maskloc
+            .offset(planesize as isize * sprite.inum as isize);
+        if !assign_background_save(frame) {
+            return false;
         }
 
-        aoff = ((ystart1 & 31) as i32 * blitwide as i32 * 2) as i16;
-        boff = ((xoff >> 4) as i32 * 2 + cwide as i32 * yoff as i32) as i16;
-        (*shp).coff = (xbw as i32 * 2 + ystart1 as i32 * 40) as i16;
-        shift = xstart & 15;
-        if xoff & 15 != 0 {
+        aoff = ((clip.ystart & 31) as i32 * blitwide as i32 * 2) as i16;
+        boff = ((clip.xoff >> 4) as i32 * 2 + cwide as i32 * clip.yoff as i32) as i16;
+        (*shp).coff = (xbw as i32 * 2 + clip.ystart as i32 * 40) as i16;
+        shift = sprite.xstart & 15;
+        if clip.xoff & 15 != 0 {
             (*shp).coff -= 2;
             wmask = 0;
         } else {
@@ -423,20 +362,217 @@ unsafe fn draw_one(frame: &mut Frame, an: *mut Shape, i: i32, cycle: i16, passmo
         }
         bmod = (cwide as i32 - blitwide as i32 * 2) as i16;
         (*shp).cmod = (40 - blitwide as i32 * 2) as i16;
+        true
+    }
+}
 
+/// Where the images of one kind of sprite are (`seq_list` entry `atype`).
+unsafe fn sprite_sheet(atype: i16) -> &'static SeqInfo {
+    unsafe {
+        &*(&raw const seq_list)
+            .cast::<SeqInfo>()
+            .offset(atype as isize)
+    }
+}
+
+/// Zeroes the scenery mask buffer, ready for the next sprite.
+unsafe fn clear_scenery_mask() {
+    unsafe {
         OwnBlitter();
-        save_background((*shp).backsave);
-
-        if !drawn_in_front(an, i, atype, inum) {
-            mask_against_scenery(an, i, ground, xbw, ystart1, ystop1, blitwide);
-        }
-
-        combine_masks();
-        draw_shape();
-        (*an).visible = 1;
+        WaitBlit();
+        clear_memory(bmask_mem, MASK_CLEAR_SIZE);
         DisownBlitter();
-        (*page).obcount += 1;
-        Drawn::Done
+    }
+}
+
+/// Picks the image for this pass: the weapon's (`passmode`) or the actor's own, and where its top
+/// left corner is on the screen. `None` means nothing is drawn.
+unsafe fn choose_image(an: *const Shape, i: i32, passmode: bool) -> Option<Sprite> {
+    unsafe {
+        let inum = (*an).index as i16;
+        let xstart = (*an).rel_x as i16;
+        let ystart = (*an).rel_y as i16;
+        let ground = ystart.wrapping_add(32);
+        let blank = Sprite {
+            atype: OBJECTS,
+            inum,
+            xstart,
+            ystart,
+            xstop: 0,
+            ystop: 0,
+            ground,
+        };
+        if passmode {
+            return Some(weapon_image(an, blank));
+        }
+        let (atype, inum) = body_image(an, i, inum)?;
+        Some(Sprite {
+            atype,
+            inum,
+            ..blank
+        })
+    }
+}
+
+/// The weapon's sprite: where it is held for this animation frame, and which image it is.
+unsafe fn weapon_image(an: *const Shape, mut sprite: Sprite) -> Sprite {
+    unsafe {
+        let mut kind = (*an).weapon as i16;
+        let frame_number = sprite.inum;
+        let is_bow_frame = kind == WEAPON_BOW as i16 && frame_number < BOW_FRAMES;
+        if is_bow_frame {
+            sprite.xstart += byte_of(&bow_x, frame_number);
+            sprite.ystart += byte_of(&bow_y, frame_number);
+        } else {
+            let entry = state_entry(frame_number);
+            sprite.xstart += entry.wpn_x as i16;
+            sprite.ystart += entry.wpn_y as i16;
+        }
+        if is_bow_frame {
+            let bow_phase = frame_number / 8;
+            sprite.inum = if bow_phase & 1 != 0 {
+                OBJ_BOW_UP
+            } else if bow_phase & 2 != 0 {
+                OBJ_BOW_MID
+            } else {
+                OBJ_BOW_DOWN
+            };
+        } else if kind == WEAPON_FIREBALL as i16 {
+            sprite.inum = (*an).facing as i16 + OBJ_ARROW_BASE;
+            if (*an).facing == 2 {
+                sprite.ystart -= 6;
+            }
+        } else {
+            // hand weapons: each kind has its own block of images
+            if let Some(&(_, base)) = WEAPON_SPRITE_BASE.iter().find(|(w, _)| *w as i16 == kind) {
+                kind = base;
+            }
+            sprite.inum = state_entry(frame_number).wpn_no as i16 + kind;
+        }
+        sprite.atype = OBJECTS;
+        sprite
+    }
+}
+
+/// The actor's own sprite sheet and image for this animation frame. `None` means nothing is drawn
+/// (a burnt body, or an object with no image).
+unsafe fn body_image(an: *const Shape, i: i32, mut inum: i16) -> Option<(i16, i16)> {
+    unsafe {
+        let mut atype = (*an).kind as i16;
+        if (atype == ENEMY && (*an).race != RACE_SPECTRE) || atype == PHIL {
+            if fiery_death != 0 && (*an).environ > 0 {
+                if (*an).state == DEAD {
+                    return None;
+                } else if (*an).state == DYING {
+                    // a body burning in the lava: nothing more to work out
+                    return Some((OBJECTS, OBJ_BURNING));
+                }
+            } else if (*an).state == FALL {
+                atype = if (*an).tactic < 16 { ENEMY } else { OBJECTS };
+            } else {
+                inum = state_entry(inum).figure as i16;
+            }
+            if (*an).race == RACE_SNAKE {
+                if (*an).state < DYING {
+                    inum += 0x24;
+                }
+            } else if i > 0 {
+                if (*an).race & 1 != 0 {
+                    inum |= 1;
+                } else {
+                    inum &= 0xfffeu16 as i16;
+                }
+            }
+        }
+        if atype == OBJECTS && (*an).race == 0 {
+            return None;
+        }
+        if atype == CARRIER && riding == 0 && loaded_actor_file == 11 {
+            atype = RAFT;
+            inum = 1;
+        }
+        Some((atype, inum))
+    }
+}
+
+/// The height of an image in lines: the sheet's, except for some small objects.
+fn image_height(atype: i16, inum: i16, sheet_height: i8) -> i8 {
+    let small_object = inum == 0x1b
+        || (8..=12).contains(&inum)
+        || inum == 25
+        || inum == 26
+        || (inum > 0x10 && inum < 0x18)
+        || (inum & 128) != 0;
+    if atype == OBJECTS && small_object {
+        8
+    } else {
+        sheet_height
+    }
+}
+
+/// Sinks the sprite into water, shortens it when the hero rides the swan, and so on. Returns false
+/// if nothing is left to draw.
+unsafe fn adjust_for_depth(
+    an: *const Shape,
+    i: i32,
+    cycle: i16,
+    passmode: bool,
+    sprite: &mut Sprite,
+) -> bool {
+    unsafe {
+        let depth = (*an).environ as i16;
+        if !passmode && sprite.atype != OBJECTS {
+            if i == 0 && riding == 11 {
+                sprite.ystop -= 16;
+            } else if depth == 2 {
+                sprite.ystop -= 10;
+            } else if depth > 29 {
+                if (*an).state == DEAD {
+                    return false;
+                }
+                // under the surface: only the bubbles show
+                sprite.ystart += 27;
+                sprite.ystop = sprite.ystart + 7;
+                sprite.atype = OBJECTS;
+                sprite.inum = OBJ_SUNK + ((cycle as i32 + i) & 1) as i16;
+            } else if depth > 2 {
+                sprite.ystart += depth;
+            }
+        } else {
+            if depth > 29 {
+                return false; // no weapon
+            }
+            if depth > 2 {
+                sprite.ystart += depth;
+                sprite.ystop += depth;
+                if sprite.ystop > sprite.ground {
+                    sprite.ystop = sprite.ground;
+                }
+                if sprite.ystart >= sprite.ground {
+                    return false;
+                }
+                sprite.ground += depth;
+            }
+        }
+        true
+    }
+}
+
+/// Reserves room to save the background under the sprite: a spare bit plane while they last (for
+/// small sprites), otherwise the page's save buffer. Returns false when the buffer is full.
+unsafe fn assign_background_save(frame: &mut Frame) -> bool {
+    unsafe {
+        let page = drawing_page;
+        if (*shp).savesize < SMALL_SAVE && frame.crack < SPARE_SAVES {
+            (*shp).backsave = (*planes.add(frame.crack as usize)).add(SPARE_PLANE_OFFSET);
+            frame.crack += 1;
+            return true;
+        }
+        (*shp).backsave = frame.backalloc;
+        let bytes = PLANES * (*shp).savesize as i32;
+        frame.backalloc = frame.backalloc.offset(bytes as isize);
+        (*page).saveused += bytes;
+        (*page).saveused < SAVE_LIMIT
     }
 }
 
@@ -532,5 +668,77 @@ unsafe fn mask_against_scenery(
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sprite_at(atype: i16, inum: i16, xstart: i16, ystart: i16, xstop: i16, ystop: i16) -> Sprite {
+        Sprite {
+            atype,
+            inum,
+            xstart,
+            ystart,
+            xstop,
+            ystop,
+            ground: ystart + 32,
+        }
+    }
+
+    #[test]
+    fn small_objects_are_eight_lines_high() {
+        for small in [0x1b, 8, 12, 25, 26, 0x11, 0x17, 0x80] {
+            assert_eq!(image_height(OBJECTS, small, 32), 8, "image {small}");
+        }
+    }
+
+    #[test]
+    fn other_images_keep_the_sheet_height() {
+        for big in [0, 7, 13, 24, 28, 0x10, 0x18] {
+            assert_eq!(image_height(OBJECTS, big, 32), 32, "image {big}");
+        }
+        // only objects have small images
+        assert_eq!(image_height(ENEMY, 0x1b, 32), 32);
+    }
+
+    #[test]
+    fn table_lookups_outside_the_table_give_zero() {
+        assert_eq!(byte_of(&bow_x, 0), bow_x[0] as i16);
+        assert_eq!(byte_of(&bow_y, 31), bow_y[31] as i16);
+        assert_eq!(byte_of(&bow_x, 32), 0);
+        assert_eq!(byte_of(&bow_x, -1), 0);
+    }
+
+    #[test]
+    fn a_sprite_inside_the_screen_is_not_cut() {
+        let mut sprite = sprite_at(PHIL, 5, 100, 50, 131, 81);
+        let clip = clip_to_screen(&mut sprite);
+        assert_eq!((clip.xstart, clip.ystart, clip.xstop, clip.ystop), (100, 50, 131, 81));
+        assert_eq!((clip.xoff, clip.yoff), (0, 0));
+    }
+
+    #[test]
+    fn a_sprite_over_the_left_and_top_edges_is_cut() {
+        let mut sprite = sprite_at(PHIL, 5, -5, -10, 26, 21);
+        let clip = clip_to_screen(&mut sprite);
+        assert_eq!((clip.xstart, clip.ystart), (0, 0));
+        assert_eq!((clip.xoff, clip.yoff), (5, 10));
+    }
+
+    #[test]
+    fn a_sprite_over_the_right_and_bottom_edges_stops_at_the_screen() {
+        let mut sprite = sprite_at(PHIL, 5, 300, 160, 331, 191);
+        let clip = clip_to_screen(&mut sprite);
+        assert_eq!((clip.xstop, clip.ystop), (SCREEN_RIGHT, SCREEN_BOTTOM));
+    }
+
+    #[test]
+    fn images_with_bit_seven_start_eight_lines_into_the_picture() {
+        let mut sprite = sprite_at(OBJECTS, 0x85, 10, 10, 25, 17);
+        let clip = clip_to_screen(&mut sprite);
+        assert_eq!(sprite.inum, 5);
+        assert_eq!(clip.yoff, 8);
     }
 }

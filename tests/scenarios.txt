@@ -17,3 +17,7 @@ witch_beam    | 900  |                |  | 700:tp:11000:36795
 rescue_scene  | 1500 |                |  | 700:tp:10840:35655
 win_ending    | 1200 | 760:T:3        |  | 700:tp:19298:16128,710:give:22:1
 
+# The hero wading into the sea: knee deep, sinking, and under water (the sprite shrinks to bubbles).
+water_wade    | 712  |                |  | 700:tp:23200:5550
+water_sinking | 745  |                |  | 700:tp:23200:5550
+water_drowned | 800  |                |  | 700:tp:23200:5550

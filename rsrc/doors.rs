@@ -9,7 +9,7 @@ use super::game_tables::loaded_blocks;
 use super::globals::{held_direction, view_status};
 use super::messages::print;
 
-/// Set after a locked door was bumped_locked_door, so "It's locked." is only said once until the hero moves on.
+/// Set after a locked door was bumped, so "It's locked." is only said once until the hero moves on.
 pub static mut bumped_locked_door: i8 = 0;
 
 /// The terrain type that marks a door.

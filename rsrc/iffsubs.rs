@@ -60,7 +60,7 @@ const SKIPPED_CHUNKS: [i32; 4] = [
     chunk_id(b"GRAB"),
 ];
 
-/// The ILBM bitmap current_chunk_id chunk; the file is big-endian. Only `width`, `height` and
+/// The ILBM bitmap header chunk; the file is big-endian. Only `width`, `height` and
 /// `compression` matter. (The C struct is 22 bytes although the IFF standard says 20; the
 /// difference is harmless because the file's own length is used when reading it.)
 #[repr(C)]

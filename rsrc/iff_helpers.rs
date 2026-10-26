@@ -5,7 +5,10 @@
 //! `unpack_line` unpacks one row of picture data, which is compressed with "ByteRun1" (the usual
 //! run-length scheme on the Amiga).
 
-use super::iffsubs::{chunk_length, row_byte_count, compression_type, bytes_left_in_file, current_chunk_id, picture_file, pack_cursor};
+use super::iffsubs::{
+    bytes_left_in_file, chunk_length, compression_type, current_chunk_id, pack_cursor,
+    picture_file, row_byte_count,
+};
 use crate::amiga::BPTR;
 
 unsafe extern "C" {
@@ -18,7 +21,11 @@ const CHUNK_FIELD_BYTES: i32 = 4;
 /// Reads a 4 byte chunk id; compared against the id string in memory, so no byte swap.
 pub fn read_chunk_id() {
     unsafe {
-        Read(picture_file as BPTR, (&raw mut current_chunk_id).cast(), CHUNK_FIELD_BYTES);
+        Read(
+            picture_file as BPTR,
+            (&raw mut current_chunk_id).cast(),
+            CHUNK_FIELD_BYTES,
+        );
         bytes_left_in_file -= CHUNK_FIELD_BYTES;
     }
 }

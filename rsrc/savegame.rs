@@ -1,7 +1,7 @@
 //! Saving and loading the game (from csrc/fmain2.c). The save file is written field by field in
 //! big-endian order, so it does not depend on how the C compiler laid out the variables.
 //!
-//! The same code does saving and loading: each `sl_*` function writes a value when `is_saving` is set
+//! The same code does saving and loading: each `transfer_*` function writes a value when `is_saving` is set
 //! and reads it back when it is clear. So the order of the calls in `save_all` is the file format:
 //! the misc variables, the region, the actors, the inventories and missiles, the extents and the
 //! object lists.

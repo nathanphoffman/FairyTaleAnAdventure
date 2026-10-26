@@ -262,3 +262,15 @@ pub fn queue_missile_sprites() {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn distance_is_the_larger_axis() {
+        assert_eq!(chebyshev(3, -5), 5);
+        assert_eq!(chebyshev(-7, 2), 7);
+        assert_eq!(chebyshev(0, 0), 0);
+    }
+}

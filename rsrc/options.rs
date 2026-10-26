@@ -20,7 +20,7 @@ use super::messages::{print, print_cont, print_wrapped};
 use super::mood::set_mood;
 use super::objects::{SetFigEntry, leave_item};
 use super::random::rand64;
-use super::savegame::{savegame, is_saving};
+use super::savegame::{is_saving, savegame};
 use super::tables::{jtrans, ob_list8, ob_listg};
 use super::types::{InvItem, Shape};
 

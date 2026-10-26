@@ -446,3 +446,96 @@ pub static mut brother_stats: [Bro; 3] = [
     Bro { brave: 20, luck: 35, kind: 15, wealth: 15, stuff: &raw mut philstuff as *mut u8 },
     Bro { brave: 15, luck: 20, kind: 35, wealth: 10, stuff: &raw mut kevstuff as *mut u8 },
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ffi::CStr;
+    use std::collections::HashSet;
+
+    #[test]
+    fn doors_are_sorted_by_x_for_the_binary_search() {
+        let doors = unsafe { &*(&raw const door_list) };
+        for pair in doors.windows(2) {
+            assert!(pair[0].xc1 <= pair[1].xc1, "door at x {} is out of order", pair[1].xc1);
+        }
+    }
+
+    /// The "around village" extent (20) has its top below its bottom in the original data, so no
+    /// point is ever inside it. The port keeps that as it was.
+    const INVERTED_EXTENT: usize = 20;
+
+    #[test]
+    fn extents_are_proper_rectangles() {
+        let extents = unsafe { &*(&raw const extent_list) };
+        for (n, e) in extents.iter().enumerate() {
+            if n == INVERTED_EXTENT {
+                assert!(e.y1 > e.y2, "the quirk of extent {n} is gone; update this test");
+            } else {
+                assert!(e.x1 <= e.x2 && e.y1 <= e.y2, "extent {n}");
+            }
+        }
+    }
+
+    #[test]
+    fn menu_labels_cover_all_the_entries() {
+        // Entries 0-4 are the menu names; every entry after that has a 5 character label.
+        let all_menus = unsafe { &*(&raw const menus) };
+        for (n, menu) in all_menus.iter().enumerate() {
+            let label = unsafe { CStr::from_ptr(menu.label_list) };
+            let needed = (menu.num as usize).saturating_sub(5) * 5;
+            assert!(label.to_bytes().len() >= needed, "menu {n}");
+            assert!(menu.num as usize <= menu.enabled.len(), "menu {n}");
+        }
+    }
+
+    #[test]
+    fn every_shortcut_key_picks_a_real_entry() {
+        let all_menus = unsafe { &*(&raw const menus) };
+        let shortcuts = unsafe { &*(&raw const menu_shortcuts) };
+        let mut seen = HashSet::new();
+        for shortcut in shortcuts {
+            let menu = &all_menus[shortcut.menu as usize];
+            assert!(shortcut.choice < menu.num, "key {}", shortcut.letter);
+            assert!(seen.insert((shortcut.letter, shortcut.menu)), "key {} twice", shortcut.letter);
+        }
+    }
+
+    #[test]
+    fn swing_transitions_lead_to_swing_states() {
+        let transitions = unsafe { &*(&raw const swing_transitions) };
+        for (state, next) in transitions.iter().enumerate() {
+            for &to in next {
+                assert!((0..=8).contains(&to), "state {state} goes to {to}");
+            }
+        }
+    }
+
+    #[test]
+    fn every_item_has_a_name() {
+        let items = unsafe { &*(&raw const item_list) };
+        assert_eq!(items.len(), 36);
+        for (n, item) in items.iter().enumerate() {
+            let name = unsafe { CStr::from_ptr(item.name) };
+            assert!(!name.to_bytes().is_empty(), "item {n}");
+        }
+        assert_eq!(unsafe { CStr::from_ptr(items[0].name) }.to_str(), Ok("Dirk"));
+    }
+
+    #[test]
+    fn the_brothers_have_their_own_item_lists() {
+        let brothers = unsafe { &*(&raw const brother_stats) };
+        let lists: HashSet<_> = brothers.iter().map(|b| b.stuff as usize).collect();
+        assert_eq!(lists.len(), 3);
+        let names = unsafe { &*(&raw const brother_names) };
+        assert_eq!(unsafe { CStr::from_ptr(names[0]) }.to_str(), Ok("Julian"));
+    }
+
+    #[test]
+    fn monsters_use_the_enemy_sprite_files() {
+        let chart = unsafe { &*(&raw const encounter_chart) };
+        for (n, monster) in chart.iter().enumerate() {
+            assert!((6..=9).contains(&monster.file_id), "monster {n}");
+        }
+    }
+}

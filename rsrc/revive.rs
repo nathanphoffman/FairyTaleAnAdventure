@@ -94,6 +94,42 @@ const HERO_SET_FILE: i16 = 13;
 pub fn revive(new: i16) {
     unsafe {
         let list = (&raw mut actor_list).cast::<Shape>();
+        place_raft_and_setfig(list);
+
+        let hero = list;
+        (*hero).kind = PHIL;
+        (*hero).goal = USER; // yes, we can usurp control from the user
+
+        reset_input();
+        battle_flag = 0;
+        good_fairy_timer = 0;
+        next_missile = 0;
+        if new != 0 {
+            stopscore();
+            leave_fallen_brother();
+            take_over_next_brother(hero);
+            show_brother_placards();
+            announce_brother();
+        } else {
+            fade_down();
+        }
+
+        put_hero_at_safe_spot(hero);
+        restore_hero(hero);
+        if brother > 3 {
+            view_status = VIEW_GAME_OVER;
+        } else {
+            view_status = VIEW_FADE_IN;
+            set_mood(1);
+        }
+        extent_type = 0;
+        fiery_death = 0;
+    }
+}
+
+/// Puts the raft and the first person back where they start.
+unsafe fn place_raft_and_setfig(list: *mut Shape) {
+    unsafe {
         let raft = list.add(1);
         (*raft).kind = RAFT;
         (*raft).abs_x = RAFT_START.0;
@@ -108,105 +144,118 @@ pub fn revive(new: i16) {
         (*setfig).abs_y = SETFIG_START.1;
         (*setfig).index = 0;
         (*setfig).weapon = 0;
+    }
+}
 
-        let hero = list;
-        (*hero).kind = PHIL;
-        (*hero).goal = USER; // yes, we can usurp control from the user
+/// The fallen brother's body is left where he died, and his ghost appears.
+unsafe fn leave_fallen_brother() {
+    unsafe {
+        if brother > 0 && brother < 3 {
+            ob_listg[brother as usize].xc = hero_x;
+            ob_listg[brother as usize].yc = hero_y;
+            ob_listg[brother as usize].ob_stat = ON_GROUND;
+            ob_listg[brother as usize + DEAD_BROTHER_PERSON].ob_stat = PERSON;
+        }
+        ob_list8[SPECTRE_SLOT].ob_stat = PERSON;
+    }
+}
 
-        reset_input();
-        battle_flag = 0;
-        good_fairy_timer = 0;
-        next_missile = 0;
-        if new != 0 {
-            stopscore();
-            if brother > 0 && brother < 3 {
-                // the fallen brother's body is left where he died, and his ghost appears
-                ob_listg[brother as usize].xc = hero_x;
-                ob_listg[brother as usize].yc = hero_y;
-                ob_listg[brother as usize].ob_stat = ON_GROUND;
-                ob_listg[brother as usize + DEAD_BROTHER_PERSON].ob_stat = PERSON;
-            }
-            ob_list8[SPECTRE_SLOT].ob_stat = PERSON;
-            let next = &brother_stats[brother as usize];
-            brave = next.brave as i16;
-            luck = next.luck as i16;
-            hero_kind = next.kind as i16;
-            wealth = next.wealth as i16;
-            stuff = next.stuff;
-            brother += 1;
+/// The next brother takes over: his stats and item list, nothing in the timers, and the first
+/// safe spot.
+unsafe fn take_over_next_brother(hero: *mut Shape) {
+    unsafe {
+        let next = &brother_stats[brother as usize];
+        brave = next.brave as i16;
+        luck = next.luck as i16;
+        hero_kind = next.kind as i16;
+        wealth = next.wealth as i16;
+        stuff = next.stuff;
+        brother += 1;
 
-            for slot in 0..GOLDBASE {
-                *stuff.add(slot) = 0; // has no stuff
-            }
-            *stuff = 1; // okay, a dirk, then
-            (*hero).weapon = 1;
+        for slot in 0..GOLDBASE {
+            *stuff.add(slot) = 0; // has no stuff
+        }
+        *stuff = 1; // okay, a dirk, then
+        (*hero).weapon = 1;
 
-            secret_timer = 0;
-            light_timer = 0;
-            freeze_timer = 0;
-            safe_x = FIRST_SAFE_SPOT.0;
-            safe_y = FIRST_SAFE_SPOT.1;
-            safe_r = FIRST_REGION;
-            region_num = FIRST_REGION;
-            move_camera_to(safe_x as i32, safe_y as i32);
-            view_status = VIEW_REDRAW;
-            actors_on_screen = 1;
-            actors_loading = 0;
+        secret_timer = 0;
+        light_timer = 0;
+        freeze_timer = 0;
+        safe_x = FIRST_SAFE_SPOT.0;
+        safe_y = FIRST_SAFE_SPOT.1;
+        safe_r = FIRST_REGION;
+        region_num = FIRST_REGION;
+        move_camera_to(safe_x as i32, safe_y as i32);
+        view_status = VIEW_REDRAW;
+        actors_on_screen = 1;
+        actors_loading = 0;
+    }
+}
 
-            map_message();
-            SetFont(current_rastport, story_font);
-            if brother == 1 {
-                placard_text(0);
-                rp_map.BitMap = (*(*drawing_page).ri_page).BitMap;
-                SetRast(&raw mut rp_map, PEN_BLACK);
-                rp_map.BitMap = (*(*viewing_page).ri_page).BitMap;
-            } else if brother == 2 {
-                placard_text(1);
-            } else if brother == 3 {
-                placard_text(3);
-            } else {
-                placard_text(5);
-            }
-
-            draw_placard_border();
-            Delay(SHOW_PLACARD);
-
-            if brother > LAST_BROTHER {
-                quit_requested = 1;
-                Delay(GAME_OVER_PAUSE);
-            } else if brother > 1 {
-                Delay(SHORT_PAUSE);
-                SetAPen(current_rastport, PEN_BLACK);
-                RectFill(current_rastport, PANEL.0, PANEL.1, PANEL.2, PANEL.3);
-                Delay(TINY_PAUSE);
-                SetAPen(current_rastport, PEN_TEXT);
-                placard_text(if brother == 2 { 2 } else { 4 });
-                Delay(SHOW_PLACARD);
-            }
-
-            SetFont(current_rastport, panel_font);
-            current_rastport = &raw mut rp_text;
-
-            loaded_actor_file = HERO_SPRITE_FILE;
-            loaded_setfig_file = HERO_SET_FILE;
-            load_start_sprites();
-
-            if brother < 4 {
-                message_off();
-                hero_place = START_PLACE;
-                show_event(9);
-                if brother == 1 {
-                    print_cont(c".".as_ptr());
-                } else if brother == 2 {
-                    show_event(10);
-                } else if brother == 3 {
-                    show_event(11);
-                }
-            }
+/// The story pages between brothers (and the game over page after the last).
+unsafe fn show_brother_placards() {
+    unsafe {
+        map_message();
+        SetFont(current_rastport, story_font);
+        if brother == 1 {
+            placard_text(0);
+            rp_map.BitMap = (*(*drawing_page).ri_page).BitMap;
+            SetRast(&raw mut rp_map, PEN_BLACK);
+            rp_map.BitMap = (*(*viewing_page).ri_page).BitMap;
+        } else if brother == 2 {
+            placard_text(1);
+        } else if brother == 3 {
+            placard_text(3);
         } else {
-            fade_down();
+            placard_text(5);
         }
 
+        draw_placard_border();
+        Delay(SHOW_PLACARD);
+
+        if brother > LAST_BROTHER {
+            quit_requested = 1;
+            Delay(GAME_OVER_PAUSE);
+        } else if brother > 1 {
+            Delay(SHORT_PAUSE);
+            SetAPen(current_rastport, PEN_BLACK);
+            RectFill(current_rastport, PANEL.0, PANEL.1, PANEL.2, PANEL.3);
+            Delay(TINY_PAUSE);
+            SetAPen(current_rastport, PEN_TEXT);
+            placard_text(if brother == 2 { 2 } else { 4 });
+            Delay(SHOW_PLACARD);
+        }
+    }
+}
+
+/// Loads the brother's sprites and tells where the story starts.
+unsafe fn announce_brother() {
+    unsafe {
+        SetFont(current_rastport, panel_font);
+        current_rastport = &raw mut rp_text;
+
+        loaded_actor_file = HERO_SPRITE_FILE;
+        loaded_setfig_file = HERO_SET_FILE;
+        load_start_sprites();
+
+        if brother < 4 {
+            message_off();
+            hero_place = START_PLACE;
+            show_event(9);
+            if brother == 1 {
+                print_cont(c".".as_ptr());
+            } else if brother == 2 {
+                show_event(10);
+            } else if brother == 3 {
+                show_event(11);
+            }
+        }
+    }
+}
+
+/// The hero (re)appears at the last safe spot, and the region there is loaded.
+unsafe fn put_hero_at_safe_spot(hero: *mut Shape) {
+    unsafe {
         hero_x = safe_x;
         (*hero).abs_x = safe_x;
         hero_y = safe_y;
@@ -215,6 +264,12 @@ pub fn revive(new: i16) {
         map_y = hero_y.wrapping_sub(CAMERA_OFFSET.1);
         new_region = safe_r;
         load_region_now();
+    }
+}
+
+/// Fresh health, a new day, and no hunger or tiredness.
+unsafe fn restore_hero(hero: *mut Shape) {
+    unsafe {
         (*hero).vitality = 15 + brave / 4;
         (*hero).environ = 0;
         (*hero).state = STILL;
@@ -227,13 +282,5 @@ pub fn revive(new: i16) {
         update_menu_availability();
         queue_print(PRQ_VITALITY);
         queue_print(PRQ_STATS);
-        if brother > 3 {
-            view_status = VIEW_GAME_OVER;
-        } else {
-            view_status = VIEW_FADE_IN;
-            set_mood(1);
-        }
-        extent_type = 0;
-        fiery_death = 0;
     }
 }
