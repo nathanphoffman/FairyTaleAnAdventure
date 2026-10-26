@@ -18,6 +18,16 @@
 pub mod iff_helpers;
 // Loads an IFF picture into a bitmap.
 pub mod iffsubs;
+// Opening doors with keys.
+pub mod doors;
+// Placing monsters and carriers, and deaths.
+pub mod encounters;
+// Choosing the music.
+pub mod mood;
+// Moving the hero and working out where it is.
+pub mod places;
+// Bringing the hero or the next brother back.
+pub mod revive;
 // Showing the finished page, the input device.
 pub mod display;
 // The text-panel menus.

@@ -28,6 +28,11 @@ unsafe extern "C" {
     fn DoIO(io: *mut c_void) -> i32;
 }
 
+/// Empties the key buffer (the hero is being revived, so old key presses are dropped).
+pub fn reset_input() {
+    reset_key_buffer();
+}
+
 const INPUT_DEVICE: &[u8] = b"input.device\0";
 
 /// The port and request used to talk to the input device.

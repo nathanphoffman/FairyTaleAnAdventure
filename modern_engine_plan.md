@@ -141,9 +141,10 @@ stays in `fmain.c` inside `#ifndef RSRC_<GROUP>` (macro defined in `build.rs`).
 - [x] Small leftovers: `menus.rs` (`set_options`, `gomenu`), `loading.rs` (`read_sample`, `effect`),
       `actors.rs` (`get_turtle`), `savegame.rs` (`mod1save`), `display.rs` (`pagechange`,
       `add_device`, `wrap_device`). `Menu` and `Bro` structs added to `types.rs`.
-- [ ] More functions found in `fmain.c` that were missing from this list: `doorfind`, `xfer`,
-      `find_place`, `set_encounter`, `checkdead`, `load_carrier`, `revive`, `screen_size`, `setmood`,
-      `propt`, `do_option`, `handle_key`, `update_hero`.
+- [x] Mid-sized functions: `doors.rs` (`doorfind`, `open_list`, `bumped`), `places.rs` (`xfer`,
+      `find_place`), `encounters.rs` (`set_encounter`, `checkdead`, `load_carrier`), `revive.rs`
+      (`revive`), `mood.rs` (`setmood`), `screen_fx.rs` (`screen_size`).
+- [ ] Still to port from the earlier missed list: `propt`, `do_option`, `handle_key`, `update_hero`.
 - [ ] `open_all`, `close_all`, `load_actors`, `print_options`.
 - [ ] The `main()` pieces: `move_actor`, `draw_sprites`, world update, combat, and so on.
 Not covered by the regression scenarios yet: `win_colors`, `rescue`, `witch_fx`, the trackdisk

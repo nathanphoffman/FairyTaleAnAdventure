@@ -1037,11 +1037,16 @@ read_sample()
 /* subroutine for opening doors */
 
 extern char skipp;
+#ifndef RSRC_DOORS /* PORT: ported to rsrc/doors.rs */
 char bumped;
+#else
+extern char bumped;
+#endif /* RSRC_DOORS */
 enum ky {NOKEY=0, GOLD, GREEN, KBLUE, RED, GREY, WHITE};
 
 /* add more door types like gates, etc */
 
+#ifndef RSRC_DOORS /* PORT: ported to rsrc/doors.rs */
 /* open doors */
 struct door_open {
 	UBYTE	door_id;
@@ -1068,9 +1073,11 @@ struct door_open {
 	{165, 800,  85, 86, 4, GREEN }, /* CABINET */
 	{210, 840, 208,209, 2, NOKEY }  /* BLUE */
 };
+#endif /* RSRC_DOORS */
 
 UBYTE *mapxy();
 
+#ifndef RSRC_DOORS /* PORT: ported to rsrc/doors.rs */
 doorfind(x,y,keytype) register USHORT x,y; register ULONG keytype;
 {	UBYTE sec_id; short reg_id, j, k; register ULONG l;
 	if (px_to_im(x,y)==15) goto found;
@@ -1116,6 +1123,7 @@ found:
 	bumped = 1;
 	return FALSE;
 }
+#endif /* RSRC_DOORS */
 
 extern char titletext[];
 
@@ -2775,6 +2783,7 @@ quit_all:
 
 /* asm */
 
+#ifndef RSRC_PLACES /* PORT: ported to rsrc/places.rs */
 xfer(xtest,ytest,flag) register USHORT xtest, ytest, flag;
 {	map_x += (xtest-hero_x);
 	map_y += (ytest-hero_y);
@@ -2796,7 +2805,9 @@ xfer(xtest,ytest,flag) register USHORT xtest, ytest, flag;
 	setmood(TRUE);
 	while (proxcheck(hero_x,hero_y,0)) hero_y++;
 }
+#endif /* RSRC_PLACES */
 
+#ifndef RSRC_PLACES /* PORT: ported to rsrc/places.rs */
 find_place(flag) short flag;
 {	register UBYTE *tbl; char *ms; register long i;
 
@@ -2872,6 +2883,7 @@ find_place(flag) short flag;
 		(!active_carrier || (!riding && actor_file != extn->v3)) )
 			load_carrier(extn->v3);
 }
+#endif /* RSRC_PLACES */
 
 load_actors()
 {	encounter_number = extn->v1 + rnd(extn->v2);
@@ -2887,6 +2899,7 @@ load_actors()
 
 #define MAX_TRY 15
 
+#ifndef RSRC_ENCOUNTERS /* PORT: ported to rsrc/encounters.rs */
 set_encounter(i,spread) USHORT i, spread;
 {	register struct shape *an; USHORT xtest, ytest;
 	register long race, w, j;
@@ -2919,7 +2932,9 @@ set_encounter(i,spread) USHORT i, spread;
 	an->rel_y = an->abs_y - map_y - 26;
 	return TRUE;
 }
+#endif /* RSRC_ENCOUNTERS */
 
+#ifndef RSRC_ENCOUNTERS /* PORT: ported to rsrc/encounters.rs */
 checkdead(i,dtype) register long i, dtype;
 {	register struct shape *an;
 	an = &(anim_list[i]);
@@ -2934,7 +2949,9 @@ checkdead(i,dtype) register long i, dtype;
 	}
 	if (i == 0) prq(4);
 }
+#endif /* RSRC_ENCOUNTERS */
 
+#ifndef RSRC_ENCOUNTERS /* PORT: ported to rsrc/encounters.rs */
 load_carrier(n) short n;
 {	register struct shape *an;
 	register long i;
@@ -2954,6 +2971,7 @@ load_carrier(n) short n;
 	anix = 4;
 	an->race = actor_file = active_carrier = n;
 }
+#endif /* RSRC_ENCOUNTERS */
 
 /* this is the death routine for the main character */
 
@@ -2965,6 +2983,7 @@ struct bro {
 	{ 20,35,15,15,philstuff },	/* phillip's attributes */
 	{ 15,20,35,10,kevstuff } };	/* kevin's attributes */
 
+#ifndef RSRC_REVIVE /* PORT: ported to rsrc/revive.rs */
 revive(new) short new;
 {	/* new tells if this is a new character */
 	register struct bro *br;
@@ -3064,7 +3083,9 @@ revive(new) short new;
 	if (brother > 3) viewstatus = 2; else { viewstatus = 3; setmood(TRUE); }
 	fiery_death = xtype = 0;
 }
+#endif /* RSRC_REVIVE */
 
+#ifndef RSRC_SCREEN_SIZE /* PORT: ported to rsrc/screen_fx.rs */
 screen_size(x) register long x;
 {	register long y;
 
@@ -3086,7 +3107,9 @@ screen_size(x) register long x;
 	MakeVPort( &v, &vp_text );
 	pagechange();
 }
+#endif /* RSRC_SCREEN_SIZE */
 
+#ifndef RSRC_MOOD /* PORT: ported to rsrc/mood.rs */
 setmood(now) char now;
 {	register long off;
 	if (anim_list[0].vitality == 0) off = (6*4);
@@ -3109,6 +3132,7 @@ setmood(now) char now;
 	}
 	else stopscore();
 }
+#endif /* RSRC_MOOD */
 
 #ifndef RSRC_REGIONS /* PORT: ported to rsrc/regions.rs */
 gen_mini()

@@ -12,7 +12,7 @@ use super::messages::{name, print};
 use super::random::bitrand;
 use super::tables::{comptable, fader, pagecolors, pplay, prec, print_que, sun_colors};
 use super::types::{FPage, Shape};
-use crate::amiga::{BitMap, RastPort, ViewPort};
+use crate::amiga::{BitMap, RasInfo, RastPort, View, ViewPort};
 
 unsafe extern "C" {
     static blackcolors: [i16; 32];
@@ -65,7 +65,11 @@ unsafe extern "C" {
     fn AvailMem(flags: u32) -> u32;
     fn print_options() -> i32;
     fn pagechange();
-    fn screen_size(x: i32) -> i32;
+    fn MakeVPort(view: *mut View, port: *mut ViewPort) -> i32;
+    static mut ri_page1: RasInfo;
+    static mut ri_page2: RasInfo;
+    static mut v: View;
+    static introcolors: [u16; 0];
 }
 
 const BLIT_COPY: u32 = 0xC0;
@@ -357,7 +361,7 @@ pub extern "C" fn win_colors() {
         LoadRGB4(&raw mut vp_page, blackcolors.as_ptr().cast(), COLOR_COUNT as i32);
         LoadRGB4(&raw mut vp_text, blackcolors.as_ptr().cast(), COLOR_COUNT as i32);
         vp_text.Modes = HIRES | SPRITES | VP_HIDE;
-        screen_size(WIN_SCREEN_SIZE);
+        screen_size(WIN_SCREEN_SIZE as i64);
         for i in (SUNRISE_END + 1..=SUNRISE_START).rev() {
             fader[0] = 0;
             fader[31] = 0;
@@ -427,5 +431,39 @@ mod tests {
         assert_eq!(down.first(), Some(&100));
         assert_eq!(down.last(), Some(&0));
         assert_eq!(down.len(), 21);
+    }
+}
+
+/// The size of the picture during the intro's zoom: `x` is half the width in pixels (0 to 160),
+/// the height keeps the 8:5 shape. Moves the page and text view ports to match, fades the colours
+/// with the size (black when small), and shows the result.
+#[unsafe(no_mangle)]
+pub extern "C" fn screen_size(x: i64) {
+    unsafe {
+        let y = (x * 5) / 8;
+
+        Delay(2);
+
+        let left = (160 - x) as i16;
+        ri_page2.RxOffset = left;
+        ri_page1.RxOffset = left;
+        vp_page.DxOffset = left;
+        vp_page.DWidth = (x + x) as i16;
+
+        let top = (100 - y) as i16;
+        ri_page2.RyOffset = top;
+        ri_page1.RyOffset = top;
+        vp_page.DyOffset = top;
+        vp_page.DHeight = (y + y) as i16;
+
+        vp_text.DxOffset = 0;
+        vp_text.DyOffset = 0;
+        vp_text.DHeight = (95 - y) as i16;
+
+        let colors = (&raw const introcolors).cast::<u16>();
+        fade_page((y * 2 - 40) as i16, (y * 2 - 70) as i16, (y * 2 - 100) as i16, 0, colors);
+
+        MakeVPort(&raw mut v, &raw mut vp_text);
+        pagechange();
     }
 }

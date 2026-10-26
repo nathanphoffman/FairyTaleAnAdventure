@@ -40,6 +40,12 @@ fn main() {
         .define("RSRC_CARRIER", None)
         .define("RSRC_MENUS", None)
         .define("RSRC_SAVE", None)
+        .define("RSRC_DOORS", None)
+        .define("RSRC_PLACES", None)
+        .define("RSRC_ENCOUNTERS", None)
+        .define("RSRC_REVIVE", None)
+        .define("RSRC_SCREEN_SIZE", None)
+        .define("RSRC_MOOD", None)
         // the C file with the game's main() is called from Rust as fta_main()
         .define("main", "fta_main")
         .compile("fta_c");
