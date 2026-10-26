@@ -2101,6 +2101,7 @@ static void draw_sprites(cycle) short cycle;
 	}
 }
 
+#ifndef RSRC_MOVE_ACTOR /* PORT: ported to rsrc/move_actor.rs */
 /* PORT: split out of main(): moves and animates one actor (hero, raft, carrier, setfig, enemy), sets
    its sprite index and terrain state (environ), and its position on screen. i = index in anim_list,
    cycle = frame counter. *jp is main's j: it carries the last terrain value from one actor to the next
@@ -2509,6 +2510,9 @@ static void move_actor(i, cycle, jp) long i; short cycle; short *jp;
 	}
 	*jp = j;
 }
+#else
+void move_actor(long i, short cycle, short *jp);
+#endif /* RSRC_MOVE_ACTOR */
 
 void main(int argc,char argv[])
 {	register long i;

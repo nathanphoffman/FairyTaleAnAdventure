@@ -159,7 +159,7 @@ yet: swan/turtle, key doors, searching a body, the freeze and fear spells, `win_
 
 #### Roadmap: what is left in `csrc/fmain.c`
 About 1,300 lines of functions (A and B are done) plus the data tables at the top. Six groups, in this
-order; four are left. Sizes are the C line counts.
+order; three are left. Sizes are the C line counts.
 - [x] **A. Menus and keys (~600).** Done: `propt` in `menus.rs`; `do_option` in `options.rs`
       (talk, buy, game, use, keys, save, give) with the Items menu in `items_menu.rs` and the Magic
       menu in `magic.rs`; `handle_key` and `update_hero` in `keys.rs` (guards `RSRC_MENUS`,
@@ -172,12 +172,13 @@ order; four are left. Sizes are the C line counts.
       (`actor_ai`). One C guard, `RSRC_WORLD`, with prototypes in the `#else`. `doorlist` stays in C
       until group F (`Door` mirror added to `types.rs`). Two original quirks are kept on purpose: the
       missile dodge test uses the missile's own index, and the melee carrier test looks at the attacker.
-- [ ] **C. `move_actor` (~400).** The riskiest: moves and animates every actor (hero, raft, carriers,
-      people, enemies), with many `goto` labels (`statc`, `raise`, `cpx`, `newloc`, `blocked`,
-      `checkdev1/2`). Port it as one function first, using a loop plus `match` for the jumps, then
-      split by actor kind only after it passes. Remember the stale-`j`/`xtest`/`ytest` rule (step 2).
-      Add scenarios for swan/turtle and key doors before this one, since it covers those paths (this
-      is the next thing to do; use the worktree comparison from step 3 above).
+- [x] **C. `move_actor` (~400).** Done: `move_actor.rs` (guard `RSRC_MOVE_ACTOR`, prototype in the C
+      `#else`). Each `goto` label of the C is a `Pc` value and each stretch between labels a method
+      (`dragon`, `carrier`, `setfig`, `raft`, `walking`, `new_loc`, `shooting`, `tail`, `raise`, ...),
+      so the order of the original is kept. `xtest`/`ytest` are statics and `j` is passed by pointer
+      (step 2). Quirks kept: the dragon's image is always 0, the `an->state == STILL` no-op for race 7.
+      Scenarios added: `swan_ride`, `swan_no_lasso`, `turtle_shell`, `door_locked`, `door_wood`; their
+      state hashes were identical on a worktree build of the C `move_actor`.
 - [ ] **D. Drawing (~260).** `draw_sprites` (~230: clipping, weapon pass, masking against scenery,
       background save) and `repair_map_and_witch` (~20). Uses the blitter already in `asm_blit.rs`.
       `main()` sets `j = anix2` after the call (see step 2); keep that.

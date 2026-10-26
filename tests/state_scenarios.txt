@@ -30,3 +30,10 @@ desert_statues   | 900  |  |  | 690:give:25:5,700:tp:6820:19360
 hunger_events    | 1400 |  |  | 700:stat:0:143
 hunger_fruit     | 1400 |  |  | 700:give:24:1,710:stat:0:40
 spells_2         | 1200 | 900:F6:3,960:F7:3 |  | 710:give:14:1,711:give:15:1,800:tp:19700:17250
+
+# Added with the move_actor port: swan ride, turtle (shell), locked and open doors walked into.
+swan_ride        | 1100 | 800:Right:60,900:Up:60 |  | 700:tp:2370:27440,710:give:5:1
+swan_no_lasso    | 1000 | 800:Right:60 |  | 700:tp:2370:27440
+turtle_shell     | 1100 | 760:U:3,800:7:3,900:Right:40 |  | 700:tp:23000:5700,710:give:6:1
+door_locked      | 1000 | 800:Up:80 |  | 700:tp:7792:15230
+door_wood        | 1000 | 800:Up:80 |  | 700:tp:9344:13230

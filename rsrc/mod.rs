@@ -46,6 +46,8 @@ pub mod world;
 pub mod combat;
 // What each enemy decides to do.
 pub mod ai;
+// Moving and animating each actor every frame.
+pub mod move_actor;
 // Hits, collision between actors, enemy tactics.
 pub mod actors;
 // The sprite blitter, done in software.
