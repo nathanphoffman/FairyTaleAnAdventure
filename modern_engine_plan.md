@@ -159,6 +159,18 @@ Decision for `fmain.c`: cut `main()` into functions in `csrc/` first (step 2, th
 port the pieces to `rsrc/`. This is the one exception to "csrc is never edited": only step-2 cuts, with
 no behaviour change. Do the cuts before starting `fmain.c` in `rsrc/`; `fmain2.c` can be ported earlier.
 
+### Keeping an all-C "original" build possible
+Idea, not scheduled: a launcher that offers "Original" (the C game logic) next to the Rust-ported game.
+Nothing in `csrc/` is deleted: the ported functions stay in the C files inside `#ifndef RSRC_*`, so
+turning the `RSRC_*` defines off compiles the original C again. Rust and C define the same function
+names, so both cannot be in one binary; the launcher would start one of two builds (for example a
+`cargo` feature that compiles every C file and leaves out the Rust game modules).
+Limits: the C still uses the Rust platform layer (SDL window, sound, files), so it is the original
+game logic on the new platform, not an Amiga build. The `main()` cuts and `cycle = 0` are the only
+edits to the C beyond the guards.
+To stop it drifting: when a file is ported, keep its C inside the guard (do not delete it), and once
+in a while build with the `RSRC_*` defines off and run the tests on that build.
+
 ### 5. Classic engine: original and improved
 Move the planar drawing code (`asm_blit.c`, `asm_map.c`) into `fta-engine-classic`. Build
 `games/original`. Add `games/improved` options (free mouse, rebinds) on top.
