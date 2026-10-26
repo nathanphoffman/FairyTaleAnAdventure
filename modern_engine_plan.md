@@ -77,7 +77,7 @@ How to do one cut (kept for reference; the method that worked):
    assigning it first, it carries a value from this block: pass it by pointer or make it static.
 3. `continue`, `break`, `goto`, `return` that jump out of the block stay in `main()`.
 4. Do not change logic, order or names.
-5. Run both test scripts. Several cuts may share one test run, but keep one commit per cut or batch.
+5. Run both test scripts. Several cuts may share one test run. (Commits are made by the user, see the handoff.)
    If a state test goes `DIFF` and the run is not deterministic (two runs of the same binary differ),
    the cause is an uninitialised variable. Bisect by applying the cuts one at a time.
 
@@ -118,8 +118,8 @@ Done files: `random`, `iff_helpers`, `input`, `iffsubs`, `hdrive`, `asm_blit`, `
    "duplicate symbol", a missing function as an undefined symbol). Then `cargo test`, then
    `tests/regress.sh` and `tests/state_regress.sh`. Run them in the background, about 10 minutes together.
    All 10 pixel tests and all 25 state scenarios must say `ok`; any `DIFF` means fix or undo.
-4. Update this plan, commit (one commit per group). Commit messages end with the Claude
-   `Co-Authored-By` line.
+4. Update this plan. **Do not commit: the user makes the commits.** Leave the changes in the working
+   tree, say what changed, and suggest a one-line commit message (one commit per group is the idea).
 
 **Rules of thumb that avoided bugs.**
 - C `long` is 64 bit, `LONG` is `i32`, `short` is `i16`, `char` is signed (`i8`). `USHORT` arithmetic
