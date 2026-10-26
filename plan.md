@@ -149,7 +149,7 @@ and each file is ported into `rsrc/`. Move modules one at a time, with the game 
 - [x] `asm_port.c`, `input.c`, `iffsubs.c`, `hdrive.c`
 - [x] `asm_blit.c`, `asm_text.c`, `asm_map.c`, `asm_stubs.c`
 - [x] `fmain2.c` (functions and data tables)
-- [ ] `fmain.c` (largest, split into modules as it moves)
+- [ ] `fmain.c` (about 60% done; the remaining groups A-F are in `modern_engine_plan.md`, section 4a)
 
 ### Phase 8 - Polish
 - [x] Window scaling and fullscreen, correct aspect ratio. (F11, resizable; gamepad added too)
