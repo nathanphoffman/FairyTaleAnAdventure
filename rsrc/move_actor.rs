@@ -6,22 +6,25 @@
 //! The C used `goto` to jump between the actor kinds. Each label became a `Pc` value and each stretch
 //! of code between labels a method that returns the next `Pc`, so the order of the original is kept.
 
-use super::actors::{move_extent, proxcheck};
-use super::asm_map::{map_adjust, newx, newy, px_to_im, wrap};
-use super::asm_text::set_course;
-use super::doors::{bumped, doorfind};
-use super::encounters::checkdead;
-use super::loading::effect;
+use super::actors::{blocked_at, center_extent_on};
+use super::asm_map::{move_camera_to, step_x, step_y, terrain_at, wrap_coordinate};
+use super::asm_text::steer_actor;
+use super::doors::{bumped_locked_door, open_door_near};
+use super::encounters::check_death;
+use super::game_tables::{facing_frame_offsets, region_num, setfig_table, swing_transitions};
+use super::globals::{
+    actor_list, brother, carrier_slot, extent_type, fiery_death, freeze_timer, frustration,
+    hero_sector, hero_x, hero_y, loaded_actor_file, luck, map_x, map_y, missile_slots, new_region,
+    next_missile, raft_nearness, riding, safe_flag, stuff, witch_on_screen,
+};
+use super::loading::play_effect;
 use super::messages::print;
-use super::mood::setmood;
+use super::mood::set_mood;
 use super::objects::{SetFigEntry, leave_item};
-use super::places::{find_place, xfer};
+use super::places::{find_place, transfer_hero};
 use super::random::{rand2, rand4, rand256};
 use super::tables::{bowshotx, bowshoty, fallstates, gunshoty};
 use super::types::{Missile, Shape};
-use super::game_tables::{diroffs, region_num, setfig_table, trans_list};
-use super::globals::{actor_file, anim_list, brother, fiery_death, freeze_timer, frustflag, hero_sector, hero_x, hero_y, luck, map_x, map_y, mdex, missile_list, new_region, raftprox, riding, safe_flag, stuff, wcarry, witchflag, xtype};
-
 
 // Actor kinds and states (csrc/ftale.h).
 const OBJECTS: i8 = 1;
@@ -63,7 +66,7 @@ const CARRIER_SLOT: usize = 3;
 /// Terrain type the turtle swims in.
 const TURTLE_WATER: i16 = 5;
 
-// Terrain types (the value `px_to_im` returns) and what the actor's `environ` becomes for them.
+// Terrain types (the value `terrain_at` returns) and what the actor's `environ` becomes for them.
 const TERRAIN_SLOW_SINK: i16 = 4;
 const TERRAIN_DEEP_WATER: i16 = 5;
 const ENVIRON_ICE: i8 = -2;
@@ -74,9 +77,9 @@ const ENVIRON_DROWNED: i8 = 30;
 const ENVIRON_SINKING: i8 = 15;
 /// The sector with the pit that drops the hero into the dungeon region.
 const PIT_SECTOR: i16 = 181;
-/// The `xtype` of the room with the pit floor.
+/// The `extent_type` of the room with the pit floor.
 const PIT_XTYPE: u16 = 52;
-/// Arrows are not fired in extents with `xtype` above this ("pax" areas).
+/// Arrows are not fired in extents with `extent_type` above this ("pax" areas).
 const NO_SHOOT_XTYPE: u16 = 80;
 /// Sprite frames.
 const FRAME_SINK: i16 = 83;
@@ -100,7 +103,7 @@ const RACE_WITCH_BODY: u8 = 10;
 const RACE_LASSO_CARRIER: u8 = 0x89;
 /// The setfig id of the witch.
 const SETFIG_WITCH: i16 = 9;
-/// Door-find terrain codes `proxcheck` returns.
+/// Door-find terrain codes `blocked_at` returns.
 const BLOCK_DOOR: i16 = 15;
 const BLOCK_PASSABLE_WITH_KEY: i16 = 12;
 /// Dragon and fireball constants.
@@ -114,7 +117,7 @@ const MAX_MISSILE: i16 = 5;
 const DRAGON_BREATH_FACING: i8 = 5;
 /// Hitting the pit: the luck it costs.
 const PIT_LUCK_COST: i16 = 2;
-/// Burning in lava, and running out of breath: dtype for `checkdead`.
+/// Burning in lava, and running out of breath: dtype for `check_death`.
 const DEATH_LAVA: i32 = 27;
 const DEATH_DROWN: i32 = 6;
 
@@ -162,19 +165,19 @@ struct Ctx {
 
 fn diroff(d: i16) -> i16 {
     // Like the C this does not check the range; facings are 0-7 (+8 for shooting).
-    unsafe { *(&raw const diroffs as *const i8).offset(d as isize) as i16 }
+    unsafe { *(&raw const facing_frame_offsets as *const i8).offset(d as isize) as i16 }
 }
 
 fn pos_x(x: i32, dir: i16, speed: i16) -> u16 {
-    newx(x, dir as i32, speed as i32) as u16
+    step_x(x, dir as i32, speed as i32) as u16
 }
 
 fn pos_y(y: i32, dir: i16, speed: i16) -> u16 {
-    newy(y, dir as i32, speed as i32) as u16
+    step_y(y, dir as i32, speed as i32) as u16
 }
 
 fn terrain(x: u16, y: u16) -> i16 {
-    px_to_im(x as i32, y as i32) as i16
+    terrain_at(x as i32, y as i32) as i16
 }
 
 /// Moves and animates actor `i`; `cycle` is the frame counter. `*jp` is the main loop's `j`, which
@@ -182,10 +185,10 @@ fn terrain(x: u16, y: u16) -> i16 {
 /// it), so it is passed in and written back.
 pub fn move_actor(i: i32, cycle: i16, jp: *mut i16) {
     unsafe {
-        let an = &raw mut anim_list[i as usize];
+        let an = &raw mut actor_list[i as usize];
         let mut c = Ctx {
             an,
-            ms: (&raw mut missile_list as *mut Missile).offset(0),
+            ms: (&raw mut missile_slots as *mut Missile).offset(0),
             i,
             cycle,
             k: 0,
@@ -204,7 +207,7 @@ pub fn move_actor(i: i32, cycle: i16, jp: *mut i16) {
             c.s = (*an).state as i16;
             c.dex = (*an).index as i16;
             c.inum = diroff(c.d);
-            c.ms = (&raw mut missile_list as *mut Missile).offset(mdex as isize);
+            c.ms = (&raw mut missile_slots as *mut Missile).offset(next_missile as isize);
             Pc::Dispatch
         };
         loop {
@@ -248,7 +251,7 @@ impl Ctx {
                 if (*an).vitality > 0 {
                     self.dex = FRAME_SINK;
                 }
-                frustflag = 0;
+                frustration = 0;
                 Pc::Cpx
             } else if self.s == WALKING {
                 self.walking()
@@ -276,9 +279,9 @@ impl Ctx {
                 self.dex = 4;
             } else if rand4() == 0 {
                 (*self.ms).speed = MISSILE_SPEED_FIREBALL;
-                mdex = mdex.wrapping_add(1);
+                next_missile = next_missile.wrapping_add(1);
                 self.dex = (rand2() + 1) as i16;
-                effect(5, 1800 + rand256());
+                play_effect(5, 1800 + rand256());
                 (*an).facing = DRAGON_BREATH_FACING;
                 (*self.ms).missile_type = MISSILE_ROCK_TYPE;
                 return Pc::DragShoot;
@@ -294,10 +297,10 @@ impl Ctx {
             let an = self.an;
             self.k = 0;
             self.j = 0;
-            let hero = &raw const anim_list[0];
-            if actor_file == SWAN_FILE {
-                if raftprox != 0
-                    && wcarry == CARRIER_SLOT as i16
+            let hero = &raw const actor_list[0];
+            if loaded_actor_file == SWAN_FILE {
+                if raft_nearness != 0
+                    && carrier_slot == CARRIER_SLOT as i16
                     && *stuff.add(STUFF_SWAN_ITEM) != 0
                 {
                     self.d = (*hero).facing as i16;
@@ -313,7 +316,7 @@ impl Ctx {
                 self.dex = self.d;
                 self.e = 0;
             } else {
-                if raftprox != 0 && wcarry == CARRIER_SLOT as i16 {
+                if raft_nearness != 0 && carrier_slot == CARRIER_SLOT as i16 {
                     self.d = (*hero).facing as i16;
                     XTEST = (*hero).abs_x;
                     YTEST = (*hero).abs_y;
@@ -332,7 +335,7 @@ impl Ctx {
                 }
                 self.e = 1;
             }
-            move_extent(self.e, XTEST as i16, YTEST as i16);
+            center_extent_on(self.e, XTEST as i16, YTEST as i16);
             Pc::Raise
         }
     }
@@ -386,9 +389,9 @@ impl Ctx {
                     self.dex += 2;
                 }
             } else if witch {
-                set_course(self.i as i32, hero_x as i32, hero_y as i32, 0);
+                steer_actor(self.i as i32, hero_x as i32, hero_y as i32, 0);
                 self.dex = ((*an).facing / 2) as i16;
-                witchflag = 1;
+                witch_on_screen = 1;
             } else if self.s == TALKING {
                 self.dex += rand2() as i16;
                 (*an).tactic = (*an).tactic.wrapping_sub(1);
@@ -409,11 +412,11 @@ impl Ctx {
         unsafe {
             let an = self.an;
             riding = 0;
-            if wcarry != RIDING_RAFT || raftprox != 2 {
+            if carrier_slot != RIDING_RAFT || raft_nearness != 2 {
                 return Pc::Statc;
             }
-            XTEST = anim_list[0].abs_x;
-            YTEST = anim_list[0].abs_y;
+            XTEST = actor_list[0].abs_x;
+            YTEST = actor_list[0].abs_y;
             self.j = terrain(XTEST, YTEST);
             if self.j < 3 || self.j > 5 {
                 return Pc::Statc;
@@ -431,8 +434,8 @@ impl Ctx {
             let an = self.an;
             if self.k == ENVIRON_ICE {
                 self.e = if riding == RIDING_SWAN { 40 } else { 42 };
-                let nvx = ((*an).vel_x as i32 + newx(20, self.d as i32, 2) - 20) as i16;
-                let nvy = ((*an).vel_y as i32 + newy(20, self.d as i32, 2) - 20) as i16;
+                let nvx = ((*an).vel_x as i32 + step_x(20, self.d as i32, 2) - 20) as i16;
+                let nvy = ((*an).vel_y as i32 + step_y(20, self.d as i32, 2) - 20) as i16;
                 let nvx1 = if nvx < 0 { -nvx } else { nvx };
                 let nvy1 = if nvy < 0 { -nvy } else { nvy };
                 if nvx1 < self.e - 8 {
@@ -444,11 +447,11 @@ impl Ctx {
                 XTEST = ((*an).abs_x as i32 + (*an).vel_x as i32 / 4) as u16;
                 YTEST = ((*an).abs_y as i32 + (*an).vel_y as i32 / 4) as u16;
                 if riding == RIDING_SWAN {
-                    set_course(0, -(nvx as i32), -(nvy as i32), 6);
+                    steer_actor(0, -(nvx as i32), -(nvy as i32), 6);
                     self.d = (*an).facing as i16;
                     return Pc::NewLoc;
                 }
-                if proxcheck(XTEST as i16, YTEST as i16, self.i as i16) == 0 {
+                if blocked_at(XTEST as i16, YTEST as i16, self.i as i16) == 0 {
                     return Pc::NewLoc;
                 }
                 self.k = 0;
@@ -467,12 +470,12 @@ impl Ctx {
             };
             XTEST = pos_x((*an).abs_x as i32, self.d, self.e);
             YTEST = pos_y((*an).abs_y as i32, self.d, self.e);
-            self.j = proxcheck(XTEST as i16, YTEST as i16, self.i as i16) as i16;
+            self.j = blocked_at(XTEST as i16, YTEST as i16, self.i as i16) as i16;
             if self.i == 0 {
                 if self.j == BLOCK_DOOR {
-                    doorfind(XTEST, YTEST, 0);
+                    open_door_near(XTEST, YTEST, 0);
                 } else {
-                    bumped = 0;
+                    bumped_locked_door = 0;
                 }
                 if *stuff.add(STUFF_GOLD_KEY_SLOT) != 0 && self.j == BLOCK_PASSABLE_WITH_KEY {
                     return Pc::NewLoc;
@@ -493,7 +496,7 @@ impl Ctx {
             self.d = (self.d + 1) & 7;
             XTEST = pos_x((*an).abs_x as i32, self.d, self.e);
             YTEST = pos_y((*an).abs_y as i32, self.d, self.e);
-            if proxcheck(XTEST as i16, YTEST as i16, self.i as i16) != 0 {
+            if blocked_at(XTEST as i16, YTEST as i16, self.i as i16) != 0 {
                 Pc::CheckDev2
             } else {
                 Pc::NewLoc
@@ -508,7 +511,7 @@ impl Ctx {
             self.d = (self.d - 2) & 7;
             XTEST = pos_x((*an).abs_x as i32, self.d, self.e);
             YTEST = pos_y((*an).abs_y as i32, self.d, self.e);
-            if proxcheck(XTEST as i16, YTEST as i16, self.i as i16) != 0 {
+            if blocked_at(XTEST as i16, YTEST as i16, self.i as i16) != 0 {
                 Pc::Blocked
             } else {
                 Pc::NewLoc
@@ -552,7 +555,7 @@ impl Ctx {
             (*an).vel_y = ((YTEST.wrapping_sub((*an).abs_y) as i16 as i32) * 4) as i8;
             (*an).abs_x = XTEST;
             (*an).abs_y = YTEST;
-            frustflag = 0;
+            frustration = 0;
             Pc::Tail
         }
     }
@@ -562,10 +565,10 @@ impl Ctx {
     unsafe fn blocked(&mut self) -> Pc {
         unsafe {
             if self.i == 0 {
-                frustflag = frustflag.wrapping_add(1);
-                if frustflag > 40 {
+                frustration = frustration.wrapping_add(1);
+                if frustration > 40 {
                     self.dex = FRAME_FRUSTRATED;
-                } else if frustflag > 20 {
+                } else if frustration > 20 {
                     self.dex = FRAME_OSCIL + ((self.cycle >> 1) & 1);
                 }
                 return Pc::Cpx;
@@ -593,7 +596,7 @@ impl Ctx {
             let an = self.an;
             let ms = self.ms;
             let d8 = self.d + 8;
-            if self.k > ENVIRON_SINKING || xtype > NO_SHOOT_XTYPE {
+            if self.k > ENVIRON_SINKING || extent_type > NO_SHOOT_XTYPE {
                 return Pc::Cpx;
             }
             if self.s == SHOOT3 {
@@ -610,16 +613,16 @@ impl Ctx {
                     *stuff.add(STUFF_ARROWS) -= 1;
                 }
                 (*ms).speed = MISSILE_SPEED_ARROW;
-                mdex = mdex.wrapping_add(1);
-                effect(4, 400 + rand256());
+                next_missile = next_missile.wrapping_add(1);
+                play_effect(4, 400 + rand256());
             } else if self.s == SHOOT1 {
                 self.dex = diroff(d8) + if (*an).kind == ENEMY { 11 } else { 10 };
                 if (*an).weapon == WEAPON_FIREBALL {
                     (*ms).speed = MISSILE_SPEED_FIREBALL;
-                    mdex = mdex.wrapping_add(1);
+                    next_missile = next_missile.wrapping_add(1);
                     (*an).state = SHOOT3 as i8;
                     self.dex = diroff(d8);
-                    effect(5, 1800 + rand256());
+                    play_effect(5, 1800 + rand256());
                 } else if self.i == 0 && *stuff.add(STUFF_ARROWS) == 0 {
                     print(c"No Arrows!".as_ptr());
                     return Pc::Cpx;
@@ -651,10 +654,10 @@ impl Ctx {
             (*ms).time_of_flight = 0;
             (*ms).direction = (*an).facing;
             (*ms).archer = self.i as i8;
-            if mdex > MAX_MISSILE {
-                mdex = 0;
+            if next_missile > MAX_MISSILE {
+                next_missile = 0;
             }
-            frustflag = 0;
+            frustration = 0;
             Pc::Cpx
         }
     }
@@ -664,14 +667,14 @@ impl Ctx {
         unsafe {
             let an = self.an;
             self.inum = diroff(self.d + 8);
-            let next = trans_list[self.s as usize][rand4() as usize] as i16;
+            let next = swing_transitions[self.s as usize][rand4() as usize] as i16;
             (*an).state = next as i8;
             self.s = next;
             if (self.i > 2 && self.s == 6) || self.s == 7 {
                 self.s = 8;
             }
             self.dex = self.s + self.inum;
-            frustflag = 0;
+            frustration = 0;
             Pc::Cpx
         }
     }
@@ -691,7 +694,7 @@ impl Ctx {
                     (*an).state = DEAD as i8;
                     self.dex = FRAME_FLAT;
                 }
-                frustflag = 0;
+                frustration = 0;
             } else if s == DEAD || s == FROZEN {
                 self.dex = FRAME_FLAT;
             } else if s == OSCIL {
@@ -747,7 +750,7 @@ impl Ctx {
                 }
             }
             let j = self.j;
-            if i == 0 && raftprox != 0 {
+            if i == 0 && raft_nearness != 0 {
                 self.k = 0; // can't drown on the raft
             } else if j == 0 {
                 self.k = 0;
@@ -757,13 +760,13 @@ impl Ctx {
                 self.k = ENVIRON_ICE;
             } else if j == 8 {
                 self.k = ENVIRON_BACKWARDS;
-            } else if j == 9 && i == 0 && xtype == PIT_XTYPE {
+            } else if j == 9 && i == 0 && extent_type == PIT_XTYPE {
                 if (*an).state as i16 != FALL {
                     self.dex = fallstates[(brother * 6) as usize] as i16;
                     (*an).state = FALL as i8;
                     (*an).tactic = 0;
                     luck = luck.wrapping_sub(PIT_LUCK_COST);
-                    setmood(1);
+                    set_mood(1);
                 }
                 self.k = ENVIRON_ICE;
             } else if j == 2 {
@@ -801,7 +804,7 @@ impl Ctx {
                         if self.i == 0 {
                             self.k = 0;
                             new_region = 9;
-                            xfer(0x1080, 34950, 0);
+                            transfer_hero(0x1080, 34950, 0);
                             find_place(1);
                         } else {
                             (*an).vitality = 0;
@@ -834,7 +837,7 @@ impl Ctx {
                 self.hero_wrap();
                 hero_x = (*an).abs_x;
                 hero_y = (*an).abs_y;
-                map_adjust(hero_x as i32, hero_y as i32);
+                move_camera_to(hero_x as i32, hero_y as i32);
                 safe_flag = self.j as i8;
             }
             if (*an).vitality == 0 {
@@ -848,11 +851,11 @@ impl Ctx {
                 } else if (*an).environ > 2 {
                     (*an).vitality = (*an).vitality.wrapping_sub(1);
                 }
-                checkdead(i, DEATH_LAVA);
+                check_death(i, DEATH_LAVA);
             }
             if (*an).environ == ENVIRON_DROWNED && (cycle & 7) == 0 && race != 2 && race != 3 {
                 (*an).vitality = (*an).vitality.wrapping_sub(1);
-                checkdead(i, DEATH_DROWN);
+                check_death(i, DEATH_DROWN);
             }
             Pc::Statc
         }
@@ -912,8 +915,8 @@ impl Ctx {
                 return;
             }
             if riding > 1 {
-                anim_list[CARRIER_SLOT].abs_x = (*an).abs_x;
-                anim_list[CARRIER_SLOT].abs_y = (*an).abs_y;
+                actor_list[CARRIER_SLOT].abs_x = (*an).abs_x;
+                actor_list[CARRIER_SLOT].abs_y = (*an).abs_y;
             }
         }
     }
@@ -929,8 +932,8 @@ impl Ctx {
             } else {
                 (8, 26)
             };
-            (*an).rel_x = wrap((*an).abs_x as i32 - map_x as i32 - ox) as u16;
-            (*an).rel_y = wrap((*an).abs_y as i32 - map_y as i32 - oy) as u16;
+            (*an).rel_x = wrap_coordinate((*an).abs_x as i32 - map_x as i32 - ox) as u16;
+            (*an).rel_y = wrap_coordinate((*an).abs_y as i32 - map_y as i32 - oy) as u16;
         }
     }
 }

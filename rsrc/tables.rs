@@ -143,7 +143,7 @@ pub static sun_colors: [i16; 53] = [
 
 /// The 32 page colours at full brightness (colour 31 changes with the region).
 /// Each is 12 bits: red, green and blue in 4 bits each.
-pub static mut pagecolors: [u16; 32] = [
+pub static mut page_colors: [u16; 32] = [
     0x0000,0x0FFF,0x0E96,0x0B63,0x0631,0x07BF,0x0333,0x0DB8,
     0x0223,0x0445,0x0889,0x0BBC,0x0521,0x0941,0x0F82,0x0FC7,
     0x0040,0x0070,0x00B0,0x06F6,0x0005,0x0009,0x000D,0x037F,
@@ -459,7 +459,7 @@ pub static glbobs: i16 = 11;
 /// The 32 colours being faded to (scratch space for `fade_page`).
 pub static mut fader: [u16; 32] = [0; 32];
 
-/// The print queue: requests for the text panel, filled by `prq` and emptied by `ppick`.
+/// The print queue: requests for the text panel, filled by `queue_print` and emptied by `handle_print_request`.
 pub static mut print_que: [i8; 32] = [0; 32];
 pub static mut prec: i16 = 0;
 pub static mut pplay: i16 = 0;

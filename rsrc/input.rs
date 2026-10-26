@@ -3,21 +3,21 @@
 //! SDL events and calls the `fta_*` functions below.
 //!
 //! How input reaches the game:
-//! - Keys go into a 128-byte ring buffer (`keybuf`). The game's main loop pops them with `getkey`.
+//! - Keys go into a 128-byte ring buffer (`keybuf`). The game's main loop pops them with `next_key`.
 //!   A key code with bit 7 set means the key was released.
 //! - The mouse pointer position is kept inside the text panel, where the menus and the compass are.
 //!   A left click on the menu column is turned into a menu key press ('a' for the first row, 'b' for
 //!   the second column of the first row, and so on).
-//! - `decode_mouse` works out which way the hero walks, from the mouse over the compass or from the
+//! - `read_walk_direction` works out which way the hero walks, from the mouse over the compass or from the
 //!   direction keys, and redraws the compass.
 //!
 //! Directions are numbered 0-7 clockwise starting at north-west: 0 NW, 1 N, 2 NE, 3 E, 4 SE, 5 S,
 //! 6 SW, 7 W. The value 9 means "not walking".
 
+use super::game_tables::compass_lit_direction;
+use super::globals::{handler_data, held_direction};
+use super::screen_fx::draw_compass;
 use std::ffi::c_void;
-use super::screen_fx::{drawcompass};
-use super::game_tables::{oldir};
-use super::globals::{handler_data, keydir};
 
 /// Mirror of `struct in_work` in csrc/ftale.h, the input handler's data area.
 #[repr(C)]
@@ -29,7 +29,7 @@ pub struct InWork {
     qualifier: i16,
     // Ring buffer write position (where the next key goes).
     pub laydown: u8,
-    // Ring buffer read position (the next key `getkey` returns).
+    // Ring buffer read position (the next key `next_key` returns).
     pub pickup: u8,
     // Set when a disk was inserted (only the Amiga needs this).
     newdisk: i8,
@@ -43,7 +43,6 @@ pub struct InWork {
     keybuf: [u8; KEY_BUFFER_SIZE],
     ticker: i16,
 }
-
 
 /// Stand-in for the CIA port A register the game peeks at (0xbfe001). Bit 7 low = joystick fire.
 #[unsafe(no_mangle)]
@@ -115,7 +114,7 @@ pub fn reset_key_buffer() {
 }
 
 /// The mouse buttons held (bit 0x4000 left, 0x2000 right).
-pub fn handler_qualifier() -> i16 {
+pub fn mouse_buttons() -> i16 {
     unsafe { (*(&raw const handler_data)).qualifier }
 }
 
@@ -127,7 +126,7 @@ pub fn forget_last_menu() {
 }
 
 /// Pops the next key code from the ring buffer, or 0 if there is none.
-pub fn getkey() -> i32 {
+pub fn next_key() -> i32 {
     unsafe {
         let data = &mut *(&raw mut handler_data);
         if data.pickup == data.laydown {
@@ -164,7 +163,7 @@ fn menu_key_at(x: i32, y: i32) -> Option<i32> {
 
 /// Mouse button change. A left click in the menu column becomes a menu key on press and the same
 /// key with bit 7 set on release, as if it had been typed. The right button only sets a flag
-/// (it makes the hero fight, see `decode_mouse`).
+/// (it makes the hero fight, see `read_walk_direction`).
 #[unsafe(no_mangle)]
 pub extern "C" fn fta_mouse_button(left: i32, right: i32) {
     let new_qualifier =
@@ -228,23 +227,23 @@ pub fn take_new_disk() -> bool {
 ///
 /// While a mouse button is down the pointer position decides; otherwise the direction key
 /// (numbered from 20, the keypad digits) does. Anything outside 20-29 means no direction.
-pub fn decode_mouse() {
+pub fn read_walk_direction() {
     unsafe {
         let data = &*(&raw const handler_data);
         let dir = if data.qualifier & (LEFT_BUTTON | RIGHT_BUTTON) != 0 {
             compass_direction(data.xsprite as i32, data.ysprite as i32)
         } else {
-            let dir = keydir.wrapping_sub(KEYDIR_BASE);
+            let dir = held_direction.wrapping_sub(KEYDIR_BASE);
             if (0..DIRECTION_COUNT).contains(&dir) {
                 dir
             } else {
-                keydir = 0;
+                held_direction = 0;
                 DIR_NONE
             }
         };
-        if dir != oldir {
-            oldir = dir;
-            drawcompass(dir);
+        if dir != compass_lit_direction {
+            compass_lit_direction = dir;
+            draw_compass(dir);
         }
     }
 }

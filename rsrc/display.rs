@@ -1,12 +1,12 @@
 //! Showing the finished page and the input device (from csrc/fmain.c).
 //!
-//! The game draws on one of two pages while the other is on screen (`fp_drawing`, `fp_viewing`),
+//! The game draws on one of two pages while the other is on screen (`drawing_page`, `viewing_page`),
 //! then swaps them. The Amiga calls here are mostly stand-ins in the platform layer.
 
+use super::globals::{drawing_page, v, viewing_page, vp_page, vp_text};
 use super::input::reset_key_buffer;
 use crate::amiga::{View, ViewPort};
 use std::ffi::{c_char, c_void};
-use super::globals::{fp_drawing, fp_viewing, v, vp_page, vp_text};
 
 unsafe extern "C" {
     fn MakeVPort(view: *mut View, port: *mut ViewPort) -> i32;
@@ -34,11 +34,11 @@ static mut INPUT_PORT: *mut c_void = std::ptr::null_mut();
 static mut INPUT_REQUEST: *mut c_void = std::ptr::null_mut();
 
 /// Swaps the page being drawn with the one being shown, and shows the one just finished.
-pub fn pagechange() {
+pub fn flip_pages() {
     unsafe {
-        let finished = fp_drawing;
-        fp_drawing = fp_viewing;
-        fp_viewing = finished;
+        let finished = drawing_page;
+        drawing_page = viewing_page;
+        viewing_page = finished;
         vp_page.RasInfo = (*finished).ri_page;
         v.LOFCprList = (*finished).savecop;
 
@@ -54,7 +54,7 @@ pub fn pagechange() {
 /// Sets up the input device: empties the key buffer and opens the device with the game's handler.
 /// Returns 1 if it worked and 0 if not. The handler itself is the Rust code in `input.rs`, so only
 /// the device requests are made here.
-pub fn add_device() -> i32 {
+pub fn install_input_handler() -> i32 {
     unsafe {
         reset_key_buffer();
         INPUT_PORT = CreatePort(std::ptr::null(), 0);
@@ -77,7 +77,7 @@ pub fn add_device() -> i32 {
 }
 
 /// Takes the input device down again.
-pub fn wrap_device() {
+pub fn remove_input_handler() {
     unsafe {
         DoIO(INPUT_REQUEST);
         CloseDevice(INPUT_REQUEST);

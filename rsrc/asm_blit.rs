@@ -7,16 +7,19 @@
 //! drawing comes out the same. Words are big-endian in memory (leftmost pixels in the first byte).
 //!
 //! How a sprite gets onto the screen (see the main loop in csrc/fmain.c):
-//! 1. `save_blit` copies the background under the sprite's rectangle to a save area.
-//! 2. `maskit` copies, for every scenery tile that should hide the sprite (trees, walls ...), the
+//! 1. `save_background` copies the background under the sprite's rectangle to a save area.
+//! 2. `add_scenery_mask` copies, for every scenery tile that should hide the sprite (trees, walls ...), the
 //!    tile's mask into a screen-sized scenery mask.
-//! 3. `mask_blit` combines the sprite's own mask with that: the sprite is visible only where it is
+//! 3. `combine_masks` combines the sprite's own mask with that: the sprite is visible only where it is
 //!    opaque and nothing is in front of it.
-//! 4. `shape_blit` draws the sprite's pixels through that mask into the 5 bitplanes of the screen.
-//! 5. Next frame `rest_blit` puts the saved background back, which erases the sprite.
-//! `make_mask` builds each frame's own mask once, when the sprite sheet is loaded.
+//! 4. `draw_shape` draws the sprite's pixels through that mask into the 5 bitplanes of the screen.
+//! 5. Next frame `restore_background` puts the saved background back, which erases the sprite.
+//! `make_sprite_masks` builds each frame's own mask once, when the sprite sheet is loaded.
 
-use super::globals::{aoff, bmask_mem, bmod, boff, mask_buffer, planes, planesize, shadow_mem, shapedata, shift, shp, wmask};
+use super::globals::{
+    aoff, bmask_mem, bmod, boff, mask_buffer, planes, planesize, shadow_mem, shapedata, shift, shp,
+    wmask,
+};
 /// Mirror of `struct sshape` in csrc/ftale.h: how one sprite is drawn this frame and where its
 /// background is saved. `coff` is the byte offset of the sprite in a bitplane and `cmod` the bytes
 /// to skip to the next line; `blitsize` is the blitter size word (height * 64 + width in words).
@@ -28,7 +31,6 @@ pub struct SShape {
     pub coff: i16,
     pub cmod: i16,
 }
-
 
 // Which channels a blit uses.
 const USE_A: u8 = 1;
@@ -203,13 +205,13 @@ unsafe fn plane_at_sprite(p: i32) -> *mut u8 {
 }
 
 /// Zeroes a rectangle of memory, sized like a BLTSIZE value.
-pub fn clear_blit(mem: *mut u8, size: i32) {
+pub fn clear_memory(mem: *mut u8, size: i32) {
     let bytes = blit_height(size as i16) * blit_width(size as i16) * 2;
     unsafe { std::ptr::write_bytes(mem, 0, bytes as usize) };
 }
 
 /// Copies the background under the sprite (all planes) to `savemem`.
-pub fn save_blit(savemem: *mut u8) {
+pub fn save_background(savemem: *mut u8) {
     unsafe {
         for p in (0..PLANE_COUNT).rev() {
             let mut t = Blit::new(USE_B | USE_D, D_EQUALS_B, (*shp).blitsize);
@@ -222,7 +224,7 @@ pub fn save_blit(savemem: *mut u8) {
 }
 
 /// Puts the saved background back (this erases the sprite).
-pub fn rest_blit(savemem: *mut u8) {
+pub fn restore_background(savemem: *mut u8) {
     unsafe {
         for p in (0..PLANE_COUNT).rev() {
             let mut t = Blit::new(USE_B | USE_D, D_EQUALS_B, (*shp).blitsize);
@@ -234,9 +236,9 @@ pub fn rest_blit(savemem: *mut u8) {
     }
 }
 
-/// Combines the sprite's own mask with the scenery mask built by `maskit`. The result goes in
+/// Combines the sprite's own mask with the scenery mask built by `add_scenery_mask`. The result goes in
 /// `bmask_mem`: the sprite is opaque here and nothing is in front of it (D = A and not C).
-pub fn mask_blit() {
+pub fn combine_masks() {
     unsafe {
         let mut t = Blit::new(USE_A | USE_C | USE_D, D_EQUALS_A_AND_NOT_C, (*shp).blitsize);
         t.a = mask_buffer.offset(boff as isize);
@@ -250,7 +252,7 @@ pub fn mask_blit() {
 
 /// Draws the sprite into the planes through the mask: D = mask ? shape : screen.
 /// The first and last word masks stop the sprite's shifted edges leaking into neighbouring pixels.
-pub fn shape_blit() {
+pub fn draw_shape() {
     unsafe {
         let bit_shift = (shift & SHIFT_MASK) as u32;
         let first = ALL_BITS >> bit_shift;
@@ -281,7 +283,7 @@ pub fn shape_blit() {
 
 /// Copies the 32 line mask of scenery tile `tile` (from `shadow_mem`) into the scenery mask at
 /// word column `x`, tile row `y`; `mod_words` is the mask width in words.
-pub fn maskit(x: i32, y: i32, mod_words: i32, tile: i32) {
+pub fn add_scenery_mask(x: i32, y: i32, mod_words: i32, tile: i32) {
     let row_bytes = mod_words as isize * 2;
     unsafe {
         let mut dst = bmask_mem
@@ -299,7 +301,7 @@ pub fn maskit(x: i32, y: i32, mod_words: i32, tile: i32) {
 
 /// For every sprite frame builds a one plane mask: all 5 planes ANDed then inverted, so colour
 /// 31 (all bits set) is transparent. The masks are stored right after the frames.
-pub fn make_mask(src: *const u8, dest: *mut u8, words: i32, scans: i32, chars: i32) {
+pub fn make_sprite_masks(src: *const u8, dest: *mut u8, words: i32, scans: i32, chars: i32) {
     let plane_bytes = (words * scans) as u16 as usize * 2;
     unsafe {
         let (mut src, mut dest) = (src, dest);

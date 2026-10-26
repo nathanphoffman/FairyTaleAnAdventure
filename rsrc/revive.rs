@@ -4,28 +4,35 @@
 //! The three brothers (Julian, Phillip, Kevin) play in turn. When one dies for good the next takes
 //! over, with the first one's bones and goods left where they fell, until the third has died.
 
-use super::asm_map::map_adjust;
-use super::asm_text::{event, placard, placard_text, prq};
+use super::asm_map::move_camera_to;
+use super::asm_text::{draw_placard_border, placard_text, queue_print, show_event};
 use super::display::reset_input;
-use super::loading::shape_read;
-use super::menus::set_options;
+use super::game_tables::{brother_stats, region_num};
+use super::globals::{
+    active_actor_count, actor_list, actors_loading, actors_on_screen, battle_flag, brave, brother,
+    current_rastport, day_clock, drawing_page, extent_type, fatigue, fiery_death, freeze_timer,
+    good_fairy_timer, hero_place, hero_x, hero_y, hunger, kind as hero_kind, light_level,
+    light_timer, loaded_actor_file, loaded_setfig_file, luck, map_x, map_y, new_region,
+    next_missile, panel_font, quit_requested, rp_map, rp_text, safe_r, safe_x, safe_y,
+    secret_timer, story_font, stuff, view_status, viewing_page, wealth,
+};
+use super::loading::load_start_sprites;
+use super::menus::update_menu_availability;
 use super::messages::print_cont;
-use super::mood::setmood;
-use super::regions::load_all;
+use super::mood::set_mood;
+use super::regions::load_region_now;
 use super::screen_fx::{fade_down, map_message, message_off};
 use super::tables::{ob_list8, ob_listg};
 use super::types::Shape;
 use crate::amiga::{RastPort, TextFont};
-use super::game_tables::{blist, region_num};
-use super::globals::{actor_file, actors_loading, actors_on_screen, afont, anim_list, anix, battleflag, brave, brother, daynight, fatigue, fiery_death, fp_drawing, fp_viewing, freeze_timer, goodfairy, hero_place, hero_x, hero_y, hunger, kind as hero_kind, light_timer, lightlevel, luck, map_x, map_y, mdex, new_region, quitflag, rp, rp_map, rp_text, safe_r, safe_x, safe_y, secret_timer, set_file, stuff, tfont, viewstatus, wealth, xtype};
 
 unsafe extern "C" {
     fn stopscore();
     fn Delay(ticks: i32);
-    fn SetFont(rp: *mut RastPort, font: *mut TextFont);
-    fn SetAPen(rp: *mut RastPort, pen: u32);
-    fn SetRast(rp: *mut RastPort, pen: u32);
-    fn RectFill(rp: *mut RastPort, x0: i32, y0: i32, x1: i32, y1: i32);
+    fn SetFont(current_rastport: *mut RastPort, font: *mut TextFont);
+    fn SetAPen(current_rastport: *mut RastPort, pen: u32);
+    fn SetRast(current_rastport: *mut RastPort, pen: u32);
+    fn RectFill(current_rastport: *mut RastPort, x0: i32, y0: i32, x1: i32, y1: i32);
 }
 
 // Actor kinds and goals.
@@ -69,7 +76,7 @@ const SHOW_PLACARD: i32 = 120;
 const SHORT_PAUSE: i32 = 80;
 const TINY_PAUSE: i32 = 10;
 const GAME_OVER_PAUSE: i32 = 500;
-/// Value of `viewstatus` for "fade in" (3) and "game over screen" (2).
+/// Value of `view_status` for "fade in" (3) and "game over screen" (2).
 const VIEW_FADE_IN: i8 = 3;
 const VIEW_GAME_OVER: i8 = 2;
 const VIEW_REDRAW: i8 = 99;
@@ -86,7 +93,7 @@ const HERO_SET_FILE: i16 = 13;
 /// (8000), and hunger and fatigue are cleared.
 pub fn revive(new: i16) {
     unsafe {
-        let list = (&raw mut anim_list).cast::<Shape>();
+        let list = (&raw mut actor_list).cast::<Shape>();
         let raft = list.add(1);
         (*raft).kind = RAFT;
         (*raft).abs_x = RAFT_START.0;
@@ -107,9 +114,9 @@ pub fn revive(new: i16) {
         (*hero).goal = USER; // yes, we can usurp control from the user
 
         reset_input();
-        battleflag = 0;
-        goodfairy = 0;
-        mdex = 0;
+        battle_flag = 0;
+        good_fairy_timer = 0;
+        next_missile = 0;
         if new != 0 {
             stopscore();
             if brother > 0 && brother < 3 {
@@ -120,7 +127,7 @@ pub fn revive(new: i16) {
                 ob_listg[brother as usize + DEAD_BROTHER_PERSON].ob_stat = PERSON;
             }
             ob_list8[SPECTRE_SLOT].ob_stat = PERSON;
-            let next = &blist[brother as usize];
+            let next = &brother_stats[brother as usize];
             brave = next.brave as i16;
             luck = next.luck as i16;
             hero_kind = next.kind as i16;
@@ -141,18 +148,18 @@ pub fn revive(new: i16) {
             safe_y = FIRST_SAFE_SPOT.1;
             safe_r = FIRST_REGION;
             region_num = FIRST_REGION;
-            map_adjust(safe_x as i32, safe_y as i32);
-            viewstatus = VIEW_REDRAW;
+            move_camera_to(safe_x as i32, safe_y as i32);
+            view_status = VIEW_REDRAW;
             actors_on_screen = 1;
             actors_loading = 0;
 
             map_message();
-            SetFont(rp, afont);
+            SetFont(current_rastport, story_font);
             if brother == 1 {
                 placard_text(0);
-                rp_map.BitMap = (*(*fp_drawing).ri_page).BitMap;
+                rp_map.BitMap = (*(*drawing_page).ri_page).BitMap;
                 SetRast(&raw mut rp_map, PEN_BLACK);
-                rp_map.BitMap = (*(*fp_viewing).ri_page).BitMap;
+                rp_map.BitMap = (*(*viewing_page).ri_page).BitMap;
             } else if brother == 2 {
                 placard_text(1);
             } else if brother == 3 {
@@ -161,39 +168,39 @@ pub fn revive(new: i16) {
                 placard_text(5);
             }
 
-            placard();
+            draw_placard_border();
             Delay(SHOW_PLACARD);
 
             if brother > LAST_BROTHER {
-                quitflag = 1;
+                quit_requested = 1;
                 Delay(GAME_OVER_PAUSE);
             } else if brother > 1 {
                 Delay(SHORT_PAUSE);
-                SetAPen(rp, PEN_BLACK);
-                RectFill(rp, PANEL.0, PANEL.1, PANEL.2, PANEL.3);
+                SetAPen(current_rastport, PEN_BLACK);
+                RectFill(current_rastport, PANEL.0, PANEL.1, PANEL.2, PANEL.3);
                 Delay(TINY_PAUSE);
-                SetAPen(rp, PEN_TEXT);
+                SetAPen(current_rastport, PEN_TEXT);
                 placard_text(if brother == 2 { 2 } else { 4 });
                 Delay(SHOW_PLACARD);
             }
 
-            SetFont(rp, tfont);
-            rp = &raw mut rp_text;
+            SetFont(current_rastport, panel_font);
+            current_rastport = &raw mut rp_text;
 
-            actor_file = HERO_SPRITE_FILE;
-            set_file = HERO_SET_FILE;
-            shape_read();
+            loaded_actor_file = HERO_SPRITE_FILE;
+            loaded_setfig_file = HERO_SET_FILE;
+            load_start_sprites();
 
             if brother < 4 {
                 message_off();
                 hero_place = START_PLACE;
-                event(9);
+                show_event(9);
                 if brother == 1 {
                     print_cont(c".".as_ptr());
                 } else if brother == 2 {
-                    event(10);
+                    show_event(10);
                 } else if brother == 3 {
-                    event(11);
+                    show_event(11);
                 }
             }
         } else {
@@ -207,26 +214,26 @@ pub fn revive(new: i16) {
         map_x = hero_x.wrapping_sub(CAMERA_OFFSET.0);
         map_y = hero_y.wrapping_sub(CAMERA_OFFSET.1);
         new_region = safe_r;
-        load_all();
+        load_region_now();
         (*hero).vitality = 15 + brave / 4;
         (*hero).environ = 0;
         (*hero).state = STILL;
         (*hero).race = 255; // -1
-        daynight = START_DAYNIGHT;
-        lightlevel = START_LIGHT;
+        day_clock = START_DAYNIGHT;
+        light_level = START_LIGHT;
         hunger = 0;
         fatigue = 0;
-        anix = 3;
-        set_options();
-        prq(PRQ_VITALITY);
-        prq(PRQ_STATS);
+        active_actor_count = 3;
+        update_menu_availability();
+        queue_print(PRQ_VITALITY);
+        queue_print(PRQ_STATS);
         if brother > 3 {
-            viewstatus = VIEW_GAME_OVER;
+            view_status = VIEW_GAME_OVER;
         } else {
-            viewstatus = VIEW_FADE_IN;
-            setmood(1);
+            view_status = VIEW_FADE_IN;
+            set_mood(1);
         }
-        xtype = 0;
+        extent_type = 0;
         fiery_death = 0;
     }
 }

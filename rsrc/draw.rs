@@ -3,16 +3,23 @@
 //! (`draw_sprites`): clipping to the screen, hiding parts behind scenery, and saving the background
 //! under each sprite so it can be put back next frame.
 
-use super::actors::{calc_dist, dohit};
-use super::asm_blit::{SShape, clear_blit, mask_blit, maskit, save_blit, shape_blit};
-use super::asm_map::{row_draw, strip_draw};
+use super::actors::{actor_distance, hit_actor};
+use super::asm_blit::{
+    SShape, add_scenery_mask, clear_memory, combine_masks, draw_shape, save_background,
+};
+use super::asm_map::{draw_map_column, draw_map_row};
+use super::game_tables::animation_frames;
+use super::globals::{
+    actor_list, aoff, bmask_mem, bmod, boff, draw_order, drawing_page, drawn_actor_count,
+    extent_type, fiery_death, hero_sector, hero_x, hero_y, loaded_actor_file, map_x, map_y,
+    mask_buffer, planes, planesize, riding, seq_list, shapedata, shift, shp, terrain_mem,
+    witch_angle, witch_direction, witch_on_screen, wmask,
+};
 use super::random::{rand2, rand4};
 use super::tables::{bow_x, bow_y, minimap};
 use super::types::{SeqInfo, Shape, StateEntry};
 use super::witch::witch_fx;
 use super::witch::{SIDE_1 as s1, SIDE_2 as s2};
-use super::game_tables::{statelist};
-use super::globals::{actor_file, anim_index, anim_list, anix2, aoff, bmask_mem, bmod, boff, fiery_death, fp_drawing, hero_sector, hero_x, hero_y, map_x, map_y, mask_buffer, planes, planesize, riding, seq_list, shapedata, shift, shp, terra_mem, wdir, witchflag, witchindex, wmask, xtype};
 
 unsafe extern "C" {
     fn OwnBlitter();
@@ -47,30 +54,30 @@ const WITCH_SLOT: usize = 2;
 pub fn repair_map_and_witch(dif_x: i16, dif_y: i16) {
     unsafe {
         if dif_x == 1 {
-            strip_draw(STRIP_RIGHT);
+            draw_map_column(STRIP_RIGHT);
         } else if dif_x == -1 {
-            strip_draw(STRIP_LEFT);
+            draw_map_column(STRIP_LEFT);
         }
         if dif_y == 1 {
-            row_draw(ROW_BOTTOM);
+            draw_map_row(ROW_BOTTOM);
         } else if dif_y == -1 {
-            row_draw(ROW_TOP);
+            draw_map_row(ROW_TOP);
         }
 
-        let witch = &raw const anim_list[WITCH_SLOT];
-        let page = fp_drawing;
+        let witch = &raw const actor_list[WITCH_SLOT];
+        let page = drawing_page;
         (*page).witchx = ((*witch).abs_x as i32 - (map_x & 0xfff0) as i32) as i16;
         (*page).witchy = (((*witch).abs_y as i32 - 15) - (map_y & 0xffe0) as i32) as i16;
         if rand4() == 0 {
-            wdir = if s1 > 0 { 1 } else { -1 };
+            witch_direction = if s1 > 0 { 1 } else { -1 };
         }
-        witchindex = witchindex.wrapping_add(wdir as u8);
-        (*page).witchdir = witchindex as i16;
-        (*page).wflag = witchflag as i16;
-        if witchflag != 0 {
+        witch_angle = witch_angle.wrapping_add(witch_direction as u8);
+        (*page).witchdir = witch_angle as i16;
+        (*page).wflag = witch_on_screen as i16;
+        if witch_on_screen != 0 {
             witch_fx(page);
-            if s1 > 0 && s2 < 0 && calc_dist(WITCH_SLOT as i32, 0) < WITCH_REACH {
-                dohit(-1, 0, (*witch).facing as i32, (rand2() + 1) as i16);
+            if s1 > 0 && s2 < 0 && actor_distance(WITCH_SLOT as i32, 0) < WITCH_REACH {
+                hit_actor(-1, 0, (*witch).facing as i32, (rand2() + 1) as i16);
             }
         }
     }
@@ -91,7 +98,7 @@ const PLANES: i32 = 5;
 const SAVE_LIMIT: i32 = 74 * 80;
 /// The mask buffer (`bmask_mem`) is cleared before each sprite: 96 lines of 64 words, plus 5.
 const MASK_CLEAR_SIZE: i32 = (96 << 6) + 5;
-/// Terrain flag bits `terra_mem[tile*4+1] & 15` says how a tile hides what is behind it.
+/// Terrain flag bits `terrain_mem[tile*4+1] & 15` says how a tile hides what is behind it.
 const TILE_FULL_MASK: i16 = 64 * 4;
 /// Fall animation: tiles at or below this offset do not hide the actor.
 const FALL_TILE_LIMIT: i16 = 220 * 4;
@@ -104,7 +111,7 @@ const RACE_NO_MASK_B: u8 = 0x87;
 /// Enemy race 8 (the spectre) and 4 (snakes) look different.
 const RACE_SPECTRE: u8 = 8;
 const RACE_SNAKE: u8 = 4;
-/// The `xtype` of the room where actors are drawn in front of everything.
+/// The `extent_type` of the room where actors are drawn in front of everything.
 const NO_MASK_XTYPE: u16 = 84;
 /// Sprite numbers (object images).
 const OBJ_BURNING: i16 = 0x58;
@@ -138,7 +145,7 @@ enum Drawn {
 unsafe fn state_entry(inum: i16) -> &'static StateEntry {
     // Not range checked, like the C table lookup.
     unsafe {
-        &*(&raw const statelist)
+        &*(&raw const animation_frames)
             .cast::<StateEntry>()
             .offset(inum as isize)
     }
@@ -152,16 +159,16 @@ fn byte_of(table: &[i8; 32], inum: i16) -> i16 {
 /// (`backsave`) so it can be undone next frame. `cycle` is the frame counter.
 pub fn draw_sprites(cycle: i16) {
     unsafe {
-        let page = fp_drawing;
+        let page = drawing_page;
         (*page).obcount = 0;
         (*page).saveused = 0;
         let mut frame = Frame {
             crack: 0,
             backalloc: (*page).backsave,
         };
-        for j in 0..anix2 {
-            let i = anim_index[j as usize] as i32;
-            let an = &raw mut anim_list[i as usize];
+        for j in 0..drawn_actor_count {
+            let i = draw_order[j as usize] as i32;
+            let an = &raw mut actor_list[i as usize];
             (*an).visible = 0;
             let mut pass: u8 = 0;
             loop {
@@ -183,7 +190,10 @@ unsafe fn weapon_passmode(an: *const Shape, pass: &mut u8) -> bool {
     unsafe {
         let mut passmode = false;
         let state = (*an).state;
-        if (*an).weapon > 0 && (*an).weapon < 8 && (state < DEAD || state >= SHOOT1 || xtype > 80) {
+        if (*an).weapon > 0
+            && (*an).weapon < 8
+            && (state < DEAD || state >= SHOOT1 || extent_type > 80)
+        {
             let facing = (*an).facing as i32;
             let flipped = *pass ^ 1;
             let mut pick = if ((facing - 2) & 4) != 0 {
@@ -204,7 +214,7 @@ unsafe fn weapon_passmode(an: *const Shape, pass: &mut u8) -> bool {
 /// Draws one actor (or its weapon) for the current pass.
 unsafe fn draw_one(frame: &mut Frame, an: *mut Shape, i: i32, cycle: i16, passmode: bool) -> Drawn {
     unsafe {
-        let page = fp_drawing;
+        let page = drawing_page;
         let mut inum = (*an).index as i16;
         let mut xstart = (*an).rel_x as i16;
         let mut ystart = (*an).rel_y as i16;
@@ -213,7 +223,7 @@ unsafe fn draw_one(frame: &mut Frame, an: *mut Shape, i: i32, cycle: i16, passmo
 
         OwnBlitter();
         WaitBlit();
-        clear_blit(bmask_mem, MASK_CLEAR_SIZE);
+        clear_memory(bmask_mem, MASK_CLEAR_SIZE);
         DisownBlitter();
 
         if passmode {
@@ -283,7 +293,7 @@ unsafe fn draw_one(frame: &mut Frame, an: *mut Shape, i: i32, cycle: i16, passmo
                 if atype == OBJECTS && (*an).race == 0 {
                     return Drawn::Done;
                 }
-                if atype == CARRIER && riding == 0 && actor_file == 11 {
+                if atype == CARRIER && riding == 0 && loaded_actor_file == 11 {
                     atype = RAFT;
                     inum = 1;
                 }
@@ -415,14 +425,14 @@ unsafe fn draw_one(frame: &mut Frame, an: *mut Shape, i: i32, cycle: i16, passmo
         (*shp).cmod = (40 - blitwide as i32 * 2) as i16;
 
         OwnBlitter();
-        save_blit((*shp).backsave);
+        save_background((*shp).backsave);
 
         if !drawn_in_front(an, i, atype, inum) {
             mask_against_scenery(an, i, ground, xbw, ystart1, ystop1, blitwide);
         }
 
-        mask_blit();
-        shape_blit();
+        combine_masks();
+        draw_shape();
         (*an).visible = 1;
         DisownBlitter();
         (*page).obcount += 1;
@@ -437,7 +447,7 @@ unsafe fn drawn_in_front(an: *const Shape, i: i32, atype: i16, inum: i16) -> boo
         if atype == CARRIER
             || (i == 0
                 && (riding == 11
-                    || xtype == NO_MASK_XTYPE
+                    || extent_type == NO_MASK_XTYPE
                     || (hero_x > 22833 && hero_x < 26428 && hero_y > 26425 && hero_y < 26527)))
         {
             return true;
@@ -468,7 +478,7 @@ unsafe fn mask_against_scenery(
                 let ystop = ground - (((ym + ym1 as i32) << 5) as i16);
                 let mut cm = ((xm + xbw as i32) * 6 + ym + ym1 as i32) as i16;
                 cm = (minimap[cm as usize] as i32 * 4) as i16;
-                let mut k = (*terra_mem.offset(cm as isize + 1) & 15) as i16;
+                let mut k = (*terrain_mem.offset(cm as isize + 1) & 15) as i16;
                 if (*an).state == FALL {
                     if cm <= FALL_TILE_LIMIT {
                         continue;
@@ -514,11 +524,11 @@ unsafe fn mask_against_scenery(
                     }
                     _ => {}
                 }
-                maskit(
+                add_scenery_mask(
                     xm,
                     ym,
                     blitwide as i32,
-                    *terra_mem.offset(cm as isize) as i32,
+                    *terrain_mem.offset(cm as isize) as i32,
                 );
             }
         }

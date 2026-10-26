@@ -3,37 +3,57 @@
 //! title and intro, starts the game and runs the main loop, one pass per frame.
 
 use super::draw::{draw_sprites, repair_map_and_witch};
-use super::loading::skipp;
+use super::loading::intro_skip_requested;
 use super::menus::print_options;
 use super::types::IOAudio;
 use crate::amiga::{
-    BitMap, ColorMap, DiskFontHeader, HIRES, JAM2, MEMF_CHIP, Process, RastPort,
-    SimpleSprite, TextAttr, TextFont, View, ViewPort,
+    BitMap, ColorMap, DiskFontHeader, HIRES, JAM2, MEMF_CHIP, Process, RastPort, SimpleSprite,
+    TextAttr, TextFont, View, ViewPort,
 };
 use std::ffi::{c_char, c_void};
 
+use super::ai::update_enemy_goals;
 use super::asm_blit::SShape;
-use super::ai::{actor_ai};
-use super::asm_map::{map_draw, scrollmap};
-use super::asm_stubs::{trapper};
-use super::asm_text::{do_error, placard_text, ssp};
-use super::combat::{melee_hits, move_missiles, queue_missiles};
-use super::display::{add_device, pagechange, wrap_device};
-use super::hdrive::{AllocDiskIO, FreeDiskIO, InvalidLastDiskIO, WaitLastDiskIO, load_track_range};
-use super::iffsubs::{unpackbrush};
-use super::input::{decode_mouse, getkey};
+use super::asm_map::{draw_map, scroll_map};
+use super::asm_stubs::WBenchMsg;
+use super::asm_stubs::trapper;
+use super::asm_text::{placard_text, print_positioned, show_error};
+use super::combat::{advance_missiles, queue_missile_sprites, resolve_melee};
+use super::display::{flip_pages, install_input_handler, remove_input_handler};
+use super::game_tables::{
+    black_colors, instrument_waves, menus, pointer_sprite, pointer_sprite_data, text_colors,
+    topaz_attr,
+};
+use super::globals::{
+    GfxBase as gfx_base, LayersBase as layers_base, active_actor_count, actor_list, audio_open,
+    audioport, bm_lim, bm_page1, bm_page2, bm_scroll, bm_source, bm_text, bmask_mem, cheat_enabled,
+    current_menu, current_rastport, current_viewport, drawing_page, drawn_actor_count, flasher,
+    font, fp_page1, fp_page2, freeze_timer, handler_data, hero_x, hero_y, image_mem, ioaudio, li,
+    light_timer, map_mem, map_x, map_y, new_region, nhinor, nhivar, oldview, openflags, origDir,
+    pagea, pageb, panel_font, queue_mem, quit_requested, ri_page1, ri_page2, ri_text, rp_map,
+    rp_text, rp_text2, sample_mem, scoremem, sector_mem, seg, shadow_mem, shape_mem, sprite_data,
+    story_font, terrain_mem, thistask, tile_x, tile_y, track, v, view_status, viewing_page, volmem,
+    vp_page, vp_text, wavmem, wb_bmap, work_bm,
+};
+use super::hdrive::{
+    close_disk, load_track_range, mark_last_read_unused, open_disk, wait_for_last_read,
+};
+use super::iffsubs::load_picture;
+use super::input::{next_key, read_walk_direction};
 use super::keys::{handle_key, update_hero};
-use super::loading::{copy_protect_junk, copypage, into_chip, load_next, read_sample, read_score, seekn, skipint};
-use super::move_actor::{move_actor};
-use super::objects::{do_objects};
-use super::regions::{gen_mini};
-use super::revive::{revive};
-use super::screen_fx::{fade_normal, ppick, screen_size, stillscreen};
-use super::world::{check_bed, check_door, day_night_tick, raft_proximity, sort_actors, spawn_encounters, speak_nearby, survival_tick, undo_sprites};
-use super::asm_stubs::{WBenchMsg};
-use super::game_tables::{_sprite_data, blackcolors, menus, new_wave, pointer, textcolors, topaz_ta};
-use super::globals::{GfxBase as gfx_base, LayersBase as layers_base, afont, anim_list, anix, anix2, audio_open, audioport, bm_lim, bm_page1, bm_page2, bm_scroll, bm_source, bm_text, bmask_mem, cheat1, cmode, flasher, font, fp_drawing, fp_page1, fp_page2, fp_viewing, freeze_timer, handler_data, hero_x, hero_y, image_mem, img_x, img_y, ioaudio, li, light_timer, map_mem, map_x, map_y, new_region, nhinor, nhivar, oldview, openflags, origDir, pagea, pageb, queue_mem, quitflag, ri_page1, ri_page2, ri_text, rp, rp_map, rp_text, rp_text2, sample_mem, scoremem, sector_mem, seg, shadow_mem, shape_mem, sprite_data, terra_mem, tfont, thistask, track, v, viewstatus, volmem, vp, vp_page, vp_text, wavmem, wb_bmap, work_bm};
-
+use super::loading::{
+    copy_protection_check, copy_protection_riddle, into_chip, intro_skipped, load_pending_region,
+    read_sample, read_score, show_story_page,
+};
+use super::move_actor::move_actor;
+use super::objects::spawn_object_actors;
+use super::regions::refresh_minimap;
+use super::revive::revive;
+use super::screen_fx::{fade_normal, handle_print_request, set_intro_zoom, show_still_screen};
+use super::world::{
+    check_bed, check_door, day_night_tick, raft_proximity, sort_actors, spawn_encounters,
+    speak_nearby, survival_tick, undo_sprites,
+};
 
 unsafe extern "C" {
     static mut hinor: [u8; 0];
@@ -46,12 +66,12 @@ unsafe extern "C" {
     fn UnMakeBitMap(bm: *mut BitMap);
     fn NewLayerInfo() -> *mut c_void;
     fn DisposeLayerInfo(li: *mut c_void);
-    fn InitRastPort(rp: *mut RastPort);
-    fn SetBPen(rp: *mut RastPort, pen: u32);
-    fn SetAPen(rp: *mut RastPort, pen: u32);
-    fn SetDrMd(rp: *mut RastPort, mode: u32);
-    fn SetRast(rp: *mut RastPort, pen: u32);
-    fn SetFont(rp: *mut RastPort, f: *mut TextFont);
+    fn InitRastPort(current_rastport: *mut RastPort);
+    fn SetBPen(current_rastport: *mut RastPort, pen: u32);
+    fn SetAPen(current_rastport: *mut RastPort, pen: u32);
+    fn SetDrMd(current_rastport: *mut RastPort, mode: u32);
+    fn SetRast(current_rastport: *mut RastPort, pen: u32);
+    fn SetFont(current_rastport: *mut RastPort, f: *mut TextFont);
     fn AllocMem(size: u32, flags: u32) -> *mut u8;
     fn FreeMem(mem: *mut c_void, size: u32);
     fn AllocRaster(w: u32, h: u32) -> *mut u8;
@@ -63,14 +83,14 @@ unsafe extern "C" {
     fn FindTask(name: *const c_char) -> *mut Process;
     fn FreeSprite(n: i32);
     fn GetSprite(s: *mut SimpleSprite, n: i32) -> i32;
-    fn ChangeSprite(vp: *mut ViewPort, s: *mut SimpleSprite, data: *mut u8);
+    fn ChangeSprite(current_viewport: *mut ViewPort, s: *mut SimpleSprite, data: *mut u8);
     fn InitView(v: *mut View);
-    fn InitVPort(vp: *mut ViewPort);
-    fn MakeVPort(v: *mut View, vp: *mut ViewPort) -> i32;
+    fn InitVPort(current_viewport: *mut ViewPort);
+    fn MakeVPort(v: *mut View, current_viewport: *mut ViewPort) -> i32;
     fn InitBitMap(bm: *mut BitMap, depth: i32, w: i32, h: i32);
     fn GetColorMap(n: i32) -> *mut ColorMap;
     fn FreeColorMap(cm: *mut ColorMap);
-    fn FreeVPortCopLists(vp: *mut ViewPort);
+    fn FreeVPortCopLists(current_viewport: *mut ViewPort);
     fn FreeCprList(c: *mut c_void);
     fn LoadView(view: *mut View);
     fn CreatePort(name: *const c_char, pri: i32) -> *mut c_void;
@@ -87,8 +107,8 @@ unsafe extern "C" {
     fn Close(f: isize);
     fn CurrentDir(lock: isize) -> isize;
     fn Delay(ticks: i32);
-    fn SetRGB4(vp: *mut ViewPort, n: i32, r: u32, g: u32, b: u32);
-    fn LoadRGB4(vp: *mut ViewPort, colors: *const u16, count: i32);
+    fn SetRGB4(current_viewport: *mut ViewPort, n: i32, r: u32, g: u32, b: u32);
+    fn LoadRGB4(current_viewport: *mut ViewPort, colors: *const u16, count: i32);
     fn BltBitMap(
         src: *mut BitMap,
         sx: i32,
@@ -179,7 +199,7 @@ unsafe fn has_flag(flag: u16) -> bool {
     unsafe { openflags & flag != 0 }
 }
 
-/// Opens everything the game needs. Returns 0, or the error number `do_error` shows.
+/// Opens everything the game needs. Returns 0, or the error number `show_error` shows.
 pub fn open_all() -> i32 {
     unsafe {
         openflags = 0;
@@ -203,13 +223,13 @@ pub fn open_all() -> i32 {
         InitRastPort(&raw mut rp_map);
         InitRastPort(&raw mut rp_text);
         InitRastPort(&raw mut rp_text2);
-        rp = &raw mut rp_text;
+        current_rastport = &raw mut rp_text;
 
         wb_bmap = &raw mut work_bm;
         rp_text.BitMap = wb_bmap; // the "workbench screen" (not)
-        SetBPen(rp, 0);
-        SetDrMd(rp, JAM2 as u32);
-        SetRast(rp, 0);
+        SetBPen(current_rastport, 0);
+        SetDrMd(current_rastport, JAM2 as u32);
+        SetRast(current_rastport, 0);
 
         bm_page1 = AllocMem(
             BITMAP_COUNT * size_of::<BitMap>() as u32,
@@ -221,7 +241,7 @@ pub fn open_all() -> i32 {
         }
         set_flag(AL_BMAP);
 
-        let err = AllocDiskIO();
+        let err = open_disk();
         if err != 0 {
             return err;
         }
@@ -230,22 +250,22 @@ pub fn open_all() -> i32 {
         if seg == 0 {
             return 15;
         }
-        // The Amiga hands out a BPTR (address / 4); the font header sits 8 bytes in.
+        // The Amiga hands out a BPTR (address / 4); the font current_chunk_id sits 8 bytes in.
         font = ((seg << 2) + 8) as *mut DiskFontHeader;
         set_flag(AL_FONT);
 
-        tfont = OpenFont(&raw mut topaz_ta);
-        SetFont(&raw mut rp_text, tfont);
-        SetFont(&raw mut rp_text2, tfont);
-        SetFont(&raw mut rp_map, tfont);
-        afont = &raw mut (*font).dfh_TF;
+        panel_font = OpenFont(&raw mut topaz_attr);
+        SetFont(&raw mut rp_text, panel_font);
+        SetFont(&raw mut rp_text2, panel_font);
+        SetFont(&raw mut rp_map, panel_font);
+        story_font = &raw mut (*font).dfh_TF;
 
         // the input handler
         handler_data.xsprite = 320;
         handler_data.ysprite = 320;
         handler_data.gbase = gfx_base.cast();
         handler_data.pbase = std::ptr::null_mut();
-        if add_device() == 0 {
+        if install_input_handler() == 0 {
             return 4;
         }
 
@@ -255,7 +275,7 @@ pub fn open_all() -> i32 {
 
         set_flag(AL_HANDLE);
         FreeSprite(0);
-        GetSprite(&raw mut pointer, 0);
+        GetSprite(&raw mut pointer_sprite, 0);
 
         InitView(&raw mut v);
         InitVPort(&raw mut vp_page);
@@ -313,8 +333,8 @@ pub fn open_all() -> i32 {
         fp_page2.savecop = std::ptr::null_mut();
         fp_page1.ri_page = &raw mut ri_page1;
         fp_page2.ri_page = &raw mut ri_page1;
-        fp_drawing = &raw mut fp_page1;
-        fp_viewing = &raw mut fp_page2;
+        drawing_page = &raw mut fp_page1;
+        viewing_page = &raw mut fp_page2;
 
         // the colour tables
         vp_page.ColorMap = GetColorMap(32);
@@ -367,7 +387,7 @@ pub fn open_all() -> i32 {
             return 17;
         }
         volmem = wavmem.add(S_WAVBUF as usize);
-        init_music((&raw const new_wave).cast(), wavmem, volmem);
+        init_music((&raw const instrument_waves).cast(), wavmem, volmem);
         set_flag(AL_MUSIC);
 
         image_mem = AllocMem(IMAGE_SZ, MEMF_CHIP);
@@ -396,8 +416,8 @@ pub fn open_all() -> i32 {
             return 11;
         }
         set_flag(AL_SAMPLE);
-        terra_mem = AllocMem(TERRA_SZ, MEMF_CHIP);
-        if terra_mem.is_null() {
+        terrain_mem = AllocMem(TERRA_SZ, MEMF_CHIP);
+        if terrain_mem.is_null() {
             return 34;
         }
         set_flag(AL_TERR);
@@ -413,9 +433,9 @@ pub fn open_all() -> i32 {
 
         bm_scroll.Planes[0] = (*bm_text).Planes[0];
 
-        sprite_data = into_chip((&raw mut _sprite_data).cast(), SPRITE_DATA_SZ);
+        sprite_data = into_chip((&raw mut pointer_sprite_data).cast(), SPRITE_DATA_SZ);
 
-        ChangeSprite(&raw mut vp_text, &raw mut pointer, sprite_data);
+        ChangeSprite(&raw mut vp_text, &raw mut pointer_sprite, sprite_data);
         handler_data.vbase = (&raw mut vp_text).cast();
 
         nhinor = into_chip((&raw mut hinor).cast(), NORM_HIGH_SZ);
@@ -455,7 +475,7 @@ unsafe fn open_audio() {
 pub fn close_all() {
     unsafe {
         if has_flag(AL_TERR) {
-            FreeMem(terra_mem.cast(), TERRA_SZ);
+            FreeMem(terrain_mem.cast(), TERRA_SZ);
         }
         if has_flag(AL_SAMPLE) {
             FreeMem(sample_mem.cast(), SAMPLE_SZ);
@@ -481,7 +501,7 @@ pub fn close_all() {
         // Memory that `into_chip` copied is freed; if it handed back the original, nothing is.
         free_chip(
             sprite_data,
-            (&raw mut _sprite_data).cast(),
+            (&raw mut pointer_sprite_data).cast(),
             SPRITE_DATA_SZ as u32,
         );
         free_chip(nhinor, (&raw mut hinor).cast(), NORM_HIGH_SZ as u32);
@@ -518,14 +538,14 @@ pub fn close_all() {
         }
 
         if has_flag(AL_HANDLE) {
-            wrap_device();
+            remove_input_handler();
         }
         if has_flag(AL_FONT) {
             UnLoadSeg(seg);
-            CloseFont(tfont);
+            CloseFont(panel_font);
         }
 
-        FreeDiskIO();
+        close_disk();
 
         if has_flag(AL_GBASE) {
             CloseLibrary(gfx_base.cast());
@@ -563,7 +583,7 @@ unsafe extern "C" {
     fn fta_test_hook();
 }
 
-// Screen modes (`viewstatus`).
+// Screen modes (`view_status`).
 const VIEW_NORMAL: i8 = 0;
 const VIEW_CHANGED: i8 = 3;
 const VIEW_BIG: i8 = 1;
@@ -603,7 +623,7 @@ const SHADOW_BLOCK: (i16, i16) = (896, 24);
 const DIF_SIGN_BIT: i32 = 0x200;
 const DIF_SIGN_EXTEND: i32 = 0xfc00;
 const DIF_MASK: i32 = 0x03ff;
-/// The scroll directions `scrollmap` takes, by (dif_x, dif_y).
+/// The scroll directions `scroll_map` takes, by (dif_x, dif_y).
 const SCROLL_UP_LEFT: i32 = 5;
 const SCROLL_LEFT: i32 = 4;
 const SCROLL_DOWN_LEFT: i32 = 3;
@@ -625,7 +645,7 @@ pub extern "C" fn fta_main(argc: i32, _argv: *mut c_char) {
         light_timer = 0;
         let err = open_all();
         if err != 0 {
-            do_error(err);
+            show_error(err);
             quit_all();
             return;
         }
@@ -655,35 +675,35 @@ unsafe fn start_up() -> bool {
 
         vp_page.RasInfo = &raw mut ri_page1;
         fp_page2.ri_page = &raw mut ri_page2;
-        rp_map.BitMap = (*(*fp_viewing).ri_page).BitMap;
+        rp_map.BitMap = (*(*viewing_page).ri_page).BitMap;
         SetRast(&raw mut rp_map, 0);
-        rp_map.BitMap = (*(*fp_drawing).ri_page).BitMap;
+        rp_map.BitMap = (*(*drawing_page).ri_page).BitMap;
         SetRast(&raw mut rp_map, 0);
-        rp = &raw mut rp_map;
-        screen_size(ZOOM_NORMAL);
+        current_rastport = &raw mut rp_map;
+        set_intro_zoom(ZOOM_NORMAL);
         SetRGB4(&raw mut vp_page, 0, 0, 0, 6);
         SetRGB4(&raw mut vp_page, 1, 15, 15, 15);
 
         // show the legal text
-        let pen = (*rp).FgPen as u32;
-        SetAPen(rp, TITLE_PEN);
-        ssp(titletext.as_ptr());
-        SetAPen(rp, pen);
+        let pen = (*current_rastport).FgPen as u32;
+        SetAPen(current_rastport, TITLE_PEN);
+        print_positioned(titletext.as_ptr());
+        SetAPen(current_rastport, pen);
 
         Delay(TITLE_WAIT);
 
-        rp = &raw mut rp_text;
+        current_rastport = &raw mut rp_text;
         rp_text.BitMap = &raw mut bm_scroll;
-        SetFont(rp, afont);
-        SetAPen(rp, 10);
-        SetBPen(rp, 11);
+        SetFont(current_rastport, story_font);
+        SetAPen(current_rastport, 10);
+        SetBPen(current_rastport, 11);
 
         read_score();
         read_sample();
 
         Delay(TITLE_WAIT);
 
-        vp = &raw mut vp_page; // so that the IFF routines can communicate
+        current_viewport = &raw mut vp_page; // so that the IFF routines can communicate
         vp_page.RasInfo = &raw mut ri_page1;
 
         for i in 0..5 {
@@ -694,46 +714,54 @@ unsafe fn start_up() -> bool {
 
         playscore(track[12], track[13], track[14], track[15]);
 
-        LoadRGB4(&raw mut vp_text, (&raw const blackcolors).cast(), PAGE_COLORS);
+        LoadRGB4(
+            &raw mut vp_text,
+            (&raw const black_colors).cast(),
+            PAGE_COLORS,
+        );
 
         fp_page2.ri_page = &raw mut ri_page2;
-        screen_size(0);
+        set_intro_zoom(0);
 
-        pagechange(); // "prime the pump"
-        pagechange();
+        flip_pages(); // "prime the pump"
+        flip_pages();
 
-        if skipint() == 0 {
+        if intro_skipped() == 0 {
             play_intro();
         }
 
-        seekn();
+        copy_protection_check();
         // go to the normal (playing) screen mode
         fp_page2.ri_page = &raw mut ri_page2;
-        rp_map.BitMap = (*(*fp_viewing).ri_page).BitMap;
+        rp_map.BitMap = (*(*viewing_page).ri_page).BitMap;
         SetRast(&raw mut rp_map, 0);
-        rp_map.BitMap = (*(*fp_drawing).ri_page).BitMap;
+        rp_map.BitMap = (*(*drawing_page).ri_page).BitMap;
         SetRast(&raw mut rp_map, 0);
 
-        LoadRGB4(&raw mut vp_text, (&raw const blackcolors).cast(), PAGE_COLORS);
-        screen_size(ZOOM_NORMAL);
+        LoadRGB4(
+            &raw mut vp_text,
+            (&raw const black_colors).cast(),
+            PAGE_COLORS,
+        );
+        set_intro_zoom(ZOOM_NORMAL);
         SetRGB4(&raw mut vp_page, 0, 0, 0, 3);
         load_track_range(SHADOW_BLOCK.0, SHADOW_BLOCK.1, shadow_mem.cast(), 0);
-        WaitLastDiskIO();
-        InvalidLastDiskIO();
+        wait_for_last_read();
+        mark_last_read_unused();
 
         SetRGB4(&raw mut vp_page, 0, 0, 0, 6);
-        unpackbrush(c"hiscreen".as_ptr(), bm_text, 0, 0);
+        load_picture(c"hiscreen".as_ptr(), bm_text, 0, 0);
 
         SetRGB4(&raw mut vp_page, 1, 15, 15, 15);
 
-        rp = &raw mut rp_map;
-        rp_map.BitMap = (*(*fp_drawing).ri_page).BitMap;
-        stillscreen();
-        SetAPen(rp, TITLE_PEN);
+        current_rastport = &raw mut rp_map;
+        rp_map.BitMap = (*(*drawing_page).ri_page).BitMap;
+        show_still_screen();
+        SetAPen(current_rastport, TITLE_PEN);
         placard_text(PLACARD_COPYRIGHT);
         handler_data.laydown = 0;
         handler_data.pickup = 0;
-        if copy_protect_junk() == 0 {
+        if copy_protection_riddle() == 0 {
             return false;
         }
         Delay(PLACARD_WAIT);
@@ -745,7 +773,7 @@ unsafe fn start_up() -> bool {
 
         stopscore();
         revive(1);
-        rp_map.BitMap = (*(*fp_drawing).ri_page).BitMap;
+        rp_map.BitMap = (*(*drawing_page).ri_page).BitMap;
 
         // establish the text page
         vp_text.DyOffset = PAGE_HEIGHT;
@@ -755,17 +783,21 @@ unsafe fn start_up() -> bool {
         vp_page.DWidth = LOWRES_WIDTH;
         vp_page.DyOffset = 0;
         MakeVPort(&raw mut v, &raw mut vp_text);
-        LoadRGB4(&raw mut vp_text, (&raw const textcolors).cast(), TEXT_COLORS);
-        handler_data.pbase = (&raw mut pointer).cast();
+        LoadRGB4(
+            &raw mut vp_text,
+            (&raw const text_colors).cast(),
+            TEXT_COLORS,
+        );
+        handler_data.pbase = (&raw mut pointer_sprite).cast();
 
         fp_page1.obcount = 0;
         fp_page2.obcount = 0;
         fp_page1.wflag = 0;
         fp_page2.wflag = 0;
 
-        viewstatus = VIEW_REDRAW;
+        view_status = VIEW_REDRAW;
 
-        cmode = 0;
+        current_menu = 0;
         print_options();
         true
     }
@@ -774,7 +806,7 @@ unsafe fn start_up() -> bool {
 /// The story pictures with the zoom in and out (skipped if the player presses Space).
 unsafe fn play_intro() {
     unsafe {
-        unpackbrush(c"page0".as_ptr(), &raw mut pageb, 0, 0);
+        load_picture(c"page0".as_ptr(), &raw mut pageb, 0, 0);
         BltBitMap(
             &raw mut pageb,
             0,
@@ -804,21 +836,21 @@ unsafe fn play_intro() {
 
         fp_page2.ri_page = &raw mut ri_page1;
         for x in (0..=ZOOM_FULL).step_by(ZOOM_STEP) {
-            screen_size(x);
+            set_intro_zoom(x);
         }
         fp_page2.ri_page = &raw mut ri_page2;
 
-        if skipint() == 0 {
-            copypage(c"p1a".as_ptr(), c"p1b".as_ptr(), 21, 29);
-            copypage(c"p2a".as_ptr(), c"p2b".as_ptr(), 20, 29);
-            copypage(c"p3a".as_ptr(), c"p3b".as_ptr(), 20, 33);
-            if skipp == 0 {
+        if intro_skipped() == 0 {
+            show_story_page(c"p1a".as_ptr(), c"p1b".as_ptr(), 21, 29);
+            show_story_page(c"p2a".as_ptr(), c"p2b".as_ptr(), 20, 29);
+            show_story_page(c"p3a".as_ptr(), c"p3b".as_ptr(), 20, 33);
+            if intro_skip_requested == 0 {
                 Delay(INTRO_PAGES_WAIT);
             }
         }
         fp_page2.ri_page = &raw mut ri_page1;
         for x in (0..=ZOOM_NORMAL).rev().step_by(ZOOM_STEP) {
-            screen_size(x);
+            set_intro_zoom(x);
         }
     }
 }
@@ -826,10 +858,10 @@ unsafe fn play_intro() {
 /// How the map moved since the last frame, in sectors (x wraps at 10 bits).
 unsafe fn scroll_step() -> (i16, i16) {
     unsafe {
-        img_x = map_x >> 4;
-        img_y = map_y >> 5;
-        let mut dif_x = (img_x as i32 - (*fp_drawing).isv_x) as i16;
-        let dif_y = (img_y as i32 - (*fp_drawing).isv_y) as i16;
+        tile_x = map_x >> 4;
+        tile_y = map_y >> 5;
+        let mut dif_x = (tile_x as i32 - (*drawing_page).isv_x) as i16;
+        let dif_y = (tile_y as i32 - (*drawing_page).isv_y) as i16;
         if dif_x as i32 & DIF_SIGN_BIT != 0 {
             dif_x = (dif_x as i32 | DIF_SIGN_EXTEND) as i16;
         } else {
@@ -846,34 +878,34 @@ unsafe fn main_loop() {
         let mut j: i16 = 0;
         let mut cycle: i16 = 0; // the frame counter (the C left it uninitialised)
 
-        cheat1 = 0;
-        quitflag = 0;
-        while quitflag == 0 {
+        cheat_enabled = 0;
+        quit_requested = 0;
+        while quit_requested == 0 {
             cycle = cycle.wrapping_add(1);
             flasher = flasher.wrapping_add(1);
             fta_test_hook(); // test commands, does nothing normally
 
-            let key = getkey() as i8;
+            let key = next_key() as i8;
 
             let notpause = menus[GAME_MENU].enabled[PAUSE_ENTRY] & 1 == 0;
             if key != 0 {
                 handle_key(key as i32, notpause as i32);
             }
 
-            if viewstatus == VIEW_PAUSED {
+            if view_status == VIEW_PAUSED {
                 Delay(PAUSE_WAIT);
-                viewstatus = VIEW_REDRAW;
-            } else if viewstatus == VIEW_BIG || viewstatus == VIEW_BIG_STILL {
-                if flasher & 16 != 0 && viewstatus == VIEW_BIG {
+                view_status = VIEW_REDRAW;
+            } else if view_status == VIEW_BIG || view_status == VIEW_BIG_STILL {
+                if flasher & 16 != 0 && view_status == VIEW_BIG {
                     SetRGB4(&raw mut vp_page, 31, FLASH_COLOR, FLASH_COLOR, FLASH_COLOR);
                 } else {
                     SetRGB4(&raw mut vp_page, 31, 0, 0, 0);
                 }
-                ppick();
+                handle_print_request();
                 continue; // go no further
             }
 
-            decode_mouse();
+            read_walk_direction();
 
             if menus[GAME_MENU].enabled[PAUSE_ENTRY] & 1 != 0 {
                 Delay(1);
@@ -885,7 +917,7 @@ unsafe fn main_loop() {
             // the monsters' and the hero's movement
             raft_proximity();
             let mut i = 0;
-            while i < anix as i32 {
+            while i < active_actor_count as i32 {
                 move_actor(i, cycle, &mut j);
                 i += 1;
             }
@@ -893,8 +925,8 @@ unsafe fn main_loop() {
             check_bed();
             check_door();
 
-            hero_x = anim_list[0].abs_x;
-            hero_y = anim_list[0].abs_y;
+            hero_x = actor_list[0].abs_x;
+            hero_y = actor_list[0].abs_y;
 
             // generate the map
             undo_sprites();
@@ -902,27 +934,27 @@ unsafe fn main_loop() {
             let (mut dif_x, mut dif_y) = scroll_step();
 
             if new_region < NO_REGION {
-                load_next();
+                load_pending_region();
             }
 
             let mut world_update = false;
-            if viewstatus == VIEW_REDRAW
-                || viewstatus == VIEW_REDRAW_2
-                || viewstatus == VIEW_CHANGED
+            if view_status == VIEW_REDRAW
+                || view_status == VIEW_REDRAW_2
+                || view_status == VIEW_CHANGED
             {
-                gen_mini();
-                map_draw();
+                refresh_minimap();
+                draw_map();
                 dif_x = 0;
                 dif_y = 0;
-                if viewstatus == VIEW_REDRAW {
-                    viewstatus = VIEW_REDRAW_2;
-                } else if viewstatus == VIEW_REDRAW_2 {
-                    viewstatus = VIEW_NORMAL;
+                if view_status == VIEW_REDRAW {
+                    view_status = VIEW_REDRAW_2;
+                } else if view_status == VIEW_REDRAW_2 {
+                    view_status = VIEW_NORMAL;
                 }
                 world_update = true;
             } else {
                 if dif_x != 0 || dif_y != 0 {
-                    gen_mini();
+                    refresh_minimap();
                 }
                 let scroll = match (dif_x, dif_y) {
                     (1, 1) => Some(SCROLL_UP_LEFT),
@@ -936,16 +968,16 @@ unsafe fn main_loop() {
                     _ => None,
                 };
                 if let Some(dir) = scroll {
-                    scrollmap(dir);
+                    scroll_map(dir);
                 } else if dif_x == 0 && dif_y == 0 {
                     // no motion: the world gets its turn here
-                    ppick();
+                    handle_print_request();
                     world_update = true;
                 } else {
                     // moved too far to scroll: redraw the whole map
                     dif_x = 0;
                     dif_y = 0;
-                    map_draw();
+                    draw_map();
                 }
             }
 
@@ -954,38 +986,38 @@ unsafe fn main_loop() {
                 if freeze_timer == 0 {
                     spawn_encounters();
                     speak_nearby();
-                    actor_ai();
+                    update_enemy_goals();
                     survival_tick();
                 }
             }
 
-            (*fp_drawing).isv_x = img_x as i32;
-            (*fp_drawing).isv_y = img_y as i32;
+            (*drawing_page).isv_x = tile_x as i32;
+            (*drawing_page).isv_y = tile_y as i32;
 
             SetAPen(&raw mut rp_map, SPRITE_PEN);
 
-            melee_hits();
-            move_missiles();
+            resolve_melee();
+            advance_missiles();
 
-            anix2 = anix;
-            do_objects();
+            drawn_actor_count = active_actor_count;
+            spawn_object_actors();
 
             // the flying missiles, then sort the actors by position
-            queue_missiles();
+            queue_missile_sprites();
             sort_actors();
 
             // now that the scroll blit is done, finish repairing the map
             repair_map_and_witch(dif_x, dif_y);
 
             draw_sprites(cycle);
-            j = anix2; // the drawing loop used to leave j here; the next frame's actor loop reads it
+            j = drawn_actor_count; // the drawing loop used to leave j here; the next frame's actor loop reads it
             WaitBlit();
-            (*(*fp_drawing).ri_page).RxOffset = (map_x & 15) as i16; // modulus 16
-            (*(*fp_drawing).ri_page).RyOffset = (map_y & 31) as i16; // modulus 32
-            pagechange();
-            if viewstatus == VIEW_CHANGED {
+            (*(*drawing_page).ri_page).RxOffset = (map_x & 15) as i16; // modulus 16
+            (*(*drawing_page).ri_page).RyOffset = (map_y & 31) as i16; // modulus 32
+            flip_pages();
+            if view_status == VIEW_CHANGED {
                 fade_normal();
-                viewstatus = VIEW_NORMAL;
+                view_status = VIEW_NORMAL;
             }
         }
     }

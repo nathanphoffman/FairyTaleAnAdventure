@@ -5,14 +5,16 @@
 //! indoor ones (8: buildings, 9: dungeons and caves). `region_num` is the region now loaded;
 //! `new_region` is the one being loaded, or `NO_REGION` when nothing is waiting to load.
 
+use super::asm_map::fill_minimap;
+use super::game_tables::{loaded_blocks, region_disk_blocks, region_num};
+use super::globals::{
+    image_mem, map_mem, map_x, map_y, new_region, region_origin_x, region_origin_y, sector_mem,
+    stuff, target_region, terrain_mem, tile_x, tile_y,
+};
 use super::hdrive::{
-    CheckDiskIO, InvalidDiskIO, IsReadDiskIO, WaitDiskIO, load_track_range, motor_off,
+    is_read_pending, load_track_range, mark_read_unused, motor_off, read_finished, wait_for_read,
 };
 use std::ffi::c_void;
-use super::asm_map::{genmini};
-use super::game_tables::{current_loads, file_index, region_num};
-use super::globals::{image_mem, img_x, img_y, lregion, map_mem, map_x, map_y, new_region, sector_mem, stuff, terra_mem, xreg, yreg};
-
 
 /// `new_region` value meaning no region is waiting to be loaded.
 const NO_REGION: u16 = 10;
@@ -44,99 +46,103 @@ const STATUES_NEEDED: u8 = 5;
 const DESERT_DOOR_TILE: usize = (11 * 128) + 26;
 const BLOCKED_TILE: u8 = 254;
 
-/// Works out which region the camera is in and starts loading it if it changed; sets `xreg` and
-/// `yreg` (where the loaded region starts, in sectors); then fills `minimap` for the screen.
+/// Works out which region the camera is in and starts loading it if it changed; sets `region_origin_x` and
+/// `region_origin_y` (where the loaded region starts, in sectors); then fills `minimap` for the screen.
 ///
 /// Outdoors the region comes from the middle of the screen: bit 6 of the sector column gives
 /// west or east, and two bits of the sector row give which of four rows.
-pub fn gen_mini() {
+pub fn refresh_minimap() {
     unsafe {
         if region_num < FIRST_INDOOR_REGION {
             if new_region < NO_REGION {
                 let xs = map_x as u32 & 0x3fff;
                 let ys = map_y as u32 & 0x1fff;
                 if (ys > 109 && ys < 7936) && (xs > 16156 || xs < 16128) {
-                    load_all();
+                    load_region_now();
                 }
             }
             let xs = (map_x as u32 + 151) >> 8;
             let ys = (map_y as u32 + 64) >> 8;
             let xr = (xs >> 6) & 1;
             let yr = (ys >> 5) & 3;
-            lregion = (xr + yr + yr) as u16;
-            if lregion != region_num {
-                new_region = lregion;
-                load_all();
+            target_region = (xr + yr + yr) as u16;
+            if target_region != region_num {
+                new_region = target_region;
+                load_region_now();
             }
         } else {
-            lregion = region_num;
+            target_region = region_num;
         }
 
-        if (CheckDiskIO(2) != 0 && CheckDiskIO(0) != 0) || new_region >= NO_REGION {
-            let yr = lregion >> 1;
-            let xr = if lregion > 7 { 0 } else { lregion & 1 };
-            xreg = xr << 6;
-            yreg = yr << 5;
+        if (read_finished(2) != 0 && read_finished(0) != 0) || new_region >= NO_REGION {
+            let yr = target_region >> 1;
+            let xr = if target_region > 7 {
+                0
+            } else {
+                target_region & 1
+            };
+            region_origin_x = xr << 6;
+            region_origin_y = yr << 5;
         }
 
-        genmini(img_x as i32, img_y as i32);
+        fill_minimap(tile_x as i32, tile_y as i32);
     }
 }
 
-/// Loads the pending region completely (`load_new_region` does one piece per call).
-pub fn load_all() {
+/// Loads the pending region completely (`load_region_piece` does one piece per call).
+pub fn load_region_now() {
     unsafe {
         while new_region < NO_REGION {
-            load_new_region();
+            load_region_piece();
         }
     }
 }
 
 /// Loads the next missing piece of the region in `new_region`: sector data, region map, the two
 /// terrain tables, then one image bank per call. Each piece is only read if the loaded one is
-/// different (`current_loads`). When everything is there, waits for the reads, turns the drive
+/// different (`loaded_blocks`). When everything is there, waits for the reads, turns the drive
 /// off, and `new_region` becomes the current region.
-pub fn load_new_region() {
+pub fn load_region_piece() {
     unsafe {
         if new_region >= NO_REGION {
             return;
         }
-        let need = &file_index[new_region as usize];
-        if need.sector != current_loads.sector {
+        let need = &region_disk_blocks[new_region as usize];
+        if need.sector != loaded_blocks.sector {
             load_track_range(
                 need.sector as i16,
                 SECTOR_BLOCKS,
                 sector_mem.cast::<c_void>(),
                 REQ_SECTOR,
             );
-            current_loads.sector = need.sector;
+            loaded_blocks.sector = need.sector;
         }
-        if need.region != current_loads.region {
+        if need.region != loaded_blocks.region {
             load_track_range(
                 need.region as i16,
                 REGION_MAP_BLOCKS,
                 map_mem.cast::<c_void>(),
                 REQ_MAP,
             );
-            current_loads.region = need.region;
+            loaded_blocks.region = need.region;
         }
-        if need.terra1 != current_loads.terra1 {
+        if need.terra1 != loaded_blocks.terra1 {
             load_track_range(
                 TERRA_BLOCK + need.terra1 as i16,
                 1,
-                terra_mem.cast::<c_void>(),
+                terrain_mem.cast::<c_void>(),
                 REQ_TERRA1,
             );
-            current_loads.terra1 = need.terra1;
+            loaded_blocks.terra1 = need.terra1;
         }
-        if need.terra2 != current_loads.terra2 {
-            let dest = terra_mem.add(TERRA_TABLE_SIZE).cast::<c_void>();
+        if need.terra2 != loaded_blocks.terra2 {
+            let dest = terrain_mem.add(TERRA_TABLE_SIZE).cast::<c_void>();
             load_track_range(TERRA_BLOCK + need.terra2 as i16, 1, dest, REQ_TERRA2);
-            current_loads.terra2 = need.terra2;
+            loaded_blocks.terra2 = need.terra2;
         }
         let mut bank_mem = image_mem;
         for bank in 0..4 {
-            if need.image[bank] != current_loads.image[bank] {
+            if need.image[bank] != loaded_blocks.image[bank] {
                 let first = need.image[bank] as i16;
                 for plane in 0..5 {
                     let dest = bank_mem.add(plane * IMAGE_PLANE_SIZE).cast::<c_void>();
@@ -148,7 +154,7 @@ pub fn load_new_region() {
                         REQ_IMAGE_FIRST + plane as i16,
                     );
                 }
-                current_loads.image[bank] = need.image[bank];
+                loaded_blocks.image[bank] = need.image[bank];
                 return;
             }
             bank_mem = bank_mem.add(QUARTER_PLANE_SIZE);
@@ -161,10 +167,10 @@ pub fn load_new_region() {
         }
 
         for request in 0..7 {
-            if IsReadDiskIO(request) != 0 {
-                WaitDiskIO(request);
+            if is_read_pending(request) != 0 {
+                wait_for_read(request);
             }
-            InvalidDiskIO(request);
+            mark_read_unused(request);
         }
 
         motor_off();

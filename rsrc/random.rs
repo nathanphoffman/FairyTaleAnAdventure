@@ -6,7 +6,7 @@
 //! if the same seed gives the same numbers. The generator is a small linear congruential one:
 //! multiply the seed by 45821, add 1, then rotate the bits to get the result.
 
-use super::game_tables::{seed1};
+use super::game_tables::seed1;
 
 const SEED_MULTIPLIER: u32 = 45821;
 const RESULT_MASK: u32 = 0x7fff_ffff;

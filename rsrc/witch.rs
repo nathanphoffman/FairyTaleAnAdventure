@@ -6,10 +6,10 @@
 //! second time erases it. It also records, in `s1` and `s2`, on which side of each edge the hero
 //! stands, which csrc/fmain.c uses to decide whether the beam hits the hero.
 
+use super::globals::{hero_x, hero_y, li, map_x, map_y, rp_map};
 use super::tables::witchpoints;
 use super::types::FPage;
 use crate::amiga::{AreaInfo, BitMap, Layer, RastPort, TmpRas};
-use super::globals::{hero_x, hero_y, li, map_x, map_y, rp_map};
 
 unsafe extern "C" {
     fn CreateUpfrontLayer(
@@ -27,10 +27,10 @@ unsafe extern "C" {
     fn FreeRaster(p: *mut u8, w: u32, h: u32);
     fn InitTmpRas(t: *mut TmpRas, buf: *mut u8, size: i32) -> *mut TmpRas;
     fn InitArea(a: *mut AreaInfo, buf: *mut i16, max_vectors: i32);
-    fn AreaMove(rp: *mut RastPort, x: i32, y: i32) -> i32;
-    fn AreaDraw(rp: *mut RastPort, x: i32, y: i32) -> i32;
-    fn AreaEnd(rp: *mut RastPort) -> i32;
-    fn SetDrMd(rp: *mut RastPort, mode: u32);
+    fn AreaMove(current_rastport: *mut RastPort, x: i32, y: i32) -> i32;
+    fn AreaDraw(current_rastport: *mut RastPort, x: i32, y: i32) -> i32;
+    fn AreaEnd(current_rastport: *mut RastPort) -> i32;
+    fn SetDrMd(current_rastport: *mut RastPort, mode: u32);
 }
 
 /// Which side of each beam edge the hero is on (the cross product and whether it is not negative).

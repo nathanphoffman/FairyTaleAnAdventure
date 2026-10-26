@@ -6,17 +6,19 @@
 //!
 //! Looking up the ground under a pixel goes: pixel -> tile column/row -> which sector (from the
 //! region map `map_mem`) -> which tile (from that sector in `sector_mem`) -> the terrain table
-//! `terra_mem` for that tile. The odd wrap-around tricks (`wrap_secx`, `clamp_secy`) copy what the
+//! `terrain_mem` for that tile. The odd wrap-around tricks (`wrap_secx`, `clamp_secy`) copy what the
 //! assembly did when the position is outside the loaded region.
 //!
-//! Drawing: the screen shows 19 x 6 tiles. `genmini` fills `minimap` with the tile numbers for the
-//! visible area, and `map_draw`, `strip_draw`, `row_draw` copy the tile graphics to the screen.
-//! `scrollmap` shifts the picture by one tile so only a new edge has to be drawn.
+//! Drawing: the screen shows 19 x 6 tiles. `fill_minimap` fills `minimap` with the tile numbers for the
+//! visible area, and `draw_map`, `draw_map_column`, `draw_map_row` copy the tile graphics to the screen.
+//! `scroll_map` shifts the picture by one tile so only a new edge has to be drawn.
 
+use super::game_tables::region_num;
+use super::globals::{
+    hero_sector, hero_x, hero_y, image_mem, map_mem, map_x, map_y, planes, region_origin_x,
+    region_origin_y, sector_mem, secx, secy, terrain_mem,
+};
 use super::tables::minimap;
-use super::game_tables::{region_num};
-use super::globals::{hero_sector, hero_x, hero_y, image_mem, map_mem, map_x, map_y, planes, sector_mem, secx, secy, terra_mem, xreg, yreg};
-
 
 /// One bitplane of 256 tiles, 64 bytes per tile.
 const IMAGE_PLANE_SIZE: usize = 16384;
@@ -53,7 +55,10 @@ fn clamp_secy(v: i16) -> u16 {
 /// The sector number for a sector column and row of the region map.
 unsafe fn sector_at(col: u16, row: u16) -> u8 {
     unsafe {
-        *map_mem.add((row as usize * MAP_ROW_BYTES + col as usize + xreg as usize) as u16 as usize)
+        *map_mem.add(
+            (row as usize * MAP_ROW_BYTES + col as usize + region_origin_x as usize) as u16
+                as usize,
+        )
     }
 }
 
@@ -62,7 +67,7 @@ unsafe fn sector_at(col: u16, row: u16) -> u8 {
 /// Each tile is divided into 8 sub-areas (2 across, 4 down); the terrain table has a bit mask
 /// saying which of them are solid, so a tile can be partly walkable (a tree trunk in the middle of
 /// a clearing, say). The bit is picked from pixel bits 3 (x), 3 and 4 (y).
-pub fn px_to_im(x: i32, y: i32) -> i32 {
+pub fn terrain_at(x: i32, y: i32) -> i32 {
     let (ux, uy) = (x as u16, y as u16);
     let mut bit = 0x80u8;
     if ux & 8 != 0 {
@@ -76,28 +81,28 @@ pub fn px_to_im(x: i32, y: i32) -> i32 {
     }
     let (imx, imy) = (ux >> 4, uy >> 5);
     unsafe {
-        let col = wrap_secx((imx >> 4).wrapping_sub(xreg));
-        let row = clamp_secy((imy >> 3).wrapping_sub(yreg) as i16);
+        let col = wrap_secx((imx >> 4).wrapping_sub(region_origin_x));
+        let row = clamp_secy((imy >> 3).wrapping_sub(region_origin_y) as i16);
         let sec = sector_at(col, row) as usize;
         let tile = *sector_mem.add(
             (sec * SECTOR_BYTES + (imy as usize & 7) * 16 + (imx as usize & 15)) as u16 as usize,
         ) as usize;
-        if *terra_mem.add(tile * 4 + 2) & bit == 0 {
+        if *terrain_mem.add(tile * 4 + 2) & bit == 0 {
             return 0;
         }
-        (*terra_mem.add(tile * 4 + 1) >> 4) as i32
+        (*terrain_mem.add(tile * 4 + 1) >> 4) as i32
     }
 }
 
 /// Collision test with two probes either side of the character (4 pixels right and left, 2 down).
 /// Returns the blocking terrain type, 0 if the way is clear. Type 1 always blocks; the right-hand
 /// probe is blocked by 10 and above, the left-hand one by 8 and above.
-pub fn prox(x: i32, y: i32) -> i32 {
-    let t = px_to_im(x + 4, y + 2);
+pub fn probe_collision(x: i32, y: i32) -> i32 {
+    let t = terrain_at(x + 4, y + 2);
     if t == 1 || t >= 10 {
         return t;
     }
-    let t = px_to_im(x - 4, y + 2);
+    let t = terrain_at(x - 4, y + 2);
     if t == 1 || t >= 8 {
         return t;
     }
@@ -105,11 +110,11 @@ pub fn prox(x: i32, y: i32) -> i32 {
 }
 
 /// Address of the tile byte for a tile position (wraps vertically too).
-pub fn mapxy(imx: i32, imy: i32) -> *const u8 {
+pub fn tile_address(imx: i32, imy: i32) -> *const u8 {
     let (ux, uy) = (imx as u16, imy as u16);
     unsafe {
-        let col = wrap_secx((ux >> 4).wrapping_sub(xreg));
-        let mut row = (uy >> 3).wrapping_sub(yreg);
+        let col = wrap_secx((ux >> 4).wrapping_sub(region_origin_x));
+        let mut row = (uy >> 3).wrapping_sub(region_origin_y);
         if row & 32 != 0 {
             row = if row & 16 != 0 { 0 } else { 31 };
         }
@@ -120,17 +125,18 @@ pub fn mapxy(imx: i32, imy: i32) -> *const u8 {
 }
 
 /// Fills `minimap` (19 columns of 6 tile numbers, column by column) for the area starting at
-/// tile (img_x, img_y), and works out which sector the hero is in.
-pub fn genmini(img_x: i32, img_y: i32) {
+/// tile (tile_x, tile_y), and works out which sector the hero is in.
+pub fn fill_minimap(tile_x: i32, tile_y: i32) {
     unsafe {
-        let mut x = img_x as u16;
+        let mut x = tile_x as u16;
         let mut next = 0;
         for _ in 0..SCREEN_COLUMNS {
             x &= 0x07ff;
-            let col = wrap_secx((x >> 4).wrapping_sub(xreg)).wrapping_add(xreg);
+            let col =
+                wrap_secx((x >> 4).wrapping_sub(region_origin_x)).wrapping_add(region_origin_x);
             for j in 0..SCREEN_ROWS as i32 {
-                let y = (img_y + j) as u16 & 0x7fff;
-                let row = clamp_secy((y >> 3).wrapping_sub(yreg) as i16);
+                let y = (tile_y + j) as u16 & 0x7fff;
+                let row = clamp_secy((y >> 3).wrapping_sub(region_origin_y) as i16);
                 let sec = *map_mem
                     .add(((row as usize) << 7).wrapping_add(col as usize) as u16 as usize)
                     as usize;
@@ -145,7 +151,7 @@ pub fn genmini(img_x: i32, img_y: i32) {
         }
         // the assembly read the high byte of hero_x and hero_y (68000 is big-endian)
         let hx = (hero_x >> 8) as i32;
-        let hy = ((hero_y >> 8).wrapping_sub(yreg)) as i16 as i32;
+        let hy = ((hero_y >> 8).wrapping_sub(region_origin_y)) as i16 as i32;
         let mut sec = *map_mem.add(((hy << 7).wrapping_add(hx)) as u16 as usize) as i32;
         if region_num & 0xff > 7 {
             sec += 256;
@@ -170,15 +176,15 @@ fn step(v: i32, dir: i32, speed: i32, table: &[i16; 10]) -> i32 {
 
 /// The x position after one step in direction `dir` (0-7) at `speed`. Directions above 7 mean
 /// "no move". Directions go clockwise from north-west.
-pub fn newx(x: i32, dir: i32, speed: i32) -> i32 {
+pub fn step_x(x: i32, dir: i32, speed: i32) -> i32 {
     if dir & 0xff > MAX_DIRECTION {
         return x;
     }
     step(x, dir, speed, &X_STEPS)
 }
 
-/// Like `newx`, but for y; it keeps bit 15 of y (a flag the game stores there).
-pub fn newy(y: i32, dir: i32, speed: i32) -> i32 {
+/// Like `step_x`, but for y; it keeps bit 15 of y (a flag the game stores there).
+pub fn step_y(y: i32, dir: i32, speed: i32) -> i32 {
     if dir & 0xff > MAX_DIRECTION {
         return y;
     }
@@ -186,7 +192,7 @@ pub fn newy(y: i32, dir: i32, speed: i32) -> i32 {
 }
 
 /// Copies bit 14 into bit 15, giving a signed 15 bit value (the world wraps around at the edges).
-pub fn wrap(x: i32) -> i32 {
+pub fn wrap_coordinate(x: i32) -> i32 {
     let mut low = x as u32 & 0xffff;
     if low & 0x4000 != 0 {
         low |= 0x8000;
@@ -245,13 +251,13 @@ fn camera_after(cam_x: u16, cam_y: u16, x: i32, y: i32) -> (u16, u16) {
 }
 
 /// Moves the camera (`map_x`, `map_y`) after the hero.
-pub fn map_adjust(x: i32, y: i32) {
+pub fn move_camera_to(x: i32, y: i32) {
     unsafe { (map_x, map_y) = camera_after(map_x, map_y, x, y) };
 }
 
 /// Small lookup used by the page-turn animation: how far in from the top and bottom a strip of
 /// the curling page starts, given its distance from the fold.
-pub fn page_det(x: i32) -> i32 {
+pub fn page_turn_inset(x: i32) -> i32 {
     const SMALL: [i32; 11] = [9, 9, 8, 7, 6, 5, 5, 5, 4, 4, 4];
     match x {
         ..=10 => SMALL[x as usize],
@@ -295,7 +301,7 @@ unsafe fn draw_minimap_tile(col: usize, row: usize) {
 }
 
 /// The whole screen, 19 x 6 tiles.
-pub fn map_draw() {
+pub fn draw_map() {
     for col in 0..SCREEN_COLUMNS {
         for row in 0..SCREEN_ROWS {
             unsafe { draw_minimap_tile(col, row) };
@@ -304,14 +310,14 @@ pub fn map_draw() {
 }
 
 /// One column of tiles; `x` is the byte offset on screen (0 or 36).
-pub fn strip_draw(x: i32) {
+pub fn draw_map_column(x: i32) {
     for row in 0..SCREEN_ROWS {
         unsafe { draw_minimap_tile(x as usize / 2, row) };
     }
 }
 
 /// One row of tiles; `r` is twice the row number (0 or 10).
-pub fn row_draw(r: i32) {
+pub fn draw_map_row(r: i32) {
     for col in 0..SCREEN_COLUMNS {
         unsafe { draw_minimap_tile(col, r as usize / 2) };
     }
@@ -348,7 +354,7 @@ const fn mode(
 
 /// Directions are numbered by how the picture moves:
 /// 0 right, 1 down+right, 2 down, 3 down+left, 4 left, 5 up+left, 6 up, 7 up+right.
-/// The new edge is filled in by `strip_draw` / `row_draw` afterwards.
+/// The new edge is filled in by `draw_map_column` / `draw_map_row` afterwards.
 const SCROLL_MODES: [ScrollMode; 8] = [
     mode(0, 0, 2, 0, 36, 192),
     mode(0, 0, 2, 32, 36, 160),
@@ -362,7 +368,7 @@ const SCROLL_MODES: [ScrollMode; 8] = [
 
 /// Shifts the map one tile in one of 8 directions (the blitter did this on the Amiga).
 /// Moving down copies from the bottom up, so lines are not overwritten before they are read.
-pub fn scrollmap(dir: i32) {
+pub fn scroll_map(dir: i32) {
     let m = &SCROLL_MODES[dir as usize & 7];
     unsafe {
         for p in 0..PLANE_COUNT {
@@ -421,22 +427,22 @@ fn overview_origin(mx: i32, my: i32, region_x: u16, region_y: u16) -> (i16, i16)
 /// Draws the overview map (the magic map spell): each sector is one 16 by 8 block of pixels drawn
 /// twice as tall, 18 x 9 sectors across the screen. Each pixel's colour is the tile's overview
 /// colour (terrain table byte 3). `secx` / `secy` tell the caller which sector is at the top left.
-pub fn bigdraw(mx: i32, my: i32) {
+pub fn draw_overview_map(mx: i32, my: i32) {
     unsafe {
-        let (x, y) = overview_origin(mx, my, xreg, yreg);
+        let (x, y) = overview_origin(mx, my, region_origin_x, region_origin_y);
         secx = x as i32;
         secy = y as i32;
         let mut offset = 0usize;
         for j in 0..OVERVIEW_ROWS {
             for i in 0..OVERVIEW_COLUMNS {
-                let index = xreg as i32 + x as i32 + i as i32 + (((y + j) as i32) << 7);
+                let index = region_origin_x as i32 + x as i32 + i as i32 + (((y + j) as i32) << 7);
                 let sec = *map_mem.add(index as u16 as usize) as usize;
                 let tiles = sector_mem.add(sec * SECTOR_BYTES);
                 for line in 0..SECTOR_TILE_ROWS {
                     let mut words = [0u32; PLANE_COUNT];
                     for px in 0..SECTOR_PIXELS {
                         let tile = *tiles.add(line * 16 + px) as usize;
-                        let color = *terra_mem.add(tile * 4 + 3);
+                        let color = *terrain_mem.add(tile * 4 + 3);
                         for (p, word) in words.iter_mut().enumerate() {
                             *word = (*word << 1) | ((color >> p) & 1) as u32;
                         }
@@ -476,34 +482,34 @@ mod tests {
 
     #[test]
     fn steps_follow_the_direction_tables() {
-        assert_eq!(newx(100, 2, 4), 104); // east, speed 4: +2 * 4 / 2
-        assert_eq!(newx(100, 6, 4), 96);
-        assert_eq!(newx(100, 9, 4), 100); // no move
-        assert_eq!(newy(100, 1, 2), 97); // north: the negative step wraps in 16 bits, then stays 15 bit
+        assert_eq!(step_x(100, 2, 4), 104); // east, speed 4: +2 * 4 / 2
+        assert_eq!(step_x(100, 6, 4), 96);
+        assert_eq!(step_x(100, 9, 4), 100); // no move
+        assert_eq!(step_y(100, 1, 2), 97); // north: the negative step wraps in 16 bits, then stays 15 bit
     }
 
     #[test]
     fn newy_keeps_bit_15() {
-        assert_eq!(newy(0x8000 | 100, 4, 2) & 0x8000, 0x8000);
+        assert_eq!(step_y(0x8000 | 100, 4, 2) & 0x8000, 0x8000);
     }
 
     #[test]
     fn wrap_copies_bit_14_to_bit_15() {
-        assert_eq!(wrap(0x4000), 0xc000);
-        assert_eq!(wrap(0x1234), 0x1234);
-        assert_eq!(wrap(0x9234), 0x1234);
+        assert_eq!(wrap_coordinate(0x4000), 0xc000);
+        assert_eq!(wrap_coordinate(0x1234), 0x1234);
+        assert_eq!(wrap_coordinate(0x9234), 0x1234);
     }
 
     #[test]
     fn page_det_covers_every_range() {
-        assert_eq!(page_det(0), 9);
-        assert_eq!(page_det(10), 4);
-        assert_eq!(page_det(11), 3);
-        assert_eq!(page_det(72), 4);
-        assert_eq!(page_det(99), 5);
-        assert_eq!(page_det(124), 6);
-        assert_eq!(page_det(136), 7);
-        assert_eq!(page_det(137), 10);
+        assert_eq!(page_turn_inset(0), 9);
+        assert_eq!(page_turn_inset(10), 4);
+        assert_eq!(page_turn_inset(11), 3);
+        assert_eq!(page_turn_inset(72), 4);
+        assert_eq!(page_turn_inset(99), 5);
+        assert_eq!(page_turn_inset(124), 6);
+        assert_eq!(page_turn_inset(136), 7);
+        assert_eq!(page_turn_inset(137), 10);
     }
 
     #[test]

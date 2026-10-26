@@ -4,22 +4,25 @@
 //! How the world's objects work: each region has a list of objects (`ob_table`) and there is one
 //! global list (`ob_listg`) for things that follow the story, like the dead brothers' bags and the
 //! spectre. Each entry has a position, an id and a state. Only the entries near the screen become
-//! actors in `anim_list`, so the game never handles more than 20 actors at once:
+//! actors in `actor_list`, so the game never handles more than 20 actors at once:
 //! - people (state 3 or 4) go in slots starting at 2, counted by `j1`;
-//! - ordinary items go after the monsters, counted by `anix2`.
+//! - ordinary items go after the monsters, counted by `drawn_actor_count`.
 //! The actor's `vitality` field is borrowed to remember which list entry it came from (the entry
 //! number, plus 0x80 for the global list), so `change_object` can find the entry again later.
 
-use super::loading::cfiles;
+use super::actors::turtle_eggs;
+use super::asm_map::terrain_at;
+use super::game_tables::{region_num, setfig_table};
+use super::globals::{
+    active_actor_count, actor_list, drawn_actor_count, loaded_setfig_file, map_x, map_y,
+    new_region, nextshape, seq_list, witch_on_screen,
+};
+use super::hdrive::motor_off;
+use super::loading::sprite_files;
+use super::loading::{finish_sprite_load, load_sprite_file};
+use super::random::bitrand;
 use super::tables::{CHEST, TURTLE, dstobs, glbobs, mapobs, ob_listg, ob_table, rand_treasure};
 use super::types::{SeqInfo, Shape, WorldObject};
-use super::asm_map::{px_to_im};
-use super::hdrive::{motor_off};
-use super::loading::{prep, read_shapes};
-use super::random::{bitrand};
-use super::actors::{turtle_eggs};
-use super::game_tables::{region_num, setfig_table};
-use super::globals::{anim_list, anix, anix2, map_x, map_y, new_region, nextshape, seq_list, set_file, witchflag};
 /// Mirror of the `setfig_table` entries in csrc/fmain.c: for each kind of person (wizard, priest,
 /// guard, princess, king, noble, sorceress, bartender, witch, ranger ...), which sprite file
 /// holds them, which image to start from, and whether they can talk.
@@ -29,7 +32,6 @@ pub struct SetFigEntry {
     pub image_base: i8,
     pub can_talk: i8,
 }
-
 
 // Actor kinds and states (csrc/ftale.h).
 const OBJECTS: i8 = 1;
@@ -75,7 +77,7 @@ const PERSON_RAISE: i16 = 18;
 const PERSON_RACE_BASE: i32 = 0x80;
 
 /// First free actor slot for people while the object lists are walked.
-pub static mut j1: i16 = 0;
+pub static mut J1: i16 = 0;
 
 /// Whether `value` is strictly between the two limits.
 fn inside(value: i16, (low, high): (i16, i16)) -> bool {
@@ -84,17 +86,17 @@ fn inside(value: i16, (low, high): (i16, i16)) -> bool {
 
 /// Turns the global and current region's object lists into actors.
 /// Called when the screen changes (new region, scrolling far, after loading a game).
-pub fn do_objects() {
+pub fn spawn_object_actors() {
     unsafe {
-        j1 = FIRST_OBJECT_ACTOR;
-        set_objects((&raw mut ob_listg).cast(), glbobs, GLOBAL_LIST_BIT as i32);
-        set_objects(
+        J1 = FIRST_OBJECT_ACTOR;
+        add_objects_near((&raw mut ob_listg).cast(), glbobs, GLOBAL_LIST_BIT as i32);
+        add_objects_near(
             ob_table[region_num as usize],
             mapobs[region_num as usize],
             0,
         );
-        if j1 > 3 {
-            anix = j1;
+        if J1 > 3 {
+            active_actor_count = J1;
         }
     }
 }
@@ -104,7 +106,7 @@ pub fn do_objects() {
 pub fn leave_item(i: i16, object: i16) {
     unsafe {
         let drop = &mut *(&raw mut ob_listg).cast::<WorldObject>();
-        let actor = &(*(&raw const anim_list))[i as usize];
+        let actor = &(*(&raw const actor_list))[i as usize];
         drop.xc = actor.abs_x;
         drop.yc = actor.abs_y.wrapping_add(10);
         drop.ob_id = object as i8;
@@ -116,7 +118,7 @@ pub fn leave_item(i: i16, object: i16) {
 /// instead (its id changes to the opened chest, rather than its state).
 pub fn change_object(id: i32, flag: i32) {
     unsafe {
-        let vitality = (*(&raw const anim_list))[id as usize].vitality;
+        let vitality = (*(&raw const actor_list))[id as usize].vitality;
         let index = (vitality & OBJECT_INDEX_MASK) as usize;
         let object = if vitality & GLOBAL_LIST_BIT != 0 {
             (&raw mut ob_listg).cast::<WorldObject>().add(index)
@@ -143,7 +145,7 @@ unsafe fn distribute_treasure() {
             loop {
                 x = (bitrand(0x3fff) + ((region_num & 1) as i32 * 0x4000)) as i16;
                 y = (bitrand(0x1fff) + ((region_num & 6) as i32 * 0x1000)) as i16;
-                if px_to_im(x as i32, y as i32) == 0 {
+                if terrain_at(x as i32, y as i32) == 0 {
                     break;
                 }
             }
@@ -167,11 +169,11 @@ unsafe fn load_set_figure(id: i8) {
             .cast::<SetFigEntry>()
             .add(id as usize))
         .cfile_entry;
-        if cfiles[entry as usize].file_id != cfiles[set_file as usize].file_id {
-            set_file = entry as i16;
+        if sprite_files[entry as usize].file_id != sprite_files[loaded_setfig_file as usize].file_id {
+            loaded_setfig_file = entry as i16;
             nextshape = (*(&raw mut seq_list).cast::<SeqInfo>().add(SETFIG as usize)).location;
-            read_shapes(entry as i32);
-            prep(SETFIG as i16);
+            load_sprite_file(entry as i32);
+            finish_sprite_load(SETFIG as i16);
             motor_off();
         }
     }
@@ -184,17 +186,17 @@ unsafe fn load_set_figure(id: i8) {
 /// centre it); people are only loaded if within about 100-400 pixels, and shown if within the
 /// screen; items that are hidden or taken are skipped. A person already in the actor list at the
 /// same place is not added twice (and is marked dead if its actor died).
-pub fn set_objects(mut list: *mut WorldObject, mut length: i16, f: i32) {
+pub fn add_objects_near(mut list: *mut WorldObject, mut length: i16, f: i32) {
     unsafe {
         turtle_eggs = 0;
-        witchflag = 0;
+        witch_on_screen = 0;
         if dstobs[region_num as usize] == 0 && new_region >= NO_REGION {
             distribute_treasure();
         }
         let mut i: i16 = 0;
         while length > 0 {
             length -= 1;
-            if anix2 >= MAX_ACTORS {
+            if drawn_actor_count >= MAX_ACTORS {
                 return;
             }
             'object: {
@@ -211,7 +213,7 @@ pub fn set_objects(mut list: *mut WorldObject, mut length: i16, f: i32) {
                     }
                     load_set_figure(id);
                     if object.ob_id == WITCH && object.ob_stat == STAT_PERSON {
-                        witchflag = 1;
+                        witch_on_screen = 1;
                     }
                 }
                 if object.ob_stat == STAT_TAKEN || object.ob_stat == STAT_HIDDEN {
@@ -222,8 +224,8 @@ pub fn set_objects(mut list: *mut WorldObject, mut length: i16, f: i32) {
                 }
                 let actor: &mut Shape;
                 if is_person {
-                    actor = &mut (*(&raw mut anim_list))[j1 as usize];
-                    j1 += 1;
+                    actor = &mut (*(&raw mut actor_list))[J1 as usize];
+                    J1 += 1;
                     if actor.abs_x == object.xc && actor.abs_y == object.yc {
                         if actor.state == DEAD {
                             object.ob_stat = STAT_DEAD_PERSON;
@@ -247,15 +249,15 @@ pub fn set_objects(mut list: *mut WorldObject, mut length: i16, f: i32) {
                     // A person's race is 0x80 plus their kind, so they can be told from monsters.
                     actor.race = (id as i32 + PERSON_RACE_BASE) as u8;
                     ystart -= PERSON_RAISE;
-                    if j1 > anix2 {
-                        anix2 = j1;
+                    if J1 > drawn_actor_count {
+                        drawn_actor_count = J1;
                     }
                 } else {
                     if object.ob_id == TURTLE as i8 {
-                        turtle_eggs = anix2 as i8;
+                        turtle_eggs = drawn_actor_count as i8;
                     }
-                    actor = &mut (*(&raw mut anim_list))[anix2 as usize];
-                    anix2 += 1;
+                    actor = &mut (*(&raw mut actor_list))[drawn_actor_count as usize];
+                    drawn_actor_count += 1;
                     actor.kind = OBJECTS;
                     actor.index = object.ob_id;
                     actor.weapon = 0;

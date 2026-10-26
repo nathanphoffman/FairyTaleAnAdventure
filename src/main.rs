@@ -1,5 +1,8 @@
 mod amiga;
 mod platform;
+// The game state lives in lower-case `static mut` variables (named for what they hold) until it
+// moves into structs.
+#[allow(non_upper_case_globals)]
 #[path = "../rsrc/mod.rs"]
 mod rsrc;
 

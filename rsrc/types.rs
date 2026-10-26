@@ -102,7 +102,7 @@ pub struct FPage {
     pub wflag: i16,
 }
 
-/// One animation frame of an actor (`struct state`, the C table `statelist`): which figure image to
+/// One animation frame of an actor (`struct state`, the C table `animation_frames`): which figure image to
 /// draw, which weapon image goes with it, and where the weapon sits relative to the actor.
 #[repr(C)]
 pub struct StateEntry {

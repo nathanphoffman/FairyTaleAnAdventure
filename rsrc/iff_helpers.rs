@@ -1,11 +1,11 @@
 //! IFF picture file helpers (from fsubs.asm via csrc/asm_port.c). The state they work on lives
 //! in `iffsubs`.
 //!
-//! `ReadHeader` and `ReadLength` read the two fields at the start of every IFF chunk;
+//! `read_chunk_id` and `read_chunk_length` read the two fields at the start of every IFF chunk;
 //! `unpack_line` unpacks one row of picture data, which is compressed with "ByteRun1" (the usual
 //! run-length scheme on the Amiga).
 
-use super::iffsubs::{blocklength, bytecount, compress, file_length, header, myfile, packdata};
+use super::iffsubs::{chunk_length, row_byte_count, compression_type, bytes_left_in_file, current_chunk_id, picture_file, pack_cursor};
 use crate::amiga::BPTR;
 
 unsafe extern "C" {
@@ -16,23 +16,23 @@ unsafe extern "C" {
 const CHUNK_FIELD_BYTES: i32 = 4;
 
 /// Reads a 4 byte chunk id; compared against the id string in memory, so no byte swap.
-pub fn ReadHeader() {
+pub fn read_chunk_id() {
     unsafe {
-        Read(myfile as BPTR, (&raw mut header).cast(), CHUNK_FIELD_BYTES);
-        file_length -= CHUNK_FIELD_BYTES;
+        Read(picture_file as BPTR, (&raw mut current_chunk_id).cast(), CHUNK_FIELD_BYTES);
+        bytes_left_in_file -= CHUNK_FIELD_BYTES;
     }
 }
 
 /// Reads a big-endian chunk length and updates how many bytes of the file are left.
-pub fn ReadLength() {
+pub fn read_chunk_length() {
     unsafe {
         Read(
-            myfile as BPTR,
-            (&raw mut blocklength).cast(),
+            picture_file as BPTR,
+            (&raw mut chunk_length).cast(),
             CHUNK_FIELD_BYTES,
         );
-        blocklength = blocklength.swap_bytes();
-        file_length -= blocklength + CHUNK_FIELD_BYTES;
+        chunk_length = chunk_length.swap_bytes();
+        bytes_left_in_file -= chunk_length + CHUNK_FIELD_BYTES;
     }
 }
 
@@ -75,12 +75,12 @@ unsafe fn unpack_byte_run(mut src: *const i8, mut dest: *mut u8, width: i32) -> 
 /// Unpacks one scan line of an IFF body (ByteRun1, or plain copy) into `dest`.
 pub fn unpack_line(dest: *mut u8) {
     unsafe {
-        if compress == 0 {
-            std::ptr::copy_nonoverlapping(packdata.cast(), dest, bytecount as usize);
-            packdata = packdata.add(bytecount as usize);
+        if compression_type == 0 {
+            std::ptr::copy_nonoverlapping(pack_cursor.cast(), dest, row_byte_count as usize);
+            pack_cursor = pack_cursor.add(row_byte_count as usize);
         } else {
-            let used = unpack_byte_run(packdata, dest, bytecount);
-            packdata = packdata.add(used);
+            let used = unpack_byte_run(pack_cursor, dest, row_byte_count);
+            pack_cursor = pack_cursor.add(used);
         }
     }
 }

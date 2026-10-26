@@ -1,25 +1,28 @@
-//! What choosing an entry of a menu does (`do_option` from csrc/fmain.c): the Items and Magic
+//! What choosing an entry of a menu does (`choose_menu_entry` from csrc/fmain.c): the Items and Magic
 //! menus (in `items_menu` and `magic`), and here talking, buying, the game menu, using items,
 //! keys, saving and giving.
 
-use super::actors::{eat, get_turtle, nearest_fig};
-use super::asm_map::{newx, newy};
-use super::asm_text::{event, prq, speak};
-use super::doors::{bumped, doorfind};
+use super::actors::{eat_food, find_nearest_figure, summon_turtle};
+use super::asm_map::{step_x, step_y};
+use super::asm_text::{queue_print, show_event, speak};
+use super::doors::{bumped_locked_door, open_door_near};
+use super::game_tables::{item_list, region_num, setfig_table};
+use super::globals::{
+    active_carrier, actor_list, brave, current_menu, day_clock, day_period, fatigue, hero_x,
+    hero_y, kind as hero_kind, luck, menu_hit_enabled, nearest_object, nearest_person,
+    quit_requested, stuff, wealth, witch_on_screen,
+};
 use super::items_menu::items_option;
 use super::magic::magic_option;
-use super::menus::set_options;
-use super::messages::{extract, print, print_cont};
-use super::mood::setmood;
+use super::menus::go_to_menu;
+use super::menus::update_menu_availability;
+use super::messages::{print, print_cont, print_wrapped};
+use super::mood::set_mood;
 use super::objects::{SetFigEntry, leave_item};
 use super::random::rand64;
-use super::savegame::{savegame, svflag};
+use super::savegame::{savegame, is_saving};
 use super::tables::{jtrans, ob_list8, ob_listg};
 use super::types::{InvItem, Shape};
-use super::menus::{gomenu};
-use super::game_tables::{inv_list, region_num, setfig_table};
-use super::globals::{active_carrier, anim_list, brave, cmode, daynight, dayperiod, fatigue, hero_x, hero_y, hitgo, kind as hero_kind, luck, nearest, nearest_person, quitflag, stuff, wealth, witchflag};
-
 
 // Menu numbers (`enum cmodes` in csrc/fmain.c).
 const ITEMS: i32 = 0;
@@ -53,7 +56,7 @@ const BONE: usize = 29;
 const PRQ_STATS: i32 = 4;
 const PRQ_VITALITY: i32 = 7;
 
-/// `nearest_fig` search ranges for yelling and for the quieter talk options.
+/// `find_nearest_figure` search ranges for yelling and for the quieter talk options.
 const YELL_RANGE: i16 = 100;
 const TALK_RANGE: i16 = 50;
 /// Anyone closer than this is told off for yelling.
@@ -134,27 +137,27 @@ const SPECTRE_NOT_HERE: i32 = 21;
 const SPECTRE_THANKS: i32 = 48;
 const SPECTRE_BONE_DROP: i16 = 140;
 
-/// Does what menu entry `hit` of the current menu `cmode` says.
-pub fn do_option(hit: i16) {
+/// Does what menu entry `chosen_entry` of the current menu `current_menu` says.
+pub fn choose_menu_entry(chosen_entry: i16) {
     unsafe {
-        let refresh = match cmode as i32 {
+        let refresh = match current_menu as i32 {
             ITEMS => {
-                items_option(hit);
+                items_option(chosen_entry);
                 true
             }
-            MAGIC => magic_option(hit),
-            TALK => talk_option(hit),
-            BUY => buy_option(hit),
-            GAME => game_option(hit),
-            USE => use_option(hit),
-            SAVEX => save_exit_option(hit),
-            FILE => file_option(hit),
-            KEYS => keys_option(hit),
-            GIVE => give_option(hit),
+            MAGIC => magic_option(chosen_entry),
+            TALK => talk_option(chosen_entry),
+            BUY => buy_option(chosen_entry),
+            GAME => game_option(chosen_entry),
+            USE => use_option(chosen_entry),
+            SAVEX => save_exit_option(chosen_entry),
+            FILE => file_option(chosen_entry),
+            KEYS => keys_option(chosen_entry),
+            GIVE => give_option(chosen_entry),
             _ => true,
         };
         if refresh {
-            set_options();
+            update_menu_availability();
         }
     }
 }
@@ -164,22 +167,29 @@ unsafe fn add_stuff(slot: usize, amount: u8) {
 }
 
 unsafe fn item_name(i: usize) -> *const std::ffi::c_char {
-    unsafe { (*(&raw const inv_list).cast::<InvItem>().add(i)).name }
+    unsafe { (*(&raw const item_list).cast::<InvItem>().add(i)).name }
 }
 
 /// Yell (louder, reaches further) or say something to the nearest person.
-unsafe fn talk_option(hit: i16) -> bool {
+unsafe fn talk_option(chosen_entry: i16) -> bool {
     unsafe {
-        let distance = nearest_fig(1, if hit == YELL { YELL_RANGE } else { TALK_RANGE });
-        if nearest == 0 {
+        let distance = find_nearest_figure(
+            1,
+            if chosen_entry == YELL {
+                YELL_RANGE
+            } else {
+                TALK_RANGE
+            },
+        );
+        if nearest_object == 0 {
             return true;
         }
-        let an = &raw mut anim_list[nearest as usize];
+        let an = &raw mut actor_list[nearest_object as usize];
         if (*an).state == DEAD {
             return true;
         }
         if (*an).kind == SETFIG {
-            if hit == YELL && (distance as u32) < TOO_CLOSE_TO_YELL as u32 {
+            if chosen_entry == YELL && (distance as u32) < TOO_CLOSE_TO_YELL as u32 {
                 speak(8);
                 return true;
             }
@@ -241,12 +251,12 @@ unsafe fn person_speaks(person: u8, an: *mut Shape) {
                     speak(45);
                     ob_listg[SORCERESS_SLOT].ob_stat = 1;
                 }
-                prq(PRQ_VITALITY);
+                queue_print(PRQ_VITALITY);
             }
             BARTENDER => {
                 if fatigue < TIRED {
                     speak(13);
-                } else if dayperiod > NIGHT_PERIOD {
+                } else if day_period > NIGHT_PERIOD {
                     speak(12);
                 } else {
                     speak(14);
@@ -279,41 +289,41 @@ unsafe fn priest_speaks() {
         } else if hero_kind < KIND_ENOUGH {
             speak(40);
         } else {
-            speak(36 + (daynight % PRIEST_BLESSINGS) as i32);
-            anim_list[0].vitality = FULL_VITALITY_BASE + brave / 4;
-            prq(PRQ_STATS);
+            speak(36 + (day_clock % PRIEST_BLESSINGS) as i32);
+            actor_list[0].vitality = FULL_VITALITY_BASE + brave / 4;
+            queue_print(PRQ_STATS);
         }
     }
 }
 
 /// Buys what the bartender sells, if the hero can pay.
-unsafe fn buy_option(hit: i16) -> bool {
+unsafe fn buy_option(chosen_entry: i16) -> bool {
     unsafe {
-        nearest = nearest_person;
-        if nearest == 0 {
+        nearest_object = nearest_person;
+        if nearest_object == 0 {
             return true;
         }
-        if anim_list[nearest as usize].race != BARTENDER_RACE {
+        if actor_list[nearest_object as usize].race != BARTENDER_RACE {
             return true;
         }
-        if hit > LAST_BUY_ENTRY {
+        if chosen_entry > LAST_BUY_ENTRY {
             return false;
         }
-        let pair = ((hit - FIRST_MENU_ENTRY) * 2) as isize;
+        let pair = ((chosen_entry - FIRST_MENU_ENTRY) * 2) as isize;
         let item = *jtrans.as_ptr().offset(pair) as u8 as usize;
         let price = *jtrans.as_ptr().offset(pair + 1) as i16;
         if wealth > price {
             wealth -= price;
-            prq(PRQ_VITALITY);
+            queue_print(PRQ_VITALITY);
             if item == FOOD {
-                event(BOUGHT_FOOD_EVENT);
-                eat(FOOD_HUNGER);
+                show_event(BOUGHT_FOOD_EVENT);
+                eat_food(FOOD_HUNGER);
             } else if item == ARROWS {
                 add_stuff(item, ARROWS_BOUGHT);
-                event(BOUGHT_ARROWS_EVENT);
+                show_event(BOUGHT_ARROWS_EVENT);
             } else {
                 add_stuff(item, 1);
-                extract(c"% bought a ".as_ptr());
+                print_wrapped(c"% bought a ".as_ptr());
                 print_cont(item_name(item));
                 print_cont(c".".as_ptr());
             }
@@ -325,125 +335,125 @@ unsafe fn buy_option(hit: i16) -> bool {
 }
 
 /// Music on/off, and going to the save/exit and load menus.
-unsafe fn game_option(hit: i16) -> bool {
+unsafe fn game_option(chosen_entry: i16) -> bool {
     unsafe {
-        if hit == MUSIC {
-            setmood(1);
+        if chosen_entry == MUSIC {
+            set_mood(1);
         }
-        if hit == QUIT {
-            gomenu(SAVEX as i16);
+        if chosen_entry == QUIT {
+            go_to_menu(SAVEX as i16);
         }
-        if hit == LOAD {
-            svflag = 0;
-            gomenu(FILE as i16);
+        if chosen_entry == LOAD {
+            is_saving = 0;
+            go_to_menu(FILE as i16);
         }
         true
     }
 }
 
 /// Picks a weapon, the key menu, the turtle shell, or the sunstone.
-unsafe fn use_option(hit: i16) -> bool {
+unsafe fn use_option(chosen_entry: i16) -> bool {
     unsafe {
-        if hit == KEY_ENTRY {
-            if hitgo != 0 {
-                gomenu(KEYS as i16);
+        if chosen_entry == KEY_ENTRY {
+            if menu_hit_enabled != 0 {
+                go_to_menu(KEYS as i16);
             } else {
-                extract(c"% has no keys!".as_ptr());
+                print_wrapped(c"% has no keys!".as_ptr());
             }
             return false;
         }
-        if hit < WEAPONS {
-            if hitgo != 0 {
-                anim_list[0].weapon = (hit + 1) as i8;
+        if chosen_entry < WEAPONS {
+            if menu_hit_enabled != 0 {
+                actor_list[0].weapon = (chosen_entry + 1) as i8;
             } else {
-                extract(c"% doesn't have one.".as_ptr());
+                print_wrapped(c"% doesn't have one.".as_ptr());
             }
         }
-        if hit == SHELL_ENTRY && hitgo != 0 {
+        if chosen_entry == SHELL_ENTRY && menu_hit_enabled != 0 {
             let (x_low, x_high, y_low, y_high) = NO_TURTLE_AREA;
             if hero_x < x_high && hero_x > x_low && hero_y < y_high && hero_y > y_low {
                 return true;
             }
-            get_turtle();
+            summon_turtle();
         }
-        if hit == SUNSTONE_ENTRY && witchflag != 0 {
+        if chosen_entry == SUNSTONE_ENTRY && witch_on_screen != 0 {
             speak(SUNSTONE_SPEECH);
         }
-        gomenu(ITEMS as i16);
+        go_to_menu(ITEMS as i16);
         true
     }
 }
 
 /// Saving goes to the file menu; exiting ends the game.
-unsafe fn save_exit_option(hit: i16) -> bool {
+unsafe fn save_exit_option(chosen_entry: i16) -> bool {
     unsafe {
-        if hit == EXIT {
-            quitflag = 1;
+        if chosen_entry == EXIT {
+            quit_requested = 1;
         }
-        if hit == SAVE {
-            svflag = 1;
-            gomenu(FILE as i16);
+        if chosen_entry == SAVE {
+            is_saving = 1;
+            go_to_menu(FILE as i16);
         }
         true
     }
 }
 
 /// A save slot was chosen: save or load, then back to the game menu.
-fn file_option(hit: i16) -> bool {
-    savegame(hit);
-    gomenu(GAME as i16);
+fn file_option(chosen_entry: i16) -> bool {
+    savegame(chosen_entry);
+    go_to_menu(GAME as i16);
     true
 }
 
 /// Tries a key on every door and chest around the hero.
-unsafe fn keys_option(hit: i16) -> bool {
+unsafe fn keys_option(chosen_entry: i16) -> bool {
     unsafe {
-        let key = (hit - FIRST_MENU_ENTRY) as usize;
-        bumped = 0;
+        let key = (chosen_entry - FIRST_MENU_ENTRY) as usize;
+        bumped_locked_door = 0;
         if *stuff.add(key + KEYBASE) != 0 {
             let mut direction = 0;
             while direction < DIRECTIONS {
-                let x = newx(hero_x as i32, direction, DOOR_REACH) as u16;
-                let y = newy(hero_y as i32, direction, DOOR_REACH) as u16;
-                if doorfind(x, y, key as u32 + 1) != 0 {
+                let x = step_x(hero_x as i32, direction, DOOR_REACH) as u16;
+                let y = step_y(hero_y as i32, direction, DOOR_REACH) as u16;
+                if open_door_near(x, y, key as u32 + 1) != 0 {
                     *stuff.add(key + KEYBASE) -= 1;
                     break;
                 }
                 direction += 1;
             }
             if direction >= DIRECTIONS {
-                extract(c"% tried a ".as_ptr());
+                print_wrapped(c"% tried a ".as_ptr());
                 print_cont(item_name(KEYBASE + key));
                 print_cont(c" but it didn't".as_ptr());
                 print(c"fit.".as_ptr());
             }
         }
-        gomenu(ITEMS as i16);
+        go_to_menu(ITEMS as i16);
         true
     }
 }
 
 /// Gives gold to a beggar, or the bone to the spectre.
-unsafe fn give_option(hit: i16) -> bool {
+unsafe fn give_option(chosen_entry: i16) -> bool {
     unsafe {
         if nearest_person == 0 {
             return true;
         }
-        let person = &raw mut anim_list[nearest_person as usize];
+        let person = &raw mut actor_list[nearest_person as usize];
         let race = (*person).race;
-        if hit == GIVE_GOLD && wealth > GOLD_GIVEN {
+        if chosen_entry == GIVE_GOLD && wealth > GOLD_GIVEN {
             wealth -= GOLD_GIVEN;
             if rand64() > hero_kind as i32 {
                 hero_kind += 1;
             }
-            prq(PRQ_STATS);
-            prq(PRQ_VITALITY);
+            queue_print(PRQ_STATS);
+            queue_print(PRQ_VITALITY);
             if race == BEGGAR_RACE {
                 speak(BEGGAR_SPEECH + (*person).goal as i32);
             } else {
                 speak(BEGGAR_THANKS);
             }
-        } else if hit == GIVE_BONE && *stuff.add(BONE) != 0 {
+        } else if chosen_entry == GIVE_BONE && *stuff.add(BONE) != 0 {
             if race != SPECTRE_RACE {
                 speak(SPECTRE_NOT_HERE);
             } else {
@@ -452,7 +462,7 @@ unsafe fn give_option(hit: i16) -> bool {
                 leave_item(nearest_person, SPECTRE_BONE_DROP);
             }
         }
-        gomenu(ITEMS as i16);
+        go_to_menu(ITEMS as i16);
         true
     }
 }

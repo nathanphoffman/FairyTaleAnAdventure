@@ -6,16 +6,21 @@
 //! fades the whole picture by scaling those components (`fade_page`) and loads them with
 //! `LoadRGB4`. Night is a darker, bluer scaling; indoors it is always full brightness.
 
-use super::asm_text::{move_to, placard, placard_text, prdec, text};
-use super::iffsubs::unpackbrush;
+use super::asm_text::{draw_placard_border, draw_text, move_to, placard_text, print_number};
+use super::display::flip_pages;
+use super::game_tables::{black_colors, intro_colors, region_num};
+use super::globals::{
+    actor_list, bm_draw, bm_source, bm_text, brave, current_rastport, day_clock, drawing_page,
+    extent_type, hero_sector, hero_x, hero_y, kind as hero_kind, light_level, light_timer, luck,
+    nhinor, nhivar, ri_page1, ri_page2, rp_map, rp_text, secret_timer, v, view_status, vp_page,
+    vp_text, wealth,
+};
+use super::iffsubs::load_picture;
+use super::menus::print_options;
 use super::messages::{name, print};
 use super::random::bitrand;
-use super::tables::{comptable, fader, pagecolors, pplay, prec, print_que, sun_colors};
+use super::tables::{comptable, fader, page_colors, pplay, prec, print_que, sun_colors};
 use crate::amiga::{BitMap, RastPort, View, ViewPort};
-use super::display::{pagechange};
-use super::menus::{print_options};
-use super::game_tables::{blackcolors, introcolors, region_num};
-use super::globals::{anim_list, bm_draw, bm_source, bm_text, brave, daynight, fp_drawing, hero_sector, hero_x, hero_y, kind as hero_kind, light_timer, lightlevel, luck, nhinor, nhivar, ri_page1, ri_page2, rp, rp_map, rp_text, secret_timer, v, viewstatus, vp_page, vp_text, wealth, xtype};
 
 unsafe extern "C" {
     fn BltBitMap(
@@ -31,11 +36,11 @@ unsafe extern "C" {
         mask: u32,
         temp: *mut u8,
     ) -> i32;
-    fn LoadRGB4(vp: *mut ViewPort, colors: *const u16, count: i32);
+    fn LoadRGB4(current_viewport: *mut ViewPort, colors: *const u16, count: i32);
     fn Delay(ticks: i32);
-    fn SetDrMd(rp: *mut RastPort, mode: u32);
-    fn SetAPen(rp: *mut RastPort, pen: u32);
-    fn SetRast(rp: *mut RastPort, pen: u32);
+    fn SetDrMd(current_rastport: *mut RastPort, mode: u32);
+    fn SetAPen(current_rastport: *mut RastPort, pen: u32);
+    fn SetRast(current_rastport: *mut RastPort, pen: u32);
     fn AvailMem(flags: u32) -> u32;
     fn MakeVPort(view: *mut View, port: *mut ViewPort) -> i32;
 }
@@ -53,7 +58,7 @@ const COMPASS_DIRECTIONS: i16 = 9;
 
 /// Redraws the compass with direction `dir` lit. First the unlit compass is copied, then the lit
 /// part for that direction (if any) is copied on top from a second image.
-pub fn drawcompass(dir: i16) {
+pub fn draw_compass(dir: i16) {
     unsafe {
         let part = &comptable[dir as usize];
         let (xr, yr) = (part.xrect as i32, part.yrect as i32);
@@ -111,7 +116,7 @@ const MAX_COMPONENT: i32 = 15;
 /// Colour 31 is changed first because it depends on where the hero is (swamp, secret room).
 pub fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: *const u16) {
     unsafe {
-        pagecolors[COLOR_31] = match region_num {
+        page_colors[COLOR_31] = match region_num {
             REGION_SWAMP => SWAMP_COLOR,
             REGION_SECRET if secret_timer != 0 => SECRET_OPEN_COLOR,
             REGION_SECRET => SECRET_SHUT_COLOR,
@@ -166,7 +171,7 @@ pub fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: *const u16) {
 }
 
 /// The teleport effect: random colours flicker for a moment (32 flashes).
-pub fn colorplay() {
+pub fn flicker_colors() {
     unsafe {
         for _ in 0..COLOR_COUNT {
             for i in 1..COLOR_COUNT {
@@ -196,7 +201,7 @@ const STATS_Y: i32 = 52;
 /// Handles one request from the print queue (or waits a tick if there is none).
 /// Requests: 2 and 3 debug information, 4 the vitality figure, 5 the menu, 7 the stats line
 /// (bravery, luck, kindness, wealth), 10 "Take What?".
-pub fn ppick() {
+pub fn handle_print_request() {
     unsafe {
         if prec == pplay {
             Delay(1);
@@ -207,24 +212,24 @@ pub fn ppick() {
         match request {
             REQUEST_DEBUG_COORDS => {
                 print(c"Coords = ".as_ptr());
-                prdec(hero_x as i32, 6);
-                prdec(hero_y as i32, 6);
+                print_number(hero_x as i32, 6);
+                print_number(hero_y as i32, 6);
                 print(c"Memory Available: ".as_ptr());
-                prdec(AvailMem(0) as i32, 6);
+                print_number(AvailMem(0) as i32, 6);
             }
             REQUEST_DEBUG_SECTOR => {
                 print(c"You are at: ".as_ptr());
-                prdec(hero_x as i32 / 256, 3);
-                prdec(hero_y as i32 / 256, 3);
+                print_number(hero_x as i32 / 256, 3);
+                print_number(hero_y as i32 / 256, 3);
                 print(c"H/Sector = ".as_ptr());
-                prdec(hero_sector as i32, 3);
-                text(c" Extent = ".as_ptr(), 10);
-                prdec(xtype as i32, 2);
+                print_number(hero_sector as i32, 3);
+                draw_text(c" Extent = ".as_ptr(), 10);
+                print_number(extent_type as i32, 2);
             }
             REQUEST_VITALITY => {
                 move_to(VITALITY_POSITION.0, VITALITY_POSITION.1);
-                text(c"Vit:".as_ptr(), 4);
-                prdec(anim_list[0].vitality as i32, 3);
+                draw_text(c"Vit:".as_ptr(), 4);
+                print_number(actor_list[0].vitality as i32, 3);
             }
             REQUEST_OPTIONS => {
                 print_options();
@@ -240,8 +245,8 @@ pub fn ppick() {
                     (321, c"Wlth:", 5, wealth),
                 ] {
                     move_to(x, STATS_Y);
-                    text(label.as_ptr(), len);
-                    prdec(value as i32, 3);
+                    draw_text(label.as_ptr(), len);
+                    print_number(value as i32, 3);
                 }
             }
             REQUEST_TAKE_WHAT => print(c"Take What?".as_ptr()),
@@ -256,7 +261,7 @@ const SPRITES: u16 = 0x4000;
 const VP_HIDE: u16 = 0x2000;
 const MAP_PEN: u32 = 24;
 const JAM1: u32 = 0;
-/// `viewstatus` values: showing a map message, and showing the normal view again.
+/// `view_status` values: showing a map message, and showing the normal view again.
 const VIEW_MESSAGE: i8 = 2;
 const VIEW_NORMAL_AGAIN: i8 = 3;
 /// Fading goes in steps of 5 percent, one tick each.
@@ -270,7 +275,7 @@ pub fn fade_down() {
             level as i16,
             level as i16,
             0,
-            (&raw const pagecolors).cast(),
+            (&raw const page_colors).cast(),
         );
         unsafe { Delay(1) };
     }
@@ -284,19 +289,19 @@ pub fn fade_normal() {
             level as i16,
             level as i16,
             0,
-            (&raw const pagecolors).cast(),
+            (&raw const page_colors).cast(),
         );
         unsafe { Delay(1) };
     }
 }
 
 /// Shows the page without scrolling.
-pub fn stillscreen() {
+pub fn show_still_screen() {
     unsafe {
-        let page = (*fp_drawing).ri_page;
+        let page = (*drawing_page).ri_page;
         (*page).RxOffset = 0;
         (*page).RyOffset = 0;
-        pagechange();
+        flip_pages();
     }
 }
 
@@ -304,20 +309,20 @@ pub fn stillscreen() {
 pub fn map_message() {
     unsafe {
         fade_down();
-        rp = &raw mut rp_map;
-        rp_map.BitMap = (*(*fp_drawing).ri_page).BitMap;
-        SetDrMd(rp, JAM1);
-        SetAPen(rp, MAP_PEN);
-        SetRast(rp, 0);
+        current_rastport = &raw mut rp_map;
+        rp_map.BitMap = (*(*drawing_page).ri_page).BitMap;
+        SetDrMd(current_rastport, JAM1);
+        SetAPen(current_rastport, MAP_PEN);
+        SetRast(current_rastport, 0);
 
         vp_text.Modes = HIRES | SPRITES | VP_HIDE;
-        stillscreen();
+        show_still_screen();
         LoadRGB4(
             &raw mut vp_page,
-            (&raw const pagecolors).cast(),
+            (&raw const page_colors).cast(),
             COLOR_COUNT as i32,
         );
-        viewstatus = VIEW_MESSAGE;
+        view_status = VIEW_MESSAGE;
     }
 }
 
@@ -325,10 +330,10 @@ pub fn map_message() {
 pub fn message_off() {
     unsafe {
         fade_down();
-        rp = &raw mut rp_text;
+        current_rastport = &raw mut rp_text;
         vp_text.Modes = HIRES | SPRITES;
-        pagechange();
-        viewstatus = VIEW_NORMAL_AGAIN;
+        flip_pages();
+        view_status = VIEW_NORMAL_AGAIN;
     }
 }
 
@@ -348,22 +353,22 @@ pub fn win_colors() {
         placard_text(WIN_MESSAGE_FIRST);
         name();
         placard_text(WIN_MESSAGE_SECOND);
-        placard();
+        draw_placard_border();
         Delay(80);
-        bm_draw = (*(*fp_drawing).ri_page).BitMap;
-        unpackbrush(c"winpic".as_ptr(), bm_draw, 0, 0);
+        bm_draw = (*(*drawing_page).ri_page).BitMap;
+        load_picture(c"winpic".as_ptr(), bm_draw, 0, 0);
         LoadRGB4(
             &raw mut vp_page,
-            (&raw const blackcolors).cast::<u16>(),
+            (&raw const black_colors).cast::<u16>(),
             COLOR_COUNT as i32,
         );
         LoadRGB4(
             &raw mut vp_text,
-            (&raw const blackcolors).cast::<u16>(),
+            (&raw const black_colors).cast::<u16>(),
             COLOR_COUNT as i32,
         );
         vp_text.Modes = HIRES | SPRITES | VP_HIDE;
-        screen_size(WIN_SCREEN_SIZE);
+        set_intro_zoom(WIN_SCREEN_SIZE);
         for i in (SUNRISE_END + 1..=SUNRISE_START).rev() {
             fader[0] = 0;
             fader[31] = 0;
@@ -398,7 +403,7 @@ pub fn win_colors() {
         Delay(30);
         LoadRGB4(
             &raw mut vp_page,
-            (&raw const blackcolors).cast::<u16>(),
+            (&raw const black_colors).cast::<u16>(),
             COLOR_COUNT as i32,
         );
     }
@@ -409,10 +414,10 @@ const DAY_DARKEN: (i32, i32, i32) = (80, 61, 62);
 const LIGHT_SPELL_BONUS: i32 = 200;
 /// Inside buildings (regions from here on) it is never night.
 const FIRST_INDOOR_REGION: u16 = 8;
-/// `viewstatus` above this means the screen has to be rebuilt.
+/// `view_status` above this means the screen has to be rebuilt.
 const VIEW_REBUILD: i8 = 97;
 
-/// Updates the page colours for the time of day, every fourth tick. `lightlevel` follows the sun;
+/// Updates the page colours for the time of day, every fourth tick. `light_level` follows the sun;
 /// inside buildings (regions 8 and 9) it is always bright.
 pub fn day_fade() {
     unsafe {
@@ -421,10 +426,10 @@ pub fn day_fade() {
         } else {
             0
         };
-        if daynight & 3 == 0 || viewstatus > VIEW_REBUILD {
-            let colors = (&raw const pagecolors).cast();
+        if day_clock & 3 == 0 || view_status > VIEW_REBUILD {
+            let colors = (&raw const page_colors).cast();
             if region_num < FIRST_INDOOR_REGION {
-                let level = lightlevel as i32;
+                let level = light_level as i32;
                 fade_page(
                     (level - DAY_DARKEN.0 + bonus) as i16,
                     (level - DAY_DARKEN.1) as i16,
@@ -460,7 +465,7 @@ mod tests {
 /// The size of the picture during the intro's zoom: `x` is half the width in pixels (0 to 160),
 /// the height keeps the 8:5 shape. Moves the page and text view ports to match, fades the colours
 /// with the size (black when small), and shows the result.
-pub fn screen_size(x: i32) {
+pub fn set_intro_zoom(x: i32) {
     unsafe {
         let y = (x * 5) / 8;
 
@@ -482,7 +487,7 @@ pub fn screen_size(x: i32) {
         vp_text.DyOffset = 0;
         vp_text.DHeight = (95 - y) as i16;
 
-        let colors = (&raw const introcolors).cast::<u16>();
+        let colors = (&raw const intro_colors).cast::<u16>();
         fade_page(
             (y * 2 - 40) as i16,
             (y * 2 - 70) as i16,
@@ -492,6 +497,6 @@ pub fn screen_size(x: i32) {
         );
 
         MakeVPort(&raw mut v, &raw mut vp_text);
-        pagechange();
+        flip_pages();
     }
 }

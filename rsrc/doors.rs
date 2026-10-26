@@ -4,18 +4,17 @@
 //! needed) swaps those tiles for the "open" ones. `open_list` says, per door and per map set,
 //! which tiles to swap in and which key is needed.
 
-use super::asm_map::{mapxy, px_to_im};
+use super::asm_map::{terrain_at, tile_address};
+use super::game_tables::loaded_blocks;
+use super::globals::{held_direction, view_status};
 use super::messages::print;
-use super::game_tables::{current_loads};
-use super::globals::{keydir, viewstatus};
 
-
-/// Set after a locked door was bumped, so "It's locked." is only said once until the hero moves on.
-pub static mut bumped: i8 = 0;
+/// Set after a locked door was bumped_locked_door, so "It's locked." is only said once until the hero moves on.
+pub static mut bumped_locked_door: i8 = 0;
 
 /// The terrain type that marks a door.
 const DOOR_TERRAIN: i32 = 15;
-/// Value of `viewstatus` that makes the whole map redraw.
+/// Value of `view_status` that makes the whole map redraw.
 const REDRAW_MAP: i8 = 99;
 
 // Key types (`enum ky` in csrc/fmain.c).
@@ -77,37 +76,37 @@ const OPEN_LIST: [DoorOpen; 17] = [
 
 /// The tile byte at tile position (x, y) of the map, to change it.
 fn tile(x: i32, y: i32) -> *mut u8 {
-    mapxy(x, y).cast_mut()
+    tile_address(x, y).cast_mut()
 }
 
 /// Tries to open a door near the pixel (x, y) with a key of type `keytype` (0 when walking into it
 /// without a key). Looks 4 pixels either side for the door terrain, then walks left and down to
 /// the door's top-left tile. Returns 1 if a door opened, 0 if not ("It's locked." is said the
 /// first time).
-pub fn doorfind(x: u16, y: u16, keytype: u32) -> i32 {
+pub fn open_door_near(x: u16, y: u16, keytype: u32) -> i32 {
     unsafe {
         let mut x = x;
         let mut y = y;
-        let mut found = px_to_im(x as i32, y as i32) == DOOR_TERRAIN;
+        let mut found = terrain_at(x as i32, y as i32) == DOOR_TERRAIN;
         if !found {
             x = x.wrapping_add(4);
-            found = px_to_im(x as i32, y as i32) == DOOR_TERRAIN;
+            found = terrain_at(x as i32, y as i32) == DOOR_TERRAIN;
         }
         if !found {
             x = x.wrapping_sub(8);
-            found = px_to_im(x as i32, y as i32) == DOOR_TERRAIN;
+            found = terrain_at(x as i32, y as i32) == DOOR_TERRAIN;
         }
         if !found {
             return 0;
         }
 
-        if px_to_im(x as i32 - 16, y as i32) == DOOR_TERRAIN {
+        if terrain_at(x as i32 - 16, y as i32) == DOOR_TERRAIN {
             x = x.wrapping_sub(16);
         }
-        if px_to_im(x as i32 - 16, y as i32) == DOOR_TERRAIN {
+        if terrain_at(x as i32 - 16, y as i32) == DOOR_TERRAIN {
             x = x.wrapping_sub(16);
         }
-        if px_to_im(x as i32, y as i32 + 32) == DOOR_TERRAIN {
+        if terrain_at(x as i32, y as i32 + 32) == DOOR_TERRAIN {
             y = y.wrapping_add(32);
         }
         let x = (x >> 4) as i32;
@@ -115,7 +114,7 @@ pub fn doorfind(x: u16, y: u16, keytype: u32) -> i32 {
 
         // we know where the door starts; now which type is it?
         let sector_id = *tile(x, y);
-        let map_id = current_loads.image[(sector_id >> 6) as usize];
+        let map_id = loaded_blocks.image[(sector_id >> 6) as usize];
         for open in OPEN_LIST.iter() {
             if open.map_id != map_id || open.door_id != sector_id {
                 continue;
@@ -140,16 +139,16 @@ pub fn doorfind(x: u16, y: u16, keytype: u32) -> i32 {
                         }
                     }
                 }
-                viewstatus = REDRAW_MAP;
-                keydir = 0;
+                view_status = REDRAW_MAP;
+                held_direction = 0;
                 print(c"It opened.".as_ptr());
                 return 1;
             }
         }
-        if bumped == 0 && keytype == 0 {
+        if bumped_locked_door == 0 && keytype == 0 {
             print(c"It's locked.".as_ptr());
         }
-        bumped = 1;
+        bumped_locked_door = 1;
         0
     }
 }

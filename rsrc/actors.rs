@@ -1,29 +1,35 @@
 //! Actor behaviour helpers (from csrc/fmain2.c): hits, collision against other actors, distances,
 //! enemy tactics, and a few story events.
 //!
-//! Actors live in `anim_list`: slot 0 is the hero, slot 1 the raft (or other carrier), slots 3 and
+//! Actors live in `actor_list`: slot 0 is the hero, slot 1 the raft (or other carrier), slots 3 and
 //! up the monsters, and people and objects after them. Positions are in world pixels. Directions
 //! are numbered 0-7 clockwise from north-west (0 NW, 1 N, 2 NE, 3 E, 4 SE, 5 S, 6 SW, 7 W).
 
-use super::asm_map::{newx, newy, prox, px_to_im};
-use super::asm_text::{event, placard, placard_text, prdec, set_course, speak};
+use super::asm_map::{probe_collision, step_x, step_y, terrain_at};
+use super::asm_text::{
+    draw_placard_border, placard_text, print_number, show_event, speak, steer_actor,
+};
+use super::encounters::{check_death, load_carrier};
+use super::game_tables::extent_list;
+use super::globals::{
+    active_actor_count, actor_list, current_rastport, drawn_actor_count, encounter_x, encounter_y,
+    extent_type, hero_x, hero_y, hunger, i as c_i, leader, nearest_object, princess, story_font,
+    stuff, wealth,
+};
+use super::loading::play_effect;
 use super::messages::{name, print, print_cont};
+use super::places::transfer_hero;
 use super::random::{bitrand, fta_rand, rand8, rand64, rand256};
+use super::screen_fx::{map_message, message_off};
 use super::tables::ob_list8;
 use super::types::{Extent, Shape, WorldObject};
 use crate::amiga::{RastPort, TextFont};
 use std::ffi::c_char;
-use super::encounters::{checkdead, load_carrier};
-use super::loading::{effect};
-use super::places::{xfer};
-use super::screen_fx::{map_message, message_off};
-use super::game_tables::{extent_list};
-use super::globals::{afont, anim_list, anix, anix2, encounter_x, encounter_y, hero_x, hero_y, hunger, i as c_i, leader, nearest, princess, rp, stuff, wealth, xtype};
 
 unsafe extern "C" {
-    fn SetFont(rp: *mut RastPort, font: *mut TextFont);
-    fn SetAPen(rp: *mut RastPort, pen: u32);
-    fn RectFill(rp: *mut RastPort, x0: i32, y0: i32, x1: i32, y1: i32);
+    fn SetFont(current_rastport: *mut RastPort, font: *mut TextFont);
+    fn SetAPen(current_rastport: *mut RastPort, pen: u32);
+    fn RectFill(current_rastport: *mut RastPort, x0: i32, y0: i32, x1: i32, y1: i32);
     fn Delay(ticks: i32);
 }
 
@@ -74,26 +80,26 @@ const EFFECT_ROCK_HIT: i16 = 5;
 const EFFECT_HERO_HURT: i16 = 0;
 const EFFECT_FOE_HURT: i16 = 3;
 
-/// Message count shown after a fight only while the area is this peaceful (`xtype` below).
+/// Message count shown after a fight only while the area is this peaceful (`extent_type` below).
 const PEACEFUL_EXTENT: u16 = 50;
 const BRAVE_LOW_VITALITY: i16 = 5;
 
 /// Collision box around an actor.
 const BLOCK_HALF_WIDTH: i32 = 11;
 const BLOCK_HALF_HEIGHT: i32 = 9;
-/// Value `proxcheck` returns when another actor is in the way.
+/// Value `blocked_at` returns when another actor is in the way.
 const BLOCKED_BY_ACTOR: i32 = 16;
 /// Terrain types that never stop the hero.
 const SOFT_TERRAIN: [i32; 2] = [8, 9];
 const HERO: usize = 0;
 const RAFT_SLOT: usize = 1;
 
-/// Set when turtle eggs are in view; the slot of the eggs' actor (see `aftermath`).
+/// Set when turtle eggs are in view; the slot of the eggs' actor (see `report_battle_result`).
 pub static mut turtle_eggs: i8 = 0;
 
 /// Actor `i`. A raw pointer, because the functions called while it is in use change actors too.
 fn actor(i: i32) -> *mut Shape {
-    (&raw mut anim_list)
+    (&raw mut actor_list)
         .cast::<Shape>()
         .wrapping_add(i as usize)
 }
@@ -105,7 +111,7 @@ fn actor(i: i32) -> *mut Shape {
 /// kind 9) cannot be hurt by weak weapons (weapon below 4); the witch can be hurt anyway if the hero
 /// holds the item in inventory slot 7 (the sun stone). Races 0x8a and 0x8b (the spectre and the
 /// ghost brothers) are never hurt. Dragons and people are not pushed back.
-pub fn dohit(i: i32, j: i32, fc: i32, wt: i16) {
+pub fn hit_actor(i: i32, j: i32, fc: i32, wt: i16) {
     unsafe {
         let target = actor(j);
         if (*actor(HERO as i32)).weapon < MIN_HURT_WEAPON
@@ -120,29 +126,29 @@ pub fn dohit(i: i32, j: i32, fc: i32, wt: i16) {
         }
         (*target).vitality = ((*target).vitality - wt).max(0);
         match (i, j) {
-            (-1, _) => effect(EFFECT_ARROW_HIT, 500 + rand64()),
-            (-2, _) => effect(EFFECT_ROCK_HIT, 3200 + bitrand(511)),
-            (_, 0) => effect(EFFECT_HERO_HURT, 800 + bitrand(511)),
-            _ => effect(EFFECT_FOE_HURT, 400 + rand256()),
+            (-1, _) => play_effect(EFFECT_ARROW_HIT, 500 + rand64()),
+            (-2, _) => play_effect(EFFECT_ROCK_HIT, 3200 + bitrand(511)),
+            (_, 0) => play_effect(EFFECT_HERO_HURT, 800 + bitrand(511)),
+            _ => play_effect(EFFECT_FOE_HURT, 400 + rand256()),
         }
         // push back the foe
         if (*target).kind != DRAGON
             && (*target).kind != SETFIG
-            && move_figure(j as i16, fc as i16, KNOCKBACK) != 0
+            && step_figure(j as i16, fc as i16, KNOCKBACK) != 0
             && i >= 0
         {
-            move_figure(i as i16, fc as i16, KNOCKBACK);
+            step_figure(i as i16, fc as i16, KNOCKBACK);
         }
-        checkdead(j, WORLD_DEAD_CHECK);
+        check_death(j, WORLD_DEAD_CHECK);
     }
 }
 
 /// After a fight: reports how many foes were defeated or fled, or "Bravely done!" if the hero is
 /// nearly dead. Then, if turtle eggs are around, the turtle story event is checked.
-pub fn aftermath() {
+pub fn report_battle_result() {
     unsafe {
         let (mut dead, mut fled) = (0, 0);
-        for i in 3..anix as i32 {
+        for i in 3..active_actor_count as i32 {
             let a = actor(i);
             if (*a).kind != ENEMY {
                 continue;
@@ -158,21 +164,21 @@ pub fn aftermath() {
             // dead, so no message
         } else if vitality < BRAVE_LOW_VITALITY && dead != 0 {
             print(c"Bravely done!".as_ptr());
-        } else if xtype < PEACEFUL_EXTENT {
+        } else if extent_type < PEACEFUL_EXTENT {
             if dead != 0 {
                 print(c"".as_ptr());
-                prdec(dead, 1);
+                print_number(dead, 1);
                 print_cont(c"foes were defeated in battle.".as_ptr());
             }
             if fled != 0 {
                 print(c"".as_ptr());
-                prdec(fled, 1);
+                print_number(fled, 1);
                 print_cont(c"foes fled in retreat.".as_ptr());
             }
         }
         // check for presence of turtle eggs
         if turtle_eggs != 0 {
-            get_turtle();
+            summon_turtle();
         }
     }
 }
@@ -183,11 +189,11 @@ pub fn aftermath() {
 /// and 9). Then every other actor is checked: it blocks if it is within 10 pixels sideways and
 /// 8 pixels up or down.
 /// Dead actors and the raft can be walked over.
-pub fn proxcheck(x: i16, y: i16, i: i16) -> i32 {
+pub fn blocked_at(x: i16, y: i16, i: i16) -> i32 {
     unsafe {
         let me = actor(i as i32);
         if (*me).kind != ENEMY || (*me).race != RACE_WRAITH {
-            let mut terrain = prox(x as i32, y as i32);
+            let mut terrain = probe_collision(x as i32, y as i32);
             if i == 0 && SOFT_TERRAIN.contains(&terrain) {
                 terrain = 0;
             }
@@ -195,7 +201,7 @@ pub fn proxcheck(x: i16, y: i16, i: i16) -> i32 {
                 return terrain;
             }
         }
-        for j in 0..anix as i32 {
+        for j in 0..active_actor_count as i32 {
             let other = actor(j);
             // dead actors and rafts can be walked over
             if i as i32 != j
@@ -218,21 +224,21 @@ pub fn proxcheck(x: i16, y: i16, i: i16) -> i32 {
     }
 }
 
-/// Finds the nearest actor to the hero closer than `dist`, setting `nearest`; returns the
+/// Finds the nearest actor to the hero closer than `dist`, setting `nearest_object`; returns the
 /// distance found. With `constraint` set, objects are ignored too.
-pub fn nearest_fig(constraint: c_char, mut dist: i16) -> i32 {
+pub fn find_nearest_figure(constraint: c_char, mut dist: i16) -> i32 {
     /// Index of the "still" object type that always counts.
     const ALWAYS_COUNTED_OBJECT: i8 = 0x1d;
     unsafe {
-        nearest = 0;
-        for i in 1..anix2 as i32 {
+        nearest_object = 0;
+        for i in 1..drawn_actor_count as i32 {
             let a = actor(i);
             if (*a).kind == OBJECTS && (constraint != 0 || (*a).index == ALWAYS_COUNTED_OBJECT) {
                 continue;
             }
-            let d = calc_dist(i, 0);
+            let d = actor_distance(i, 0);
             if d < dist as i32 {
-                nearest = i as i16;
+                nearest_object = i as i16;
                 dist = d as i16;
             }
         }
@@ -242,7 +248,7 @@ pub fn nearest_fig(constraint: c_char, mut dist: i16) -> i32 {
 
 /// Distance between two actors. The game avoids a square root: if one axis is more than twice
 /// the other it is used alone, otherwise (x + y) * 5 / 7 approximates the diagonal.
-pub fn calc_dist(a: i32, b: i32) -> i32 {
+pub fn actor_distance(a: i32, b: i32) -> i32 {
     let (a, b) = unsafe { (&*actor(a), &*actor(b)) };
     let x = (a.abs_x as i32 - b.abs_x as i32).abs();
     let y = (a.abs_y as i32 - b.abs_y as i32).abs();
@@ -256,12 +262,12 @@ pub fn calc_dist(a: i32, b: i32) -> i32 {
 }
 
 /// Moves an actor `dist` in direction `dir` if nothing blocks it. Returns TRUE if it moved.
-pub fn move_figure(fig: i16, dir: i16, dist: i16) -> i32 {
+pub fn step_figure(fig: i16, dir: i16, dist: i16) -> i32 {
     unsafe {
         let a = actor(fig as i32);
-        let xtest = newx((*a).abs_x as i32, dir as i32, dist as i32) as u16;
-        let ytest = newy((*a).abs_y as i32, dir as i32, dist as i32) as u16;
-        if proxcheck(xtest as i16, ytest as i16, fig) != 0 {
+        let xtest = step_x((*a).abs_x as i32, dir as i32, dist as i32) as u16;
+        let ytest = step_y((*a).abs_y as i32, dir as i32, dist as i32) as u16;
+        if blocked_at(xtest as i16, ytest as i16, fig) != 0 {
             return 0;
         }
         (*a).abs_x = xtest;
@@ -274,7 +280,7 @@ pub fn move_figure(fig: i16, dir: i16, dist: i16) -> i32 {
 const SHOOT_CLOSE: i16 = 8;
 const SHOOT_DIAGONAL_BELOW: i16 = 5;
 const SHOOT_DIAGONAL_ABOVE: i16 = 7;
-// `set_course` modes.
+// `steer_actor` modes.
 const COURSE_TOWARD: i32 = 0;
 const COURSE_AWAY: i32 = 3;
 const COURSE_STRAIGHT: i32 = 4;
@@ -293,7 +299,7 @@ const EGG_Y: i32 = 5667;
 ///   diagonal) and aim, else approach.  - RANDOM: wander.  - BUMBLE_SEEK: head toward the hero
 ///   without smart steering.  - BACKUP: head away from the hero.  - FOLLOW: stay near the leader.
 /// - EVADE: keep away from another enemy.  - EGG_SEEK: go to the turtle eggs.
-pub fn do_tactic(i: i32, tactic: i32) {
+pub fn run_tactic(i: i32, tactic: i32) {
     unsafe {
         let mut r = fta_rand() & 7 == 0;
         let an = actor(i);
@@ -305,7 +311,7 @@ pub fn do_tactic(i: i32, tactic: i32) {
         match tactic {
             PURSUE => {
                 if r {
-                    set_course(i, hx, hy, COURSE_TOWARD);
+                    steer_actor(i, hx, hy, COURSE_TOWARD);
                 }
             }
             SHOOT => {
@@ -318,12 +324,12 @@ pub fn do_tactic(i: i32, tactic: i32) {
                     || (xd as i32 > yd as i32 - SHOOT_DIAGONAL_BELOW as i32
                         && (xd as i32) < yd as i32 + SHOOT_DIAGONAL_ABOVE as i32);
                 if fta_rand() & 1 != 0 && lined_up {
-                    set_course(i, hx, hy, COURSE_TURN_ONLY);
+                    steer_actor(i, hx, hy, COURSE_TURN_ONLY);
                     if (*an).state < SHOOT1 {
                         (*an).state = SHOOT1;
                     }
                 } else {
-                    set_course(i, hx, hy, COURSE_TOWARD);
+                    steer_actor(i, hx, hy, COURSE_TOWARD);
                 }
             }
             RANDOM => {
@@ -334,12 +340,12 @@ pub fn do_tactic(i: i32, tactic: i32) {
             }
             BUMBLE_SEEK => {
                 if r {
-                    set_course(i, hx, hy, COURSE_STRAIGHT);
+                    steer_actor(i, hx, hy, COURSE_STRAIGHT);
                 }
             }
             BACKUP => {
                 if r {
-                    set_course(i, hx, hy, COURSE_AWAY);
+                    steer_actor(i, hx, hy, COURSE_AWAY);
                 }
             }
             FOLLOW => {
@@ -349,7 +355,7 @@ pub fn do_tactic(i: i32, tactic: i32) {
                 }
                 if r {
                     let target = actor(f);
-                    set_course(
+                    steer_actor(
                         i,
                         (*target).abs_x as i32,
                         (*target).abs_y as i32 + FOLLOW_OFFSET,
@@ -358,10 +364,14 @@ pub fn do_tactic(i: i32, tactic: i32) {
                 }
             }
             EVADE => {
-                let f = if i == anix as i32 { i - 1 } else { i + i };
+                let f = if i == active_actor_count as i32 {
+                    i - 1
+                } else {
+                    i + i
+                };
                 if r {
                     let target = actor(f);
-                    set_course(
+                    steer_actor(
                         i,
                         (*target).abs_x as i32,
                         (*target).abs_y as i32 + FOLLOW_OFFSET,
@@ -371,7 +381,7 @@ pub fn do_tactic(i: i32, tactic: i32) {
             }
             EGG_SEEK => {
                 if r {
-                    set_course(i, EGG_X, EGG_Y, COURSE_TOWARD);
+                    steer_actor(i, EGG_X, EGG_Y, COURSE_TOWARD);
                 }
                 (*an).state = WALKING;
             }
@@ -383,7 +393,7 @@ pub fn do_tactic(i: i32, tactic: i32) {
 /// Places the turtle: tries up to 25 random spots around the hero for one on water (terrain 5),
 /// then moves the turtle extent there and loads the turtle as the carrier. Called when turtle
 /// eggs are in view. Leaves the loop count in C's global `i`, as the original did.
-pub fn get_turtle() {
+pub fn summon_turtle() {
     const TRIES: i32 = 25;
     const WATER: i32 = 5;
     const TURTLE_EXTENT: i16 = 1;
@@ -391,8 +401,8 @@ pub fn get_turtle() {
     unsafe {
         c_i = 0;
         while c_i < TRIES {
-            set_loc();
-            if px_to_im(encounter_x as i32, encounter_y as i32) == WATER {
+            pick_encounter_spot();
+            if terrain_at(encounter_x as i32, encounter_y as i32) == WATER {
                 break;
             }
             c_i += 1;
@@ -400,13 +410,13 @@ pub fn get_turtle() {
         if c_i == TRIES {
             return;
         }
-        move_extent(TURTLE_EXTENT, encounter_x as i16, encounter_y as i16);
+        center_extent_on(TURTLE_EXTENT, encounter_x as i16, encounter_y as i16);
         load_carrier(TURTLE_CARRIER);
     }
 }
 
 /// Centres extent `e` on a point (it covers 500 by 400 pixels around it).
-pub fn move_extent(e: i16, x: i16, y: i16) {
+pub fn center_extent_on(e: i16, x: i16, y: i16) {
     const HALF_WIDTH: i32 = 250;
     const HALF_HEIGHT: i32 = 200;
     unsafe {
@@ -441,23 +451,23 @@ const REWARD_GOLD: i16 = 100;
 /// Shows the story pages, moves the hero to the princess's home, repositions the extent for the
 /// next princess, changes the princess object, gives 100 gold and three of each key, and bumps
 /// the `princess` count (each rescue shows different story pages).
-pub fn rescue() {
+pub fn rescue_princess() {
     unsafe {
         map_message();
-        SetFont(rp, afont);
+        SetFont(current_rastport, story_font);
         let line = princess as i32 * 3;
         placard_text(8 + line);
         name();
         placard_text(9 + line);
         name();
         placard_text(10 + line);
-        placard();
+        draw_placard_border();
         Delay(RESCUE_PAUSE);
-        SetAPen(rp, 0);
+        SetAPen(current_rastport, 0);
         let (x0, y0, x1, y1) = PLACARD_AREA;
-        RectFill(rp, x0, y0, x1, y1);
+        RectFill(current_rastport, x0, y0, x1, y1);
         Delay(CLEAR_PAUSE);
-        SetAPen(rp, PLACARD_PEN);
+        SetAPen(current_rastport, PLACARD_PEN);
         placard_text(17);
         name();
         placard_text(18);
@@ -465,8 +475,8 @@ pub fn rescue() {
         message_off();
 
         princess += 1;
-        xfer(PRINCESS_HOME.0, PRINCESS_HOME.1, 0); // do princess transfer
-        move_extent(0, PRINCESS_EXTENT.0, PRINCESS_EXTENT.1);
+        transfer_hero(PRINCESS_HOME.0, PRINCESS_HOME.1, 0); // do princess transfer
+        center_extent_on(0, PRINCESS_EXTENT.0, PRINCESS_EXTENT.1);
         let objects = (&raw mut ob_list8).cast::<WorldObject>();
         (*objects.add(PRINCESS_OBJECT)).ob_id = PRINCESS_OBJECT_ID;
         *stuff.add(PRINCESS_STUFF) = 1;
@@ -481,13 +491,13 @@ pub fn rescue() {
 
 /// Eats: lowers hunger by `amt`. If that would go below zero the hero is simply full
 /// (message 13); otherwise "Yum!".
-pub fn eat(amt: i32) {
+pub fn eat_food(amt: i32) {
     const HUNGER_FULL_MESSAGE: i32 = 13;
     unsafe {
         hunger = (hunger as i32 - amt) as i16;
         if hunger < 0 {
             hunger = 0;
-            event(HUNGER_FULL_MESSAGE);
+            show_event(HUNGER_FULL_MESSAGE);
         } else {
             print(c"Yum!".as_ptr());
         }
@@ -499,12 +509,12 @@ const ENCOUNTER_MIN_DISTANCE: i32 = 150;
 
 /// Picks where a new encounter appears: a random direction and distance from the hero
 /// (150 to 213 pixels).
-pub fn set_loc() {
+pub fn pick_encounter_spot() {
     unsafe {
         let direction = rand8();
         let distance = ENCOUNTER_MIN_DISTANCE + rand64();
-        encounter_x = newx(hero_x as i32, direction, distance) as u16;
-        encounter_y = newy(hero_y as i32, direction, distance) as u16;
+        encounter_x = step_x(hero_x as i32, direction, distance) as u16;
+        encounter_y = step_y(hero_y as i32, direction, distance) as u16;
     }
 }
 

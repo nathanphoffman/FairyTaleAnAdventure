@@ -1,27 +1,31 @@
-//! The Items menu actions (from `do_option` in csrc/fmain.c): showing the item list, taking what
+//! The Items menu actions (from `choose_menu_entry` in csrc/fmain.c): showing the item list, taking what
 //! is nearby (objects, containers, dead bodies) and looking around.
 
-use super::actors::{calc_dist, eat, nearest_fig};
-use super::asm_text::{event, prdec, prq};
+use super::actors::{actor_distance, eat_food, find_nearest_figure};
+use super::asm_text::{print_number, queue_print, show_event};
 use super::encounters::Encounter;
-use super::messages::{announce_container, announce_treasure, extract, print, print_cont};
+use super::game_tables::{encounter_chart, item_list, region_num};
+use super::globals::{
+    actor_list, current_rastport, drawing_page, drawn_actor_count, freeze_timer, hunger, julstuff,
+    nearest_object, pagea, philstuff, quit_requested, rp_map, seq_list, story_font, stuff,
+    view_status, vp_page, wealth,
+};
+use super::menus::go_to_menu;
+use super::messages::{announce_container, announce_treasure, print, print_cont, print_wrapped};
 use super::objects::change_object;
 use super::random::{rand4, rand8};
-use super::screen_fx::{map_message, stillscreen, win_colors};
-use super::tables::{itrans, ob_listg, pagecolors, treasure_probs};
+use super::screen_fx::{map_message, show_still_screen, win_colors};
+use super::tables::{itrans, ob_listg, page_colors, treasure_probs};
 use super::types::{InvItem, SeqInfo};
 use crate::amiga::{BitMap, RastPort, TextFont, ViewPort};
 use std::ffi::c_char;
-use super::menus::{gomenu};
-use super::game_tables::{encounter_chart, inv_list, region_num};
-use super::globals::{afont, anim_list, anix2, fp_drawing, freeze_timer, hunger, julstuff, nearest, pagea, philstuff, quitflag, rp, rp_map, seq_list, stuff, viewstatus, vp_page, wealth};
 
 unsafe extern "C" {
-    fn SetRast(rp: *mut RastPort, pen: u32);
+    fn SetRast(current_rastport: *mut RastPort, pen: u32);
     fn InitBitMap(bm: *mut BitMap, depth: i32, width: i32, height: i32);
-    fn SetRGB4(vp: *mut ViewPort, n: i32, r: u32, g: u32, b: u32);
-    fn LoadRGB4(vp: *mut ViewPort, colors: *const u16, count: i32);
-    fn SetFont(rp: *mut RastPort, font: *mut TextFont);
+    fn SetRGB4(current_viewport: *mut ViewPort, n: i32, r: u32, g: u32, b: u32);
+    fn LoadRGB4(current_viewport: *mut ViewPort, colors: *const u16, count: i32);
+    fn SetFont(current_rastport: *mut RastPort, font: *mut TextFont);
     fn BltBitMap(
         src: *mut BitMap,
         sx: i32,
@@ -56,7 +60,7 @@ const KEYBASE: i32 = 16;
 const ARROWS: usize = 8;
 const FRUIT_SLOT: usize = 24;
 const TALISMAN: usize = 22;
-/// The 100 gold pieces entry of `inv_list`.
+/// The 100 gold pieces entry of `item_list`.
 const HUNDRED_GOLD: i32 = GOLDBASE as i32 + 3;
 
 // Object ids of things that are not plain pickups.
@@ -107,18 +111,18 @@ const ITEM_X_MARGIN: i32 = 20;
 const BLIT_COPY: u32 = 0xC0;
 const ALL_PLANES: u32 = 0xff;
 const BACKGROUND_PEN: u32 = 31;
-/// `viewstatus` value while the item list is shown.
+/// `view_status` value while the item list is shown.
 const VIEW_ITEMS: i8 = 4;
 const VIEW_GAME_OVER: i8 = 2;
 const COLOURS_SHOWN: i32 = 31;
 
 /// The name of inventory item `i`.
 unsafe fn item_name(i: usize) -> *const c_char {
-    unsafe { (*(&raw const inv_list).cast::<InvItem>().add(i)).name }
+    unsafe { (*(&raw const item_list).cast::<InvItem>().add(i)).name }
 }
 
 unsafe fn item(i: usize) -> &'static InvItem {
-    unsafe { &*(&raw const inv_list).cast::<InvItem>().add(i) }
+    unsafe { &*(&raw const item_list).cast::<InvItem>().add(i) }
 }
 
 unsafe fn add_stuff(slot: usize, amount: u8) {
@@ -126,14 +130,14 @@ unsafe fn add_stuff(slot: usize, amount: u8) {
 }
 
 /// Handles an entry of the Items menu.
-pub unsafe fn items_option(hit: i16) {
+pub unsafe fn items_option(chosen_entry: i16) {
     unsafe {
-        match hit {
-            USE_ENTRY => gomenu(USE),
+        match chosen_entry {
+            USE_ENTRY => go_to_menu(USE),
             LIST => show_item_list(),
             TAKE => take_nearest(),
             LOOK => look_around(),
-            GIVE_ENTRY => gomenu(GIVE),
+            GIVE_ENTRY => go_to_menu(GIVE),
             _ => {}
         }
     }
@@ -142,7 +146,7 @@ pub unsafe fn items_option(hit: i16) {
 /// Draws every item the hero has, stacked, on a black page and shows it.
 unsafe fn show_item_list() {
     unsafe {
-        let bm = (*(*fp_drawing).ri_page).BitMap;
+        let bm = (*(*drawing_page).ri_page).BitMap;
         rp_map.BitMap = bm;
         SetRast(&raw mut rp_map, 0);
 
@@ -182,28 +186,28 @@ unsafe fn show_item_list() {
         }
 
         SetRGB4(&raw mut vp_page, BACKGROUND_PEN as i32, 0, 0, 0);
-        stillscreen();
+        show_still_screen();
         LoadRGB4(
             &raw mut vp_page,
-            (&raw const pagecolors).cast(),
+            (&raw const page_colors).cast(),
             COLOURS_SHOWN,
         );
-        viewstatus = VIEW_ITEMS;
-        prq(PRQ_LIST);
+        view_status = VIEW_ITEMS;
+        queue_print(PRQ_LIST);
     }
 }
 
 /// Takes the nearest object, or searches the nearest dead body.
 unsafe fn take_nearest() {
     unsafe {
-        prq(PRQ_VITALITY);
-        nearest_fig(0, TAKE_RANGE);
+        queue_print(PRQ_VITALITY);
+        find_nearest_figure(0, TAKE_RANGE);
         *stuff.add(ARROWBASE) = 0;
-        if nearest == 0 {
-            prq(PRQ_NOTHING_NEAR);
+        if nearest_object == 0 {
+            queue_print(PRQ_NOTHING_NEAR);
             return;
         }
-        let an = &raw mut anim_list[nearest as usize];
+        let an = &raw mut actor_list[nearest_object as usize];
         if (*an).kind == OBJECTS {
             if take_object() {
                 finish_pickup();
@@ -213,7 +217,7 @@ unsafe fn take_nearest() {
         } else if (*an).vitality == 0 || freeze_timer != 0 {
             search_body();
         } else {
-            event(EVENT_ALIVE);
+            show_event(EVENT_ALIVE);
         }
     }
 }
@@ -222,22 +226,22 @@ unsafe fn take_nearest() {
 /// count, and ends the game if the talisman was found.
 unsafe fn finish_pickup() {
     unsafe {
-        change_object(nearest as i32, 2);
+        change_object(nearest_object as i32, 2);
         add_stuff(ARROWS, (*stuff.add(ARROWBASE) as u32 * 10) as u8);
         if *stuff.add(TALISMAN) != 0 {
-            quitflag = 1;
-            viewstatus = VIEW_GAME_OVER;
+            quit_requested = 1;
+            view_status = VIEW_GAME_OVER;
             map_message();
-            SetFont(rp, afont);
+            SetFont(current_rastport, story_font);
             win_colors();
         }
     }
 }
 
-/// Handles taking the object `nearest`. Returns true if it was taken (so it must be removed).
+/// Handles taking the object `nearest_object`. Returns true if it was taken (so it must be removed).
 unsafe fn take_object() -> bool {
     unsafe {
-        let an = &raw mut anim_list[nearest as usize];
+        let an = &raw mut actor_list[nearest_object as usize];
         let id = (*an).index as u8 as u32;
         let owner = (*an).vitality as u32 & 0x7f;
         match id {
@@ -247,8 +251,8 @@ unsafe fn take_object() -> bool {
                 true
             }
             SCRAP_OF_PAPER => {
-                event(EVENT_PAPER);
-                event(if region_num > FIRST_INDOOR_REGION {
+                show_event(EVENT_PAPER);
+                show_event(if region_num > FIRST_INDOOR_REGION {
                     EVENT_PAPER_INDOORS
                 } else {
                     EVENT_PAPER_OUTDOORS
@@ -258,9 +262,9 @@ unsafe fn take_object() -> bool {
             FRUIT => {
                 if hunger < NOT_HUNGRY {
                     add_stuff(FRUIT_SLOT, 1);
-                    event(EVENT_FRUIT_KEPT);
+                    show_event(EVENT_FRUIT_KEPT);
                 } else {
-                    eat(FRUIT_HUNGER);
+                    eat_food(FRUIT_HUNGER);
                 }
                 true
             }
@@ -395,7 +399,7 @@ unsafe fn three_things() {
     }
 }
 
-/// Searches the dead body `nearest`: takes its weapon and any treasure.
+/// Searches the dead body `nearest_object`: takes its weapon and any treasure.
 unsafe fn search_body() {
     unsafe {
         const ARCHER_WEAPON: u32 = 4;
@@ -403,8 +407,8 @@ unsafe fn search_body() {
         const EXTRA_ARROWS_MIN: i32 = 2;
         const SETFIG_RACE_BIT: u8 = 0x80;
         const TREASURE_CLASS_SIZE: i32 = 8;
-        let an = &raw mut anim_list[nearest as usize];
-        extract(c"% searched the body and found".as_ptr());
+        let an = &raw mut actor_list[nearest_object as usize];
+        print_wrapped(c"% searched the body and found".as_ptr());
         print(c"".as_ptr());
         let mut weapon = (*an).weapon as u32;
         if weapon > MAX_WEAPON {
@@ -414,13 +418,13 @@ unsafe fn search_body() {
             print_cont(c"a ".as_ptr());
             print_cont(item_name(weapon as usize - 1));
             add_stuff(weapon as usize - 1, 1);
-            if weapon as i8 > anim_list[0].weapon {
-                anim_list[0].weapon = weapon as i8;
+            if weapon as i8 > actor_list[0].weapon {
+                actor_list[0].weapon = weapon as i8;
             }
             if weapon == ARCHER_WEAPON {
                 print_cont(c" and ".as_ptr());
                 let arrows = rand8() + EXTRA_ARROWS_MIN;
-                prdec(arrows, 1);
+                print_number(arrows, 1);
                 print_cont(c" Arrows.".as_ptr());
                 add_stuff(ARROWS, arrows as u8);
                 (*an).weapon = -1;
@@ -461,14 +465,14 @@ unsafe fn search_body() {
 unsafe fn look_around() {
     unsafe {
         let mut found = false;
-        for i in 0..anix2 as i32 {
-            let an = &raw const anim_list[i as usize];
-            if (*an).kind == OBJECTS && (*an).race == 0 && calc_dist(i, 0) < LOOK_RANGE {
+        for i in 0..drawn_actor_count as i32 {
+            let an = &raw const actor_list[i as usize];
+            if (*an).kind == OBJECTS && (*an).race == 0 && actor_distance(i, 0) < LOOK_RANGE {
                 found = true;
                 change_object(i, 1);
             }
         }
-        event(if found {
+        show_event(if found {
             EVENT_FOUND_HIDDEN
         } else {
             EVENT_NOTHING_HIDDEN

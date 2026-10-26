@@ -1,13 +1,15 @@
 //! Fighting each frame (from the main loop in csrc/fmain.c): swings and bites, arrows and
 //! fireballs in flight, and putting the visible missiles in the actor list so they get drawn.
 
-use super::actors::dohit;
-use super::asm_map::{newx, newy, px_to_im};
-use super::loading::effect;
+use super::actors::hit_actor;
+use super::asm_map::{step_x, step_y, terrain_at};
+use super::globals::{
+    active_actor_count, actor_list, brave, drawn_actor_count, freeze_timer, map_x, map_y,
+    missile_slots,
+};
+use super::loading::play_effect;
 use super::random::{bitrand, rand4, rand8, rand256};
 use super::types::Missile;
-use super::globals::{anim_list, anix, anix2, brave, freeze_timer, map_x, map_y, missile_list};
-
 
 // Actor kinds and states (csrc/ftale.h).
 const OBJECTS: i8 = 1;
@@ -42,15 +44,15 @@ fn chebyshev(dx: i16, dy: i16) -> i16 {
 }
 
 /// Everything not walking swings its weapon (or bites) at whatever is within reach of the tip:
-/// `dohit` if it lands, a whoosh if it nearly does. Only the hero acts while time is frozen.
-pub fn melee_hits() {
+/// `hit_actor` if it lands, a whoosh if it nearly does. Only the hero acts while time is frozen.
+pub fn resolve_melee() {
     unsafe {
         let mut i = 0;
-        while i < anix as usize {
+        while i < active_actor_count as usize {
             if i > 0 && freeze_timer != 0 {
                 break;
             }
-            let attacker = &raw const anim_list[i];
+            let attacker = &raw const actor_list[i];
             if i != RAFT && (*attacker).state < WALKING {
                 swing(i);
             }
@@ -62,7 +64,7 @@ pub fn melee_hits() {
 /// One actor's swing.
 unsafe fn swing(i: usize) {
     unsafe {
-        let attacker = &raw const anim_list[i];
+        let attacker = &raw const actor_list[i];
         let mut wt = (*attacker).weapon as i16;
         let fc = (*attacker).facing as i32;
         if wt & BOW_BIT != 0 {
@@ -73,8 +75,8 @@ unsafe fn swing(i: usize) {
         }
         wt += bitrand(2) as i16;
         let reach = (wt + wt) as i32;
-        let xs = (newx((*attacker).abs_x as i32, fc, reach) + rand8() - TIP_NOISE) as i16;
-        let ys = (newy((*attacker).abs_y as i32, fc, reach) + rand8() - TIP_NOISE) as i16;
+        let xs = (step_x((*attacker).abs_x as i32, fc, reach) + rand8() - TIP_NOISE) as i16;
+        let ys = (step_y((*attacker).abs_y as i32, fc, reach) + rand8() - TIP_NOISE) as i16;
         let mut bv = if i == 0 {
             brave / BRAVE_PER_REACH + HERO_BASE_REACH
         } else {
@@ -84,8 +86,8 @@ unsafe fn swing(i: usize) {
             bv = REACH_LIMIT;
         }
         let mut j = 0;
-        while j < anix as usize {
-            let target = &raw const anim_list[j];
+        while j < active_actor_count as usize {
+            let target = &raw const actor_list[j];
             if j == RAFT || j == i || (*target).state == DEAD || (*attacker).kind == CARRIER {
                 j += 1;
                 continue;
@@ -94,10 +96,10 @@ unsafe fn swing(i: usize) {
             let yd = ((*target).abs_y as i32 - ys as i32) as i16;
             let dist = chebyshev(xd, yd);
             if (i == 0 || rand256() > brave as i32) && dist < bv && freeze_timer == 0 {
-                dohit(i as i32, j as i32, fc, wt);
+                hit_actor(i as i32, j as i32, fc, wt);
                 break;
             } else if dist < bv + WHOOSH_MARGIN && wt != TOUCH_WEAPON {
-                effect(SWING_SOUND, SWING_SOUND_PITCH + rand256());
+                play_effect(SWING_SOUND, SWING_SOUND_PITCH + rand256());
             }
             j += 1;
         }
@@ -119,19 +121,19 @@ const FIREBALL_HIT_RANGE: i16 = 9;
 const OTHER_DODGE: i16 = 20;
 const DODGE_RANGE: i32 = 512;
 const MISSILE_DAMAGE_BASE: i32 = 4;
-/// `dohit` attacker codes for an arrow and for a fireball.
+/// `hit_actor` attacker codes for an arrow and for a fireball.
 const BY_ARROW: i32 = -1;
 const BY_FIREBALL: i32 = -2;
 
 /// Moves the six arrows and fireballs; they hit actors in the way and stop at walls. Nothing
 /// moves while time is frozen.
-pub fn move_missiles() {
+pub fn advance_missiles() {
     unsafe {
         if freeze_timer != 0 {
             return;
         }
         for i in 0..MISSILES {
-            let ms = &raw mut missile_list[i];
+            let ms = &raw mut missile_slots[i];
             fly(i, ms);
         }
     }
@@ -158,7 +160,7 @@ unsafe fn fly(i: usize, ms: *mut Missile) {
 
         let xs = (*ms).abs_x as i16;
         let ys = (*ms).abs_y as i16;
-        if WALL_TERRAIN.contains(&px_to_im(xs as i32, ys as i32)) {
+        if WALL_TERRAIN.contains(&terrain_at(xs as i32, ys as i32)) {
             (*ms).missile_type = MISSILE_NONE;
             s = 0;
         }
@@ -172,7 +174,7 @@ unsafe fn fly(i: usize, ms: *mut Missile) {
         let mut j = 0;
         while j < actor_count() {
             let bv = if j == 0 { brave } else { OTHER_DODGE };
-            let target = &raw const anim_list[j];
+            let target = &raw const actor_list[j];
             if j == RAFT
                 || (*ms).archer as i16 == j as i16
                 || (*target).state == DEAD
@@ -190,7 +192,7 @@ unsafe fn fly(i: usize, ms: *mut Missile) {
                 } else {
                     BY_ARROW
                 };
-                dohit(by, j as i32, fc, (rand8() + MISSILE_DAMAGE_BASE) as i16);
+                hit_actor(by, j as i32, fc, (rand8() + MISSILE_DAMAGE_BASE) as i16);
                 (*ms).speed = 0;
                 if (*ms).missile_type == MISSILE_ROCK {
                     (*ms).missile_type = MISSILE_SPENT;
@@ -199,14 +201,14 @@ unsafe fn fly(i: usize, ms: *mut Missile) {
             }
             j += 1;
         }
-        (*ms).abs_x = newx((*ms).abs_x as i32, fc, s as i32) as u16;
-        (*ms).abs_y = newy((*ms).abs_y as i32, fc, s as i32) as u16;
+        (*ms).abs_x = step_x((*ms).abs_x as i32, fc, s as i32) as u16;
+        (*ms).abs_y = step_y((*ms).abs_y as i32, fc, s as i32) as u16;
     }
 }
 
 /// The current number of actors (the loop bound is read again each time, as in the original).
 pub fn actor_count() -> usize {
-    unsafe { anix as usize }
+    unsafe { active_actor_count as usize }
 }
 
 // ---- queue_missiles ----
@@ -223,10 +225,10 @@ const NO_RACE: u8 = 0xff;
 
 /// Adds the visible missiles to the end of the actor list as objects so the drawing draws them.
 /// Stops when the list is full.
-pub fn queue_missiles() {
+pub fn queue_missile_sprites() {
     unsafe {
         for i in 0..MISSILES {
-            let ms = &raw const missile_list[i];
+            let ms = &raw const missile_slots[i];
             let t = (*ms).missile_type;
             if t == MISSILE_NONE {
                 continue;
@@ -238,7 +240,7 @@ pub fn queue_missiles() {
                 && ystart > SCREEN_TOP
                 && ystart < SCREEN_BOTTOM
             {
-                let an = &raw mut anim_list[anix2 as usize];
+                let an = &raw mut actor_list[drawn_actor_count as usize];
                 (*an).abs_x = (*ms).abs_x;
                 (*an).abs_y = (*ms).abs_y;
                 (*an).rel_x = xstart as u16;
@@ -252,8 +254,8 @@ pub fn queue_missiles() {
                 } else if t == MISSILE_ROCK {
                     (*an).index = (*an).index.wrapping_add(MISSILE_ROCK_IMAGE);
                 }
-                anix2 += 1;
-                if anix2 >= ACTOR_SLOTS {
+                drawn_actor_count += 1;
+                if drawn_actor_count >= ACTOR_SLOTS {
                     return;
                 }
             }

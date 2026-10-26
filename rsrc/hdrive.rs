@@ -9,9 +9,9 @@
 //!
 //! The trackdisk path is kept (it is the original behaviour) but is never used on Linux.
 
+use super::globals::openflags;
 use crate::amiga::BPTR;
 use std::ffi::{c_char, c_void};
-use super::globals::{openflags};
 
 /// Mirror of `struct IOExtTD` in csrc/amiga.h: an Amiga trackdisk I/O request (a standard I/O
 /// request plus two trackdisk fields). Only the trackdisk path uses it.
@@ -87,7 +87,7 @@ const BLOCK_SIZE: i32 = 512;
 const LOADING_REQUESTS: usize = 9;
 const MOTOR_REQUEST: usize = 9;
 
-// Error codes returned by `AllocDiskIO`.
+// Error codes returned by `open_disk`.
 const ERR_NO_FILE: i32 = 30;
 const ERR_NO_REQUEST: i32 = 31;
 const ERR_NO_DEVICE: i32 = 32;
@@ -95,10 +95,10 @@ const ERR_NO_DEVICE: i32 = 32;
 static mut FROM_FILE: bool = false;
 static mut IMAGE: BPTR = 0;
 
-pub static mut diskport: *mut c_void = std::ptr::null_mut();
-pub static mut diskreq1: *mut IoExtTd = std::ptr::null_mut();
-pub static mut diskreqs: [IoExtTd; 10] = [ZERO_REQUEST; 10];
-pub static mut lastreq: *mut IoExtTd = std::ptr::null_mut();
+pub static mut DISKPORT: *mut c_void = std::ptr::null_mut();
+pub static mut DISKREQ1: *mut IoExtTd = std::ptr::null_mut();
+pub static mut DISKREQS: [IoExtTd; 10] = [ZERO_REQUEST; 10];
+pub static mut LASTREQ: *mut IoExtTd = std::ptr::null_mut();
 
 /// True when blocks come from the `image` file instead of trackdisk.
 fn from_file() -> bool {
@@ -107,7 +107,7 @@ fn from_file() -> bool {
 
 /// The I/O request slot `num`. Slots 0-8 are for loading, 9 is for the drive motor.
 fn request(num: usize) -> *mut IoExtTd {
-    unsafe { &raw mut diskreqs[num] }
+    unsafe { &raw mut DISKREQS[num] }
 }
 
 /// Records in `openflags` (a variable in csrc/fmain.c) that a resource was set up, so it can be freed on exit.
@@ -122,7 +122,7 @@ fn has_flag(flag: u16) -> bool {
 
 /// Opens the `image` file, or else sets up the trackdisk device. Returns 0 or an error code
 /// (30 no file or port, 31 no request, 32 no device).
-pub fn AllocDiskIO() -> i32 {
+pub fn open_disk() -> i32 {
     unsafe {
         let lock = Lock(IMAGE_FILE.as_ptr().cast(), ACCESS_READ);
         if lock != 0 {
@@ -131,61 +131,61 @@ pub fn AllocDiskIO() -> i32 {
             IMAGE = Open(IMAGE_FILE.as_ptr().cast(), MODE_OLDFILE);
             return if IMAGE == 0 { ERR_NO_FILE } else { 0 };
         }
-        diskport = CreatePort(std::ptr::null(), 0);
-        if diskport.is_null() {
+        DISKPORT = CreatePort(std::ptr::null(), 0);
+        if DISKPORT.is_null() {
             return ERR_NO_FILE;
         }
         set_flag(AL_PORT);
-        diskreq1 = CreateExtIO(diskport, size_of::<IoExtTd>() as i32).cast();
-        if diskreq1.is_null() {
+        DISKREQ1 = CreateExtIO(DISKPORT, size_of::<IoExtTd>() as i32).cast();
+        if DISKREQ1.is_null() {
             return ERR_NO_REQUEST;
         }
         set_flag(AL_IOREQ);
-        if OpenDevice(TD_NAME.as_ptr().cast(), 0, diskreq1.cast(), 0) != 0 {
+        if OpenDevice(TD_NAME.as_ptr().cast(), 0, DISKREQ1.cast(), 0) != 0 {
             return ERR_NO_DEVICE;
         }
         set_flag(AL_TDISK);
         for num in 0..LOADING_REQUESTS {
-            diskreqs[num] = *diskreq1;
+            DISKREQS[num] = *DISKREQ1;
         }
         0
     }
 }
 
 /// Closes the image file or the trackdisk device, whichever was opened.
-pub fn FreeDiskIO() {
+pub fn close_disk() {
     unsafe {
         if IMAGE != 0 {
             Close(IMAGE);
         }
         if has_flag(AL_TDISK) {
-            CloseDevice(diskreq1.cast());
+            CloseDevice(DISKREQ1.cast());
         }
         if has_flag(AL_IOREQ) {
-            DeleteExtIO(diskreq1.cast());
+            DeleteExtIO(DISKREQ1.cast());
         }
         if has_flag(AL_PORT) {
-            DeletePort(diskport);
+            DeletePort(DISKPORT);
         }
     }
 }
 
 /// Waits for read request `num` to finish. Nothing to wait for when reading from the file.
-pub fn WaitDiskIO(num: i32) {
+pub fn wait_for_read(num: i32) {
     if !from_file() {
         unsafe { WaitIO(request(num as usize).cast()) };
     }
 }
 
 /// Marks read request `num` as unused.
-pub fn InvalidDiskIO(num: i32) {
+pub fn mark_read_unused(num: i32) {
     if !from_file() {
         unsafe { (*request(num as usize)).command = CMD_INVALID };
     }
 }
 
 /// Whether request `num` has finished (always true for the file).
-pub fn CheckDiskIO(num: i32) -> i32 {
+pub fn read_finished(num: i32) -> i32 {
     if from_file() {
         return 1;
     }
@@ -193,35 +193,35 @@ pub fn CheckDiskIO(num: i32) -> i32 {
 }
 
 /// Whether request `num` is a read in progress (never, for the file).
-pub fn IsReadDiskIO(num: i32) -> i32 {
+pub fn is_read_pending(num: i32) -> i32 {
     (!from_file() && unsafe { (*request(num as usize)).command } == CMD_READ) as i32
 }
 
 /// Waits for the most recently started read.
-pub fn WaitLastDiskIO() {
+pub fn wait_for_last_read() {
     if !from_file() {
-        unsafe { WaitIO(lastreq.cast()) };
+        unsafe { WaitIO(LASTREQ.cast()) };
     }
 }
 
 /// Marks the most recently started read as unused.
-pub fn InvalidLastDiskIO() {
+pub fn mark_last_read_unused() {
     if !from_file() {
-        unsafe { (*lastreq).command = CMD_INVALID };
+        unsafe { (*LASTREQ).command = CMD_INVALID };
     }
 }
 
 /// Whether the most recently started read has finished (always true for the file).
-pub fn CheckLastDiskIO() -> i32 {
+pub fn last_read_finished() -> i32 {
     if from_file() {
         return 1;
     }
-    unsafe { CheckIO(lastreq.cast()) }
+    unsafe { CheckIO(LASTREQ.cast()) }
 }
 
 /// Whether the most recent request is a read in progress (never, for the file).
-pub fn IsReadLastDiskIO() -> i32 {
-    (!from_file() && unsafe { (*lastreq).command } == CMD_READ) as i32
+pub fn is_last_read_pending() -> i32 {
+    (!from_file() && unsafe { (*LASTREQ).command } == CMD_READ) as i32
 }
 
 /// Starts reading `b_count` blocks from block `f_block` into `buffer`, using request `dr` when
@@ -237,16 +237,16 @@ pub fn load_track_range(f_block: i16, b_count: i16, buffer: *mut c_void, dr: i16
             Read(IMAGE, buffer.cast(), b_count as i32 * BLOCK_SIZE);
             return;
         }
-        lastreq = request(dr as usize);
-        if (*lastreq).command == CMD_READ {
-            WaitIO(lastreq.cast());
+        LASTREQ = request(dr as usize);
+        if (*LASTREQ).command == CMD_READ {
+            WaitIO(LASTREQ.cast());
         }
-        *lastreq = *diskreq1;
-        (*lastreq).length = (b_count as i32 * BLOCK_SIZE) as u32;
-        (*lastreq).data = buffer;
-        (*lastreq).command = CMD_READ;
-        (*lastreq).offset = (f_block as i32 * BLOCK_SIZE) as u32;
-        SendIO(lastreq.cast());
+        *LASTREQ = *DISKREQ1;
+        (*LASTREQ).length = (b_count as i32 * BLOCK_SIZE) as u32;
+        (*LASTREQ).data = buffer;
+        (*LASTREQ).command = CMD_READ;
+        (*LASTREQ).offset = (f_block as i32 * BLOCK_SIZE) as u32;
+        SendIO(LASTREQ.cast());
     }
 }
 
@@ -257,7 +257,7 @@ pub fn motor_off() {
     }
     unsafe {
         let req = request(MOTOR_REQUEST);
-        *req = *diskreq1;
+        *req = *DISKREQ1;
         (*req).length = 0;
         (*req).command = TD_MOTOR;
         DoIO(req.cast());

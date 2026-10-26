@@ -2,31 +2,31 @@
 //! inline #asm in fmain2.c; from csrc/asm_text.c). The story strings are in csrc/narr_data.c.
 //!
 //! Three groups of routines live here:
-//! - Printing: numbers (`ion`, `prdec`), strings with position escapes (`ssp`), and the lists of
-//!   messages and speeches (`event`, `speak`, `msg`, `placard_text`, `question`).
-//! - The print queue and the typing cursor (`prq`, `cursor`) and the story page border (`placard`).
-//! - Enemy steering (`set_course`): turn an actor toward or away from a target and start it walking.
+//! - Printing: numbers (`format_number`, `print_number`), strings with position escapes (`print_positioned`), and the lists of
+//!   messages and speeches (`show_event`, `speak`, `show_message`, `placard_text`, `question`).
+//! - The print queue and the typing cursor (`queue_print`, `cursor`) and the story page border (`draw_placard_border`).
+//! - Enemy steering (`steer_actor`): turn an actor toward or away from a target and start it walking.
 //!
 //! Message lists are zero-terminated strings stored one after another; picking message `n` means
 //! skipping `n` zero bytes.
 
+use super::game_tables::number_buffer;
+use super::globals::{actor_list, current_rastport, rp_map, stuff};
+use super::messages::print_wrapped;
 use super::random::fta_rand;
-use super::tables::{answr, pplay, prec, print_que, xx, yy};
+use super::tables::{pplay, prec, print_que};
 use crate::amiga::RastPort;
 use std::ffi::c_char;
-use super::messages::{extract, print_cont};
-use super::game_tables::{numbuf};
-use super::globals::{anim_list, rp, rp_map, stuff};
 
 unsafe extern "C" {
     static event_msg: [c_char; 0];
     static speeches: [c_char; 0];
     static placard_msgs: [*const c_char; 0];
 
-    fn Move(rp: *mut RastPort, x: i32, y: i32);
-    fn Draw(rp: *mut RastPort, x: i32, y: i32);
-    fn Text(rp: *mut RastPort, s: *const c_char, len: i32) -> i32;
-    fn SetAPen(rp: *mut RastPort, pen: u32);
+    fn Move(current_rastport: *mut RastPort, x: i32, y: i32);
+    fn Draw(current_rastport: *mut RastPort, x: i32, y: i32);
+    fn Text(current_rastport: *mut RastPort, s: *const c_char, len: i32) -> i32;
+    fn SetAPen(current_rastport: *mut RastPort, pen: u32);
 }
 
 /// In a string: followed by x/2 and y, moves the text position.
@@ -40,11 +40,11 @@ const PRINT_QUEUE_MASK: i16 = 31;
 const WALKING: i8 = 12;
 const STILL: i8 = 13;
 
-/// Right-aligned decimal in the first 10 characters of `numbuf`, leading positions blank.
-/// (The 11th character is a space, which `prdec` prints after the number.)
-pub fn ion(mut value: u32) -> i32 {
+/// Right-aligned decimal in the first 10 characters of `number_buffer`, leading positions blank.
+/// (The 11th character is a space, which `print_number` prints after the number.)
+pub fn format_number(mut value: u32) -> i32 {
     unsafe {
-        let digits = &mut (&mut *(&raw mut numbuf))[..NUMBER_DIGITS];
+        let digits = &mut (&mut *(&raw mut number_buffer))[..NUMBER_DIGITS];
         let mut i = NUMBER_DIGITS;
         loop {
             i -= 1;
@@ -60,12 +60,12 @@ pub fn ion(mut value: u32) -> i32 {
 }
 
 /// Prints the number in a field of `len` characters, plus the trailing space.
-pub fn prdec(value: i32, len: i32) {
-    ion(value as u32);
+pub fn print_number(value: i32, len: i32) {
+    format_number(value as u32);
     unsafe {
         Text(
-            rp,
-            (&raw const numbuf)
+            current_rastport,
+            (&raw const number_buffer)
                 .cast::<c_char>()
                 .add(NUMBER_DIGITS)
                 .offset(-(len as isize)),
@@ -78,29 +78,29 @@ pub fn prdec(value: i32, len: i32) {
 /// Moves the text position (the C name is `move`, a keyword in Rust).
 #[unsafe(export_name = "move")]
 pub extern "C" fn move_to(x: i32, y: i32) {
-    unsafe { Move(rp, x, y) };
+    unsafe { Move(current_rastport, x, y) };
 }
 
 /// Prints `len` characters at the text position.
-pub fn text(s: *const c_char, len: i32) {
-    unsafe { Text(rp, s, len) };
+pub fn draw_text(s: *const c_char, len: i32) {
+    unsafe { Text(current_rastport, s, len) };
 }
 
 /// Prints a string that may hold XY escapes (128, x/2, y) to move the text position. A string
 /// ends at a zero byte; bytes of 128 and above end each plain run of text.
 /// (The x position is stored halved so it fits in a byte.)
-pub fn ssp(mut s: *const u8) {
+pub fn print_positioned(mut s: *const u8) {
     unsafe {
         while *s != 0 {
             if *s == XY {
-                Move(rp, *s.add(1) as i32 * 2, *s.add(2) as i32);
+                Move(current_rastport, *s.add(1) as i32 * 2, *s.add(2) as i32);
                 s = s.add(3);
             } else {
                 let mut n = 0;
                 while *s.add(n) != 0 && *s.add(n) < XY {
                     n += 1;
                 }
-                Text(rp, s.cast(), n as i32);
+                Text(current_rastport, s.cast(), n as i32);
                 s = s.add(n);
                 if n == 0 {
                     s = s.add(1); // stray byte >= 128 that is not XY
@@ -110,13 +110,15 @@ pub fn ssp(mut s: *const u8) {
     }
 }
 
-/// Prints story page text number `n` (the strings use position escapes, see `ssp`).
+/// Prints story page text number `n` (the strings use position escapes, see `print_positioned`).
 pub fn placard_text(n: i32) {
     unsafe {
-        ssp((*(&raw const placard_msgs)
-            .cast::<*const c_char>()
-            .offset(n as isize))
-        .cast())
+        print_positioned(
+            (*(&raw const placard_msgs)
+                .cast::<*const c_char>()
+                .offset(n as isize))
+            .cast(),
+        )
     };
 }
 
@@ -134,24 +136,24 @@ unsafe fn skip_strings(mut p: *const c_char, mut n: i32) -> *const c_char {
     p
 }
 
-/// Shows the `num`-th string of a list of messages, word-wrapped (see `extract`).
-pub fn msg(start: *const c_char, num: i32) {
-    unsafe { extract(skip_strings(start, num)) };
+/// Shows the `num`-th string of a list of messages, word-wrapped (see `print_wrapped`).
+pub fn show_message(start: *const c_char, num: i32) {
+    unsafe { print_wrapped(skip_strings(start, num)) };
 }
 
 /// Shows event message `n` (things that happen to the hero, such as hunger).
-pub fn event(n: i32) {
-    msg((&raw const event_msg).cast(), n);
+pub fn show_event(n: i32) {
+    show_message((&raw const event_msg).cast(), n);
 }
 
 /// Shows speech number `n` (what people say).
 pub fn speak(n: i32) {
-    msg((&raw const speeches).cast(), n);
+    show_message((&raw const speeches).cast(), n);
 }
 
-/// Adds a request to the print queue (ignored if the queue is full). `ppick` handles them one
+/// Adds a request to the print queue (ignored if the queue is full). `handle_print_request` handles them one
 /// per tick, which spreads the redrawing work over several frames.
-pub fn prq(x: i32) {
+pub fn queue_print(x: i32) {
     unsafe {
         let next = (prec + 1) & PRINT_QUEUE_MASK;
         if next == pplay {
@@ -185,7 +187,7 @@ unsafe fn line(r: *mut RastPort, x0: i32, y0: i32, x1: i32, y1: i32) {
 
 /// Draws the decorative border around a story page: many short strokes, five each with the last in
 /// a highlight colour, winding around the four edges. The first passes also draw the top and bottom.
-pub fn placard() {
+pub fn draw_placard_border() {
     unsafe {
         let r = &raw mut rp_map;
         let (mut xorg, mut yorg) = (BORDER_START_X, 0);
@@ -217,7 +219,7 @@ pub fn placard() {
 }
 
 /// Menu state for an item: 10 if the player has item `n`, otherwise 8 (a menu item state).
-pub fn stuff_flag(n: i32) -> i32 {
+pub fn item_menu_state(n: i32) -> i32 {
     if unsafe { *stuff.offset(n as isize) } != 0 {
         10
     } else {
@@ -287,10 +289,10 @@ fn steer(xdif: i16, ydif: i16, mode: i32, random_bit: impl FnOnce() -> bool) -> 
 /// Points an actor toward (or away from) a target and sets it walking (see `steer` for modes).
 /// The random number is only drawn when the actor moves, as in the original, so recorded games
 /// stay in step.
-pub fn set_course(object: i32, target_x: i32, target_y: i32, mode: i32) {
+pub fn steer_actor(object: i32, target_x: i32, target_y: i32, mode: i32) {
     let mode = mode & 0xff;
     unsafe {
-        let actor = &mut (*(&raw mut anim_list))[object as usize];
+        let actor = &mut (*(&raw mut actor_list))[object as usize];
         let (xdif, ydif) = if mode == 6 {
             (target_x as i16, target_y as i16)
         } else {
@@ -317,13 +319,13 @@ const ERROR_SCREEN_Y: i32 = 90;
 const ERROR_NO_GRAPHICS: i32 = 2;
 
 /// Shows "ERROR n" on the text panel (startup failures). Error 2 (no graphics) cannot be shown.
-pub fn do_error(n: i32) {
+pub fn show_error(n: i32) {
     if n == ERROR_NO_GRAPHICS {
         return;
     }
     move_to(ERROR_SCREEN_X, ERROR_SCREEN_Y);
-    text(c"ERROR ".as_ptr(), 6);
-    prdec(n, 2);
+    draw_text(c"ERROR ".as_ptr(), 6);
+    print_number(n, 2);
 }
 
 #[cfg(test)]

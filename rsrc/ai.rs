@@ -1,15 +1,17 @@
-//! What each enemy wants to do each frame (`actor_ai`, from the main loop in csrc/fmain.c): picks a
+//! What each enemy wants to do each frame (`update_enemy_goals`, from the main loop in csrc/fmain.c): picks a
 //! goal and a tactic from how near the hero is and what the enemy carries, and starts or ends the
 //! battle music.
 
-use super::actors::{aftermath, do_tactic};
-use super::asm_text::{prq, set_course};
-use super::mood::setmood;
+use super::actors::turtle_eggs;
+use super::actors::{report_battle_result, run_tactic};
+use super::asm_text::{queue_print, steer_actor};
+use super::globals::{
+    active_actor_count, actor_list, actors_on_screen, battle_flag, current_extent, day_clock,
+    extent_type, good_fairy_timer, hero_x, hero_y, leader,
+};
+use super::mood::set_mood;
 use super::random::{bitrand, rand2, rand4};
 use super::types::Shape;
-use super::actors::{turtle_eggs};
-use super::globals::{actors_on_screen, anim_list, anix, battleflag, daynight, extn, goodfairy, hero_x, hero_y, leader, xtype};
-
 
 // Actor kinds and states (csrc/ftale.h).
 const CARRIER: i8 = 5;
@@ -48,7 +50,7 @@ const FIRST_AI_ACTOR: usize = 2;
 const FAIRY_ARRIVES: u8 = 120;
 /// An actor within this many pixels (in x and y) of the hero counts as on screen.
 const SCREEN_RANGE: i16 = 300;
-/// Special encounters (xtype above this) only fight if they are the encounter's race.
+/// Special encounters (extent_type above this) only fight if they are the encounter's race.
 const SPECIAL_XTYPE: u16 = 59;
 /// Carriers (the turtle) re-aim every 16 ticks, steering mode 5.
 const CARRIER_AIM_MASK: u16 = 15;
@@ -70,27 +72,27 @@ const PRQ_STATS: i32 = 4;
 const PRQ_VITALITY: i32 = 7;
 
 /// Decides each enemy's goal and tactic, and starts or ends the battle mood.
-pub fn actor_ai() {
+pub fn update_enemy_goals() {
     unsafe {
         actors_on_screen = 0;
         leader = 0;
-        let battle2 = battleflag;
-        battleflag = 0;
+        let battle2 = battle_flag;
+        battle_flag = 0;
         let mut i = FIRST_AI_ACTOR;
-        while i < anix as usize {
-            if goodfairy != 0 && goodfairy < FAIRY_ARRIVES {
+        while i < active_actor_count as usize {
+            if good_fairy_timer != 0 && good_fairy_timer < FAIRY_ARRIVES {
                 break;
             }
             think(i, battle2);
             i += 1;
         }
-        if battle2 == 0 && battleflag != 0 {
-            setmood(1);
+        if battle2 == 0 && battle_flag != 0 {
+            set_mood(1);
         }
-        if battleflag == 0 && battle2 != 0 {
-            prq(PRQ_VITALITY);
-            prq(PRQ_STATS);
-            aftermath();
+        if battle_flag == 0 && battle2 != 0 {
+            queue_print(PRQ_VITALITY);
+            queue_print(PRQ_STATS);
+            report_battle_result();
         }
     }
 }
@@ -99,10 +101,10 @@ pub fn actor_ai() {
 /// anyone out of hit points who is on screen.
 unsafe fn think(i: usize, battle2: i8) {
     unsafe {
-        let an = &raw mut anim_list[i];
+        let an = &raw mut actor_list[i];
         if (*an).kind == CARRIER {
-            if daynight & CARRIER_AIM_MASK == 0 {
-                set_course(i as i32, hero_x as i32, hero_y as i32, CARRIER_AIM_MODE);
+            if day_clock & CARRIER_AIM_MASK == 0 {
+                steer_actor(i as i32, hero_x as i32, hero_y as i32, CARRIER_AIM_MODE);
             }
             return;
         } else if (*an).kind == SETFIG {
@@ -120,24 +122,24 @@ unsafe fn think(i: usize, battle2: i8) {
                 return;
             }
             if (*an).visible != 0 || battle2 != 0 {
-                battleflag = 1;
+                battle_flag = 1;
             }
         }
         let mut r = bitrand(15) == 0;
-        let hero_state = anim_list[0].state;
+        let hero_state = actor_list[0].state;
         if hero_state == DEAD || hero_state == FALL {
             mode = if leader == 0 { FLEE } else { FOLLOWER };
         } else if (*an).vitality < NEARLY_DEAD
-            || (xtype > SPECIAL_XTYPE && (*an).race != (*extn).v3)
+            || (extent_type > SPECIAL_XTYPE && (*an).race != (*current_extent).v3)
         {
             mode = FLEE; // special encounters don't flee in the 60+ zones
         }
 
         if tactic == FRUST || tactic == SHOOTFRUST {
             if (*an).weapon & BOW_BIT != 0 {
-                do_tactic(i as i32, rand4() + 2);
+                run_tactic(i as i32, rand4() + 2);
             } else {
-                do_tactic(i as i32, rand2() + 3);
+                run_tactic(i as i32, rand2() + 3);
             }
         } else if (*an).state == SHOOT1 {
             (*an).state = SHOOT3;
@@ -150,11 +152,11 @@ unsafe fn think(i: usize, battle2: i8) {
             }
             hostile_action(i, an, mode, tactic, xd, yd);
         } else if mode == FLEE {
-            do_tactic(i as i32, BACKUP);
+            run_tactic(i as i32, BACKUP);
         } else if mode == FOLLOWER {
-            do_tactic(i as i32, FOLLOW);
+            run_tactic(i as i32, FOLLOW);
         } else if mode == STAND {
-            set_course(i as i32, hero_x as i32, hero_y as i32, 0);
+            steer_actor(i as i32, hero_x as i32, hero_y as i32, 0);
             (*an).state = STILL;
         } else if mode == WAIT {
             (*an).state = STILL;
@@ -201,7 +203,7 @@ unsafe fn hostile_action(i: usize, an: *mut Shape, mode: i16, tactic: i16, xd: i
             thresh = DKNIGHT_STRIKE;
         }
         if (*an).weapon & BOW_BIT == 0 && xd < thresh && yd < thresh {
-            set_course(i as i32, hero_x as i32, hero_y as i32, 0);
+            steer_actor(i as i32, hero_x as i32, hero_y as i32, 0);
             if (*an).state >= WALKING {
                 (*an).state = FIGHTING;
             }
@@ -209,7 +211,7 @@ unsafe fn hostile_action(i: usize, an: *mut Shape, mode: i16, tactic: i16, xd: i
             (*an).state = STILL;
             (*an).facing = DKNIGHT_FACING;
         } else {
-            do_tactic(i as i32, tactic as i32);
+            run_tactic(i as i32, tactic as i32);
         }
     }
 }

@@ -1,27 +1,31 @@
 //! Loading sprite files, songs and the intro pictures (from csrc/fmain2.c).
 //!
 //! Sprites: every kind of character (the three brothers, monsters, people, the raft, the turtle ...)
-//! is stored on the disk image as a block of frames. `cfiles` lists them. `read_shapes` copies one
-//! into `shape_mem`, a big scratch area, and `prep` builds a transparency mask for it so the
+//! is stored on the disk image as a block of frames. `sprite_files` lists them. `load_sprite_file` copies one
+//! into `shape_mem`, a big scratch area, and `finish_sprite_load` builds a transparency mask for it so the
 //! blitter knows which pixels to leave alone. Each loaded sprite sequence takes its frames (5
 //! bitplanes) plus one mask plane, in memory order.
 //!
 //! Also here: reading the music scores (`read_score`) and the story book page-turn animation
-//! (`copypage`, `flipscan`).
+//! (`show_story_page`, `turn_page`).
 
-use super::asm_blit::make_mask;
-use super::display::pagechange;
-use super::hdrive::{
-    CheckLastDiskIO, InvalidDiskIO, IsReadLastDiskIO, WaitDiskIO, load_track_range, motor_off,
+use super::asm_blit::make_sprite_masks;
+use super::display::flip_pages;
+use super::game_tables::{menus, region_num};
+use super::globals::{
+    brother, drawing_page, loaded_actor_file, loaded_setfig_file, new_region, nextshape, pagea,
+    pageb, sample, sample_mem, sample_size, scoremem, seq_list, shape_mem, track,
 };
-use super::iffsubs::unpackbrush;
-use super::input::getkey;
+use super::hdrive::{
+    is_last_read_pending, last_read_finished, load_track_range, mark_read_unused, motor_off,
+    wait_for_read,
+};
+use super::iffsubs::load_picture;
+use super::input::next_key;
+use super::regions::{load_region_now, load_region_piece};
 use super::types::SeqInfo;
 use crate::amiga::{BPTR, BitMap};
 use std::ffi::c_char;
-use super::regions::{load_all, load_new_region};
-use super::game_tables::{menus, region_num};
-use super::globals::{actor_file, brother, fp_drawing, new_region, nextshape, pagea, pageb, sample, sample_mem, sample_size, scoremem, seq_list, set_file, shape_mem, track};
 
 unsafe extern "C" {
     fn Open(name: *const c_char, mode: i32) -> BPTR;
@@ -106,7 +110,7 @@ const fn cfile(
 ///
 /// Entry 12 (snake and salamander) uses the same block as entry 0, which looks like a leftover
 /// placeholder in the original; it is copied as it was.
-pub static cfiles: [CFileInfo; 18] = [
+pub static sprite_files: [CFileInfo; 18] = [
     cfile(1, 32, 67, 42, PHIL, 1376),     // julian
     cfile(1, 32, 67, 42, PHIL, 1418),     // phillip
     cfile(1, 32, 67, 42, PHIL, 1460),     // kevin
@@ -127,28 +131,28 @@ pub static cfiles: [CFileInfo; 18] = [
     cfile(1, 32, 8, 5, SETFIG, 951),      // ranger/begger
 ];
 
-// Indexes into `cfiles` that are always loaded together at the start.
+// Indexes into `sprite_files` that are always loaded together at the start.
 const OBJECTS_FILE: i32 = 3;
 const RAFT_FILE: i32 = 4;
 
 /// Loads the sprite sets the game starts with: objects, the current brother, the raft, the
 /// current monsters and set figures, then the region.
-pub fn shape_read() {
+pub fn load_start_sprites() {
     unsafe {
         nextshape = shape_mem;
-        read_shapes(OBJECTS_FILE);
-        prep(OBJECTS as i16);
-        read_shapes(brother as i32 - 1);
-        prep(PHIL as i16);
-        read_shapes(RAFT_FILE);
-        prep(RAFT as i16);
+        load_sprite_file(OBJECTS_FILE);
+        finish_sprite_load(OBJECTS as i16);
+        load_sprite_file(brother as i32 - 1);
+        finish_sprite_load(PHIL as i16);
+        load_sprite_file(RAFT_FILE);
+        finish_sprite_load(RAFT as i16);
         sequence(ENEMY).location = nextshape;
-        read_shapes(actor_file as i32);
-        prep(cfiles[actor_file as usize].seq_num as i16);
-        read_shapes(set_file as i32);
-        prep(SETFIG as i16);
+        load_sprite_file(loaded_actor_file as i32);
+        finish_sprite_load(sprite_files[loaded_actor_file as usize].seq_num as i16);
+        load_sprite_file(loaded_setfig_file as i32);
+        finish_sprite_load(SETFIG as i16);
         new_region = region_num;
-        load_all();
+        load_region_now();
         motor_off();
     }
 }
@@ -162,9 +166,9 @@ unsafe fn sequence(slot: u8) -> &'static mut SeqInfo {
 ///
 /// Each sequence is stored as 5 planes of `size` bytes followed by a one-plane mask (`size` bytes).
 /// The check makes sure that all of it, with room to spare, fits in the scratch area.
-pub fn read_shapes(num: i32) {
+pub fn load_sprite_file(num: i32) {
     unsafe {
-        let file = &cfiles[num as usize];
+        let file = &sprite_files[num as usize];
         let slot = sequence(file.seq_num);
         slot.bytes = file.height as i16 * file.width as i16 * 2;
         let size = slot.bytes as usize * file.count as usize;
@@ -188,22 +192,22 @@ pub fn read_shapes(num: i32) {
 
 /// Was the copy protection check (the original checked the disk's volume date); the protection is
 /// removed, so it always passes.
-pub fn cpytest() -> i32 {
+pub fn copy_protection_disk_check() -> i32 {
     1
 }
 
 /// Was part of the copy protection; now just the (always passing) check.
-pub fn seekn() {
-    cpytest();
+pub fn copy_protection_check() {
+    copy_protection_disk_check();
 }
 
 /// Waits for the sprite load to finish and builds the masks for slot `slot`.
-pub fn prep(slot: i16) {
-    WaitDiskIO(SPRITE_REQUEST as i32);
-    InvalidDiskIO(SPRITE_REQUEST as i32);
+pub fn finish_sprite_load(slot: i16) {
+    wait_for_read(SPRITE_REQUEST as i32);
+    mark_read_unused(SPRITE_REQUEST as i32);
     unsafe {
         let s = sequence(slot as u8);
-        make_mask(
+        make_sprite_masks(
             s.location,
             s.maskloc,
             s.width as i32,
@@ -215,9 +219,9 @@ pub fn prep(slot: i16) {
 
 /// Loads the next region once the previous disk read is done. On the Amiga the disk was slow, so
 /// the game kept playing while a region loaded in the background and called this to check.
-pub fn load_next() {
-    if IsReadLastDiskIO() == 0 || CheckLastDiskIO() != 0 {
-        load_new_region();
+pub fn load_pending_region() {
+    if is_last_read_pending() == 0 || last_read_finished() != 0 {
+        load_region_piece();
     }
 }
 
@@ -254,16 +258,16 @@ pub fn read_score() {
 }
 
 /// Set once the player has pressed Space to skip the intro.
-pub static mut skipp: i8 = 0;
+pub static mut intro_skip_requested: i8 = 0;
 
 /// Whether the intro is being skipped. Once Space has been seen the skip sticks (the original
 /// reset it on every poll without a key).
-pub fn skipint() -> i32 {
+pub fn intro_skipped() -> i32 {
     unsafe {
-        if getkey() == b' ' as i32 {
-            skipp = 1;
+        if next_key() == b' ' as i32 {
+            intro_skip_requested = 1;
         }
-        skipp as i32
+        intro_skip_requested as i32
     }
 }
 
@@ -277,9 +281,9 @@ const PAGE_DELAY: i32 = 350;
 
 /// Shows two pictures on the story page, then turns it over.
 /// The new pictures are drawn onto `pageb` while `pagea` keeps the old page for the turn.
-pub fn copypage(br1: *const c_char, br2: *const c_char, x: i16, y: i16) {
+pub fn show_story_page(br1: *const c_char, br2: *const c_char, x: i16, y: i16) {
     unsafe {
-        if skipp != 0 {
+        if intro_skip_requested != 0 {
             return;
         }
         Delay(PAGE_DELAY);
@@ -296,13 +300,13 @@ pub fn copypage(br1: *const c_char, br2: *const c_char, x: i16, y: i16) {
             ALL_PLANES,
             std::ptr::null_mut(),
         );
-        unpackbrush(br1, &raw mut pageb, PICTURE_X, PICTURE_Y);
-        unpackbrush(br2, &raw mut pageb, x, y);
-        if skipint() != 0 {
+        load_picture(br1, &raw mut pageb, PICTURE_X, PICTURE_Y);
+        load_picture(br2, &raw mut pageb, x, y);
+        if intro_skipped() != 0 {
             return;
         }
-        flipscan();
-        skipint();
+        turn_page();
+        intro_skipped();
     }
 }
 
@@ -352,14 +356,14 @@ unsafe fn copy_rect(
 /// The page turn animation, 22 frames.
 ///
 /// The first 11 frames lift the right page: the old page is drawn as thin vertical strips that
-/// get narrower and shorter (using `page_det` for the curl), on top of the new page. The last 11
+/// get narrower and shorter (using `page_turn_inset` for the curl), on top of the new page. The last 11
 /// frames lay the curling page down on the left. `FLIP_RATE`, `FLIP_WIDE` and `FLIP_DELAY` give
 /// the strip step, strip width and pause for each frame.
-pub fn flipscan() {
+pub fn turn_page() {
     unsafe {
         let (a, b) = (&raw mut pagea, &raw mut pageb);
         for frame in 0..FLIP_RATE.len() {
-            let temp = (*(*fp_drawing).ri_page).BitMap;
+            let temp = (*(*drawing_page).ri_page).BitMap;
             let mut dcol: i32 = 0;
             let rate = FLIP_RATE[frame];
             let wide = FLIP_WIDE[frame] as i32;
@@ -370,7 +374,7 @@ pub fn flipscan() {
                     let mut h = 0;
                     let mut scol = wide as i16;
                     while scol < PAGE_STRIP_END {
-                        h = super::asm_map::page_det(scol as i32);
+                        h = super::asm_map::page_turn_inset(scol as i32);
                         copy_rect(
                             a,
                             bcol + scol as i32,
@@ -394,7 +398,7 @@ pub fn flipscan() {
                     copy_rect(a, 24, 0, temp, 24, 0, PAGE_HALF_WIDTH, SCREEN_HEIGHT);
                     let mut scol = wide as i16;
                     while scol < PAGE_STRIP_END {
-                        let h = super::asm_map::page_det(scol as i32);
+                        let h = super::asm_map::page_turn_inset(scol as i32);
                         dcol += wide;
                         copy_rect(
                             b,
@@ -412,7 +416,7 @@ pub fn flipscan() {
                     copy_rect(b, 24, h, temp, 159 - dcol, h, 1, SCREEN_HEIGHT - h - h);
                 }
             }
-            pagechange();
+            flip_pages();
             if FLIP_DELAY[frame] != 0 {
                 Delay(FLIP_DELAY[frame]);
             }
@@ -433,7 +437,7 @@ pub fn into_chip(oldpointer: *mut u8, size: i32) -> *mut u8 {
 }
 
 /// Was the manual-lookup riddle (copy protection, typing a word from the manual); it is skipped.
-pub fn copy_protect_junk() -> i32 {
+pub fn copy_protection_riddle() -> i32 {
     1
 }
 
@@ -444,8 +448,8 @@ mod tests {
     #[test]
     fn sprite_table_matches_the_c_struct() {
         assert_eq!(size_of::<CFileInfo>(), 8);
-        assert_eq!(cfiles.len(), 18);
-        assert_eq!(cfiles[16].file_id, 946); // witch
+        assert_eq!(sprite_files.len(), 18);
+        assert_eq!(sprite_files[16].file_id, 946); // witch
     }
 
     #[test]
@@ -476,8 +480,8 @@ pub fn read_sample() {
             sample_mem.cast(),
             SAMPLE_REQUEST,
         );
-        WaitDiskIO(SAMPLE_REQUEST as i32);
-        InvalidDiskIO(SAMPLE_REQUEST as i32);
+        wait_for_read(SAMPLE_REQUEST as i32);
+        mark_read_unused(SAMPLE_REQUEST as i32);
 
         let mut at = sample_mem;
         for i in 0..SAMPLE_COUNT {
@@ -491,7 +495,7 @@ pub fn read_sample() {
 }
 
 /// Plays sound effect `num` at the pitch `speed`, unless sound effects are switched off.
-pub fn effect(num: i16, speed: i32) {
+pub fn play_effect(num: i16, speed: i32) {
     unsafe {
         if menus[GAME_MENU].enabled[SOUND_ENTRY] & 1 != 0 {
             let n = num as usize;
