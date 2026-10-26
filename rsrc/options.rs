@@ -16,33 +16,10 @@ use super::random::rand64;
 use super::savegame::{savegame, svflag};
 use super::tables::{jtrans, ob_list8, ob_listg};
 use super::types::{InvItem, Shape};
+use super::menus::{gomenu};
+use super::game_tables::{inv_list, region_num, setfig_table};
+use super::globals::{active_carrier, anim_list, brave, cmode, daynight, dayperiod, fatigue, hero_x, hero_y, hitgo, kind as hero_kind, luck, nearest, nearest_person, quitflag, stuff, wealth, witchflag};
 
-unsafe extern "C" {
-    static mut anim_list: [Shape; 20];
-    static mut stuff: *mut u8;
-    static setfig_table: [SetFigEntry; 0];
-    static inv_list: [InvItem; 0];
-    static mut nearest: i16;
-    static nearest_person: i16;
-    static hitgo: i8;
-    static mut wealth: i16;
-    #[link_name = "kind"]
-    static mut hero_kind: i16;
-    static mut luck: i16;
-    static brave: i16;
-    static fatigue: i16;
-    static dayperiod: i16;
-    static daynight: u16;
-    static region_num: u16;
-    static active_carrier: i16;
-    static witchflag: i8;
-    static hero_x: u16;
-    static hero_y: u16;
-    static mut quitflag: i8;
-    static cmode: i16;
-
-    fn gomenu(mode: i16);
-}
 
 // Menu numbers (`enum cmodes` in csrc/fmain.c).
 const ITEMS: i32 = 0;
@@ -158,8 +135,7 @@ const SPECTRE_THANKS: i32 = 48;
 const SPECTRE_BONE_DROP: i16 = 140;
 
 /// Does what menu entry `hit` of the current menu `cmode` says.
-#[unsafe(no_mangle)]
-pub extern "C" fn do_option(hit: i16) {
+pub fn do_option(hit: i16) {
     unsafe {
         let refresh = match cmode as i32 {
             ITEMS => {
@@ -208,7 +184,12 @@ unsafe fn talk_option(hit: i16) -> bool {
                 return true;
             }
             let person = (*an).race & 0x7f;
-            if (*(&raw const setfig_table).cast::<SetFigEntry>().add(person as usize)).can_talk != 0 {
+            if (*(&raw const setfig_table)
+                .cast::<SetFigEntry>()
+                .add(person as usize))
+            .can_talk
+                != 0
+            {
                 (*an).state = TALKING;
                 (*an).tactic = TACTIC_TALK;
             }
@@ -233,7 +214,11 @@ unsafe fn person_speaks(person: u8, an: *mut Shape) {
     unsafe {
         let goal = (*an).goal as i32;
         match person {
-            WIZARD => speak(if hero_kind < KIND_ENOUGH { 35 } else { 27 + goal }),
+            WIZARD => speak(if hero_kind < KIND_ENOUGH {
+                35
+            } else {
+                27 + goal
+            }),
             PRIEST => priest_speaks(),
             GUARD_FRONT | GUARD_BACK => speak(15),
             PRINCESS => {
@@ -270,7 +255,11 @@ unsafe fn person_speaks(person: u8, an: *mut Shape) {
             WITCH => speak(46),
             SPECTRE => speak(47),
             GHOST => speak(49),
-            RANGER => speak(if region_num == RANGER_SWAMP_REGION { 22 } else { 53 + goal }),
+            RANGER => speak(if region_num == RANGER_SWAMP_REGION {
+                22
+            } else {
+                53 + goal
+            }),
             BEGGAR => speak(23),
             _ => {}
         }
@@ -400,12 +389,10 @@ unsafe fn save_exit_option(hit: i16) -> bool {
 }
 
 /// A save slot was chosen: save or load, then back to the game menu.
-unsafe fn file_option(hit: i16) -> bool {
-    unsafe {
-        savegame(hit);
-        gomenu(GAME as i16);
-        true
-    }
+fn file_option(hit: i16) -> bool {
+    savegame(hit);
+    gomenu(GAME as i16);
+    true
 }
 
 /// Tries a key on every door and chest around the hero.

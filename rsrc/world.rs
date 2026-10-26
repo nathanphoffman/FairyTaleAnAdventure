@@ -14,60 +14,13 @@ use super::places::{find_place, xfer};
 use super::random::{fta_rand, rand4, rand64};
 use super::screen_fx::{day_fade, fade_page};
 use super::tables::{ob_list8, ob_listg, pagecolors};
-use super::types::{Door, FPage, Shape};
+use super::types::{Door, Shape};
 use super::witch::witch_fx;
-use crate::amiga::{BitMap, RastPort};
+use super::encounters::{load_actors};
+use super::game_tables::{doorlist, region_num};
+use super::globals::{active_carrier, actors_loading, actors_on_screen, anim_index, anim_list, anix, anix2, battleflag, bm_draw, brave, danger_level, daynight, dayperiod, encounter_number, encounter_type, encounter_x, encounter_y, fatigue, fp_drawing, freeze_timer, hero_x, hero_y, hunger, last_person, lightlevel, mixflag, nearest_person, new_region, perdist, planes, raftprox, riding, rp_map, safe_flag, safe_r, safe_x, safe_y, shp, sleepwait, stuff, turtleprox, wcarry, witchflag, wt, xtype};
 
 unsafe extern "C" {
-    static mut anim_list: [Shape; 20];
-    static mut anim_index: [u8; 20];
-    static mut stuff: *mut u8;
-    static doorlist: [Door; 0];
-    static mut fp_drawing: *mut FPage;
-    static mut bm_draw: *mut BitMap;
-    static mut planes: *mut *mut u8;
-    static mut shp: *mut SShape;
-    static mut rp_map: RastPort;
-    static mut raftprox: i16;
-    static mut turtleprox: i16;
-    static mut wcarry: i16;
-    static active_carrier: i16;
-    static riding: i16;
-    static mut sleepwait: i16;
-    static mut hero_x: u16;
-    static mut hero_y: u16;
-    static region_num: u16;
-    static mut new_region: u16;
-    static mut fatigue: i16;
-    static mut hunger: i16;
-    static brave: i16;
-    static mut daynight: u16;
-    static mut lightlevel: u16;
-    static mut dayperiod: i16;
-    static freeze_timer: i16;
-    static battleflag: i8;
-    static mut actors_loading: i8;
-    static mut actors_on_screen: i8;
-    static mut anix: i16;
-    static anix2: i16;
-    static mut encounter_number: u8;
-    static mut encounter_type: u16;
-    static encounter_x: u16;
-    static encounter_y: u16;
-    static mut danger_level: u8;
-    static mut mixflag: i16;
-    static mut wt: i16;
-    static xtype: u16;
-    static mut safe_r: u16;
-    static mut safe_x: u16;
-    static mut safe_y: u16;
-    static safe_flag: i8;
-    static witchflag: i8;
-    static mut nearest_person: i16;
-    static mut last_person: i16;
-    static mut perdist: i16;
-
-    fn load_actors();
     fn OwnBlitter();
     fn DisownBlitter();
 }
@@ -96,12 +49,15 @@ const CARRIER_OFFSET: i32 = 4;
 
 /// How close the hero is to the raft or turtle (`raftprox` 1 = near, 2 = very near). Riding the
 /// bird sets the hero's environ.
-#[unsafe(no_mangle)]
-pub extern "C" fn raft_proximity() {
+pub fn raft_proximity() {
     unsafe {
         raftprox = 0;
         turtleprox = 0;
-        wcarry = if active_carrier != 0 { CARRIER_SLOT } else { RAFT_SLOT };
+        wcarry = if active_carrier != 0 {
+            CARRIER_SLOT
+        } else {
+            RAFT_SLOT
+        };
         let carrier = &raw const anim_list[wcarry as usize];
         let hero = &raw mut anim_list[0];
         let dx = ((*hero).abs_x as i32 - (*carrier).abs_x as i32 - CARRIER_OFFSET) as i16;
@@ -130,8 +86,7 @@ const EVENT_SLEEPING: i32 = 26;
 const BED_Y_MASK: u16 = 0x1f;
 
 /// Copies the hero's position, and puts the hero to bed after standing on a bed for 30 ticks.
-#[unsafe(no_mangle)]
-pub extern "C" fn check_bed() {
+pub fn check_bed() {
     unsafe {
         let hero = &raw mut anim_list[0];
         if (*hero).state != STILL {
@@ -202,8 +157,7 @@ unsafe fn door_at(j: i32) -> &'static Door {
 /// Is the hero standing at a door? Outdoors the doors are in sorted order and found by binary
 /// search; indoors they are searched in turn. If so, the hero is moved to the other side.
 /// Riding disables doors.
-#[unsafe(no_mangle)]
-pub extern "C" fn check_door() {
+pub fn check_door() {
     unsafe {
         if riding != 0 {
             return;
@@ -237,14 +191,28 @@ unsafe fn enter_door(xtest: u16, ytest: u16) {
                 low = j + 1;
             } else {
                 let horizontal = d.kind & 1 != 0;
-                let lined_up = if horizontal { hero_y & 0x10 == 0 } else { hero_x & 15 <= 6 };
+                let lined_up = if horizontal {
+                    hero_y & 0x10 == 0
+                } else {
+                    hero_x & 15 <= 6
+                };
                 let allowed = d.kind != DESERT || *stuff.add(STATBASE) >= STATUES_NEEDED;
                 if lined_up && allowed {
                     let (x, y) = inside_spot(d);
-                    new_region = if d.secs == 1 { REGION_INSIDE } else { REGION_INSIDE_OTHER };
+                    new_region = if d.secs == 1 {
+                        REGION_INSIDE
+                    } else {
+                        REGION_INSIDE_OTHER
+                    };
                     xfer(x, y, 0);
                     find_place(2);
-                    fade_page(FADE_WHITE, FADE_WHITE, FADE_WHITE, 1, (&raw const pagecolors).cast());
+                    fade_page(
+                        FADE_WHITE,
+                        FADE_WHITE,
+                        FADE_WHITE,
+                        1,
+                        (&raw const pagecolors).cast(),
+                    );
                 }
                 break;
             }
@@ -260,8 +228,14 @@ unsafe fn leave_door(xtest: u16, ytest: u16) {
         for j in 0..DOORCOUNT {
             let d = door_at(j);
             let horizontal = d.kind & 1 != 0;
-            if d.yc2 == ytest && (d.xc2 == xtest || (d.xc2 as i32 == xtest as i32 - 16 && horizontal)) {
-                let lined_up = if horizontal { hero_y & 0x10 != 0 } else { hero_x & 15 >= 2 };
+            if d.yc2 == ytest
+                && (d.xc2 == xtest || (d.xc2 as i32 == xtest as i32 - 16 && horizontal))
+            {
+                let lined_up = if horizontal {
+                    hero_y & 0x10 != 0
+                } else {
+                    hero_x & 15 >= 2
+                };
                 if lined_up {
                     let (x, y) = outside_spot(d);
                     xfer(x, y, 1);
@@ -275,8 +249,7 @@ unsafe fn leave_door(xtest: u16, ytest: u16) {
 
 // ---- undo_sprites ----
 /// Puts back the background under last frame's sprites, then undoes the witch effect on that page.
-#[unsafe(no_mangle)]
-pub extern "C" fn undo_sprites() {
+pub fn undo_sprites() {
     unsafe {
         bm_draw = (*(*fp_drawing).ri_page).BitMap;
         planes = (*bm_draw).Planes.as_mut_ptr();
@@ -318,8 +291,7 @@ const HEAL_BASE: i16 = 15;
 const WAKE_Y_MASK: u16 = 0xffe0;
 
 /// Sleeping, the day clock, the light level, the messages for the time of day and slow healing.
-#[unsafe(no_mangle)]
-pub extern "C" fn day_night_tick() {
+pub fn day_night_tick() {
     unsafe {
         let hero = &raw mut anim_list[0];
         if (*hero).state == SLEEP {
@@ -347,7 +319,10 @@ pub extern "C" fn day_night_tick() {
 
         day_fade();
 
-        if daynight & HEAL_MASK == 0 && (*hero).vitality < HEAL_BASE + brave / 4 && (*hero).state != DEAD {
+        if daynight & HEAL_MASK == 0
+            && (*hero).vitality < HEAL_BASE + brave / 4
+            && (*hero).state != DEAD
+        {
             (*hero).vitality += 1;
             prq(PRQ_STATS);
         }
@@ -391,8 +366,7 @@ const INDOOR_REGION: u16 = 7;
 
 /// Says where the hero is, finishes loading monsters, places waiting ones and now and then
 /// starts a new random encounter.
-#[unsafe(no_mangle)]
-pub extern "C" fn spawn_encounters() {
+pub fn spawn_encounters() {
     unsafe {
         find_place(2);
 
@@ -405,8 +379,17 @@ pub extern "C" fn spawn_encounters() {
         if daynight & 15 == 0 && encounter_number != 0 && actors_loading == 0 {
             place_waiting_encounters();
         }
-        if daynight & 31 == 0 && actors_on_screen == 0 && actors_loading == 0 && active_carrier == 0 && xtype < NO_RANDOM_XTYPE {
-            danger_level = (if region_num > INDOOR_REGION { 5 + xtype } else { 2 + xtype }) as u8;
+        if daynight & 31 == 0
+            && actors_on_screen == 0
+            && actors_loading == 0
+            && active_carrier == 0
+            && xtype < NO_RANDOM_XTYPE
+        {
+            danger_level = (if region_num > INDOOR_REGION {
+                5 + xtype
+            } else {
+                2 + xtype
+            }) as u8;
             if rand64() <= danger_level as i32 {
                 encounter_type = rand4() as u16;
                 if xtype == DKNIGHT_XTYPE && encounter_type == 2 {
@@ -472,8 +455,7 @@ const DKNIGHT: i16 = 7;
 const PRINCESS_FREED_SLOT: usize = 9;
 
 /// The nearest person says something when they come near (once per person).
-#[unsafe(no_mangle)]
-pub extern "C" fn speak_nearby() {
+pub fn speak_nearby() {
     unsafe {
         let race = anim_list[nearest_person as usize].race as i16;
         if nearest_person != 0 && race != last_person {
@@ -511,8 +493,7 @@ const FAINT_RESET: i16 = 130;
 const TIRED_AT: i16 = 70;
 
 /// Notes a safe spot, picks the music, and makes the hero hungrier and more tired.
-#[unsafe(no_mangle)]
-pub extern "C" fn survival_tick() {
+pub fn survival_tick() {
     unsafe {
         let hero = &raw mut anim_list[0];
         if daynight & SAFE_CHECK_MASK == 0
@@ -586,8 +567,7 @@ const RAFT_ACTOR: u8 = 1;
 
 /// Finds the nearest person, and sorts `anim_index` by y so that actors lower on the screen are
 /// drawn later.
-#[unsafe(no_mangle)]
-pub extern "C" fn sort_actors() {
+pub fn sort_actors() {
     unsafe {
         nearest_person = 0;
         perdist = PERSON_RANGE;

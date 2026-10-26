@@ -11,39 +11,13 @@ use super::iffsubs::unpackbrush;
 use super::messages::{name, print};
 use super::random::bitrand;
 use super::tables::{comptable, fader, pagecolors, pplay, prec, print_que, sun_colors};
-use super::types::{FPage, Shape};
-use crate::amiga::{BitMap, RasInfo, RastPort, View, ViewPort};
+use crate::amiga::{BitMap, RastPort, View, ViewPort};
+use super::display::{pagechange};
+use super::menus::{print_options};
+use super::game_tables::{blackcolors, introcolors, region_num};
+use super::globals::{anim_list, bm_draw, bm_source, bm_text, brave, daynight, fp_drawing, hero_sector, hero_x, hero_y, kind as hero_kind, light_timer, lightlevel, luck, nhinor, nhivar, ri_page1, ri_page2, rp, rp_map, rp_text, secret_timer, v, viewstatus, vp_page, vp_text, wealth, xtype};
 
 unsafe extern "C" {
-    static blackcolors: [i16; 32];
-    static mut vp_page: ViewPort;
-    static mut vp_text: ViewPort;
-    static mut rp: *mut RastPort;
-    static mut rp_map: RastPort;
-    static mut rp_text: RastPort;
-    static fp_drawing: *mut FPage;
-    static mut bm_draw: *mut BitMap;
-    static bm_text: *mut BitMap;
-    static bm_source: *mut BitMap;
-    static nhinor: *mut u8;
-    static nhivar: *mut u8;
-    static mut viewstatus: i8;
-    static region_num: u16;
-    static secret_timer: i16;
-    static light_timer: i16;
-    static daynight: u16;
-    static lightlevel: u16;
-    static anim_list: [Shape; 20];
-    static hero_x: u16;
-    static hero_y: u16;
-    static hero_sector: i16;
-    static xtype: u16;
-    static mut luck: i16;
-    static brave: i16;
-    #[link_name = "kind"]
-    static hero_kind: i16;
-    static wealth: i16;
-
     fn BltBitMap(
         src: *mut BitMap,
         sx: i32,
@@ -63,13 +37,7 @@ unsafe extern "C" {
     fn SetAPen(rp: *mut RastPort, pen: u32);
     fn SetRast(rp: *mut RastPort, pen: u32);
     fn AvailMem(flags: u32) -> u32;
-    fn print_options() -> i32;
-    fn pagechange();
     fn MakeVPort(view: *mut View, port: *mut ViewPort) -> i32;
-    static mut ri_page1: RasInfo;
-    static mut ri_page2: RasInfo;
-    static mut v: View;
-    static introcolors: [u16; 0];
 }
 
 const BLIT_COPY: u32 = 0xC0;
@@ -85,13 +53,24 @@ const COMPASS_DIRECTIONS: i16 = 9;
 
 /// Redraws the compass with direction `dir` lit. First the unlit compass is copied, then the lit
 /// part for that direction (if any) is copied on top from a second image.
-#[unsafe(no_mangle)]
-pub extern "C" fn drawcompass(dir: i16) {
+pub fn drawcompass(dir: i16) {
     unsafe {
         let part = &comptable[dir as usize];
         let (xr, yr) = (part.xrect as i32, part.yrect as i32);
         (*bm_source).Planes[COMPASS_PLANE] = nhinor;
-        BltBitMap(bm_source, 0, 0, bm_text, COMPASS_X, COMPASS_Y, COMPASS_WIDTH, COMPASS_HEIGHT, BLIT_COPY, COMPASS_PLANE_MASK, std::ptr::null_mut());
+        BltBitMap(
+            bm_source,
+            0,
+            0,
+            bm_text,
+            COMPASS_X,
+            COMPASS_Y,
+            COMPASS_WIDTH,
+            COMPASS_HEIGHT,
+            BLIT_COPY,
+            COMPASS_PLANE_MASK,
+            std::ptr::null_mut(),
+        );
         if dir < COMPASS_DIRECTIONS {
             (*bm_source).Planes[COMPASS_PLANE] = nhivar;
             BltBitMap(
@@ -130,8 +109,7 @@ const MAX_COMPONENT: i32 = 15;
 /// apply (red never below 10%, green 25%, blue 60%) and some blue is mixed in from green, which gives
 /// the bluish moonlight. The light spell (`light_timer`) makes reds as bright as greens.
 /// Colour 31 is changed first because it depends on where the hero is (swamp, secret room).
-#[unsafe(no_mangle)]
-pub extern "C" fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: *const u16) {
+pub fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: *const u16) {
     unsafe {
         pagecolors[COLOR_31] = match region_num {
             REGION_SWAMP => SWAMP_COLOR,
@@ -179,19 +157,26 @@ pub extern "C" fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: *const u
             }
             fader[i] = ((r1 << 8) + (g1 << 4) + b1) as u16;
         }
-        LoadRGB4(&raw mut vp_page, (&raw const fader).cast(), COLOR_COUNT as i32);
+        LoadRGB4(
+            &raw mut vp_page,
+            (&raw const fader).cast(),
+            COLOR_COUNT as i32,
+        );
     }
 }
 
 /// The teleport effect: random colours flicker for a moment (32 flashes).
-#[unsafe(no_mangle)]
-pub extern "C" fn colorplay() {
+pub fn colorplay() {
     unsafe {
         for _ in 0..COLOR_COUNT {
             for i in 1..COLOR_COUNT {
                 fader[i] = bitrand(0xfff) as u16;
             }
-            LoadRGB4(&raw mut vp_page, (&raw const fader).cast(), COLOR_COUNT as i32);
+            LoadRGB4(
+                &raw mut vp_page,
+                (&raw const fader).cast(),
+                COLOR_COUNT as i32,
+            );
             Delay(1);
         }
     }
@@ -211,8 +196,7 @@ const STATS_Y: i32 = 52;
 /// Handles one request from the print queue (or waits a tick if there is none).
 /// Requests: 2 and 3 debug information, 4 the vitality figure, 5 the menu, 7 the stats line
 /// (bravery, luck, kindness, wealth), 10 "Take What?".
-#[unsafe(no_mangle)]
-pub extern "C" fn ppick() {
+pub fn ppick() {
     unsafe {
         if prec == pplay {
             Delay(1);
@@ -279,26 +263,35 @@ const VIEW_NORMAL_AGAIN: i8 = 3;
 const FADE_STEP: usize = 5;
 
 /// Fades the page out to black.
-#[unsafe(no_mangle)]
-pub extern "C" fn fade_down() {
+pub fn fade_down() {
     for level in (0..=FULL_LEVEL).rev().step_by(FADE_STEP) {
-        fade_page(level as i16, level as i16, level as i16, 0, (&raw const pagecolors).cast());
+        fade_page(
+            level as i16,
+            level as i16,
+            level as i16,
+            0,
+            (&raw const pagecolors).cast(),
+        );
         unsafe { Delay(1) };
     }
 }
 
 /// Fades the page back in from black.
-#[unsafe(no_mangle)]
-pub extern "C" fn fade_normal() {
+pub fn fade_normal() {
     for level in (0..=FULL_LEVEL).step_by(FADE_STEP) {
-        fade_page(level as i16, level as i16, level as i16, 0, (&raw const pagecolors).cast());
+        fade_page(
+            level as i16,
+            level as i16,
+            level as i16,
+            0,
+            (&raw const pagecolors).cast(),
+        );
         unsafe { Delay(1) };
     }
 }
 
 /// Shows the page without scrolling.
-#[unsafe(no_mangle)]
-pub extern "C" fn stillscreen() {
+pub fn stillscreen() {
     unsafe {
         let page = (*fp_drawing).ri_page;
         (*page).RxOffset = 0;
@@ -308,8 +301,7 @@ pub extern "C" fn stillscreen() {
 }
 
 /// Switches to the map page for a message (the text panel is hidden) and fades in.
-#[unsafe(no_mangle)]
-pub extern "C" fn map_message() {
+pub fn map_message() {
     unsafe {
         fade_down();
         rp = &raw mut rp_map;
@@ -320,14 +312,17 @@ pub extern "C" fn map_message() {
 
         vp_text.Modes = HIRES | SPRITES | VP_HIDE;
         stillscreen();
-        LoadRGB4(&raw mut vp_page, (&raw const pagecolors).cast(), COLOR_COUNT as i32);
+        LoadRGB4(
+            &raw mut vp_page,
+            (&raw const pagecolors).cast(),
+            COLOR_COUNT as i32,
+        );
         viewstatus = VIEW_MESSAGE;
     }
 }
 
 /// Goes back from the map message to the normal view.
-#[unsafe(no_mangle)]
-pub extern "C" fn message_off() {
+pub fn message_off() {
     unsafe {
         fade_down();
         rp = &raw mut rp_text;
@@ -348,8 +343,7 @@ const WIN_SCREEN_SIZE: i32 = 156;
 
 /// The win screen: shows the picture and brings the sun up behind it by cycling the sky colours
 /// through `sun_colors`, with two glowing colours that fade out near the end.
-#[unsafe(no_mangle)]
-pub extern "C" fn win_colors() {
+pub fn win_colors() {
     unsafe {
         placard_text(WIN_MESSAGE_FIRST);
         name();
@@ -358,10 +352,18 @@ pub extern "C" fn win_colors() {
         Delay(80);
         bm_draw = (*(*fp_drawing).ri_page).BitMap;
         unpackbrush(c"winpic".as_ptr(), bm_draw, 0, 0);
-        LoadRGB4(&raw mut vp_page, blackcolors.as_ptr().cast(), COLOR_COUNT as i32);
-        LoadRGB4(&raw mut vp_text, blackcolors.as_ptr().cast(), COLOR_COUNT as i32);
+        LoadRGB4(
+            &raw mut vp_page,
+            (&raw const blackcolors).cast::<u16>(),
+            COLOR_COUNT as i32,
+        );
+        LoadRGB4(
+            &raw mut vp_text,
+            (&raw const blackcolors).cast::<u16>(),
+            COLOR_COUNT as i32,
+        );
         vp_text.Modes = HIRES | SPRITES | VP_HIDE;
-        screen_size(WIN_SCREEN_SIZE as i64);
+        screen_size(WIN_SCREEN_SIZE);
         for i in (SUNRISE_END + 1..=SUNRISE_START).rev() {
             fader[0] = 0;
             fader[31] = 0;
@@ -369,7 +371,11 @@ pub extern "C" fn win_colors() {
             fader[28] = 0xfff;
             for j in SUNRISE_COLORS {
                 let index = i + j as i32;
-                fader[j] = if index > 0 { sun_colors[index as usize] as u16 } else { 0 };
+                fader[j] = if index > 0 {
+                    sun_colors[index as usize] as u16
+                } else {
+                    0
+                };
             }
             if i > SUN_GLOW_UNTIL {
                 fader[29] = 0x800;
@@ -379,14 +385,22 @@ pub extern "C" fn win_colors() {
                 fader[29] = (0x100 * j) as u16;
                 fader[30] = (0x100 * (j / 2)) as u16;
             }
-            LoadRGB4(&raw mut vp_page, (&raw const fader).cast(), COLOR_COUNT as i32);
+            LoadRGB4(
+                &raw mut vp_page,
+                (&raw const fader).cast(),
+                COLOR_COUNT as i32,
+            );
             if i == SUNRISE_START {
                 Delay(60);
             }
             Delay(9);
         }
         Delay(30);
-        LoadRGB4(&raw mut vp_page, blackcolors.as_ptr().cast(), COLOR_COUNT as i32);
+        LoadRGB4(
+            &raw mut vp_page,
+            (&raw const blackcolors).cast::<u16>(),
+            COLOR_COUNT as i32,
+        );
     }
 }
 
@@ -400,15 +414,24 @@ const VIEW_REBUILD: i8 = 97;
 
 /// Updates the page colours for the time of day, every fourth tick. `lightlevel` follows the sun;
 /// inside buildings (regions 8 and 9) it is always bright.
-#[unsafe(no_mangle)]
-pub extern "C" fn day_fade() {
+pub fn day_fade() {
     unsafe {
-        let bonus = if light_timer != 0 { LIGHT_SPELL_BONUS } else { 0 };
+        let bonus = if light_timer != 0 {
+            LIGHT_SPELL_BONUS
+        } else {
+            0
+        };
         if daynight & 3 == 0 || viewstatus > VIEW_REBUILD {
             let colors = (&raw const pagecolors).cast();
             if region_num < FIRST_INDOOR_REGION {
                 let level = lightlevel as i32;
-                fade_page((level - DAY_DARKEN.0 + bonus) as i16, (level - DAY_DARKEN.1) as i16, (level - DAY_DARKEN.2) as i16, 1, colors);
+                fade_page(
+                    (level - DAY_DARKEN.0 + bonus) as i16,
+                    (level - DAY_DARKEN.1) as i16,
+                    (level - DAY_DARKEN.2) as i16,
+                    1,
+                    colors,
+                );
             } else {
                 fade_page(100, 100, 100, 1, colors);
             }
@@ -437,8 +460,7 @@ mod tests {
 /// The size of the picture during the intro's zoom: `x` is half the width in pixels (0 to 160),
 /// the height keeps the 8:5 shape. Moves the page and text view ports to match, fades the colours
 /// with the size (black when small), and shows the result.
-#[unsafe(no_mangle)]
-pub extern "C" fn screen_size(x: i64) {
+pub fn screen_size(x: i32) {
     unsafe {
         let y = (x * 5) / 8;
 
@@ -461,7 +483,13 @@ pub extern "C" fn screen_size(x: i64) {
         vp_text.DHeight = (95 - y) as i16;
 
         let colors = (&raw const introcolors).cast::<u16>();
-        fade_page((y * 2 - 40) as i16, (y * 2 - 70) as i16, (y * 2 - 100) as i16, 0, colors);
+        fade_page(
+            (y * 2 - 40) as i16,
+            (y * 2 - 70) as i16,
+            (y * 2 - 100) as i16,
+            0,
+            colors,
+        );
 
         MakeVPort(&raw mut v, &raw mut vp_text);
         pagechange();

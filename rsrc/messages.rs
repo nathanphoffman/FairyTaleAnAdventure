@@ -9,11 +9,10 @@
 use super::asm_text::{move_to, text};
 use crate::amiga::RastPort;
 use std::ffi::{CStr, c_char};
+use super::game_tables::{datanames};
+use super::globals::{brother, rp};
 
 unsafe extern "C" {
-    static rp: *mut RastPort;
-    static brother: i16;
-    static datanames: [*const c_char; 3];
     fn ScrollRaster(rp: *mut RastPort, dx: i32, dy: i32, x0: i32, y0: i32, x1: i32, y1: i32);
 }
 
@@ -36,9 +35,7 @@ const CARRIAGE_RETURN: c_char = 13;
 /// In message text: replaced by the current brother's name.
 const NAME_MARK: c_char = b'%' as c_char;
 
-#[unsafe(no_mangle)]
 pub static mut mbuf: *mut c_char = std::ptr::null_mut();
-#[unsafe(no_mangle)]
 pub static mut mesbuf: [c_char; 200] = [0; 200];
 
 /// Length of a C string.
@@ -53,18 +50,24 @@ unsafe fn brother_name() -> *const c_char {
 
 /// Starts a new line in the panel and prints `s` on it.
 /// The old lines scroll up by one text line (10 pixels) inside the message area.
-#[unsafe(no_mangle)]
-pub extern "C" fn print(s: *const c_char) {
+pub fn print(s: *const c_char) {
     unsafe {
-        ScrollRaster(rp, 0, LINE_HEIGHT, TEXT_X_MIN, TEXT_Y_MIN, TEXT_X_MAX, TEXT_Y_MAX);
+        ScrollRaster(
+            rp,
+            0,
+            LINE_HEIGHT,
+            TEXT_X_MIN,
+            TEXT_Y_MIN,
+            TEXT_X_MAX,
+            TEXT_Y_MAX,
+        );
         move_to(TEXT_X_MIN, NEW_LINE_Y);
         text(s, length(s));
     }
 }
 
 /// Continues the current line with `s`.
-#[unsafe(no_mangle)]
-pub extern "C" fn print_cont(s: *const c_char) {
+pub fn print_cont(s: *const c_char) {
     unsafe { text(s, length(s)) };
 }
 
@@ -74,8 +77,7 @@ pub extern "C" fn print_cont(s: *const c_char) {
 /// How it works: characters are copied into `mesbuf`, remembering where the last space was. When
 /// a line reaches 37 characters it is cut at that space (the space becomes the end of the string)
 /// and printed, and the leftover characters start the next line. The message ends at a zero byte.
-#[unsafe(no_mangle)]
-pub extern "C" fn extract(mut start: *const c_char) {
+pub fn extract(mut start: *const c_char) {
     unsafe {
         let mut line_start = (&raw mut mesbuf).cast::<c_char>();
         mbuf = line_start;
@@ -138,8 +140,7 @@ pub extern "C" fn extract(mut start: *const c_char) {
 }
 
 /// Prints "<Brother> found <container> containing ", ready for the contents to be added.
-#[unsafe(no_mangle)]
-pub extern "C" fn announce_container(s: *const c_char) {
+pub fn announce_container(s: *const c_char) {
     unsafe {
         print(brother_name());
         print_cont(c" found ".as_ptr());
@@ -149,8 +150,7 @@ pub extern "C" fn announce_container(s: *const c_char) {
 }
 
 /// Prints "<Brother> found <treasure>".
-#[unsafe(no_mangle)]
-pub extern "C" fn announce_treasure(s: *const c_char) {
+pub fn announce_treasure(s: *const c_char) {
     unsafe {
         print(brother_name());
         print_cont(c" found ".as_ptr());
@@ -159,7 +159,6 @@ pub extern "C" fn announce_treasure(s: *const c_char) {
 }
 
 /// Adds the current brother's name to the line being printed.
-#[unsafe(no_mangle)]
-pub extern "C" fn name() {
+pub fn name() {
     unsafe { print_cont(brother_name()) };
 }

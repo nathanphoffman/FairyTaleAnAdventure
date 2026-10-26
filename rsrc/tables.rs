@@ -45,7 +45,6 @@ pub const RED_KEY: u8 = 242;
 /// What the bartender sells: pairs of (inventory item number, price). Item 0 is food (eaten
 /// at once), item 8 is a bundle of 10 arrows, the others are single items. The buy menu choice
 /// (from 5) picks the pair.
-#[unsafe(no_mangle)]
 pub static jtrans: [i8; 14] = [
     0,3, 8,10, 11,15, 1,30, 2,45, 3,75, 13,20
 ];
@@ -53,7 +52,6 @@ pub static jtrans: [i8; 14] = [
 /// What a dead enemy drops: 8 entries per treasure class (the enemy's class times 8, plus a
 /// random 0-7 picks the entry). The entry is an inventory item number (gold amounts for the high
 /// numbers) or 0 for nothing.
-#[unsafe(no_mangle)]
 pub static treasure_probs: [i8; 40] = [
     0, 0, 0, 0, 0, 0, 0, 0, // no treasure
     9,11,13,31,31,17,17,32, // stone,vial,totem,gold,keys
@@ -64,7 +62,6 @@ pub static treasure_probs: [i8; 40] = [
 
 /// The weapon an enemy carries: 4 entries per weapon class (the enemy type's `arms` times 4, plus
 /// a random 0-3). 1 dirk, 2 mace, 3 sword, 4 bow, 5 magic wand, 8 touch attack, 0 none.
-#[unsafe(no_mangle)]
 pub static weapon_probs: [i8; 32] = [
     0,0,0,0, // no weapons
     1,1,1,1, // dirks only
@@ -77,7 +74,6 @@ pub static weapon_probs: [i8; 32] = [
 ];
 
 /// Sprite frames for the falling animation: 6 per brother, picked by how far into the fall the actor is.
-#[unsafe(no_mangle)]
 pub static fallstates: [u8; 24] = [
     0,0,0,0,0,0,
     0x20,0x22,0x3a,0x6f,0x70,0x71,
@@ -86,33 +82,28 @@ pub static fallstates: [u8; 24] = [
 ];
 
 /// Where the bow is drawn relative to the shooter, x, for each of the 32 shooting animation frames.
-#[unsafe(no_mangle)]
 pub static bow_x: [i8; 32] = [
     1,2,3,4,3,2,1,0, 3,2,0,-2,-3,-2,0,2,
     -3,-3,-3,-3,-3,-3,-3,-2, 0,1,1,1,0,-2,-3,-2
 ];
 
 /// Where the bow is drawn relative to the shooter, y, for each of the 32 shooting animation frames.
-#[unsafe(no_mangle)]
 pub static bow_y: [i8; 32] = [
     8,8,8,7,8,8,8,8, 11,12,13,13,13,13,13,12,
     8,7,6,5,6,7,8,9, 12,12,12,12,12,12,11,12
 ];
 
 /// Where an arrow starts relative to the shooter, x, for each of the 8 facings.
-#[unsafe(no_mangle)]
 pub static bowshotx: [i8; 8] = [
     0, 0, 3, 6,-3,-3,-3,-6
 ];
 
 /// Where an arrow starts relative to the shooter, y, for each of the 8 facings.
-#[unsafe(no_mangle)]
 pub static bowshoty: [i8; 8] = [
     -6,-6,-1, 0, 6, 8, 0,-1
 ];
 
 /// Where a fireball (non-bow missile) starts relative to the shooter, y, for each of the 8 facings.
-#[unsafe(no_mangle)]
 pub static gunshoty: [i8; 8] = [
     2, 0, 4, 7, 9, 4, 7, 8
 ];
@@ -152,7 +143,6 @@ pub static sun_colors: [i16; 53] = [
 
 /// The 32 page colours at full brightness (colour 31 changes with the region).
 /// Each is 12 bits: red, green and blue in 4 bits each.
-#[unsafe(no_mangle)]
 pub static mut pagecolors: [u16; 32] = [
     0x0000,0x0FFF,0x0E96,0x0B63,0x0631,0x07BF,0x0333,0x0DB8,
     0x0223,0x0445,0x0889,0x0BBC,0x0521,0x0941,0x0F82,0x0FC7,
@@ -162,7 +152,6 @@ pub static mut pagecolors: [u16; 32] = [
 
 /// Item translation: pairs of (object id in the world, inventory slot). When the hero picks up
 /// an object, the pair with its id says which inventory count to raise. Ended by 0, 0.
-#[unsafe(no_mangle)]
 pub static itrans: [u8; 64] = [
     QUIVER, 35,
     B_STONE, 9,
@@ -243,7 +232,6 @@ const BLANK: WorldObject = obj(0, 0, 0, 0);
 // 4 a dead person, 5 hidden until looked for, 6 cabinet items.
 
 /// Global objects.
-#[unsafe(no_mangle)]
 pub static mut ob_listg: [WorldObject; 11] = [
    // global objects
     obj(0, 0, 0, 0), // special item (for 'give')
@@ -342,7 +330,6 @@ pub static mut ob_list7: [WorldObject; 11] = [
 ];
 
 /// Interiors of buildings.
-#[unsafe(no_mangle)]
 pub static mut ob_list8: [WorldObject; 78] = [
    // interiors of buildings
     obj(6700, 33756, 1, 3), // priest in chapel
@@ -478,7 +465,6 @@ pub static mut prec: i16 = 0;
 pub static mut pplay: i16 = 0;
 
 /// The tile numbers of the visible map (19 columns of 6), plus spare room.
-#[unsafe(no_mangle)]
 pub static mut minimap: [i16; 120] = [0; 120];
 
 /// The typed answer and where it is shown (the copy protection riddle, now skipped).

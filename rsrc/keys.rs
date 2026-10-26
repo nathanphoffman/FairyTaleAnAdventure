@@ -10,44 +10,11 @@ use super::menus::{gomenu, propt, set_options};
 use super::options::do_option;
 use super::random::{fta_rand, rand4, rnd};
 use super::revive::revive;
-use super::types::{Letter, Menu, Shape};
+use super::types::Letter;
+use super::menus::{print_options};
+use super::game_tables::{letter_list, menus, oldir};
+use super::globals::{active_carrier, actors_on_screen, anim_list, anix, battleflag, cheat1, cmode, daynight, fiery_death, freeze_timer, goodfairy, hero_x, hero_y, hit as menu_hit, hitgo, hunger, keydir, keyfight, light_timer, luck, map_x, map_y, real_options, riding, secret_timer, stuff, viewstatus, xtype};
 
-unsafe extern "C" {
-    static mut anim_list: [Shape; 20];
-    static mut menus: [Menu; 10];
-    static mut cmode: i16;
-    static mut stuff: *mut u8;
-    static real_options: [i8; 12];
-    static letter_list: [Letter; 0];
-    #[link_name = "hit"]
-    static mut menu_hit: i8;
-    static mut hitgo: i8;
-    static mut viewstatus: i8;
-    static mut keydir: i16;
-    static mut keyfight: i16;
-    static mut oldir: i16;
-    static cheat1: i16;
-    static active_carrier: i16;
-    static mut riding: i16;
-    static mut daynight: u16;
-    static mut map_x: u16;
-    static mut map_y: u16;
-    static hero_x: u16;
-    static hero_y: u16;
-    static mut hunger: i16;
-    static luck: i16;
-    static mut goodfairy: u8;
-    static mut anix: i16;
-    static mut actors_on_screen: i8;
-    static mut battleflag: i8;
-    static mut light_timer: i16;
-    static mut secret_timer: i16;
-    static mut freeze_timer: i16;
-    static mut fiery_death: i8;
-    static xtype: u16;
-
-    fn print_options() -> i32;
-}
 
 // Menu numbers (`enum cmodes`).
 const ITEMS: i16 = 0;
@@ -117,8 +84,7 @@ const VIAL_SLOT: usize = 22;
 ///
 /// Codes with bit 7 set are releases. Keys that do nothing in the current state fall through
 /// to the menu shortcut letters at the end.
-#[unsafe(no_mangle)]
-pub extern "C" fn handle_key(key: i32, notpause: i32) {
+pub fn handle_key(key: i32, notpause: i32) {
     unsafe {
         let key = key as i8;
         let notpause = notpause as i16 != 0;
@@ -164,7 +130,11 @@ unsafe fn cheat_items(key: i8) -> bool {
             if active_carrier == CARRIER_BIRD {
                 *stuff.add(RAFT_STONE_SLOT) = 1;
             }
-            move_extent(0, (hero_x as i16).wrapping_add(CARRIER_OFFSET), (hero_y as i16).wrapping_add(CARRIER_OFFSET));
+            move_extent(
+                0,
+                (hero_x as i16).wrapping_add(CARRIER_OFFSET),
+                (hero_y as i16).wrapping_add(CARRIER_OFFSET),
+            );
             load_carrier(CARRIER_BIRD);
             true
         } else if key == CHEAT_STUFF {
@@ -218,7 +188,7 @@ unsafe fn cheat_move(key: i8) -> bool {
 unsafe fn menu_click(key: i8, notpause: bool) {
     unsafe {
         let slot = ((key & CODE_MASK) - FIRST_MENU_CLICK) as i16;
-        menu_hit = *real_options.as_ptr().offset(slot as isize);
+        menu_hit = *(&raw const real_options).cast::<i8>().offset(slot as isize);
         let hit = menu_hit as i16;
         let menu = &raw mut menus[cmode as usize];
         let valid = hit >= 0 && hit < (*menu).num as i16;
@@ -319,21 +289,24 @@ const NOT_WALKING: i16 = 9;
 
 /// Counts the timers down and sets the hero's state from the controls: the good fairy when dead
 /// or falling, shooting, riding, fighting or walking. `cycle` is the main loop's frame counter.
-#[unsafe(no_mangle)]
-pub extern "C" fn update_hero(cycle: i16) {
+pub fn update_hero(cycle: i16) {
     unsafe {
         count_down(&raw mut light_timer);
         count_down(&raw mut secret_timer);
         count_down(&raw mut freeze_timer);
 
-        fiery_death = (map_x > LAVA_X.0 && map_x < LAVA_X.1 && map_y > LAVA_Y.0 && map_y < LAVA_Y.1) as i8;
+        fiery_death =
+            (map_x > LAVA_X.0 && map_x < LAVA_X.1 && map_y > LAVA_Y.0 && map_y < LAVA_Y.1) as i8;
 
         let mut state = anim_list[0].state;
         if state == DEAD || state == FALL {
             state = fairy_or_revive(state, cycle);
         } else if state == DYING || state == SINK || state == SLEEP {
             // nothing to do
-        } else if handler_qualifier() & RIGHT_BUTTON != 0 || keyfight != 0 || (fta_pia & FIRE_BUTTON) == 0 {
+        } else if handler_qualifier() & RIGHT_BUTTON != 0
+            || keyfight != 0
+            || (fta_pia & FIRE_BUTTON) == 0
+        {
             state = fighting_state(state);
         } else if state == SHOOT1 {
             state = SHOOT3; // release the arrow
@@ -372,7 +345,9 @@ unsafe fn fairy_or_revive(state: i8, cycle: i16) -> i8 {
         } else if goodfairy < FAIRY_ARRIVES {
             let fairy = &raw mut anim_list[FAIRY_SLOT];
             anix = NO_ACTORS_LOADED;
-            (*fairy).abs_x = hero_x.wrapping_add(goodfairy as u16 * FAIRY_SPEED).wrapping_sub(FAIRY_X_OFFSET);
+            (*fairy).abs_x = hero_x
+                .wrapping_add(goodfairy as u16 * FAIRY_SPEED)
+                .wrapping_sub(FAIRY_X_OFFSET);
             (*fairy).abs_y = hero_y;
             (*fairy).kind = OBJECTS;
             (*fairy).index = FAIRY_IMAGE + (cycle & 1) as i8;
@@ -404,10 +379,18 @@ unsafe fn fighting_state(state: i8) -> i8 {
         if riding == BIRD {
             if fiery_death != 0 {
                 event(EVENT_LAVA);
-            } else if dif_x > -DISMOUNT_SPEED && dif_x < DISMOUNT_SPEED && dif_y > -DISMOUNT_SPEED && dif_y < DISMOUNT_SPEED {
+            } else if dif_x > -DISMOUNT_SPEED
+                && dif_x < DISMOUNT_SPEED
+                && dif_y > -DISMOUNT_SPEED
+                && dif_y < DISMOUNT_SPEED
+            {
                 let ytest = (*hero).abs_y.wrapping_sub(DISMOUNT_STEP);
                 if proxcheck((*hero).abs_x as i16, ytest as i16, 0) == 0
-                    && proxcheck((*hero).abs_x as i16, ytest.wrapping_add(DISMOUNT_CHECK) as i16, 0) == 0
+                    && proxcheck(
+                        (*hero).abs_x as i16,
+                        ytest.wrapping_add(DISMOUNT_CHECK) as i16,
+                        0,
+                    ) == 0
                 {
                     riding = 0;
                     (*hero).abs_y = ytest;
@@ -438,7 +421,11 @@ unsafe fn walking_state(state: i8) -> i8 {
             return STILL;
         }
         if hunger > STUMBLE_HUNGER && rand4() == 0 {
-            oldir = if fta_rand() & 1 != 0 { (oldir + 1) & 7 } else { (oldir - 1) & 7 };
+            oldir = if fta_rand() & 1 != 0 {
+                (oldir + 1) & 7
+            } else {
+                (oldir - 1) & 7
+            };
         }
         anim_list[0].facing = oldir as i8;
         if handler_qualifier() & LEFT_BUTTON != 0 || keydir != 0 {

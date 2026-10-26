@@ -181,6 +181,34 @@ pub struct Letter {
     pub choice: i8,
 }
 
+#[repr(C)]
+pub struct Message {
+    pub mn_reply_port: *mut c_void,
+}
+
+/// Mirror of `pub struct IORequest` (csrc/amiga.h).
+#[repr(C)]
+pub struct IORequest {
+    pub io_message: Message,
+    pub io_device: *mut c_void,
+    pub io_unit: *mut c_void,
+    pub io_command: u16,
+    pub io_flags: u8,
+    pub io_error: i8,
+}
+
+/// Mirror of `pub struct IOAudio` (csrc/amiga.h).
+#[repr(C)]
+pub struct IOAudio {
+    pub ioa_request: IORequest,
+    pub ioa_alloc_key: i16,
+    pub ioa_data: *mut u8,
+    pub ioa_length: u32,
+    pub ioa_period: u16,
+    pub ioa_volume: u16,
+    pub ioa_cycles: u16,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

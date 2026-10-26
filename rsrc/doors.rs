@@ -6,16 +6,11 @@
 
 use super::asm_map::{mapxy, px_to_im};
 use super::messages::print;
-use super::types::Need;
+use super::game_tables::{current_loads};
+use super::globals::{keydir, viewstatus};
 
-unsafe extern "C" {
-    static current_loads: Need;
-    static mut viewstatus: i8;
-    static mut keydir: i16;
-}
 
 /// Set after a locked door was bumped, so "It's locked." is only said once until the hero moves on.
-#[unsafe(no_mangle)]
 pub static mut bumped: i8 = 0;
 
 /// The terrain type that marks a door.
@@ -50,27 +45,34 @@ struct DoorOpen {
 }
 
 const fn door(door_id: u8, map_id: u16, new1: u8, new2: u8, above: u8, keytype: u8) -> DoorOpen {
-    DoorOpen { door_id, map_id, new1, new2, above, keytype }
+    DoorOpen {
+        door_id,
+        map_id,
+        new1,
+        new2,
+        above,
+        keytype,
+    }
 }
 
 const OPEN_LIST: [DoorOpen; 17] = [
-    door(64, 360, 123, 124, SIDE, GREEN),  // HSTONE
-    door(120, 360, 125, 126, SIDE, NOKEY), // HWOOD
-    door(122, 360, 127, 0, 0, NOKEY),      // VWOOD
-    door(64, 280, 124, 125, SIDE, GREY),   // HSTONE2
-    door(77, 280, 126, 0, 0, GREY),        // VSTONE2
-    door(82, 480, 84, 85, SIDE, KBLUE),    // CRYST
-    door(64, 480, 105, 106, SIDE, GREEN),  // OASIS
-    door(128, 240, 154, 155, ABOVE, WHITE), // MARBLE
-    door(39, 680, 41, 42, SIDE, GOLD),     // HGATE
-    door(25, 680, 27, 26, BACK, GOLD),     // VGATE
-    door(114, 760, 116, 117, ABOVE, RED),  // SECRET
-    door(118, 760, 116, 117, ABOVE, GREY), // TUNNEL
-    door(136, 800, 133, 134, 135, GOLD),   // GOLDEN
-    door(187, 800, 76, 77, SIDE, NOKEY),   // HSTON3
-    door(73, 720, 75, 0, 0, NOKEY),        // VSTON3
+    door(64, 360, 123, 124, SIDE, GREEN),          // HSTONE
+    door(120, 360, 125, 126, SIDE, NOKEY),         // HWOOD
+    door(122, 360, 127, 0, 0, NOKEY),              // VWOOD
+    door(64, 280, 124, 125, SIDE, GREY),           // HSTONE2
+    door(77, 280, 126, 0, 0, GREY),                // VSTONE2
+    door(82, 480, 84, 85, SIDE, KBLUE),            // CRYST
+    door(64, 480, 105, 106, SIDE, GREEN),          // OASIS
+    door(128, 240, 154, 155, ABOVE, WHITE),        // MARBLE
+    door(39, 680, 41, 42, SIDE, GOLD),             // HGATE
+    door(25, 680, 27, 26, BACK, GOLD),             // VGATE
+    door(114, 760, 116, 117, ABOVE, RED),          // SECRET
+    door(118, 760, 116, 117, ABOVE, GREY),         // TUNNEL
+    door(136, 800, 133, 134, 135, GOLD),           // GOLDEN
+    door(187, 800, 76, 77, SIDE, NOKEY),           // HSTON3
+    door(73, 720, 75, 0, 0, NOKEY),                // VSTON3
     door(165, 800, 85, 86, CABINET_LAYOUT, GREEN), // CABINET
-    door(210, 840, 208, 209, SIDE, NOKEY), // BLUE
+    door(210, 840, 208, 209, SIDE, NOKEY),         // BLUE
 ];
 
 /// The tile byte at tile position (x, y) of the map, to change it.
@@ -82,8 +84,7 @@ fn tile(x: i32, y: i32) -> *mut u8 {
 /// without a key). Looks 4 pixels either side for the door terrain, then walks left and down to
 /// the door's top-left tile. Returns 1 if a door opened, 0 if not ("It's locked." is said the
 /// first time).
-#[unsafe(no_mangle)]
-pub extern "C" fn doorfind(x: u16, y: u16, keytype: u32) -> i32 {
+pub fn doorfind(x: u16, y: u16, keytype: u32) -> i32 {
     unsafe {
         let mut x = x;
         let mut y = y;

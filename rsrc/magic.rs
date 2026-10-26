@@ -9,40 +9,12 @@ use super::messages::print;
 use super::places::xfer;
 use super::random::rand8;
 use super::screen_fx::{colorplay, stillscreen};
-use super::types::{Extent, FPage, Shape};
-use crate::amiga::{BitMap, RastPort};
+use crate::amiga::RastPort;
 use std::ffi::c_char;
+use super::game_tables::{region_num, stone_list};
+use super::globals::{anim_list, anix, battleflag, bm_draw, brave, cheat1, extn, fp_drawing, freeze_timer, hero_sector, hero_x, hero_y, light_timer, map_x, map_y, planes, riding, rp_map, secret_timer, secx, secy, stuff, viewstatus, wcarry, xreg, yreg};
 
 unsafe extern "C" {
-    static mut anim_list: [Shape; 20];
-    static mut stuff: *mut u8;
-    static extn: *const Extent;
-    static stone_list: [u8; 22];
-    static mut rp_map: RastPort;
-    static mut bm_draw: *mut BitMap;
-    static mut planes: *mut *mut u8;
-    static fp_drawing: *mut FPage;
-    static mut light_timer: i16;
-    static mut secret_timer: i16;
-    static mut freeze_timer: i16;
-    static mut battleflag: i8;
-    static mut brave: i16;
-    static riding: i16;
-    static wcarry: i16;
-    static cheat1: i16;
-    static region_num: u16;
-    static hero_x: u16;
-    static hero_y: u16;
-    static map_x: u16;
-    static map_y: u16;
-    static hero_sector: i16;
-    static xreg: u16;
-    static yreg: u16;
-    static secx: i32;
-    static secy: i32;
-    static mut viewstatus: i8;
-    static anix: i16;
-
     fn SetDrMd(rp: *mut RastPort, mode: u32);
     fn SetAPen(rp: *mut RastPort, pen: u32);
     fn Move(rp: *mut RastPort, x: i32, y: i32);
@@ -176,7 +148,9 @@ unsafe fn stone_jump() -> bool {
         }
         let (sector_x, sector_y) = (hero_x >> 8, hero_y >> 8);
         for ring in 0..STONE_CIRCLES {
-            if stone_list[ring * 2] as u16 == sector_x && stone_list[ring * 2 + 1] as u16 == sector_y {
+            if stone_list[ring * 2] as u16 == sector_x
+                && stone_list[ring * 2 + 1] as u16 == sector_y
+            {
                 let mut target = ring + (anim_list[0].facing + 1) as usize;
                 if target > STONE_CIRCLES - 1 {
                     target -= STONE_CIRCLES;
@@ -219,7 +193,7 @@ unsafe fn scare_enemies() {
             let an = &raw mut anim_list[i];
             if (*an).vitality != 0 && (*an).kind == ENEMY && (*an).race < FEAR_RACE_LIMIT {
                 (*an).vitality = 0;
-                checkdead(i as i64, 0);
+                checkdead(i as i32, 0);
                 brave -= 1;
             }
             i += 1;

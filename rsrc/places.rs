@@ -12,46 +12,18 @@ use super::loading::prep;
 use super::mood::setmood;
 use super::regions::{gen_mini, load_all};
 use super::tables::ob_list8;
-use super::types::{Extent, Shape};
+use super::types::Extent;
 use std::ffi::c_char;
+use super::encounters::{load_actors};
+use super::hdrive::{motor_off};
+use super::game_tables::{extent_list, region_num};
+use super::globals::{active_carrier, actor_file, actors_loading, anim_list, anix, encounter_number, encounter_type, encounter_x, encounter_y, extn, hero_place, hero_sector, hero_x, hero_y, j as c_j, keydir, map_x, map_y, mixflag, new_region, riding, viewstatus, wt, xreg, xtype, yreg};
 
 unsafe extern "C" {
-    static mut map_x: u16;
-    static mut map_y: u16;
-    static mut hero_x: u16;
-    static mut hero_y: u16;
-    static xreg: u16;
-    static yreg: u16;
-    static region_num: u16;
-    static mut new_region: u16;
-    static mut keydir: i16;
-    static mut viewstatus: i8;
-    static mut encounter_number: u8;
-    static mut encounter_x: u16;
-    static mut encounter_y: u16;
-    static mut encounter_type: u16;
-    static mut hero_sector: i16;
-    static mut hero_place: u16;
-    static mut xtype: u16;
-    static mut extn: *mut Extent;
-    static mut extent_list: [Extent; 0];
-    static mut anim_list: [Shape; 20];
-    static mut anix: i16;
-    static mut mixflag: i16;
-    static mut wt: i16;
-    static mut actors_loading: i8;
-    static mut active_carrier: i16;
-    static riding: i16;
-    static actor_file: i16;
     static place_tbl: [u8; 0];
     static inside_tbl: [u8; 0];
     static place_msg: [c_char; 0];
     static inside_msg: [c_char; 0];
-    #[link_name = "j"]
-    static mut c_j: i16;
-
-    fn load_actors();
-    fn motor_off();
 }
 
 /// The first region number that is indoors.
@@ -145,8 +117,7 @@ unsafe fn start_forced_encounter() {
 /// extent the hero stands in, and whatever that extent starts.
 ///
 /// `flag` 0 is silent, 1 also starts monster zones, 2 only says the place name.
-#[unsafe(no_mangle)]
-pub extern "C" fn find_place(flag: i16) -> i32 {
+pub fn find_place(flag: i16) -> i32 {
     unsafe {
         let mut flag = flag;
         loop {
@@ -240,4 +211,3 @@ pub extern "C" fn find_place(flag: i16) -> i32 {
         }
     }
 }
-

@@ -9,32 +9,9 @@ use super::mood::setmood;
 use super::random::{bitrand, rand2, rand4, rnd};
 use super::tables::weapon_probs;
 use super::types::{Extent, SeqInfo, Shape};
+use super::game_tables::{encounter_chart, extent_list};
+use super::globals::{active_carrier, actor_file, actors_loading, anim_list, anix, brave, encounter_number, encounter_type, encounter_x, encounter_y, extn, kind as hero_kind, luck, map_x, map_y, mixflag, nextshape, seq_list, wt, xtype};
 
-unsafe extern "C" {
-    static mut anim_list: [Shape; 20];
-    static mut extent_list: [Extent; 0];
-    static extn: *const Extent;
-    static mut seq_list: [SeqInfo; 0];
-    static mut nextshape: *mut u8;
-    static mut anix: i16;
-    static mut actors_loading: i8;
-    static mut encounter_number: u8;
-    static mut actor_file: i16;
-    static mut active_carrier: i16;
-    static encounter_x: u16;
-    static encounter_y: u16;
-    static encounter_type: u16;
-    static xtype: u16;
-    static map_x: u16;
-    static map_y: u16;
-    static mixflag: i16;
-    static mut wt: i16;
-    static encounter_chart: [Encounter; 5];
-    #[link_name = "kind"]
-    static mut hero_kind: i16;
-    static mut brave: i16;
-    static mut luck: i16;
-}
 
 /// One kind of monster (`struct encounter`): hit points, how aggressive, which weapon row it uses,
 /// how clever, what treasure it drops, and which sprite file it needs.
@@ -92,8 +69,7 @@ const FIRST_CARRIER_SLOT: usize = 3;
 /// encounter spot (`encounter_x`, `encounter_y`), on a free square. Its race is `encounter_type`
 /// (mixed with the one next to it when `mixflag` bit 1 is set). Returns 1 if it was placed and
 /// 0 if no free spot was found in 15 tries.
-#[unsafe(no_mangle)]
-pub extern "C" fn set_encounter(i: u16, spread: u16) -> i32 {
+pub fn set_encounter(i: u16, spread: u16) -> i32 {
     unsafe {
         let an = (&raw mut anim_list).cast::<Shape>().add(i as usize);
         let mut xtest: u16 = 0;
@@ -152,7 +128,7 @@ pub extern "C" fn set_encounter(i: u16, spread: u16) -> i32 {
 /// 3 kindness. If it is the hero, `dtype` is the death message, luck drops by 5 and the music
 /// changes. The hero's stats are always refreshed on screen.
 #[unsafe(no_mangle)]
-pub extern "C" fn checkdead(i: i64, dtype: i64) {
+pub extern "C" fn checkdead(i: i32, dtype: i32) {
     unsafe {
         let an = (&raw mut anim_list).cast::<Shape>().add(i as usize);
         if (*an).vitality < 1 && (*an).state != DYING && (*an).state != DEAD {
@@ -168,7 +144,7 @@ pub extern "C" fn checkdead(i: i64, dtype: i64) {
             if i != 0 {
                 brave += 1;
             } else {
-                event(dtype as i32);
+                event(dtype);
                 luck -= LUCK_LOSS;
                 setmood(1);
             }
@@ -185,8 +161,7 @@ pub extern "C" fn checkdead(i: i64, dtype: i64) {
 
 /// Puts carrier `n` (5 turtle, 10 dragon, otherwise the swan) in actor slot 3, loading its sprites
 /// if they are not the ones already loaded, in the middle of its extent.
-#[unsafe(no_mangle)]
-pub extern "C" fn load_carrier(n: i16) {
+pub fn load_carrier(n: i16) {
     unsafe {
         let an = (&raw mut anim_list).cast::<Shape>().add(FIRST_CARRIER_SLOT);
         (*an).kind = if n == CARRIER_DRAGON { DRAGON } else { CARRIER };
@@ -220,8 +195,7 @@ pub extern "C" fn load_carrier(n: i16) {
 
 /// The actors' sprite file the monsters of this encounter need: sets how many appear and, if that
 /// file is not the one loaded, loads it (the carrier is dropped then).
-#[unsafe(no_mangle)]
-pub extern "C" fn load_actors() {
+pub fn load_actors() {
     const FIRST_ENEMY_SLOT: i16 = 3;
     unsafe {
         encounter_number = ((*extn).v1 as i32 + rnd((*extn).v2 as i32)) as u8;

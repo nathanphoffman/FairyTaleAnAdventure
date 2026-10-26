@@ -16,6 +16,7 @@
 //! 5. Next frame `rest_blit` puts the saved background back, which erases the sprite.
 //! `make_mask` builds each frame's own mask once, when the sprite sheet is loaded.
 
+use super::globals::{aoff, bmask_mem, bmod, boff, mask_buffer, planes, planesize, shadow_mem, shapedata, shift, shp, wmask};
 /// Mirror of `struct sshape` in csrc/ftale.h: how one sprite is drawn this frame and where its
 /// background is saved. `coff` is the byte offset of the sprite in a bitplane and `cmod` the bytes
 /// to skip to the next line; `blitsize` is the blitter size word (height * 64 + width in words).
@@ -28,20 +29,6 @@ pub struct SShape {
     pub cmod: i16,
 }
 
-unsafe extern "C" {
-    static shp: *mut SShape;
-    static mask_buffer: *mut u8;
-    static shapedata: *mut u8;
-    static bmask_mem: *mut u8;
-    static shadow_mem: *mut u8;
-    static shift: i16;
-    static aoff: i16;
-    static boff: i16;
-    static bmod: i16;
-    static planesize: i16;
-    static wmask: i16;
-    static planes: *mut *mut u8;
-}
 
 // Which channels a blit uses.
 const USE_A: u8 = 1;
@@ -216,15 +203,13 @@ unsafe fn plane_at_sprite(p: i32) -> *mut u8 {
 }
 
 /// Zeroes a rectangle of memory, sized like a BLTSIZE value.
-#[unsafe(no_mangle)]
-pub extern "C" fn clear_blit(mem: *mut u8, size: i32) {
+pub fn clear_blit(mem: *mut u8, size: i32) {
     let bytes = blit_height(size as i16) * blit_width(size as i16) * 2;
     unsafe { std::ptr::write_bytes(mem, 0, bytes as usize) };
 }
 
 /// Copies the background under the sprite (all planes) to `savemem`.
-#[unsafe(no_mangle)]
-pub extern "C" fn save_blit(savemem: *mut u8) {
+pub fn save_blit(savemem: *mut u8) {
     unsafe {
         for p in (0..PLANE_COUNT).rev() {
             let mut t = Blit::new(USE_B | USE_D, D_EQUALS_B, (*shp).blitsize);
@@ -237,8 +222,7 @@ pub extern "C" fn save_blit(savemem: *mut u8) {
 }
 
 /// Puts the saved background back (this erases the sprite).
-#[unsafe(no_mangle)]
-pub extern "C" fn rest_blit(savemem: *mut u8) {
+pub fn rest_blit(savemem: *mut u8) {
     unsafe {
         for p in (0..PLANE_COUNT).rev() {
             let mut t = Blit::new(USE_B | USE_D, D_EQUALS_B, (*shp).blitsize);
@@ -252,8 +236,7 @@ pub extern "C" fn rest_blit(savemem: *mut u8) {
 
 /// Combines the sprite's own mask with the scenery mask built by `maskit`. The result goes in
 /// `bmask_mem`: the sprite is opaque here and nothing is in front of it (D = A and not C).
-#[unsafe(no_mangle)]
-pub extern "C" fn mask_blit() {
+pub fn mask_blit() {
     unsafe {
         let mut t = Blit::new(USE_A | USE_C | USE_D, D_EQUALS_A_AND_NOT_C, (*shp).blitsize);
         t.a = mask_buffer.offset(boff as isize);
@@ -267,8 +250,7 @@ pub extern "C" fn mask_blit() {
 
 /// Draws the sprite into the planes through the mask: D = mask ? shape : screen.
 /// The first and last word masks stop the sprite's shifted edges leaking into neighbouring pixels.
-#[unsafe(no_mangle)]
-pub extern "C" fn shape_blit() {
+pub fn shape_blit() {
     unsafe {
         let bit_shift = (shift & SHIFT_MASK) as u32;
         let first = ALL_BITS >> bit_shift;
@@ -299,8 +281,7 @@ pub extern "C" fn shape_blit() {
 
 /// Copies the 32 line mask of scenery tile `tile` (from `shadow_mem`) into the scenery mask at
 /// word column `x`, tile row `y`; `mod_words` is the mask width in words.
-#[unsafe(no_mangle)]
-pub extern "C" fn maskit(x: i32, y: i32, mod_words: i32, tile: i32) {
+pub fn maskit(x: i32, y: i32, mod_words: i32, tile: i32) {
     let row_bytes = mod_words as isize * 2;
     unsafe {
         let mut dst = bmask_mem
@@ -318,8 +299,7 @@ pub extern "C" fn maskit(x: i32, y: i32, mod_words: i32, tile: i32) {
 
 /// For every sprite frame builds a one plane mask: all 5 planes ANDed then inverted, so colour
 /// 31 (all bits set) is transparent. The masks are stored right after the frames.
-#[unsafe(no_mangle)]
-pub extern "C" fn make_mask(src: *const u8, dest: *mut u8, words: i32, scans: i32, chars: i32) {
+pub fn make_mask(src: *const u8, dest: *mut u8, words: i32, scans: i32, chars: i32) {
     let plane_bytes = (words * scans) as u16 as usize * 2;
     unsafe {
         let (mut src, mut dest) = (src, dest);

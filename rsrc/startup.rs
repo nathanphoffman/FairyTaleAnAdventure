@@ -3,115 +3,41 @@
 //! title and intro, starts the game and runs the main loop, one pass per frame.
 
 use super::draw::{draw_sprites, repair_map_and_witch};
-use super::input::InWork;
 use super::loading::skipp;
 use super::menus::print_options;
-use super::types::FPage;
+use super::types::IOAudio;
 use crate::amiga::{
-    BitMap, ColorMap, DiskFontHeader, GfxBase, HIRES, JAM2, MEMF_CHIP, Process, RasInfo, RastPort, SimpleSprite,
-    TextAttr, TextFont, View, ViewPort,
+    BitMap, ColorMap, DiskFontHeader, HIRES, JAM2, MEMF_CHIP, Process, RastPort,
+    SimpleSprite, TextAttr, TextFont, View, ViewPort,
 };
 use std::ffi::{c_char, c_void};
 
 use super::asm_blit::SShape;
-use super::types::{Menu, Shape};
+use super::ai::{actor_ai};
+use super::asm_map::{map_draw, scrollmap};
+use super::asm_stubs::{trapper};
+use super::asm_text::{do_error, placard_text, ssp};
+use super::combat::{melee_hits, move_missiles, queue_missiles};
+use super::display::{add_device, pagechange, wrap_device};
+use super::hdrive::{AllocDiskIO, FreeDiskIO, InvalidLastDiskIO, WaitLastDiskIO, load_track_range};
+use super::iffsubs::{unpackbrush};
+use super::input::{decode_mouse, getkey};
+use super::keys::{handle_key, update_hero};
+use super::loading::{copy_protect_junk, copypage, into_chip, load_next, read_sample, read_score, seekn, skipint};
+use super::move_actor::{move_actor};
+use super::objects::{do_objects};
+use super::regions::{gen_mini};
+use super::revive::{revive};
+use super::screen_fx::{fade_normal, ppick, screen_size, stillscreen};
+use super::world::{check_bed, check_door, day_night_tick, raft_proximity, sort_actors, spawn_encounters, speak_nearby, survival_tick, undo_sprites};
+use super::asm_stubs::{WBenchMsg};
+use super::game_tables::{_sprite_data, blackcolors, menus, new_wave, pointer, textcolors, topaz_ta};
+use super::globals::{GfxBase as gfx_base, LayersBase as layers_base, afont, anim_list, anix, anix2, audio_open, audioport, bm_lim, bm_page1, bm_page2, bm_scroll, bm_source, bm_text, bmask_mem, cheat1, cmode, flasher, font, fp_drawing, fp_page1, fp_page2, fp_viewing, freeze_timer, handler_data, hero_x, hero_y, image_mem, img_x, img_y, ioaudio, li, light_timer, map_mem, map_x, map_y, new_region, nhinor, nhivar, oldview, openflags, origDir, pagea, pageb, queue_mem, quitflag, ri_page1, ri_page2, ri_text, rp, rp_map, rp_text, rp_text2, sample_mem, scoremem, sector_mem, seg, shadow_mem, shape_mem, sprite_data, terra_mem, tfont, thistask, track, v, viewstatus, volmem, vp, vp_page, vp_text, wavmem, wb_bmap, work_bm};
 
-#[repr(C)]
-struct Message {
-    mn_reply_port: *mut c_void,
-}
-
-/// Mirror of `struct IORequest` (csrc/amiga.h).
-#[repr(C)]
-struct IORequest {
-    io_message: Message,
-    io_device: *mut c_void,
-    io_unit: *mut c_void,
-    io_command: u16,
-    io_flags: u8,
-    io_error: i8,
-}
-
-/// Mirror of `struct IOAudio` (csrc/amiga.h).
-#[repr(C)]
-struct IOAudio {
-    ioa_request: IORequest,
-    ioa_alloc_key: i16,
-    ioa_data: *mut u8,
-    ioa_length: u32,
-    ioa_period: u16,
-    ioa_volume: u16,
-    ioa_cycles: u16,
-}
 
 unsafe extern "C" {
-    // Libraries and the screen.
-    #[link_name = "GfxBase"]
-    static mut gfx_base: *mut GfxBase;
-    #[link_name = "LayersBase"]
-    static mut layers_base: *mut c_void;
-    static mut openflags: u16;
-    static mut oldview: *mut View;
-    static mut work_bm: BitMap;
-    static mut li: *mut c_void;
-    static mut rp_map: RastPort;
-    static mut rp_text: RastPort;
-    static mut rp_text2: RastPort;
-    static mut rp: *mut RastPort;
-    static mut wb_bmap: *mut BitMap;
-    static mut bm_page1: *mut BitMap;
-    static mut bm_page2: *mut BitMap;
-    static mut bm_text: *mut BitMap;
-    static mut bm_lim: *mut BitMap;
-    static mut bm_source: *mut BitMap;
-    static mut bm_scroll: BitMap;
-    static mut pagea: BitMap;
-    static mut pageb: BitMap;
-    static mut v: View;
-    static mut vp_page: ViewPort;
-    static mut vp_text: ViewPort;
-    static mut vp: *mut ViewPort;
-    static mut ri_page1: RasInfo;
-    static mut ri_page2: RasInfo;
-    static mut ri_text: RasInfo;
-    static mut fp_page1: FPage;
-    static mut fp_page2: FPage;
-    static mut fp_drawing: *mut FPage;
-    static mut fp_viewing: *mut FPage;
-    static mut pointer: SimpleSprite;
-    static mut handler_data: InWork;
-    // Fonts.
-    static mut seg: isize;
-    static mut font: *mut DiskFontHeader;
-    static mut tfont: *mut TextFont;
-    static mut afont: *mut TextFont;
-    static mut topaz_ta: TextAttr;
-    static mut thistask: *mut Process;
-    static mut origDir: isize;
-    // Memory areas.
-    static mut queue_mem: *mut u8;
-    static mut bmask_mem: *mut u8;
-    static mut image_mem: *mut u8;
-    static mut sector_mem: *mut u8;
-    static mut map_mem: *mut u8;
-    static mut shape_mem: *mut u8;
-    static mut shadow_mem: *mut u8;
-    static mut sample_mem: *mut u8;
-    static mut terra_mem: *mut u8;
-    static mut wavmem: *mut u8;
-    static mut volmem: *mut u8;
-    static mut scoremem: *mut u8;
-    static new_wave: [i16; 0];
-    static mut sprite_data: *mut u8;
-    static mut _sprite_data: [i32; 0];
-    static mut nhinor: *mut u8;
-    static mut nhivar: *mut u8;
     static mut hinor: [u8; 0];
     static mut hivar: [u8; 0];
-    // Sound.
-    static mut audioport: *mut c_void;
-    static mut ioaudio: *mut IOAudio;
-    static mut audio_open: i16;
 
     // AmigaOS calls the platform layer provides.
     fn OpenLibrary(name: *const c_char, version: u32) -> *mut c_void;
@@ -182,14 +108,6 @@ unsafe extern "C" {
     fn init_music(ins: *const i16, wav: *mut u8, vol: *mut u8);
     fn wrap_music();
     fn stopscore();
-    fn trapper() -> i32;
-    fn into_chip(old: *mut u8, size: i32) -> *mut u8;
-    fn AllocDiskIO() -> i32;
-    fn FreeDiskIO();
-    fn add_device() -> i32;
-    fn wrap_device();
-    fn do_error(n: i32);
-    static WBenchMsg: *const WBStartup;
 }
 
 #[repr(C)]
@@ -262,8 +180,7 @@ unsafe fn has_flag(flag: u16) -> bool {
 }
 
 /// Opens everything the game needs. Returns 0, or the error number `do_error` shows.
-#[unsafe(no_mangle)]
-pub extern "C" fn open_all() -> i32 {
+pub fn open_all() -> i32 {
     unsafe {
         openflags = 0;
 
@@ -294,7 +211,11 @@ pub extern "C" fn open_all() -> i32 {
         SetDrMd(rp, JAM2 as u32);
         SetRast(rp, 0);
 
-        bm_page1 = AllocMem(BITMAP_COUNT * size_of::<BitMap>() as u32, MEMF_CHIP | MEMF_CLEAR).cast();
+        bm_page1 = AllocMem(
+            BITMAP_COUNT * size_of::<BitMap>() as u32,
+            MEMF_CHIP | MEMF_CLEAR,
+        )
+        .cast();
         if bm_page1.is_null() {
             return 1;
         }
@@ -446,7 +367,7 @@ pub extern "C" fn open_all() -> i32 {
             return 17;
         }
         volmem = wavmem.add(S_WAVBUF as usize);
-        init_music(new_wave.as_ptr(), wavmem, volmem);
+        init_music((&raw const new_wave).cast(), wavmem, volmem);
         set_flag(AL_MUSIC);
 
         image_mem = AllocMem(IMAGE_SZ, MEMF_CHIP);
@@ -531,8 +452,7 @@ unsafe fn open_audio() {
 }
 
 /// Gives back everything `open_all` took, then ends the program.
-#[unsafe(no_mangle)]
-pub extern "C" fn close_all() {
+pub fn close_all() {
     unsafe {
         if has_flag(AL_TERR) {
             FreeMem(terra_mem.cast(), TERRA_SZ);
@@ -559,7 +479,11 @@ pub extern "C" fn close_all() {
         }
 
         // Memory that `into_chip` copied is freed; if it handed back the original, nothing is.
-        free_chip(sprite_data, (&raw mut _sprite_data).cast(), SPRITE_DATA_SZ as u32);
+        free_chip(
+            sprite_data,
+            (&raw mut _sprite_data).cast(),
+            SPRITE_DATA_SZ as u32,
+        );
         free_chip(nhinor, (&raw mut hinor).cast(), NORM_HIGH_SZ as u32);
         free_chip(nhivar, (&raw mut hivar).cast(), NORM_HIGH_SZ as u32);
         LoadView(oldview);
@@ -634,71 +558,8 @@ unsafe fn free_chip(new: *mut u8, old: *mut u8, size: u32) {
 
 // ---- fta_main ----
 unsafe extern "C" {
-    static mut light_timer: i16;
-    static mut viewstatus: i8;
-    static mut flasher: i8;
-    static mut cheat1: i16;
-    static mut quitflag: i8;
-    static mut cmode: i16;
-    static mut menus: [Menu; 10];
-    static mut anim_list: [Shape; 20];
-    static mut anix: i16;
-    static mut anix2: i16;
-    static freeze_timer: i16;
-    static mut map_x: u16;
-    static mut map_y: u16;
-    static mut hero_x: u16;
-    static mut hero_y: u16;
-    static mut img_x: u16;
-    static mut img_y: u16;
-    static track: [*mut u8; 32];
     static titletext: [u8; 0];
-    static blackcolors: [u16; 32];
-    static textcolors: [u16; 20];
-    static new_region: u16;
-
-    fn screen_size(x: i64);
-    fn ssp(s: *const u8);
-    fn read_score();
-    fn read_sample();
     fn playscore(t1: *const u8, t2: *const u8, t3: *const u8, t4: *const u8);
-    fn pagechange();
-    fn skipint() -> i32;
-    fn unpackbrush(name: *const c_char, bm: *mut BitMap, x: i16, y: i16) -> i32;
-    fn copypage(br1: *const c_char, br2: *const c_char, x: i16, y: i16);
-    fn seekn();
-    fn load_track_range(f_block: i16, b_count: i16, buffer: *mut c_void, dr: i16);
-    fn WaitLastDiskIO();
-    fn InvalidLastDiskIO();
-    fn stillscreen();
-    fn placard_text(n: i32);
-    fn copy_protect_junk() -> i32;
-    fn revive(new: i16);
-    fn getkey() -> i32;
-    fn handle_key(key: i32, notpause: i32);
-    fn ppick();
-    fn decode_mouse();
-    fn update_hero(cycle: i16);
-    fn raft_proximity();
-    fn move_actor(i: i32, cycle: i16, jp: *mut i16);
-    fn check_bed();
-    fn check_door();
-    fn undo_sprites();
-    fn gen_mini();
-    fn map_draw();
-    fn load_next();
-    fn scrollmap(dir: i32);
-    fn day_night_tick();
-    fn spawn_encounters();
-    fn speak_nearby();
-    fn actor_ai();
-    fn survival_tick();
-    fn melee_hits();
-    fn move_missiles();
-    fn do_objects();
-    fn queue_missiles();
-    fn sort_actors();
-    fn fade_normal();
     fn fta_test_hook();
 }
 
@@ -714,8 +575,8 @@ const VIEW_REDRAW: i8 = 99;
 const GAME_MENU: usize = 4;
 const PAUSE_ENTRY: usize = 5;
 /// Intro: how big the picture zooms (half the width in pixels), and the step.
-const ZOOM_FULL: i64 = 160;
-const ZOOM_NORMAL: i64 = 156;
+const ZOOM_FULL: i32 = 160;
+const ZOOM_NORMAL: i32 = 156;
 const ZOOM_STEP: usize = 4;
 /// A region number below this means the next region is still being loaded.
 const NO_REGION: u16 = 10;
@@ -758,7 +619,7 @@ const SCROLL_DOWN_RIGHT: i32 = 1;
 pub extern "C" fn fta_main(argc: i32, _argv: *mut c_char) {
     unsafe {
         if argc == 0 {
-            origDir = CurrentDir((*(*WBenchMsg).sm_arglist).wa_lock);
+            origDir = CurrentDir((*(*WBenchMsg.cast::<WBStartup>()).sm_arglist).wa_lock);
         }
 
         light_timer = 0;
@@ -833,7 +694,7 @@ unsafe fn start_up() -> bool {
 
         playscore(track[12], track[13], track[14], track[15]);
 
-        LoadRGB4(&raw mut vp_text, blackcolors.as_ptr(), PAGE_COLORS);
+        LoadRGB4(&raw mut vp_text, (&raw const blackcolors).cast(), PAGE_COLORS);
 
         fp_page2.ri_page = &raw mut ri_page2;
         screen_size(0);
@@ -853,7 +714,7 @@ unsafe fn start_up() -> bool {
         rp_map.BitMap = (*(*fp_drawing).ri_page).BitMap;
         SetRast(&raw mut rp_map, 0);
 
-        LoadRGB4(&raw mut vp_text, blackcolors.as_ptr(), PAGE_COLORS);
+        LoadRGB4(&raw mut vp_text, (&raw const blackcolors).cast(), PAGE_COLORS);
         screen_size(ZOOM_NORMAL);
         SetRGB4(&raw mut vp_page, 0, 0, 0, 3);
         load_track_range(SHADOW_BLOCK.0, SHADOW_BLOCK.1, shadow_mem.cast(), 0);
@@ -894,7 +755,7 @@ unsafe fn start_up() -> bool {
         vp_page.DWidth = LOWRES_WIDTH;
         vp_page.DyOffset = 0;
         MakeVPort(&raw mut v, &raw mut vp_text);
-        LoadRGB4(&raw mut vp_text, textcolors.as_ptr(), TEXT_COLORS);
+        LoadRGB4(&raw mut vp_text, (&raw const textcolors).cast(), TEXT_COLORS);
         handler_data.pbase = (&raw mut pointer).cast();
 
         fp_page1.obcount = 0;
@@ -914,8 +775,32 @@ unsafe fn start_up() -> bool {
 unsafe fn play_intro() {
     unsafe {
         unpackbrush(c"page0".as_ptr(), &raw mut pageb, 0, 0);
-        BltBitMap(&raw mut pageb, 0, 0, bm_page1, 0, 0, 320, 200, 0xC0, 0x1f, std::ptr::null_mut());
-        BltBitMap(&raw mut pageb, 0, 0, bm_page2, 0, 0, 320, 200, 0xC0, 0x1f, std::ptr::null_mut());
+        BltBitMap(
+            &raw mut pageb,
+            0,
+            0,
+            bm_page1,
+            0,
+            0,
+            320,
+            200,
+            0xC0,
+            0x1f,
+            std::ptr::null_mut(),
+        );
+        BltBitMap(
+            &raw mut pageb,
+            0,
+            0,
+            bm_page2,
+            0,
+            0,
+            320,
+            200,
+            0xC0,
+            0x1f,
+            std::ptr::null_mut(),
+        );
 
         fp_page2.ri_page = &raw mut ri_page1;
         for x in (0..=ZOOM_FULL).step_by(ZOOM_STEP) {
@@ -1021,7 +906,10 @@ unsafe fn main_loop() {
             }
 
             let mut world_update = false;
-            if viewstatus == VIEW_REDRAW || viewstatus == VIEW_REDRAW_2 || viewstatus == VIEW_CHANGED {
+            if viewstatus == VIEW_REDRAW
+                || viewstatus == VIEW_REDRAW_2
+                || viewstatus == VIEW_CHANGED
+            {
                 gen_mini();
                 map_draw();
                 dif_x = 0;

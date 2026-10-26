@@ -12,28 +12,21 @@
 
 use super::random::fta_rand;
 use super::tables::{answr, pplay, prec, print_que, xx, yy};
-use super::types::Shape;
 use crate::amiga::RastPort;
-use std::ffi::{c_char, c_void};
+use std::ffi::c_char;
+use super::messages::{extract, print_cont};
+use super::game_tables::{numbuf};
+use super::globals::{anim_list, rp, rp_map, stuff};
 
 unsafe extern "C" {
-    static mut rp: *mut RastPort;
-    static mut rp_map: RastPort;
-    static mut anim_list: [Shape; 20];
-    static stuff: *const u8;
-    static mut numbuf: [c_char; 11];
     static event_msg: [c_char; 0];
     static speeches: [c_char; 0];
     static placard_msgs: [*const c_char; 0];
-    static question_msgs: [*const c_char; 0];
 
     fn Move(rp: *mut RastPort, x: i32, y: i32);
     fn Draw(rp: *mut RastPort, x: i32, y: i32);
     fn Text(rp: *mut RastPort, s: *const c_char, len: i32) -> i32;
     fn SetAPen(rp: *mut RastPort, pen: u32);
-    fn SetBPen(rp: *mut RastPort, pen: u32);
-    fn print_cont(s: *const c_void) -> i32;
-    fn extract(s: *const c_char);
 }
 
 /// In a string: followed by x/2 and y, moves the text position.
@@ -49,8 +42,7 @@ const STILL: i8 = 13;
 
 /// Right-aligned decimal in the first 10 characters of `numbuf`, leading positions blank.
 /// (The 11th character is a space, which `prdec` prints after the number.)
-#[unsafe(no_mangle)]
-pub extern "C" fn ion(mut value: u32) -> i32 {
+pub fn ion(mut value: u32) -> i32 {
     unsafe {
         let digits = &mut (&mut *(&raw mut numbuf))[..NUMBER_DIGITS];
         let mut i = NUMBER_DIGITS;
@@ -68,10 +60,18 @@ pub extern "C" fn ion(mut value: u32) -> i32 {
 }
 
 /// Prints the number in a field of `len` characters, plus the trailing space.
-#[unsafe(no_mangle)]
-pub extern "C" fn prdec(value: i32, len: i32) {
+pub fn prdec(value: i32, len: i32) {
     ion(value as u32);
-    unsafe { Text(rp, (&raw const numbuf).cast::<c_char>().add(NUMBER_DIGITS).offset(-(len as isize)), len + 1) };
+    unsafe {
+        Text(
+            rp,
+            (&raw const numbuf)
+                .cast::<c_char>()
+                .add(NUMBER_DIGITS)
+                .offset(-(len as isize)),
+            len + 1,
+        )
+    };
 }
 
 // `move` is a Rust keyword, so this one is exported under the C name.
@@ -82,16 +82,14 @@ pub extern "C" fn move_to(x: i32, y: i32) {
 }
 
 /// Prints `len` characters at the text position.
-#[unsafe(no_mangle)]
-pub extern "C" fn text(s: *const c_char, len: i32) {
+pub fn text(s: *const c_char, len: i32) {
     unsafe { Text(rp, s, len) };
 }
 
 /// Prints a string that may hold XY escapes (128, x/2, y) to move the text position. A string
 /// ends at a zero byte; bytes of 128 and above end each plain run of text.
 /// (The x position is stored halved so it fits in a byte.)
-#[unsafe(no_mangle)]
-pub extern "C" fn ssp(mut s: *const u8) {
+pub fn ssp(mut s: *const u8) {
     unsafe {
         while *s != 0 {
             if *s == XY {
@@ -113,15 +111,13 @@ pub extern "C" fn ssp(mut s: *const u8) {
 }
 
 /// Prints story page text number `n` (the strings use position escapes, see `ssp`).
-#[unsafe(no_mangle)]
-pub extern "C" fn placard_text(n: i32) {
-    unsafe { ssp((*(&raw const placard_msgs).cast::<*const c_char>().offset(n as isize)).cast()) };
-}
-
-/// Prints riddle question `n` (the copy protection riddles, skipped now).
-#[unsafe(no_mangle)]
-pub extern "C" fn question(n: i32) {
-    unsafe { print_cont((*(&raw const question_msgs).cast::<*const c_char>().offset(n as isize)).cast()) };
+pub fn placard_text(n: i32) {
+    unsafe {
+        ssp((*(&raw const placard_msgs)
+            .cast::<*const c_char>()
+            .offset(n as isize))
+        .cast())
+    };
 }
 
 /// Skips `n` zero-terminated strings.
@@ -139,27 +135,23 @@ unsafe fn skip_strings(mut p: *const c_char, mut n: i32) -> *const c_char {
 }
 
 /// Shows the `num`-th string of a list of messages, word-wrapped (see `extract`).
-#[unsafe(no_mangle)]
-pub extern "C" fn msg(start: *const c_char, num: i32) {
+pub fn msg(start: *const c_char, num: i32) {
     unsafe { extract(skip_strings(start, num)) };
 }
 
 /// Shows event message `n` (things that happen to the hero, such as hunger).
-#[unsafe(no_mangle)]
-pub extern "C" fn event(n: i32) {
+pub fn event(n: i32) {
     msg((&raw const event_msg).cast(), n);
 }
 
 /// Shows speech number `n` (what people say).
-#[unsafe(no_mangle)]
-pub extern "C" fn speak(n: i32) {
+pub fn speak(n: i32) {
     msg((&raw const speeches).cast(), n);
 }
 
 /// Adds a request to the print queue (ignored if the queue is full). `ppick` handles them one
 /// per tick, which spreads the redrawing work over several frames.
-#[unsafe(no_mangle)]
-pub extern "C" fn prq(x: i32) {
+pub fn prq(x: i32) {
     unsafe {
         let next = (prec + 1) & PRINT_QUEUE_MASK;
         if next == pplay {
@@ -167,21 +159,6 @@ pub extern "C" fn prq(x: i32) {
         }
         (*(&raw mut print_que))[prec as usize] = x as c_char;
         prec = next;
-    }
-}
-
-/// Redraws the typed answer and a block cursor after it (the riddle input).
-#[unsafe(no_mangle)]
-pub extern "C" fn cursor(len: i32, pen: i32) {
-    let space = b" ".as_ptr().cast::<c_char>();
-    unsafe {
-        SetBPen(rp, 0);
-        Move(rp, xx as i32, yy as i32);
-        Text(rp, (&raw const answr).cast(), len);
-        SetBPen(rp, pen as u32);
-        Text(rp, space, 1);
-        SetBPen(rp, 0);
-        Text(rp, space, 1);
     }
 }
 
@@ -208,8 +185,7 @@ unsafe fn line(r: *mut RastPort, x0: i32, y0: i32, x1: i32, y1: i32) {
 
 /// Draws the decorative border around a story page: many short strokes, five each with the last in
 /// a highlight colour, winding around the four edges. The first passes also draw the top and bottom.
-#[unsafe(no_mangle)]
-pub extern "C" fn placard() {
+pub fn placard() {
     unsafe {
         let r = &raw mut rp_map;
         let (mut xorg, mut yorg) = (BORDER_START_X, 0);
@@ -218,7 +194,14 @@ pub extern "C" fn placard() {
                 let dx = xorg + BORDER_X_STEPS[step];
                 let dy = yorg + BORDER_Y_STEPS[step];
                 for stroke in (0..STROKES_PER_STEP).rev() {
-                    SetAPen(r, if stroke == 0 { BORDER_HIGHLIGHT_PEN } else { BORDER_PEN });
+                    SetAPen(
+                        r,
+                        if stroke == 0 {
+                            BORDER_HIGHLIGHT_PEN
+                        } else {
+                            BORDER_PEN
+                        },
+                    );
                     if pass > LONG_EDGE_ABOVE_PASS {
                         line(r, xorg, yorg, dx, dy);
                         line(r, 284 - xorg, 124 - yorg, 284 - dx, 124 - dy);
@@ -234,9 +217,12 @@ pub extern "C" fn placard() {
 }
 
 /// Menu state for an item: 10 if the player has item `n`, otherwise 8 (a menu item state).
-#[unsafe(no_mangle)]
-pub extern "C" fn stuff_flag(n: i32) -> i32 {
-    if unsafe { *stuff.offset(n as isize) } != 0 { 10 } else { 8 }
+pub fn stuff_flag(n: i32) -> i32 {
+    if unsafe { *stuff.offset(n as isize) } != 0 {
+        10
+    } else {
+        8
+    }
 }
 
 /// Direction number for each of the 9 combinations of horizontal and vertical steering.
@@ -301,15 +287,17 @@ fn steer(xdif: i16, ydif: i16, mode: i32, random_bit: impl FnOnce() -> bool) -> 
 /// Points an actor toward (or away from) a target and sets it walking (see `steer` for modes).
 /// The random number is only drawn when the actor moves, as in the original, so recorded games
 /// stay in step.
-#[unsafe(no_mangle)]
-pub extern "C" fn set_course(object: i32, target_x: i32, target_y: i32, mode: i32) {
+pub fn set_course(object: i32, target_x: i32, target_y: i32, mode: i32) {
     let mode = mode & 0xff;
     unsafe {
         let actor = &mut (*(&raw mut anim_list))[object as usize];
         let (xdif, ydif) = if mode == 6 {
             (target_x as i16, target_y as i16)
         } else {
-            ((actor.abs_x as i32 - target_x) as i16, (actor.abs_y as i32 - target_y) as i16)
+            (
+                (actor.abs_x as i32 - target_x) as i16,
+                (actor.abs_y as i32 - target_y) as i16,
+            )
         };
         match steer(xdif, ydif, mode, || fta_rand() & 2 != 0) {
             Course::Stop => actor.state = STILL,
@@ -329,8 +317,7 @@ const ERROR_SCREEN_Y: i32 = 90;
 const ERROR_NO_GRAPHICS: i32 = 2;
 
 /// Shows "ERROR n" on the text panel (startup failures). Error 2 (no graphics) cannot be shown.
-#[unsafe(no_mangle)]
-pub extern "C" fn do_error(n: i32) {
+pub fn do_error(n: i32) {
     if n == ERROR_NO_GRAPHICS {
         return;
     }

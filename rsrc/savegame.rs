@@ -10,77 +10,19 @@
 //! exists (always, on Linux) the save is just named `A.faery`, `B.faery` ... (one letter per menu
 //! choice) and the platform layer puts the files in the `saves/` folder.
 
-use super::input::take_new_disk;
 use super::asm_text::prq;
+use super::input::take_new_disk;
 use super::messages::print;
 use super::tables::{dstobs, glbobs, mapobs, ob_listg, ob_table};
-use super::types::{Bro, Extent, Missile, Shape, WorldObject};
+use super::types::{Extent, Missile, Shape, WorldObject};
 use crate::amiga::{BPTR, RastPort, TextFont};
 use std::ffi::{c_char, c_void};
+use super::loading::{shape_read};
+use super::menus::{set_options};
+use super::game_tables::{blist, extent_list, region_num};
+use super::globals::{active_carrier, actor_file, actors_loading, afont, anim_list, anix, anix2, brave, brother, cheat1, cmode, daynight, encounter_number, encounter_type, fatigue, flying, freeze_timer, hero_place, hero_sector, hero_x, hero_y, hunger, img_x, img_y, julstuff, kevstuff, kind, leader, light_timer, lightlevel, luck, map_x, map_y, mdex, missile_list, pad1, pad2, pad3, philstuff, princess, raftprox, riding, rp, safe_r, safe_x, safe_y, secret_timer, set_file, stuff, tfont, turtleprox, viewstatus, wcarry, wealth, wt, xtype};
 
 unsafe extern "C" {
-    static mut rp: *mut RastPort;
-    static tfont: *mut TextFont;
-    static afont: *mut TextFont;
-    static mut anim_list: [Shape; 20];
-    static mut extent_list: [Extent; 0];
-    static mut wt: i16;
-    static mut encounter_number: u8;
-    static mut encounter_type: u16;
-    static mut actors_loading: i8;
-    static mut viewstatus: i8;
-    static mut region_num: u16;
-    static mut anix: i16;
-    static mut anix2: i16;
-    static mut mdex: i16;
-
-    // the variables saved as one block (see `save_variables`)
-    static mut map_x: u16;
-    static mut map_y: u16;
-    static mut hero_x: u16;
-    static mut hero_y: u16;
-    static mut safe_x: u16;
-    static mut safe_y: u16;
-    static mut safe_r: u16;
-    static mut img_x: u16;
-    static mut img_y: u16;
-    static mut cheat1: i16;
-    static mut riding: i16;
-    static mut flying: i16;
-    static mut wcarry: i16;
-    static mut turtleprox: i16;
-    static mut raftprox: i16;
-    static mut brave: i16;
-    static mut luck: i16;
-    static mut kind: i16;
-    static mut wealth: i16;
-    static mut hunger: i16;
-    static mut fatigue: i16;
-    static mut brother: i16;
-    static mut stuff: *mut u8;
-    static mut julstuff: [u8; 35];
-    static mut philstuff: [u8; 35];
-    static mut kevstuff: [u8; 35];
-    static blist: [Bro; 3];
-    static mut missile_list: [Missile; 6];
-    static mut princess: i16;
-    static mut hero_sector: i16;
-    static mut hero_place: u16;
-    static mut daynight: u16;
-    static mut lightlevel: u16;
-    static mut actor_file: i16;
-    static mut set_file: i16;
-    static mut active_carrier: i16;
-    static mut xtype: u16;
-    static mut leader: i16;
-    static mut secret_timer: i16;
-    static mut light_timer: i16;
-    static mut freeze_timer: i16;
-    static mut cmode: i16;
-    static mut pad1: u16;
-    static mut pad2: u16;
-    static mut pad3: u16;
-
     fn Lock(name: *const c_char, mode: i32) -> BPTR;
     fn UnLock(lock: BPTR);
     fn Open(name: *const c_char, mode: i32) -> BPTR;
@@ -90,8 +32,6 @@ unsafe extern "C" {
     fn IoErr() -> i32;
     fn Delay(ticks: i32);
     fn SetFont(rp: *mut RastPort, font: *mut TextFont);
-    fn shape_read();
-    fn set_options();
 }
 
 const ACCESS_READ: i32 = -2;
@@ -117,20 +57,14 @@ const PRINT_STATS: i32 = 7;
 const MISC_VARIABLES: usize = 40;
 
 /// Set when saving, clear when loading.
-#[unsafe(no_mangle)]
 pub static mut svflag: i8 = 0;
-#[unsafe(no_mangle)]
 pub static mut svfile: i32 = 0;
-#[unsafe(no_mangle)]
 pub static mut sverr: i32 = 0;
-#[unsafe(no_mangle)]
 pub static mut savename: [u8; 12] = *b"df1:A.faery\0";
-#[unsafe(no_mangle)]
 pub static mut flock: BPTR = 0;
 
 /// Non-zero if `name` can be locked with the given access (AmigaDOS's way of asking "does this exist / is it writable").
-#[unsafe(no_mangle)]
-pub extern "C" fn locktest(name: *const c_char, access: i32) -> i32 {
+pub fn locktest(name: *const c_char, access: i32) -> i32 {
     unsafe {
         flock = Lock(name, access);
         if flock != 0 {
@@ -141,8 +75,7 @@ pub extern "C" fn locktest(name: *const c_char, access: i32) -> i32 {
 }
 
 /// Waits (about 30 seconds) for a disk to be inserted. Returns 1 if one was, 0 if not.
-#[unsafe(no_mangle)]
-pub extern "C" fn waitnewdisk() -> i32 {
+pub fn waitnewdisk() -> i32 {
     for _ in 0..DISK_POLL_COUNT {
         if take_new_disk() {
             return 1;
@@ -168,7 +101,9 @@ unsafe fn find_target() -> Target {
         } else if locktest(c"df1:".as_ptr(), ACCESS_WRITE) != 0 {
             savename[DRIVE_DIGIT_INDEX] = b'1';
             Target::Floppy
-        } else if locktest(c"df0:".as_ptr(), ACCESS_WRITE) != 0 && locktest(c"df0:winpic".as_ptr(), ACCESS_READ) == 0 {
+        } else if locktest(c"df0:".as_ptr(), ACCESS_WRITE) != 0
+            && locktest(c"df0:winpic".as_ptr(), ACCESS_READ) == 0
+        {
             savename[DRIVE_DIGIT_INDEX] = b'0';
             Target::Floppy
         } else {
@@ -217,8 +152,7 @@ unsafe fn save_all() {
 /// Steps: find a place to save (asking for a disk on a real Amiga), open the file, run `save_all`,
 /// close it. When loading, afterwards the sprites are reloaded for the loaded game and the
 /// status lines are redrawn.
-#[unsafe(no_mangle)]
-pub extern "C" fn savegame(hit: i16) {
+pub fn savegame(hit: i16) {
     unsafe {
         sverr = 0;
         SetFont(rp, tfont);
@@ -243,7 +177,14 @@ pub extern "C" fn savegame(hit: i16) {
         };
         savename[SLOT_LETTER_INDEX] = b'A'.wrapping_add(hit as u8);
         let name = (&raw const savename).cast::<c_char>().add(name_offset);
-        svfile = Open(name, if svflag != 0 { MODE_NEWFILE } else { MODE_OLDFILE }) as i32;
+        svfile = Open(
+            name,
+            if svflag != 0 {
+                MODE_NEWFILE
+            } else {
+                MODE_OLDFILE
+            },
+        ) as i32;
         if svfile != 0 {
             save_all();
             Close(svfile as BPTR);
@@ -251,7 +192,11 @@ pub extern "C" fn savegame(hit: i16) {
             sverr = IoErr();
         }
         if sverr != 0 {
-            print(if svflag != 0 { c"ERROR: Couldn't save game.".as_ptr() } else { c"ERROR: Couldn't load game.".as_ptr() });
+            print(if svflag != 0 {
+                c"ERROR: Couldn't save game.".as_ptr()
+            } else {
+                c"ERROR: Couldn't load game.".as_ptr()
+            });
         }
         if on_floppy {
             loop {
@@ -283,8 +228,7 @@ pub extern "C" fn savegame(hit: i16) {
 }
 
 /// Writes or reads `length` bytes of the save file, remembering an error.
-#[unsafe(no_mangle)]
-pub extern "C" fn saveload(buffer: *mut c_void, length: i32) {
+pub fn saveload(buffer: *mut c_void, length: i32) {
     unsafe {
         let result = if svflag != 0 {
             Write(svfile as BPTR, buffer, length)
@@ -299,14 +243,12 @@ pub extern "C" fn saveload(buffer: *mut c_void, length: i32) {
 }
 
 /// Saves or loads one byte.
-#[unsafe(no_mangle)]
-pub extern "C" fn sl_u8(v: *mut u8) {
+pub fn sl_u8(v: *mut u8) {
     saveload(v.cast(), 1);
 }
 
 /// Saves or loads a 16-bit number, always stored big-endian (as the Amiga's 68000 kept it).
-#[unsafe(no_mangle)]
-pub extern "C" fn sl_u16(v: *mut u16) {
+pub fn sl_u16(v: *mut u16) {
     unsafe {
         let mut bytes = [0u8; 2];
         if svflag != 0 {
@@ -371,8 +313,7 @@ fn save_variables() {
 }
 
 /// Saves or loads one actor.
-#[unsafe(no_mangle)]
-pub extern "C" fn sl_shape(a: *mut Shape) {
+pub fn sl_shape(a: *mut Shape) {
     unsafe {
         let a = &mut *a;
         sl_u16(&mut a.abs_x);
@@ -381,7 +322,16 @@ pub extern "C" fn sl_shape(a: *mut Shape) {
         sl_u16(&mut a.rel_y);
         sl_u8((&mut a.kind as *mut i8).cast());
         sl_u8(&mut a.race);
-        for byte in [&mut a.index, &mut a.visible, &mut a.weapon, &mut a.environ, &mut a.goal, &mut a.tactic, &mut a.state, &mut a.facing] {
+        for byte in [
+            &mut a.index,
+            &mut a.visible,
+            &mut a.weapon,
+            &mut a.environ,
+            &mut a.goal,
+            &mut a.tactic,
+            &mut a.state,
+            &mut a.facing,
+        ] {
             sl_u8((byte as *mut i8).cast());
         }
         sl_u16((&mut a.vitality as *mut i16).cast());
@@ -391,8 +341,7 @@ pub extern "C" fn sl_shape(a: *mut Shape) {
 }
 
 /// Saves or loads one extent (a special rectangle of the world).
-#[unsafe(no_mangle)]
-pub extern "C" fn sl_extent(e: *mut Extent) {
+pub fn sl_extent(e: *mut Extent) {
     unsafe {
         let e = &mut *e;
         sl_u16(&mut e.x1);
@@ -407,8 +356,7 @@ pub extern "C" fn sl_extent(e: *mut Extent) {
 }
 
 /// Saves or loads one object (an item or person in the world).
-#[unsafe(no_mangle)]
-pub extern "C" fn sl_object(o: *mut WorldObject) {
+pub fn sl_object(o: *mut WorldObject) {
     unsafe {
         let o = &mut *o;
         sl_u16(&mut o.xc);
@@ -419,13 +367,18 @@ pub extern "C" fn sl_object(o: *mut WorldObject) {
 }
 
 /// Saves or loads one missile (arrow, rock, fireball). Called from `mod1save` in csrc/fmain.c.
-#[unsafe(no_mangle)]
-pub extern "C" fn sl_missile(m: *mut Missile) {
+pub fn sl_missile(m: *mut Missile) {
     unsafe {
         let m = &mut *m;
         sl_u16(&mut m.abs_x);
         sl_u16(&mut m.abs_y);
-        for byte in [&mut m.missile_type, &mut m.time_of_flight, &mut m.speed, &mut m.direction, &mut m.archer] {
+        for byte in [
+            &mut m.missile_type,
+            &mut m.time_of_flight,
+            &mut m.speed,
+            &mut m.direction,
+            &mut m.archer,
+        ] {
             sl_u8((byte as *mut i8).cast());
         }
     }
@@ -436,8 +389,7 @@ const STUFF_SIZE: i32 = 35;
 
 /// Saves or loads the three brothers' item lists and the 6 missiles (the count `mdex` is saved
 /// elsewhere). After loading, `stuff` points at the current brother's list.
-#[unsafe(no_mangle)]
-pub extern "C" fn mod1save() {
+pub fn mod1save() {
     unsafe {
         saveload((&raw mut julstuff).cast(), STUFF_SIZE);
         saveload((&raw mut philstuff).cast(), STUFF_SIZE);

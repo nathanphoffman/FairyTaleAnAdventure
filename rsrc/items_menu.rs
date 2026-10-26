@@ -9,34 +9,14 @@ use super::objects::change_object;
 use super::random::{rand4, rand8};
 use super::screen_fx::{map_message, stillscreen, win_colors};
 use super::tables::{itrans, ob_listg, pagecolors, treasure_probs};
-use super::types::{FPage, InvItem, SeqInfo, Shape};
+use super::types::{InvItem, SeqInfo};
 use crate::amiga::{BitMap, RastPort, TextFont, ViewPort};
 use std::ffi::c_char;
+use super::menus::{gomenu};
+use super::game_tables::{encounter_chart, inv_list, region_num};
+use super::globals::{afont, anim_list, anix2, fp_drawing, freeze_timer, hunger, julstuff, nearest, pagea, philstuff, quitflag, rp, rp_map, seq_list, stuff, viewstatus, vp_page, wealth};
 
 unsafe extern "C" {
-    static mut anim_list: [Shape; 20];
-    static mut stuff: *mut u8;
-    static julstuff: [u8; 35];
-    static philstuff: [u8; 35];
-    static inv_list: [InvItem; 0];
-    static encounter_chart: [Encounter; 0];
-    static mut seq_list: [SeqInfo; 0];
-    static mut pagea: BitMap;
-    static mut rp_map: RastPort;
-    static mut vp_page: ViewPort;
-    static mut rp: *mut RastPort;
-    static afont: *mut TextFont;
-    static fp_drawing: *mut FPage;
-    static mut nearest: i16;
-    static anix2: i16;
-    static region_num: u16;
-    static freeze_timer: i16;
-    static mut wealth: i16;
-    static hunger: i16;
-    static mut viewstatus: i8;
-    static mut quitflag: i8;
-
-    fn gomenu(mode: i16);
     fn SetRast(rp: *mut RastPort, pen: u32);
     fn InitBitMap(bm: *mut BitMap, depth: i32, width: i32, height: i32);
     fn SetRGB4(vp: *mut ViewPort, n: i32, r: u32, g: u32, b: u32);
@@ -166,7 +146,12 @@ unsafe fn show_item_list() {
         rp_map.BitMap = bm;
         SetRast(&raw mut rp_map, 0);
 
-        InitBitMap(&raw mut pagea, ITEM_IMAGE_PLANES, ITEM_IMAGE_WIDTH, ITEM_IMAGE_ROWS);
+        InitBitMap(
+            &raw mut pagea,
+            ITEM_IMAGE_PLANES,
+            ITEM_IMAGE_WIDTH,
+            ITEM_IMAGE_ROWS,
+        );
         let data = (*(&raw mut seq_list).cast::<SeqInfo>().add(OBJECTS as usize)).location;
         for plane in 0..ITEM_IMAGE_PLANES as usize {
             pagea.Planes[plane] = data.add(plane * ITEM_IMAGE_BYTES);
@@ -179,14 +164,30 @@ unsafe fn show_item_list() {
             let mut y = it.yoff as u16;
             let source_row = it.image_number as i32 * ITEM_ROW_HEIGHT + it.img_off as i32;
             for _ in 0..shown {
-                BltBitMap(&raw mut pagea, 0, source_row, bm, x, y as i32, ITEM_IMAGE_WIDTH, it.img_height as i32, BLIT_COPY, ALL_PLANES, std::ptr::null_mut());
+                BltBitMap(
+                    &raw mut pagea,
+                    0,
+                    source_row,
+                    bm,
+                    x,
+                    y as i32,
+                    ITEM_IMAGE_WIDTH,
+                    it.img_height as i32,
+                    BLIT_COPY,
+                    ALL_PLANES,
+                    std::ptr::null_mut(),
+                );
                 y = y.wrapping_add(it.ydelta as u16);
             }
         }
 
         SetRGB4(&raw mut vp_page, BACKGROUND_PEN as i32, 0, 0, 0);
         stillscreen();
-        LoadRGB4(&raw mut vp_page, (&raw const pagecolors).cast(), COLOURS_SHOWN);
+        LoadRGB4(
+            &raw mut vp_page,
+            (&raw const pagecolors).cast(),
+            COLOURS_SHOWN,
+        );
         viewstatus = VIEW_ITEMS;
         prq(PRQ_LIST);
     }
@@ -247,7 +248,11 @@ unsafe fn take_object() -> bool {
             }
             SCRAP_OF_PAPER => {
                 event(EVENT_PAPER);
-                event(if region_num > FIRST_INDOOR_REGION { EVENT_PAPER_INDOORS } else { EVENT_PAPER_OUTDOORS });
+                event(if region_num > FIRST_INDOOR_REGION {
+                    EVENT_PAPER_INDOORS
+                } else {
+                    EVENT_PAPER_OUTDOORS
+                });
                 true
             }
             FRUIT => {
@@ -265,7 +270,11 @@ unsafe fn take_object() -> bool {
                 ob_listg[BONES.0].ob_stat = 0;
                 ob_listg[BONES.1].ob_stat = 0;
                 for slot in 0..GOLDBASE {
-                    let other = if owner == 1 { julstuff[slot] } else { philstuff[slot] };
+                    let other = if owner == 1 {
+                        julstuff[slot]
+                    } else {
+                        philstuff[slot]
+                    };
                     add_stuff(slot, other);
                 }
                 true
@@ -421,8 +430,12 @@ unsafe fn search_body() {
         (*an).weapon = -1;
         let mut found = 0;
         if (*an).race & SETFIG_RACE_BIT == 0 {
-            let class = (*(&raw const encounter_chart).cast::<Encounter>().add((*an).race as usize)).treasure;
-            found = treasure_probs[(class as i32 * TREASURE_CLASS_SIZE + rand8()) as usize] as i32 as u32;
+            let class = (*(&raw const encounter_chart)
+                .cast::<Encounter>()
+                .add((*an).race as usize))
+            .treasure;
+            found = treasure_probs[(class as i32 * TREASURE_CLASS_SIZE + rand8()) as usize] as i32
+                as u32;
         }
         if found != 0 {
             if weapon != 0 {
@@ -455,6 +468,10 @@ unsafe fn look_around() {
                 change_object(i, 1);
             }
         }
-        event(if found { EVENT_FOUND_HIDDEN } else { EVENT_NOTHING_HIDDEN });
+        event(if found {
+            EVENT_FOUND_HIDDEN
+        } else {
+            EVENT_NOTHING_HIDDEN
+        });
     }
 }

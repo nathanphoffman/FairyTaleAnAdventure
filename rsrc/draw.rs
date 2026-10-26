@@ -8,43 +8,13 @@ use super::asm_blit::{SShape, clear_blit, mask_blit, maskit, save_blit, shape_bl
 use super::asm_map::{row_draw, strip_draw};
 use super::random::{rand2, rand4};
 use super::tables::{bow_x, bow_y, minimap};
-use super::types::{FPage, SeqInfo, Shape, StateEntry};
+use super::types::{SeqInfo, Shape, StateEntry};
 use super::witch::witch_fx;
+use super::witch::{SIDE_1 as s1, SIDE_2 as s2};
+use super::game_tables::{statelist};
+use super::globals::{actor_file, anim_index, anim_list, anix2, aoff, bmask_mem, bmod, boff, fiery_death, fp_drawing, hero_sector, hero_x, hero_y, map_x, map_y, mask_buffer, planes, planesize, riding, seq_list, shapedata, shift, shp, terra_mem, wdir, witchflag, witchindex, wmask, xtype};
 
 unsafe extern "C" {
-    static mut anim_list: [Shape; 20];
-    static anim_index: [u8; 20];
-    static anix2: i16;
-    static mut fp_drawing: *mut FPage;
-    static mut seq_list: [SeqInfo; 7];
-    static statelist: [StateEntry; 0];
-    static planes: *mut *mut u8;
-    static bmask_mem: *mut u8;
-    static terra_mem: *const u8;
-    static mut shp: *mut SShape;
-    static mut shapedata: *mut u8;
-    static mut mask_buffer: *mut u8;
-    static mut shift: i16;
-    static mut aoff: i16;
-    static mut boff: i16;
-    static mut bmod: i16;
-    static mut planesize: i16;
-    static mut wmask: i16;
-    static map_x: u16;
-    static map_y: u16;
-    static xtype: u16;
-    static riding: i16;
-    static actor_file: i16;
-    static fiery_death: i8;
-    static hero_x: u16;
-    static hero_y: u16;
-    static hero_sector: i16;
-    static witchflag: i8;
-    static mut wdir: i8;
-    static mut witchindex: u8;
-    static s1: i16;
-    static s2: i16;
-
     fn OwnBlitter();
     fn DisownBlitter();
     fn WaitBlit();
@@ -74,8 +44,7 @@ const WITCH_SLOT: usize = 2;
 
 /// Finishes the scrolled map edge (`dif_x`, `dif_y` = scroll step) and runs the witch's beam and her
 /// damage.
-#[unsafe(no_mangle)]
-pub extern "C" fn repair_map_and_witch(dif_x: i16, dif_y: i16) {
+pub fn repair_map_and_witch(dif_x: i16, dif_y: i16) {
     unsafe {
         if dif_x == 1 {
             strip_draw(STRIP_RIGHT);
@@ -128,7 +97,7 @@ const TILE_FULL_MASK: i16 = 64 * 4;
 const FALL_TILE_LIMIT: i16 = 220 * 4;
 /// The bridge sector, where actors other than the raft walk in front of the bridge.
 const BRIDGE_SECTOR: i16 = 48;
-const RAFT_SLOT: i64 = 1;
+const RAFT_SLOT: i32 = 1;
 /// Races that are never hidden behind scenery.
 const RACE_NO_MASK_A: u8 = 0x85;
 const RACE_NO_MASK_B: u8 = 0x87;
@@ -168,7 +137,11 @@ enum Drawn {
 
 unsafe fn state_entry(inum: i16) -> &'static StateEntry {
     // Not range checked, like the C table lookup.
-    unsafe { &*(&raw const statelist).cast::<StateEntry>().offset(inum as isize) }
+    unsafe {
+        &*(&raw const statelist)
+            .cast::<StateEntry>()
+            .offset(inum as isize)
+    }
 }
 
 fn byte_of(table: &[i8; 32], inum: i16) -> i16 {
@@ -177,15 +150,17 @@ fn byte_of(table: &[i8; 32], inum: i16) -> i16 {
 
 /// Draws every actor, and its weapon, into the page being drawn, and saves the background under each
 /// (`backsave`) so it can be undone next frame. `cycle` is the frame counter.
-#[unsafe(no_mangle)]
-pub extern "C" fn draw_sprites(cycle: i16) {
+pub fn draw_sprites(cycle: i16) {
     unsafe {
         let page = fp_drawing;
         (*page).obcount = 0;
         (*page).saveused = 0;
-        let mut frame = Frame { crack: 0, backalloc: (*page).backsave };
+        let mut frame = Frame {
+            crack: 0,
+            backalloc: (*page).backsave,
+        };
         for j in 0..anix2 {
-            let i = anim_index[j as usize] as i64;
+            let i = anim_index[j as usize] as i32;
             let an = &raw mut anim_list[i as usize];
             (*an).visible = 0;
             let mut pass: u8 = 0;
@@ -211,7 +186,11 @@ unsafe fn weapon_passmode(an: *const Shape, pass: &mut u8) -> bool {
         if (*an).weapon > 0 && (*an).weapon < 8 && (state < DEAD || state >= SHOOT1 || xtype > 80) {
             let facing = (*an).facing as i32;
             let flipped = *pass ^ 1;
-            let mut pick = if ((facing - 2) & 4) != 0 { flipped } else { *pass };
+            let mut pick = if ((facing - 2) & 4) != 0 {
+                flipped
+            } else {
+                *pass
+            };
             if (*an).weapon == WEAPON_BOW && state < SHOOT1 {
                 pick = if (facing & 4) == 0 { flipped } else { *pass };
             }
@@ -223,7 +202,7 @@ unsafe fn weapon_passmode(an: *const Shape, pass: &mut u8) -> bool {
 }
 
 /// Draws one actor (or its weapon) for the current pass.
-unsafe fn draw_one(frame: &mut Frame, an: *mut Shape, i: i64, cycle: i16, passmode: bool) -> Drawn {
+unsafe fn draw_one(frame: &mut Frame, an: *mut Shape, i: i32, cycle: i16, passmode: bool) -> Drawn {
     unsafe {
         let page = fp_drawing;
         let mut inum = (*an).index as i16;
@@ -315,13 +294,21 @@ unsafe fn draw_one(frame: &mut Frame, an: *mut Shape, i: i64, cycle: i16, passmo
         ystart += (map_y & 31) as i16;
         ground += (map_y & 31) as i16;
 
-        let seq = &*(&raw const seq_list).cast::<SeqInfo>().offset(atype as isize);
+        let seq = &*(&raw const seq_list)
+            .cast::<SeqInfo>()
+            .offset(atype as isize);
         let xsize = (seq.width << 4) as i8;
         let mut ysize = seq.height as i8;
 
         if atype == OBJECTS {
             let n = inum;
-            if n == 0x1b || (8..=12).contains(&n) || n == 25 || n == 26 || (n > 0x10 && n < 0x18) || (n & 128) != 0 {
+            if n == 0x1b
+                || (8..=12).contains(&n)
+                || n == 25
+                || n == 26
+                || (n > 0x10 && n < 0x18)
+                || (n & 128) != 0
+            {
                 ysize = 8;
             }
         }
@@ -342,7 +329,7 @@ unsafe fn draw_one(frame: &mut Frame, an: *mut Shape, i: i64, cycle: i16, passmo
                 ystart += 27;
                 ystop = ystart + 7;
                 atype = OBJECTS;
-                inum = OBJ_SUNK + ((cycle as i64 + i) & 1) as i16;
+                inum = OBJ_SUNK + ((cycle as i32 + i) & 1) as i16;
             } else if (*an).environ > 2 {
                 ystart += (*an).environ as i16;
             }
@@ -389,12 +376,17 @@ unsafe fn draw_one(frame: &mut Frame, an: *mut Shape, i: i64, cycle: i16, passmo
             blitwide = blitwide.wrapping_add(1);
         }
 
-        shp = (*page).shape_queue.cast::<SShape>().offset((*page).obcount as isize);
+        shp = (*page)
+            .shape_queue
+            .cast::<SShape>()
+            .offset((*page).obcount as isize);
         planesize = seq.bytes;
         (*shp).savesize = (blitwide as i32 * blithigh as i32 * 2) as i16;
         (*shp).blitsize = (((blithigh as i32) << 6) + blitwide as i32) as i16;
 
-        shapedata = seq.location.offset(planesize as isize * PLANES as isize * inum as isize);
+        shapedata = seq
+            .location
+            .offset(planesize as isize * PLANES as isize * inum as isize);
         mask_buffer = seq.maskloc.offset(planesize as isize * inum as isize);
         if (*shp).savesize < SMALL_SAVE && frame.crack < SPARE_SAVES {
             (*shp).backsave = (*planes.add(frame.crack as usize)).add(SPARE_PLANE_OFFSET);
@@ -440,7 +432,7 @@ unsafe fn draw_one(frame: &mut Frame, an: *mut Shape, i: i64, cycle: i16, passmo
 
 /// True for sprites drawn in front of everything: carriers, the hero when riding the swan or in
 /// certain places, arrows and some special races.
-unsafe fn drawn_in_front(an: *const Shape, i: i64, atype: i16, inum: i16) -> bool {
+unsafe fn drawn_in_front(an: *const Shape, i: i32, atype: i16, inum: i16) -> bool {
     unsafe {
         if atype == CARRIER
             || (i == 0
@@ -459,7 +451,15 @@ unsafe fn drawn_in_front(an: *const Shape, i: i64, atype: i16, inum: i16) -> boo
 
 /// Cuts out the parts of the sprite that scenery (trees, walls, roofs) should hide, one map tile at a
 /// time, by marking them in the mask buffer.
-unsafe fn mask_against_scenery(an: *const Shape, i: i64, ground: i16, xbw: i8, ystart1: i16, ystop1: i16, blitwide: i8) {
+unsafe fn mask_against_scenery(
+    an: *const Shape,
+    i: i32,
+    ground: i16,
+    xbw: i8,
+    ystart1: i16,
+    ystop1: i16,
+    blitwide: i8,
+) {
     unsafe {
         let ym1 = (ystart1 >> 5) as u8;
         let ym2 = ((ystop1 >> 5) as u8).wrapping_sub(ym1);
@@ -514,7 +514,12 @@ unsafe fn mask_against_scenery(an: *const Shape, i: i64, ground: i16, xbw: i8, y
                     }
                     _ => {}
                 }
-                maskit(xm, ym, blitwide as i32, *terra_mem.offset(cm as isize) as i32);
+                maskit(
+                    xm,
+                    ym,
+                    blitwide as i32,
+                    *terra_mem.offset(cm as isize) as i32,
+                );
             }
         }
     }

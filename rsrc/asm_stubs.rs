@@ -8,15 +8,8 @@
 
 use std::ffi::c_void;
 
-#[unsafe(no_mangle)]
-pub extern "C" fn trapper() -> i32 {
+pub fn trapper() -> i32 {
     0
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn HandlerInterface() -> i32 {
-    0
-}
-
-#[unsafe(no_mangle)]
 pub static mut WBenchMsg: *mut c_void = std::ptr::null_mut();

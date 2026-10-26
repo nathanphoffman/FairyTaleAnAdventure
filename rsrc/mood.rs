@@ -3,19 +3,10 @@
 //! The music depends on what the hero is doing: dying, in the astral plane, fighting, indoors,
 //! or just walking by day or night. `track` holds the four voices of each tune in order.
 
-use super::types::{Menu, Shape};
+use super::game_tables::{menus, new_wave, region_num};
+use super::globals::{anim_list, battleflag, hero_x, hero_y, lightlevel, track};
 
 unsafe extern "C" {
-    static anim_list: [Shape; 20];
-    static hero_x: u16;
-    static hero_y: u16;
-    static region_num: u16;
-    static lightlevel: u16;
-    static battleflag: i8;
-    static menus: [Menu; 10];
-    static track: [*const u8; 32];
-    static mut new_wave: [i16; 0];
-
     fn playscore(t1: *const u8, t2: *const u8, t3: *const u8, t4: *const u8);
     fn setscore(t1: *const u8, t2: *const u8, t3: *const u8, t4: *const u8);
     fn stopscore();
@@ -47,18 +38,25 @@ const MUSIC_ENTRY: usize = 6;
 
 /// Picks the tune for the situation and plays it right away if `now` is set, otherwise changes
 /// to it at the end of the current one. If music is switched off, stops the music.
-#[unsafe(no_mangle)]
-pub extern "C" fn setmood(now: i8) {
+pub fn setmood(now: i8) {
     unsafe {
         let tune = if anim_list[0].vitality == 0 {
             TUNE_DEATH
-        } else if hero_x > ASTRAL_X.0 && hero_x < ASTRAL_X.1 && hero_y > ASTRAL_Y.0 && hero_y < ASTRAL_Y.1 {
+        } else if hero_x > ASTRAL_X.0
+            && hero_x < ASTRAL_X.1
+            && hero_y > ASTRAL_Y.0
+            && hero_y < ASTRAL_Y.1
+        {
             TUNE_ASTRAL
         } else if battleflag != 0 {
             TUNE_BATTLE
         } else if region_num > INDOOR_REGION {
             let wave = (&raw mut new_wave).cast::<i16>().add(WAVE_SLOT);
-            *wave = if region_num == CAVE_REGION { WAVE_CAVE } else { WAVE_INDOORS };
+            *wave = if region_num == CAVE_REGION {
+                WAVE_CAVE
+            } else {
+                WAVE_INDOORS
+            };
             TUNE_INDOORS
         } else if lightlevel > NIGHT_LIGHT {
             TUNE_DAY

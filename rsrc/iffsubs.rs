@@ -12,35 +12,27 @@ use crate::amiga::{BPTR, BitMap};
 use std::ffi::c_char;
 
 use super::iff_helpers::{ReadHeader, ReadLength, unpack_line};
+use super::globals::{shape_mem};
 
 unsafe extern "C" {
     fn Open(name: *const c_char, mode: i32) -> BPTR;
     fn Close(file: BPTR);
     fn Read(file: BPTR, buf: *mut u8, len: i32) -> i32;
     fn Seek(file: BPTR, pos: i32, mode: i32) -> i32;
-    /// Scratch memory the compressed picture body is read into (csrc/fmain.c).
-    static shape_mem: *mut i8;
 }
 
 // State shared with iff_helpers; the names are the C ones (the C code and iff_helpers use them).
 /// Bytes left in the FORM being read.
-#[unsafe(no_mangle)]
 pub static mut file_length: i32 = 0;
-#[unsafe(no_mangle)]
 pub static mut myfile: i32 = 0;
 /// The id of the chunk just read.
-#[unsafe(no_mangle)]
 pub static mut header: i32 = 0;
-#[unsafe(no_mangle)]
 pub static mut blocklength: i32 = 0;
 /// Bytes in one unpacked scan line.
-#[unsafe(no_mangle)]
 pub static mut bytecount: i32 = 0;
 /// Read position in the compressed body.
-#[unsafe(no_mangle)]
 pub static mut packdata: *const i8 = std::ptr::null();
 /// Compression type of the body: 0 = none, 1 = ByteRun1.
-#[unsafe(no_mangle)]
 pub static mut compress: i8 = 0;
 
 /// AmigaDOS open mode for an existing file.
@@ -61,7 +53,12 @@ const FORM: i32 = chunk_id(b"FORM");
 const ILBM: i32 = chunk_id(b"ILBM");
 const BMHD: i32 = chunk_id(b"BMHD");
 const BODY: i32 = chunk_id(b"BODY");
-const SKIPPED_CHUNKS: [i32; 4] = [chunk_id(b"CAMG"), chunk_id(b"CRNG"), chunk_id(b"CMAP"), chunk_id(b"GRAB")];
+const SKIPPED_CHUNKS: [i32; 4] = [
+    chunk_id(b"CAMG"),
+    chunk_id(b"CRNG"),
+    chunk_id(b"CMAP"),
+    chunk_id(b"GRAB"),
+];
 
 /// The ILBM bitmap header chunk; the file is big-endian. Only `width`, `height` and
 /// `compression` matter. (The C struct is 22 bytes although the IFF standard says 20; the
@@ -102,7 +99,7 @@ unsafe fn read_bitmap_header() -> BitMapHeader {
 /// unpacked once per bitplane (up to 5, fewer if the bitmap is shallower).
 unsafe fn read_body(bmhd: &BitMapHeader, bitmap: &BitMap, offset: usize) {
     unsafe {
-        packdata = shape_mem;
+        packdata = shape_mem.cast();
         bytecount = ((bmhd.width as i32 + 15) / 8) & 0xfffe;
         ReadLength();
         Read(myfile as BPTR, shape_mem.cast(), blocklength);
@@ -122,8 +119,7 @@ unsafe fn read_body(bmhd: &BitMapHeader, bitmap: &BitMap, offset: usize) {
 
 /// Loads the picture `filename` into `bitmap` at byte column `x`, row `y`. Returns TRUE/FALSE.
 /// Used for the title pages, the story pictures, the text panel background and the winning picture.
-#[unsafe(no_mangle)]
-pub extern "C" fn unpackbrush(filename: *const c_char, bitmap: *mut BitMap, x: i16, y: i16) -> i32 {
+pub fn unpackbrush(filename: *const c_char, bitmap: *mut BitMap, x: i16, y: i16) -> i32 {
     unsafe {
         let bitmap = &*bitmap;
         let offset = (x as i32 + bitmap.BytesPerRow as i32 * y as i32) as usize;

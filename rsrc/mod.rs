@@ -53,6 +53,8 @@ pub mod draw;
 // Opening and closing everything, the title and intro, and the main loop.
 pub mod startup;
 // The game's constant tables: people, monsters, doors, items, menus.
+// The tables keep the C layout (one entry per line), so rustfmt leaves them alone.
+#[rustfmt::skip]
 pub mod game_tables;
 // The game's variables.
 pub mod globals;
@@ -85,6 +87,7 @@ pub mod savegame;
 // Colour fades, the compass, the print queue, the win sequence.
 pub mod screen_fx;
 // Constant tables and per-region object lists.
+#[rustfmt::skip]
 pub mod tables;
 // Rust mirrors of the game's C structs.
 pub mod types;

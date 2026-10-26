@@ -11,6 +11,7 @@
 
 use crate::amiga::BPTR;
 use std::ffi::{c_char, c_void};
+use super::globals::{openflags};
 
 /// Mirror of `struct IOExtTD` in csrc/amiga.h: an Amiga trackdisk I/O request (a standard I/O
 /// request plus two trackdisk fields). Only the trackdisk path uses it.
@@ -47,7 +48,6 @@ const ZERO_REQUEST: IoExtTd = IoExtTd {
 };
 
 unsafe extern "C" {
-    static mut openflags: u16;
     fn Lock(name: *const c_char, mode: i32) -> BPTR;
     fn UnLock(lock: BPTR);
     fn Open(name: *const c_char, mode: i32) -> BPTR;
@@ -95,13 +95,9 @@ const ERR_NO_DEVICE: i32 = 32;
 static mut FROM_FILE: bool = false;
 static mut IMAGE: BPTR = 0;
 
-#[unsafe(no_mangle)]
 pub static mut diskport: *mut c_void = std::ptr::null_mut();
-#[unsafe(no_mangle)]
 pub static mut diskreq1: *mut IoExtTd = std::ptr::null_mut();
-#[unsafe(no_mangle)]
 pub static mut diskreqs: [IoExtTd; 10] = [ZERO_REQUEST; 10];
-#[unsafe(no_mangle)]
 pub static mut lastreq: *mut IoExtTd = std::ptr::null_mut();
 
 /// True when blocks come from the `image` file instead of trackdisk.
@@ -126,8 +122,7 @@ fn has_flag(flag: u16) -> bool {
 
 /// Opens the `image` file, or else sets up the trackdisk device. Returns 0 or an error code
 /// (30 no file or port, 31 no request, 32 no device).
-#[unsafe(no_mangle)]
-pub extern "C" fn AllocDiskIO() -> i32 {
+pub fn AllocDiskIO() -> i32 {
     unsafe {
         let lock = Lock(IMAGE_FILE.as_ptr().cast(), ACCESS_READ);
         if lock != 0 {
@@ -158,8 +153,7 @@ pub extern "C" fn AllocDiskIO() -> i32 {
 }
 
 /// Closes the image file or the trackdisk device, whichever was opened.
-#[unsafe(no_mangle)]
-pub extern "C" fn FreeDiskIO() {
+pub fn FreeDiskIO() {
     unsafe {
         if IMAGE != 0 {
             Close(IMAGE);
@@ -177,24 +171,21 @@ pub extern "C" fn FreeDiskIO() {
 }
 
 /// Waits for read request `num` to finish. Nothing to wait for when reading from the file.
-#[unsafe(no_mangle)]
-pub extern "C" fn WaitDiskIO(num: i32) {
+pub fn WaitDiskIO(num: i32) {
     if !from_file() {
         unsafe { WaitIO(request(num as usize).cast()) };
     }
 }
 
 /// Marks read request `num` as unused.
-#[unsafe(no_mangle)]
-pub extern "C" fn InvalidDiskIO(num: i32) {
+pub fn InvalidDiskIO(num: i32) {
     if !from_file() {
         unsafe { (*request(num as usize)).command = CMD_INVALID };
     }
 }
 
 /// Whether request `num` has finished (always true for the file).
-#[unsafe(no_mangle)]
-pub extern "C" fn CheckDiskIO(num: i32) -> i32 {
+pub fn CheckDiskIO(num: i32) -> i32 {
     if from_file() {
         return 1;
     }
@@ -202,30 +193,26 @@ pub extern "C" fn CheckDiskIO(num: i32) -> i32 {
 }
 
 /// Whether request `num` is a read in progress (never, for the file).
-#[unsafe(no_mangle)]
-pub extern "C" fn IsReadDiskIO(num: i32) -> i32 {
+pub fn IsReadDiskIO(num: i32) -> i32 {
     (!from_file() && unsafe { (*request(num as usize)).command } == CMD_READ) as i32
 }
 
 /// Waits for the most recently started read.
-#[unsafe(no_mangle)]
-pub extern "C" fn WaitLastDiskIO() {
+pub fn WaitLastDiskIO() {
     if !from_file() {
         unsafe { WaitIO(lastreq.cast()) };
     }
 }
 
 /// Marks the most recently started read as unused.
-#[unsafe(no_mangle)]
-pub extern "C" fn InvalidLastDiskIO() {
+pub fn InvalidLastDiskIO() {
     if !from_file() {
         unsafe { (*lastreq).command = CMD_INVALID };
     }
 }
 
 /// Whether the most recently started read has finished (always true for the file).
-#[unsafe(no_mangle)]
-pub extern "C" fn CheckLastDiskIO() -> i32 {
+pub fn CheckLastDiskIO() -> i32 {
     if from_file() {
         return 1;
     }
@@ -233,8 +220,7 @@ pub extern "C" fn CheckLastDiskIO() -> i32 {
 }
 
 /// Whether the most recent request is a read in progress (never, for the file).
-#[unsafe(no_mangle)]
-pub extern "C" fn IsReadLastDiskIO() -> i32 {
+pub fn IsReadLastDiskIO() -> i32 {
     (!from_file() && unsafe { (*lastreq).command } == CMD_READ) as i32
 }
 
@@ -244,8 +230,7 @@ pub extern "C" fn IsReadLastDiskIO() -> i32 {
 /// The file offset is `block * 512`. The game uses a different request number `dr` for each
 /// kind of data (0 sector data, 1-2 terrain, 3-7 landscape images, 8 sprites) so several reads
 /// could be in flight at once on a real disk.
-#[unsafe(no_mangle)]
-pub extern "C" fn load_track_range(f_block: i16, b_count: i16, buffer: *mut c_void, dr: i16) {
+pub fn load_track_range(f_block: i16, b_count: i16, buffer: *mut c_void, dr: i16) {
     unsafe {
         if from_file() {
             Seek(IMAGE, f_block as i32 * BLOCK_SIZE, OFFSET_BEGINNING);
@@ -266,8 +251,7 @@ pub extern "C" fn load_track_range(f_block: i16, b_count: i16, buffer: *mut c_vo
 }
 
 /// Turns the floppy drive motor off after loading (trackdisk only; nothing to do for the file).
-#[unsafe(no_mangle)]
-pub extern "C" fn motor_off() {
+pub fn motor_off() {
     if from_file() {
         return;
     }
@@ -278,12 +262,6 @@ pub extern "C" fn motor_off() {
         (*req).command = TD_MOTOR;
         DoIO(req.cast());
     }
-}
-
-/// True if the game is reading from the `image` file (the original called this "hard drive" mode).
-#[unsafe(no_mangle)]
-pub extern "C" fn IsHardDrive() -> i16 {
-    from_file() as i16
 }
 
 #[cfg(test)]

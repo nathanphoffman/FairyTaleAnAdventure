@@ -19,35 +19,9 @@ use super::places::{find_place, xfer};
 use super::random::{rand2, rand4, rand256};
 use super::tables::{bowshotx, bowshoty, fallstates, gunshoty};
 use super::types::{Missile, Shape};
+use super::game_tables::{diroffs, region_num, setfig_table, trans_list};
+use super::globals::{actor_file, anim_list, brother, fiery_death, freeze_timer, frustflag, hero_sector, hero_x, hero_y, luck, map_x, map_y, mdex, missile_list, new_region, raftprox, riding, safe_flag, stuff, wcarry, witchflag, xtype};
 
-unsafe extern "C" {
-    static mut anim_list: [Shape; 20];
-    static mut missile_list: [Missile; 6];
-    static mut mdex: i16;
-    static stuff: *mut u8;
-    static mut riding: i16;
-    static raftprox: i16;
-    static wcarry: i16;
-    static actor_file: i16;
-    static freeze_timer: i16;
-    static xtype: u16;
-    static region_num: u16;
-    static mut new_region: u16;
-    static mut hero_x: u16;
-    static mut hero_y: u16;
-    static map_x: u16;
-    static map_y: u16;
-    static mut safe_flag: i8;
-    static mut witchflag: i8;
-    static mut frustflag: i8;
-    static fiery_death: i8;
-    static mut luck: i16;
-    static brother: i16;
-    static hero_sector: i16;
-    static diroffs: [i8; 16];
-    static trans_list: [[i8; 4]; 9];
-    static setfig_table: [SetFigEntry; 0];
-}
 
 // Actor kinds and states (csrc/ftale.h).
 const OBJECTS: i8 = 1;
@@ -141,8 +115,8 @@ const DRAGON_BREATH_FACING: i8 = 5;
 /// Hitting the pit: the luck it costs.
 const PIT_LUCK_COST: i16 = 2;
 /// Burning in lava, and running out of breath: dtype for `checkdead`.
-const DEATH_LAVA: i64 = 27;
-const DEATH_DROWN: i64 = 6;
+const DEATH_LAVA: i32 = 27;
+const DEATH_DROWN: i32 = 6;
 
 /// Where the next stretch of code continues; one value per `goto` label of the C.
 #[derive(Clone, Copy)]
@@ -169,7 +143,7 @@ static mut YTEST: u16 = 0;
 struct Ctx {
     an: *mut Shape,
     ms: *mut Missile,
-    i: i64,
+    i: i32,
     cycle: i16,
     /// The actor's environ (terrain state).
     k: i8,
@@ -206,9 +180,7 @@ fn terrain(x: u16, y: u16) -> i16 {
 /// Moves and animates actor `i`; `cycle` is the frame counter. `*jp` is the main loop's `j`, which
 /// carries the last terrain value from one actor to the next (a dead actor reads it without setting
 /// it), so it is passed in and written back.
-#[unsafe(no_mangle)]
-pub extern "C" fn move_actor(i: i32, cycle: i16, jp: *mut i16) {
-    let i = i as i64;
+pub fn move_actor(i: i32, cycle: i16, jp: *mut i16) {
     unsafe {
         let an = &raw mut anim_list[i as usize];
         let mut c = Ctx {
@@ -306,7 +278,7 @@ impl Ctx {
                 (*self.ms).speed = MISSILE_SPEED_FIREBALL;
                 mdex = mdex.wrapping_add(1);
                 self.dex = (rand2() + 1) as i16;
-                effect(5, 1800 + rand256() as i64);
+                effect(5, 1800 + rand256());
                 (*an).facing = DRAGON_BREATH_FACING;
                 (*self.ms).missile_type = MISSILE_ROCK_TYPE;
                 return Pc::DragShoot;
@@ -324,7 +296,10 @@ impl Ctx {
             self.j = 0;
             let hero = &raw const anim_list[0];
             if actor_file == SWAN_FILE {
-                if raftprox != 0 && wcarry == CARRIER_SLOT as i16 && *stuff.add(STUFF_SWAN_ITEM) != 0 {
+                if raftprox != 0
+                    && wcarry == CARRIER_SLOT as i16
+                    && *stuff.add(STUFF_SWAN_ITEM) != 0
+                {
                     self.d = (*hero).facing as i16;
                     (*an).abs_x = (*hero).abs_x;
                     XTEST = (*hero).abs_x;
@@ -395,7 +370,9 @@ impl Ctx {
         unsafe {
             let an = self.an;
             self.j = ((*an).race & 0x7f) as i16;
-            let entry = &*(&raw const setfig_table).cast::<SetFigEntry>().add(self.j as usize);
+            let entry = &*(&raw const setfig_table)
+                .cast::<SetFigEntry>()
+                .add(self.j as usize);
             self.dex = entry.image_base as i16;
             let witch = self.j == SETFIG_WITCH;
             if self.s == DYING {
@@ -501,7 +478,11 @@ impl Ctx {
                     return Pc::NewLoc;
                 }
             }
-            if self.j != 0 { Pc::CheckDev1 } else { Pc::NewLoc }
+            if self.j != 0 {
+                Pc::CheckDev1
+            } else {
+                Pc::NewLoc
+            }
         }
     }
 
@@ -544,7 +525,7 @@ impl Ctx {
             self.inum = diroff(self.d);
             self.dex = self.inum;
             if !(riding != 0 && self.i == 0) && (*an).race != RACE_WRAITH {
-                self.dex = (self.dex as i64 + ((self.cycle as i64 + self.i) & 7)) as i16;
+                self.dex = (self.dex as i32 + ((self.cycle as i32 + self.i) & 7)) as i16;
             }
             if self.k == ENVIRON_ICE {
                 return Pc::Cpx;
@@ -630,7 +611,7 @@ impl Ctx {
                 }
                 (*ms).speed = MISSILE_SPEED_ARROW;
                 mdex = mdex.wrapping_add(1);
-                effect(4, 400 + rand256() as i64);
+                effect(4, 400 + rand256());
             } else if self.s == SHOOT1 {
                 self.dex = diroff(d8) + if (*an).kind == ENEMY { 11 } else { 10 };
                 if (*an).weapon == WEAPON_FIREBALL {
@@ -638,7 +619,7 @@ impl Ctx {
                     mdex = mdex.wrapping_add(1);
                     (*an).state = SHOOT3 as i8;
                     self.dex = diroff(d8);
-                    effect(5, 1800 + rand256() as i64);
+                    effect(5, 1800 + rand256());
                 } else if self.i == 0 && *stuff.add(STUFF_ARROWS) == 0 {
                     print(c"No Arrows!".as_ptr());
                     return Pc::Cpx;
@@ -804,7 +785,11 @@ impl Ctx {
     unsafe fn wade(&mut self, j: i16) {
         unsafe {
             let an = self.an;
-            let limit: i8 = if j == TERRAIN_SLOW_SINK { 10 } else { ENVIRON_DROWNED };
+            let limit: i8 = if j == TERRAIN_SLOW_SINK {
+                10
+            } else {
+                ENVIRON_DROWNED
+            };
             if self.k > limit {
                 self.k -= 1;
             } else if self.k < limit {

@@ -5,30 +5,14 @@
 //! indoor ones (8: buildings, 9: dungeons and caves). `region_num` is the region now loaded;
 //! `new_region` is the one being loaded, or `NO_REGION` when nothing is waiting to load.
 
-use super::hdrive::{CheckDiskIO, InvalidDiskIO, IsReadDiskIO, WaitDiskIO, load_track_range, motor_off};
-use super::types::Need;
+use super::hdrive::{
+    CheckDiskIO, InvalidDiskIO, IsReadDiskIO, WaitDiskIO, load_track_range, motor_off,
+};
 use std::ffi::c_void;
+use super::asm_map::{genmini};
+use super::game_tables::{current_loads, file_index, region_num};
+use super::globals::{image_mem, img_x, img_y, lregion, map_mem, map_x, map_y, new_region, sector_mem, stuff, terra_mem, xreg, yreg};
 
-unsafe extern "C" {
-    static map_x: u16;
-    static map_y: u16;
-    static img_x: u16;
-    static img_y: u16;
-    static mut xreg: u16;
-    static mut yreg: u16;
-    static mut new_region: u16;
-    static mut lregion: u16;
-    static mut region_num: u16;
-    static mut current_loads: Need;
-    static file_index: [Need; 10];
-    static image_mem: *mut u8;
-    static sector_mem: *mut u8;
-    static map_mem: *mut u8;
-    static terra_mem: *mut u8;
-    static stuff: *mut u8;
-
-    fn genmini(img_x: i32, img_y: i32);
-}
 
 /// `new_region` value meaning no region is waiting to be loaded.
 const NO_REGION: u16 = 10;
@@ -65,8 +49,7 @@ const BLOCKED_TILE: u8 = 254;
 ///
 /// Outdoors the region comes from the middle of the screen: bit 6 of the sector column gives
 /// west or east, and two bits of the sector row give which of four rows.
-#[unsafe(no_mangle)]
-pub extern "C" fn gen_mini() {
+pub fn gen_mini() {
     unsafe {
         if region_num < FIRST_INDOOR_REGION {
             if new_region < NO_REGION {
@@ -101,8 +84,7 @@ pub extern "C" fn gen_mini() {
 }
 
 /// Loads the pending region completely (`load_new_region` does one piece per call).
-#[unsafe(no_mangle)]
-pub extern "C" fn load_all() {
+pub fn load_all() {
     unsafe {
         while new_region < NO_REGION {
             load_new_region();
@@ -114,23 +96,37 @@ pub extern "C" fn load_all() {
 /// terrain tables, then one image bank per call. Each piece is only read if the loaded one is
 /// different (`current_loads`). When everything is there, waits for the reads, turns the drive
 /// off, and `new_region` becomes the current region.
-#[unsafe(no_mangle)]
-pub extern "C" fn load_new_region() {
+pub fn load_new_region() {
     unsafe {
         if new_region >= NO_REGION {
             return;
         }
         let need = &file_index[new_region as usize];
         if need.sector != current_loads.sector {
-            load_track_range(need.sector as i16, SECTOR_BLOCKS, sector_mem.cast::<c_void>(), REQ_SECTOR);
+            load_track_range(
+                need.sector as i16,
+                SECTOR_BLOCKS,
+                sector_mem.cast::<c_void>(),
+                REQ_SECTOR,
+            );
             current_loads.sector = need.sector;
         }
         if need.region != current_loads.region {
-            load_track_range(need.region as i16, REGION_MAP_BLOCKS, map_mem.cast::<c_void>(), REQ_MAP);
+            load_track_range(
+                need.region as i16,
+                REGION_MAP_BLOCKS,
+                map_mem.cast::<c_void>(),
+                REQ_MAP,
+            );
             current_loads.region = need.region;
         }
         if need.terra1 != current_loads.terra1 {
-            load_track_range(TERRA_BLOCK + need.terra1 as i16, 1, terra_mem.cast::<c_void>(), REQ_TERRA1);
+            load_track_range(
+                TERRA_BLOCK + need.terra1 as i16,
+                1,
+                terra_mem.cast::<c_void>(),
+                REQ_TERRA1,
+            );
             current_loads.terra1 = need.terra1;
         }
         if need.terra2 != current_loads.terra2 {
@@ -145,7 +141,12 @@ pub extern "C" fn load_new_region() {
                 for plane in 0..5 {
                     let dest = bank_mem.add(plane * IMAGE_PLANE_SIZE).cast::<c_void>();
                     let block = first + plane as i16 * IMAGE_PLANE_BLOCKS;
-                    load_track_range(block, IMAGE_PLANE_BLOCKS, dest, REQ_IMAGE_FIRST + plane as i16);
+                    load_track_range(
+                        block,
+                        IMAGE_PLANE_BLOCKS,
+                        dest,
+                        REQ_IMAGE_FIRST + plane as i16,
+                    );
                 }
                 current_loads.image[bank] = need.image[bank];
                 return;

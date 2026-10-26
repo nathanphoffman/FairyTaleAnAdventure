@@ -15,6 +15,9 @@
 //! 6 SW, 7 W. The value 9 means "not walking".
 
 use std::ffi::c_void;
+use super::screen_fx::{drawcompass};
+use super::game_tables::{oldir};
+use super::globals::{handler_data, keydir};
 
 /// Mirror of `struct in_work` in csrc/ftale.h, the input handler's data area.
 #[repr(C)]
@@ -41,14 +44,6 @@ pub struct InWork {
     ticker: i16,
 }
 
-unsafe extern "C" {
-    static mut handler_data: InWork;
-    // The direction key currently held (set by the key handling in csrc/fmain.c).
-    static mut keydir: i16;
-    // The direction last shown on the compass.
-    static mut oldir: i16;
-    fn drawcompass(dir: i16);
-}
 
 /// Stand-in for the CIA port A register the game peeks at (0xbfe001). Bit 7 low = joystick fire.
 #[unsafe(no_mangle)]
@@ -132,8 +127,7 @@ pub fn forget_last_menu() {
 }
 
 /// Pops the next key code from the ring buffer, or 0 if there is none.
-#[unsafe(no_mangle)]
-pub extern "C" fn getkey() -> i32 {
+pub fn getkey() -> i32 {
     unsafe {
         let data = &mut *(&raw mut handler_data);
         if data.pickup == data.laydown {
@@ -234,8 +228,7 @@ pub fn take_new_disk() -> bool {
 ///
 /// While a mouse button is down the pointer position decides; otherwise the direction key
 /// (numbered from 20, the keypad digits) does. Anything outside 20-29 means no direction.
-#[unsafe(no_mangle)]
-pub extern "C" fn decode_mouse() {
+pub fn decode_mouse() {
     unsafe {
         let data = &*(&raw const handler_data);
         let dir = if data.qualifier & (LEFT_BUTTON | RIGHT_BUTTON) != 0 {

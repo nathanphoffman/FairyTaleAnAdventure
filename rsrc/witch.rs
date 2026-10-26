@@ -9,15 +9,9 @@
 use super::tables::witchpoints;
 use super::types::FPage;
 use crate::amiga::{AreaInfo, BitMap, Layer, RastPort, TmpRas};
+use super::globals::{hero_x, hero_y, li, map_x, map_y, rp_map};
 
 unsafe extern "C" {
-    static hero_x: u16;
-    static hero_y: u16;
-    static map_x: u16;
-    static map_y: u16;
-    static mut rp_map: RastPort;
-    static li: *mut std::ffi::c_void;
-
     fn CreateUpfrontLayer(
         li: *mut std::ffi::c_void,
         bm: *mut BitMap,
@@ -41,15 +35,16 @@ unsafe extern "C" {
 
 /// Which side of each beam edge the hero is on (the cross product and whether it is not negative).
 /// Read by the witch's steering in csrc/fmain.c under the names `s1` and `s2`.
-#[unsafe(export_name = "s1")]
 pub static mut SIDE_1: i16 = 0;
-#[unsafe(export_name = "s2")]
 pub static mut SIDE_2: i16 = 0;
 static mut SIDE_FLAG_1: i16 = 0;
 static mut SIDE_FLAG_2: i16 = 0;
 
 // Work areas for filling the beam.
-static mut MY_TMP: TmpRas = TmpRas { RasPtr: std::ptr::null_mut(), Size: 0 };
+static mut MY_TMP: TmpRas = TmpRas {
+    RasPtr: std::ptr::null_mut(),
+    Size: 0,
+};
 static mut MY_AREA_INFO: AreaInfo = AreaInfo {
     VctrTbl: std::ptr::null_mut(),
     VctrPtr: std::ptr::null_mut(),
@@ -107,14 +102,22 @@ fn side(p1: (i16, i16), p2: (i16, i16), xh: i16, yh: i16) -> (i16, i16) {
 
 /// Draws the witch's beam on page `fp` and records on which side of its edges the hero is.
 /// The drawing is clipped to a temporary layer covering just the map area.
-#[unsafe(no_mangle)]
-pub extern "C" fn witch_fx(fp: *mut FPage) {
+pub fn witch_fx(fp: *mut FPage) {
     unsafe {
         let fp = &*fp;
         let xh = hero_x.wrapping_sub(map_x & TILE_X_MASK) as i16;
         let yh = hero_y.wrapping_sub(map_y & TILE_Y_MASK) as i16;
 
-        LAYER = CreateUpfrontLayer(li, rp_map.BitMap, 0, 0, LAYER_WIDTH, LAYER_HEIGHT, LAYER_SIMPLE, std::ptr::null_mut());
+        LAYER = CreateUpfrontLayer(
+            li,
+            rp_map.BitMap,
+            0,
+            0,
+            LAYER_WIDTH,
+            LAYER_HEIGHT,
+            LAYER_SIMPLE,
+            std::ptr::null_mut(),
+        );
         let r = &raw mut rp_map;
         OLD_LAYER = (*r).Layer;
         (*r).Layer = LAYER;
@@ -129,8 +132,16 @@ pub extern "C" fn witch_fx(fp: *mut FPage) {
         if !MY_RAS.is_null() {
             let old_tmp = (*r).TmpRas;
             let old_area = (*r).AreaInfo;
-            (*r).TmpRas = InitTmpRas(&raw mut MY_TMP, MY_RAS, raster_bytes(RASTER_SIZE, RASTER_SIZE));
-            InitArea(&raw mut MY_AREA_INFO, (&raw mut AREA_BUFFER).cast(), AREA_MAX_VECTORS);
+            (*r).TmpRas = InitTmpRas(
+                &raw mut MY_TMP,
+                MY_RAS,
+                raster_bytes(RASTER_SIZE, RASTER_SIZE),
+            );
+            InitArea(
+                &raw mut MY_AREA_INFO,
+                (&raw mut AREA_BUFFER).cast(),
+                AREA_MAX_VECTORS,
+            );
             (*r).AreaInfo = &raw mut MY_AREA_INFO;
             AreaMove(r, p1.0 as i32, p1.1 as i32);
             AreaDraw(r, p2.0 as i32, p2.1 as i32);

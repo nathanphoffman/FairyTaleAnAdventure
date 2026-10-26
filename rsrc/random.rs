@@ -6,10 +6,7 @@
 //! if the same seed gives the same numbers. The generator is a small linear congruential one:
 //! multiply the seed by 45821, add 1, then rotate the bits to get the result.
 
-unsafe extern "C" {
-    /// The generator's state, defined in csrc/fmain.c.
-    static mut seed1: i32;
-}
+use super::game_tables::{seed1};
 
 const SEED_MULTIPLIER: u32 = 45821;
 const RESULT_MASK: u32 = 0x7fff_ffff;
@@ -40,52 +37,44 @@ fn bounded(value: i32, n: i32) -> i32 {
 
 /// The next random number (0 to 2^31 - 1). The C code calls this `rand()`; the game's own version
 /// replaces the libc one. The seed lives in `seed1`, defined in csrc/fmain.c.
-#[unsafe(no_mangle)]
-pub extern "C" fn fta_rand() -> i32 {
+pub fn fta_rand() -> i32 {
     let (next, value) = step(unsafe { seed1 });
     unsafe { seed1 = next };
     value
 }
 
 /// A random number with only the bits in `mask` kept, e.g. `bitrand(0x3fff)` is 0 to 16383.
-#[unsafe(no_mangle)]
-pub extern "C" fn bitrand(mask: i32) -> i32 {
+pub fn bitrand(mask: i32) -> i32 {
     fta_rand() & mask
 }
 
 /// Random 0 or 1.
-#[unsafe(no_mangle)]
-pub extern "C" fn rand2() -> i32 {
+pub fn rand2() -> i32 {
     fta_rand() & 1
 }
 
 /// Random 0 to 3.
-#[unsafe(no_mangle)]
-pub extern "C" fn rand4() -> i32 {
+pub fn rand4() -> i32 {
     fta_rand() & 3
 }
 
 /// Random 0 to 7 (also used as a random compass direction).
-#[unsafe(no_mangle)]
-pub extern "C" fn rand8() -> i32 {
+pub fn rand8() -> i32 {
     fta_rand() & 7
 }
 
 /// Random 0 to 63.
-#[unsafe(no_mangle)]
-pub extern "C" fn rand64() -> i32 {
+pub fn rand64() -> i32 {
     fta_rand() & 63
 }
 
 /// Random 0 to 255.
-#[unsafe(no_mangle)]
-pub extern "C" fn rand256() -> i32 {
+pub fn rand256() -> i32 {
     fta_rand() & 255
 }
 
 /// A random number from 0 to `n - 1`, for any `n` up to 16 bits.
-#[unsafe(no_mangle)]
-pub extern "C" fn rnd(n: i32) -> i32 {
+pub fn rnd(n: i32) -> i32 {
     bounded(fta_rand(), n)
 }
 
@@ -105,7 +94,10 @@ mod tests {
             seed = next;
             values.push(value);
         }
-        assert_eq!(values, [1777372681, 1298959771, 555739856, 636999534, 442890465]);
+        assert_eq!(
+            values,
+            [1777372681, 1298959771, 555739856, 636999534, 442890465]
+        );
         assert_eq!(seed, -1719781274);
     }
 

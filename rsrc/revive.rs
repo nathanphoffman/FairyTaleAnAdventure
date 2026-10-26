@@ -14,56 +14,12 @@ use super::mood::setmood;
 use super::regions::load_all;
 use super::screen_fx::{fade_down, map_message, message_off};
 use super::tables::{ob_list8, ob_listg};
-use super::types::{Bro, FPage, Shape};
+use super::types::Shape;
 use crate::amiga::{RastPort, TextFont};
+use super::game_tables::{blist, region_num};
+use super::globals::{actor_file, actors_loading, actors_on_screen, afont, anim_list, anix, battleflag, brave, brother, daynight, fatigue, fiery_death, fp_drawing, fp_viewing, freeze_timer, goodfairy, hero_place, hero_x, hero_y, hunger, kind as hero_kind, light_timer, lightlevel, luck, map_x, map_y, mdex, new_region, quitflag, rp, rp_map, rp_text, safe_r, safe_x, safe_y, secret_timer, set_file, stuff, tfont, viewstatus, wealth, xtype};
 
 unsafe extern "C" {
-    static mut anim_list: [Shape; 20];
-    static mut brother: i16;
-    static mut hero_x: u16;
-    static mut hero_y: u16;
-    static mut map_x: u16;
-    static mut map_y: u16;
-    static mut safe_x: u16;
-    static mut safe_y: u16;
-    static mut safe_r: u16;
-    static mut region_num: u16;
-    static mut new_region: u16;
-    static mut brave: i16;
-    static mut luck: i16;
-    #[link_name = "kind"]
-    static mut hero_kind: i16;
-    static mut wealth: i16;
-    static mut hunger: i16;
-    static mut fatigue: i16;
-    static mut stuff: *mut u8;
-    static blist: [Bro; 3];
-    static mut mdex: i16;
-    static mut battleflag: i8;
-    static mut goodfairy: u8;
-    static mut secret_timer: i16;
-    static mut light_timer: i16;
-    static mut freeze_timer: i16;
-    static mut viewstatus: i8;
-    static mut actors_on_screen: i8;
-    static mut actors_loading: i8;
-    static mut quitflag: i8;
-    static mut actor_file: i16;
-    static mut set_file: i16;
-    static mut hero_place: u16;
-    static mut daynight: u16;
-    static mut lightlevel: u16;
-    static mut anix: i16;
-    static mut fiery_death: i8;
-    static mut xtype: u16;
-    static mut rp: *mut RastPort;
-    static mut rp_map: RastPort;
-    static mut rp_text: RastPort;
-    static tfont: *mut TextFont;
-    static afont: *mut TextFont;
-    static fp_drawing: *mut FPage;
-    static fp_viewing: *mut FPage;
-
     fn stopscore();
     fn Delay(ticks: i32);
     fn SetFont(rp: *mut RastPort, font: *mut TextFont);
@@ -128,8 +84,7 @@ const HERO_SET_FILE: i16 = 13;
 ///
 /// Either way the hero gets full health for the bravery, the clock is set to the morning
 /// (8000), and hunger and fatigue are cleared.
-#[unsafe(no_mangle)]
-pub extern "C" fn revive(new: i16) {
+pub fn revive(new: i16) {
     unsafe {
         let list = (&raw mut anim_list).cast::<Shape>();
         let raft = list.add(1);

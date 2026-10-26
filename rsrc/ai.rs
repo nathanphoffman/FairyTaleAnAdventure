@@ -6,22 +6,10 @@ use super::actors::{aftermath, do_tactic};
 use super::asm_text::{prq, set_course};
 use super::mood::setmood;
 use super::random::{bitrand, rand2, rand4};
-use super::types::{Extent, Shape};
+use super::types::Shape;
+use super::actors::{turtle_eggs};
+use super::globals::{actors_on_screen, anim_list, anix, battleflag, daynight, extn, goodfairy, hero_x, hero_y, leader, xtype};
 
-unsafe extern "C" {
-    static mut anim_list: [Shape; 20];
-    static extn: *const Extent;
-    static mut leader: i16;
-    static mut actors_on_screen: i8;
-    static mut battleflag: i8;
-    static anix: i16;
-    static goodfairy: u8;
-    static daynight: u16;
-    static hero_x: u16;
-    static hero_y: u16;
-    static xtype: u16;
-    static turtle_eggs: i8;
-}
 
 // Actor kinds and states (csrc/ftale.h).
 const CARRIER: i8 = 5;
@@ -82,8 +70,7 @@ const PRQ_STATS: i32 = 4;
 const PRQ_VITALITY: i32 = 7;
 
 /// Decides each enemy's goal and tactic, and starts or ends the battle mood.
-#[unsafe(no_mangle)]
-pub extern "C" fn actor_ai() {
+pub fn actor_ai() {
     unsafe {
         actors_on_screen = 0;
         leader = 0;
@@ -140,7 +127,9 @@ unsafe fn think(i: usize, battle2: i8) {
         let hero_state = anim_list[0].state;
         if hero_state == DEAD || hero_state == FALL {
             mode = if leader == 0 { FLEE } else { FOLLOWER };
-        } else if (*an).vitality < NEARLY_DEAD || (xtype > SPECIAL_XTYPE && (*an).race != (*extn).v3) {
+        } else if (*an).vitality < NEARLY_DEAD
+            || (xtype > SPECIAL_XTYPE && (*an).race != (*extn).v3)
+        {
             mode = FLEE; // special encounters don't flee in the 60+ zones
         }
 

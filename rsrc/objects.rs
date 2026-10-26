@@ -13,6 +13,13 @@
 use super::loading::cfiles;
 use super::tables::{CHEST, TURTLE, dstobs, glbobs, mapobs, ob_listg, ob_table, rand_treasure};
 use super::types::{SeqInfo, Shape, WorldObject};
+use super::asm_map::{px_to_im};
+use super::hdrive::{motor_off};
+use super::loading::{prep, read_shapes};
+use super::random::{bitrand};
+use super::actors::{turtle_eggs};
+use super::game_tables::{region_num, setfig_table};
+use super::globals::{anim_list, anix, anix2, map_x, map_y, new_region, nextshape, seq_list, set_file, witchflag};
 /// Mirror of the `setfig_table` entries in csrc/fmain.c: for each kind of person (wizard, priest,
 /// guard, princess, king, noble, sorceress, bartender, witch, ranger ...), which sprite file
 /// holds them, which image to start from, and whether they can talk.
@@ -23,27 +30,6 @@ pub struct SetFigEntry {
     pub can_talk: i8,
 }
 
-unsafe extern "C" {
-    static mut anim_list: [Shape; 20];
-    static mut anix: i16;
-    static mut anix2: i16;
-    static map_x: u16;
-    static map_y: u16;
-    static region_num: u16;
-    static new_region: u16;
-    static mut set_file: i16;
-    static mut witchflag: i8;
-    static mut turtle_eggs: i8;
-    static mut nextshape: *mut u8;
-    static setfig_table: [SetFigEntry; 0];
-    static mut seq_list: [SeqInfo; 0];
-
-    fn bitrand(mask: i32) -> i32;
-    fn px_to_im(x: i32, y: i32) -> i32;
-    fn read_shapes(num: i32);
-    fn prep(slot: i16);
-    fn motor_off();
-}
 
 // Actor kinds and states (csrc/ftale.h).
 const OBJECTS: i8 = 1;
@@ -89,7 +75,6 @@ const PERSON_RAISE: i16 = 18;
 const PERSON_RACE_BASE: i32 = 0x80;
 
 /// First free actor slot for people while the object lists are walked.
-#[unsafe(no_mangle)]
 pub static mut j1: i16 = 0;
 
 /// Whether `value` is strictly between the two limits.
@@ -99,12 +84,15 @@ fn inside(value: i16, (low, high): (i16, i16)) -> bool {
 
 /// Turns the global and current region's object lists into actors.
 /// Called when the screen changes (new region, scrolling far, after loading a game).
-#[unsafe(no_mangle)]
-pub extern "C" fn do_objects() {
+pub fn do_objects() {
     unsafe {
         j1 = FIRST_OBJECT_ACTOR;
         set_objects((&raw mut ob_listg).cast(), glbobs, GLOBAL_LIST_BIT as i32);
-        set_objects(ob_table[region_num as usize], mapobs[region_num as usize], 0);
+        set_objects(
+            ob_table[region_num as usize],
+            mapobs[region_num as usize],
+            0,
+        );
         if j1 > 3 {
             anix = j1;
         }
@@ -113,8 +101,7 @@ pub extern "C" fn do_objects() {
 
 /// Drops `object` where actor `i` stands (slot 0 of the global list is used for this).
 /// That slot is reused for each item the hero or a monster leaves behind.
-#[unsafe(no_mangle)]
-pub extern "C" fn leave_item(i: i16, object: i16) {
+pub fn leave_item(i: i16, object: i16) {
     unsafe {
         let drop = &mut *(&raw mut ob_listg).cast::<WorldObject>();
         let actor = &(*(&raw const anim_list))[i as usize];
@@ -127,8 +114,7 @@ pub extern "C" fn leave_item(i: i16, object: i16) {
 
 /// Changes the object that actor `id` stands for: `flag` 1 = show, 2 = take. A chest opens
 /// instead (its id changes to the opened chest, rather than its state).
-#[unsafe(no_mangle)]
-pub extern "C" fn change_object(id: i32, flag: i32) {
+pub fn change_object(id: i32, flag: i32) {
     unsafe {
         let vitality = (*(&raw const anim_list))[id as usize].vitality;
         let index = (vitality & OBJECT_INDEX_MASK) as usize;
@@ -177,7 +163,10 @@ unsafe fn distribute_treasure() {
 /// file, so it is only reloaded when the needed file differs from the loaded one.
 unsafe fn load_set_figure(id: i8) {
     unsafe {
-        let entry = (*(&raw const setfig_table).cast::<SetFigEntry>().add(id as usize)).cfile_entry;
+        let entry = (*(&raw const setfig_table)
+            .cast::<SetFigEntry>()
+            .add(id as usize))
+        .cfile_entry;
         if cfiles[entry as usize].file_id != cfiles[set_file as usize].file_id {
             set_file = entry as i16;
             nextshape = (*(&raw mut seq_list).cast::<SeqInfo>().add(SETFIG as usize)).location;
@@ -195,8 +184,7 @@ unsafe fn load_set_figure(id: i8) {
 /// centre it); people are only loaded if within about 100-400 pixels, and shown if within the
 /// screen; items that are hidden or taken are skipped. A person already in the actor list at the
 /// same place is not added twice (and is marked dead if its actor died).
-#[unsafe(no_mangle)]
-pub extern "C" fn set_objects(mut list: *mut WorldObject, mut length: i16, f: i32) {
+pub fn set_objects(mut list: *mut WorldObject, mut length: i16, f: i32) {
     unsafe {
         turtle_eggs = 0;
         witchflag = 0;
@@ -212,7 +200,8 @@ pub extern "C" fn set_objects(mut list: *mut WorldObject, mut length: i16, f: i3
             'object: {
                 let object = &mut *list;
                 let xstart = (object.xc as i32 - map_x as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
-                let mut ystart = (object.yc as i32 - map_y as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
+                let mut ystart =
+                    (object.yc as i32 - map_y as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
                 // States 3 and 4 are people; everything else is an item.
                 let is_person = object.ob_stat == STAT_PERSON || object.ob_stat == STAT_DEAD_PERSON;
                 let id = object.ob_id;
@@ -242,12 +231,19 @@ pub extern "C" fn set_objects(mut list: *mut WorldObject, mut length: i16, f: i3
                         break 'object;
                     }
                     actor.kind = SETFIG;
-                    actor.index = (*(&raw const setfig_table).cast::<SetFigEntry>().add(id as usize)).image_base;
+                    actor.index = (*(&raw const setfig_table)
+                        .cast::<SetFigEntry>()
+                        .add(id as usize))
+                    .image_base;
                     actor.weapon = 0;
                     actor.vitality = 2 + id as i16 + id as i16;
                     actor.goal = i as i8;
                     actor.environ = 0;
-                    actor.state = if object.ob_stat == STAT_DEAD_PERSON { DEAD } else { STILL };
+                    actor.state = if object.ob_stat == STAT_DEAD_PERSON {
+                        DEAD
+                    } else {
+                        STILL
+                    };
                     // A person's race is 0x80 plus their kind, so they can be told from monsters.
                     actor.race = (id as i32 + PERSON_RACE_BASE) as u8;
                     ystart -= PERSON_RAISE;

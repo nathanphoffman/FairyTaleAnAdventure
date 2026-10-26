@@ -16,8 +16,7 @@ unsafe extern "C" {
 const CHUNK_FIELD_BYTES: i32 = 4;
 
 /// Reads a 4 byte chunk id; compared against the id string in memory, so no byte swap.
-#[unsafe(no_mangle)]
-pub extern "C" fn ReadHeader() {
+pub fn ReadHeader() {
     unsafe {
         Read(myfile as BPTR, (&raw mut header).cast(), CHUNK_FIELD_BYTES);
         file_length -= CHUNK_FIELD_BYTES;
@@ -25,10 +24,13 @@ pub extern "C" fn ReadHeader() {
 }
 
 /// Reads a big-endian chunk length and updates how many bytes of the file are left.
-#[unsafe(no_mangle)]
-pub extern "C" fn ReadLength() {
+pub fn ReadLength() {
     unsafe {
-        Read(myfile as BPTR, (&raw mut blocklength).cast(), CHUNK_FIELD_BYTES);
+        Read(
+            myfile as BPTR,
+            (&raw mut blocklength).cast(),
+            CHUNK_FIELD_BYTES,
+        );
         blocklength = blocklength.swap_bytes();
         file_length -= blocklength + CHUNK_FIELD_BYTES;
     }
@@ -71,8 +73,7 @@ unsafe fn unpack_byte_run(mut src: *const i8, mut dest: *mut u8, width: i32) -> 
 }
 
 /// Unpacks one scan line of an IFF body (ByteRun1, or plain copy) into `dest`.
-#[unsafe(no_mangle)]
-pub extern "C" fn unpack_line(dest: *mut u8) {
+pub fn unpack_line(dest: *mut u8) {
     unsafe {
         if compress == 0 {
             std::ptr::copy_nonoverlapping(packdata.cast(), dest, bytecount as usize);

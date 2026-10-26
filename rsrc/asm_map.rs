@@ -14,24 +14,9 @@
 //! `scrollmap` shifts the picture by one tile so only a new edge has to be drawn.
 
 use super::tables::minimap;
+use super::game_tables::{region_num};
+use super::globals::{hero_sector, hero_x, hero_y, image_mem, map_mem, map_x, map_y, planes, sector_mem, secx, secy, terra_mem, xreg, yreg};
 
-unsafe extern "C" {
-    static xreg: u16;
-    static yreg: u16;
-    static mut map_x: u16;
-    static mut map_y: u16;
-    static hero_x: u16;
-    static hero_y: u16;
-    static region_num: u16;
-    static mut hero_sector: i16;
-    static map_mem: *const u8;
-    static sector_mem: *const u8;
-    static terra_mem: *const u8;
-    static image_mem: *const u8;
-    static planes: *mut *mut u8;
-    static mut secx: i32;
-    static mut secy: i32;
-}
 
 /// One bitplane of 256 tiles, 64 bytes per tile.
 const IMAGE_PLANE_SIZE: usize = 16384;
@@ -67,7 +52,9 @@ fn clamp_secy(v: i16) -> u16 {
 
 /// The sector number for a sector column and row of the region map.
 unsafe fn sector_at(col: u16, row: u16) -> u8 {
-    unsafe { *map_mem.add((row as usize * MAP_ROW_BYTES + col as usize + xreg as usize) as u16 as usize) }
+    unsafe {
+        *map_mem.add((row as usize * MAP_ROW_BYTES + col as usize + xreg as usize) as u16 as usize)
+    }
 }
 
 /// Terrain type (0-15) at a pixel position, 0 if that sub-area is clear.
@@ -75,8 +62,7 @@ unsafe fn sector_at(col: u16, row: u16) -> u8 {
 /// Each tile is divided into 8 sub-areas (2 across, 4 down); the terrain table has a bit mask
 /// saying which of them are solid, so a tile can be partly walkable (a tree trunk in the middle of
 /// a clearing, say). The bit is picked from pixel bits 3 (x), 3 and 4 (y).
-#[unsafe(no_mangle)]
-pub extern "C" fn px_to_im(x: i32, y: i32) -> i32 {
+pub fn px_to_im(x: i32, y: i32) -> i32 {
     let (ux, uy) = (x as u16, y as u16);
     let mut bit = 0x80u8;
     if ux & 8 != 0 {
@@ -93,7 +79,9 @@ pub extern "C" fn px_to_im(x: i32, y: i32) -> i32 {
         let col = wrap_secx((imx >> 4).wrapping_sub(xreg));
         let row = clamp_secy((imy >> 3).wrapping_sub(yreg) as i16);
         let sec = sector_at(col, row) as usize;
-        let tile = *sector_mem.add((sec * SECTOR_BYTES + (imy as usize & 7) * 16 + (imx as usize & 15)) as u16 as usize) as usize;
+        let tile = *sector_mem.add(
+            (sec * SECTOR_BYTES + (imy as usize & 7) * 16 + (imx as usize & 15)) as u16 as usize,
+        ) as usize;
         if *terra_mem.add(tile * 4 + 2) & bit == 0 {
             return 0;
         }
@@ -104,8 +92,7 @@ pub extern "C" fn px_to_im(x: i32, y: i32) -> i32 {
 /// Collision test with two probes either side of the character (4 pixels right and left, 2 down).
 /// Returns the blocking terrain type, 0 if the way is clear. Type 1 always blocks; the right-hand
 /// probe is blocked by 10 and above, the left-hand one by 8 and above.
-#[unsafe(no_mangle)]
-pub extern "C" fn prox(x: i32, y: i32) -> i32 {
+pub fn prox(x: i32, y: i32) -> i32 {
     let t = px_to_im(x + 4, y + 2);
     if t == 1 || t >= 10 {
         return t;
@@ -118,8 +105,7 @@ pub extern "C" fn prox(x: i32, y: i32) -> i32 {
 }
 
 /// Address of the tile byte for a tile position (wraps vertically too).
-#[unsafe(no_mangle)]
-pub extern "C" fn mapxy(imx: i32, imy: i32) -> *const u8 {
+pub fn mapxy(imx: i32, imy: i32) -> *const u8 {
     let (ux, uy) = (imx as u16, imy as u16);
     unsafe {
         let col = wrap_secx((ux >> 4).wrapping_sub(xreg));
@@ -128,14 +114,14 @@ pub extern "C" fn mapxy(imx: i32, imy: i32) -> *const u8 {
             row = if row & 16 != 0 { 0 } else { 31 };
         }
         let sec = sector_at(col, row) as usize;
-        sector_mem.add((sec * SECTOR_BYTES + (uy as usize & 7) * 16 + (ux as usize & 15)) as u16 as usize)
+        sector_mem
+            .add((sec * SECTOR_BYTES + (uy as usize & 7) * 16 + (ux as usize & 15)) as u16 as usize)
     }
 }
 
 /// Fills `minimap` (19 columns of 6 tile numbers, column by column) for the area starting at
 /// tile (img_x, img_y), and works out which sector the hero is in.
-#[unsafe(no_mangle)]
-pub extern "C" fn genmini(img_x: i32, img_y: i32) {
+pub fn genmini(img_x: i32, img_y: i32) {
     unsafe {
         let mut x = img_x as u16;
         let mut next = 0;
@@ -145,8 +131,13 @@ pub extern "C" fn genmini(img_x: i32, img_y: i32) {
             for j in 0..SCREEN_ROWS as i32 {
                 let y = (img_y + j) as u16 & 0x7fff;
                 let row = clamp_secy((y >> 3).wrapping_sub(yreg) as i16);
-                let sec = *map_mem.add(((row as usize) << 7).wrapping_add(col as usize) as u16 as usize) as usize;
-                let tile = *sector_mem.add((sec * SECTOR_BYTES + (y as usize & 7) * 16 + (x as usize & 15)) as u16 as usize);
+                let sec = *map_mem
+                    .add(((row as usize) << 7).wrapping_add(col as usize) as u16 as usize)
+                    as usize;
+                let tile = *sector_mem.add(
+                    (sec * SECTOR_BYTES + (y as usize & 7) * 16 + (x as usize & 15)) as u16
+                        as usize,
+                );
                 minimap[next] = tile as i16;
                 next += 1;
             }
@@ -179,8 +170,7 @@ fn step(v: i32, dir: i32, speed: i32, table: &[i16; 10]) -> i32 {
 
 /// The x position after one step in direction `dir` (0-7) at `speed`. Directions above 7 mean
 /// "no move". Directions go clockwise from north-west.
-#[unsafe(no_mangle)]
-pub extern "C" fn newx(x: i32, dir: i32, speed: i32) -> i32 {
+pub fn newx(x: i32, dir: i32, speed: i32) -> i32 {
     if dir & 0xff > MAX_DIRECTION {
         return x;
     }
@@ -188,8 +178,7 @@ pub extern "C" fn newx(x: i32, dir: i32, speed: i32) -> i32 {
 }
 
 /// Like `newx`, but for y; it keeps bit 15 of y (a flag the game stores there).
-#[unsafe(no_mangle)]
-pub extern "C" fn newy(y: i32, dir: i32, speed: i32) -> i32 {
+pub fn newy(y: i32, dir: i32, speed: i32) -> i32 {
     if dir & 0xff > MAX_DIRECTION {
         return y;
     }
@@ -197,8 +186,7 @@ pub extern "C" fn newy(y: i32, dir: i32, speed: i32) -> i32 {
 }
 
 /// Copies bit 14 into bit 15, giving a signed 15 bit value (the world wraps around at the edges).
-#[unsafe(no_mangle)]
-pub extern "C" fn wrap(x: i32) -> i32 {
+pub fn wrap(x: i32) -> i32 {
     let mut low = x as u32 & 0xffff;
     if low & 0x4000 != 0 {
         low |= 0x8000;
@@ -257,15 +245,13 @@ fn camera_after(cam_x: u16, cam_y: u16, x: i32, y: i32) -> (u16, u16) {
 }
 
 /// Moves the camera (`map_x`, `map_y`) after the hero.
-#[unsafe(no_mangle)]
-pub extern "C" fn map_adjust(x: i32, y: i32) {
+pub fn map_adjust(x: i32, y: i32) {
     unsafe { (map_x, map_y) = camera_after(map_x, map_y, x, y) };
 }
 
 /// Small lookup used by the page-turn animation: how far in from the top and bottom a strip of
 /// the curling page starts, given its distance from the fold.
-#[unsafe(no_mangle)]
-pub extern "C" fn page_det(x: i32) -> i32 {
+pub fn page_det(x: i32) -> i32 {
     const SMALL: [i32; 11] = [9, 9, 8, 7, 6, 5, 5, 5, 4, 4, 4];
     match x {
         ..=10 => SMALL[x as usize],
@@ -284,7 +270,9 @@ pub extern "C" fn page_det(x: i32) -> i32 {
 unsafe fn draw_tile(tile: i32, dst: usize) {
     unsafe {
         for p in 0..PLANE_COUNT {
-            let mut src = image_mem.add(p * IMAGE_PLANE_SIZE).offset(tile as isize * TILE_BYTES as isize);
+            let mut src = image_mem
+                .add(p * IMAGE_PLANE_SIZE)
+                .offset(tile as isize * TILE_BYTES as isize);
             let mut d = (*planes.add(p)).add(dst);
             for _ in 0..TILE_LINES {
                 *d = *src;
@@ -298,12 +286,16 @@ unsafe fn draw_tile(tile: i32, dst: usize) {
 
 /// Draws the tile at minimap position (col, row) to its place on screen.
 unsafe fn draw_minimap_tile(col: usize, row: usize) {
-    unsafe { draw_tile(minimap[col * SCREEN_ROWS + row] as i32, row * TILE_LINES * ROW_BYTES + col * 2) };
+    unsafe {
+        draw_tile(
+            minimap[col * SCREEN_ROWS + row] as i32,
+            row * TILE_LINES * ROW_BYTES + col * 2,
+        )
+    };
 }
 
 /// The whole screen, 19 x 6 tiles.
-#[unsafe(no_mangle)]
-pub extern "C" fn map_draw() {
+pub fn map_draw() {
     for col in 0..SCREEN_COLUMNS {
         for row in 0..SCREEN_ROWS {
             unsafe { draw_minimap_tile(col, row) };
@@ -312,16 +304,14 @@ pub extern "C" fn map_draw() {
 }
 
 /// One column of tiles; `x` is the byte offset on screen (0 or 36).
-#[unsafe(no_mangle)]
-pub extern "C" fn strip_draw(x: i32) {
+pub fn strip_draw(x: i32) {
     for row in 0..SCREEN_ROWS {
         unsafe { draw_minimap_tile(x as usize / 2, row) };
     }
 }
 
 /// One row of tiles; `r` is twice the row number (0 or 10).
-#[unsafe(no_mangle)]
-pub extern "C" fn row_draw(r: i32) {
+pub fn row_draw(r: i32) {
     for col in 0..SCREEN_COLUMNS {
         unsafe { draw_minimap_tile(col, r as usize / 2) };
     }
@@ -338,8 +328,22 @@ struct ScrollMode {
     lines: usize,
 }
 
-const fn mode(src_x: usize, src_line: usize, dst_x: usize, dst_line: usize, width: usize, lines: usize) -> ScrollMode {
-    ScrollMode { src_x, src_line, dst_x, dst_line, width, lines }
+const fn mode(
+    src_x: usize,
+    src_line: usize,
+    dst_x: usize,
+    dst_line: usize,
+    width: usize,
+    lines: usize,
+) -> ScrollMode {
+    ScrollMode {
+        src_x,
+        src_line,
+        dst_x,
+        dst_line,
+        width,
+        lines,
+    }
 }
 
 /// Directions are numbered by how the picture moves:
@@ -358,15 +362,18 @@ const SCROLL_MODES: [ScrollMode; 8] = [
 
 /// Shifts the map one tile in one of 8 directions (the blitter did this on the Amiga).
 /// Moving down copies from the bottom up, so lines are not overwritten before they are read.
-#[unsafe(no_mangle)]
-pub extern "C" fn scrollmap(dir: i32) {
+pub fn scrollmap(dir: i32) {
     let m = &SCROLL_MODES[dir as usize & 7];
     unsafe {
         for p in 0..PLANE_COUNT {
             let plane = *planes.add(p);
             for i in 0..m.lines {
                 // copy bottom-up when moving down so rows are not overwritten before being read
-                let line = if m.dst_line > m.src_line { m.lines - 1 - i } else { i };
+                let line = if m.dst_line > m.src_line {
+                    m.lines - 1 - i
+                } else {
+                    i
+                };
                 std::ptr::copy(
                     plane.add((m.src_line + line) * ROW_BYTES + m.src_x),
                     plane.add((m.dst_line + line) * ROW_BYTES + m.dst_x),
@@ -393,7 +400,10 @@ const OVERVIEW_ROW_SKIP: usize = 40 * 15 + 4;
 
 /// The overview's top left sector for a map position, clamped to the map.
 fn overview_origin(mx: i32, my: i32, region_x: u16, region_y: u16) -> (i16, i16) {
-    let mut x = (((mx as u16 >> 8) as i32 - 9 - region_x as i32) as i16, ((my as u16 >> 8) as i32 - 4 - region_y as i32) as i16);
+    let mut x = (
+        ((mx as u16 >> 8) as i32 - 9 - region_x as i32) as i16,
+        ((my as u16 >> 8) as i32 - 4 - region_y as i32) as i16,
+    );
     for v in [&mut x.0, &mut x.1] {
         if *v < 32 {
             *v += MAP_WRAP;
@@ -411,8 +421,7 @@ fn overview_origin(mx: i32, my: i32, region_x: u16, region_y: u16) -> (i16, i16)
 /// Draws the overview map (the magic map spell): each sector is one 16 by 8 block of pixels drawn
 /// twice as tall, 18 x 9 sectors across the screen. Each pixel's colour is the tile's overview
 /// colour (terrain table byte 3). `secx` / `secy` tell the caller which sector is at the top left.
-#[unsafe(no_mangle)]
-pub extern "C" fn bigdraw(mx: i32, my: i32) {
+pub fn bigdraw(mx: i32, my: i32) {
     unsafe {
         let (x, y) = overview_origin(mx, my, xreg, yreg);
         secx = x as i32;

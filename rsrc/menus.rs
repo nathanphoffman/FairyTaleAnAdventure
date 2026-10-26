@@ -6,19 +6,12 @@
 
 use super::asm_text::stuff_flag;
 use super::input::forget_last_menu;
-use super::types::Menu;
 use crate::amiga::RastPort;
 use std::ffi::c_char;
+use super::game_tables::{keycolors, label1, menus};
+use super::globals::{cmode, real_options, rp_text2, wealth};
 
 unsafe extern "C" {
-    static mut menus: [Menu; 10];
-    static mut cmode: i16;
-    static wealth: i16;
-    static mut rp_text2: RastPort;
-    static mut real_options: [i8; 12];
-    static keycolors: [i8; 6];
-    static label1: [c_char; 0];
-
     fn SetAPen(rp: *mut RastPort, pen: u32);
     fn SetBPen(rp: *mut RastPort, pen: u32);
     fn Move(rp: *mut RastPort, x: i32, y: i32);
@@ -50,8 +43,7 @@ const BONE: i32 = 29;
 const GIVE_GOLD_MIN: i16 = 2;
 
 /// Switches the use, magic, keys and give entries on or off to match what the hero is carrying.
-#[unsafe(no_mangle)]
-pub extern "C" fn set_options() {
+pub fn set_options() {
     unsafe {
         for i in 0..7 {
             menus[MAGIC].enabled[i + 5] = stuff_flag(i as i32 + MAGIC_ITEM_BASE) as i8;
@@ -68,7 +60,11 @@ pub extern "C" fn set_options() {
         }
         menus[USE].enabled[7] = keys;
         menus[USE].enabled[8] = stuff_flag(SUNSTONE) as i8;
-        menus[GIVE].enabled[5] = if wealth > GIVE_GOLD_MIN { AVAILABLE } else { GREYED }; // gold
+        menus[GIVE].enabled[5] = if wealth > GIVE_GOLD_MIN {
+            AVAILABLE
+        } else {
+            GREYED
+        }; // gold
         menus[GIVE].enabled[6] = GREYED; // book
         menus[GIVE].enabled[7] = stuff_flag(WRIT) as i8;
         menus[GIVE].enabled[8] = stuff_flag(BONE) as i8;
@@ -82,8 +78,7 @@ const SHOWN: i8 = 2;
 
 /// Draws the current menu (`cmode`): the entries that are switched on, in the order they are shown,
 /// and blanks over the slots that are left. `real_options` remembers which entry each slot is.
-#[unsafe(no_mangle)]
-pub extern "C" fn print_options() {
+pub fn print_options() {
     unsafe {
         let menu = &menus[cmode as usize];
         let mut slot = 0usize;
@@ -101,7 +96,11 @@ pub extern "C" fn print_options() {
         }
         SetBPen(&raw mut rp_text2, 0);
         while slot < SLOTS {
-            let x = if slot & 1 != 0 { RIGHT_COLUMN_X } else { LEFT_COLUMN_X };
+            let x = if slot & 1 != 0 {
+                RIGHT_COLUMN_X
+            } else {
+                LEFT_COLUMN_X
+            };
             let y = (slot / 2) as i32 * ROW_HEIGHT + FIRST_ROW_Y;
             Move(&raw mut rp_text2, x, y);
             Text(&raw mut rp_text2, c"      ".as_ptr(), 6);
@@ -112,8 +111,7 @@ pub extern "C" fn print_options() {
 }
 
 /// Switches to menu `mode` and redraws it, unless the game is paused.
-#[unsafe(no_mangle)]
-pub extern "C" fn gomenu(mode: i16) {
+pub fn gomenu(mode: i16) {
     unsafe {
         if menus[GAME].enabled[PAUSE_ENTRY] & 1 != 0 {
             return;
@@ -142,8 +140,7 @@ const MAIN_PEN: u32 = 4;
 
 /// Draws entry slot `j` (0-11) of the current menu in the panel. `pena` is the text colour:
 /// 1 for a selected entry, 0 for a plain one. The box colour depends on the menu.
-#[unsafe(no_mangle)]
-pub extern "C" fn propt(j: i16, pena: i16) {
+pub fn propt(j: i16, pena: i16) {
     unsafe {
         let r = &raw mut rp_text2;
         let entry = real_options[j as usize] as i32;
@@ -164,7 +161,11 @@ pub extern "C" fn propt(j: i16, pena: i16) {
         SetBPen(r, box_pen);
 
         let offset = entry * LABEL_LEN as i32;
-        let x = if j & 1 != 0 { RIGHT_COLUMN_X } else { LEFT_COLUMN_X };
+        let x = if j & 1 != 0 {
+            RIGHT_COLUMN_X
+        } else {
+            LEFT_COLUMN_X
+        };
         let y = (j as i32 / 2) * ROW_HEIGHT + FIRST_ROW_Y;
         Move(r, x, y);
         Text(r, BOX.as_ptr().cast(), BOX.len() as i32);

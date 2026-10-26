@@ -13,7 +13,6 @@ use std::ffi::c_char;
 use super::globals::{julstuff, kevstuff, philstuff};
 
 /// The kinds of people (setfigs): which sprite file, the first image, and whether they can talk.
-#[unsafe(no_mangle)]
 pub static mut setfig_table: [SetFigEntry; 14] = [
     SetFigEntry { cfile_entry: 13, image_base: 0, can_talk: 1 },
     SetFigEntry { cfile_entry: 13, image_base: 4, can_talk: 1 },
@@ -32,7 +31,6 @@ pub static mut setfig_table: [SetFigEntry; 14] = [
 ];
 
 /// The monsters: hit points, aggression, weapon row, cleverness, treasure and sprite file.
-#[unsafe(no_mangle)]
 pub static mut encounter_chart: [Encounter; 11] = [
     Encounter { hitpoints: 18, agressive: 1, arms: 2, cleverness: 0, treasure: 2, file_id: 6 },
     Encounter { hitpoints: 12, agressive: 1, arms: 4, cleverness: 1, treasure: 1, file_id: 6 },
@@ -48,7 +46,6 @@ pub static mut encounter_chart: [Encounter; 11] = [
 ];
 
 /// Next state of a weapon swing, for each state and each of 4 random picks.
-#[unsafe(no_mangle)]
 pub static mut trans_list: [[i8; 4]; 9] = [
     [1, 8, 0, 1],
     [2, 0, 1, 0],
@@ -62,7 +59,6 @@ pub static mut trans_list: [[i8; 4]; 9] = [
 ];
 
 /// What to draw for each animation state: the figure image, the weapon image, and where the weapon is.
-#[unsafe(no_mangle)]
 pub static mut statelist: [StateEntry; 87] = [
     StateEntry { figure: 0, wpn_no: 11, wpn_x: -2, wpn_y: 11 },
     StateEntry { figure: 1, wpn_no: 11, wpn_x: -3, wpn_y: 11 },
@@ -154,7 +150,6 @@ pub static mut statelist: [StateEntry; 87] = [
 ];
 
 /// Every door: where it is outside, where it leads inside, its kind and the sectors it joins.
-#[unsafe(no_mangle)]
 pub static mut doorlist: [Door; 86] = [
     Door { xc1: 4464, yc1: 20576, xc2: 10352, yc2: 35680, kind: 1, secs: 1 },
     Door { xc1: 4464, yc1: 20576, xc2: 10352, yc2: 35680, kind: 1, secs: 1 },
@@ -245,7 +240,6 @@ pub static mut doorlist: [Door; 86] = [
 ];
 
 /// Rectangles of the world with a meaning: where monsters appear, peaceful places, the carriers.
-#[unsafe(no_mangle)]
 pub static mut extent_list: [Extent; 23] = [
     Extent { x1: 2118, y1: 27237, x2: 2618, y2: 27637, etype: 70, v1: 0, v2: 1, v3: 11 },
     Extent { x1: 0, y1: 0, x2: 0, y2: 0, etype: 70, v1: 0, v2: 1, v3: 5 },
@@ -273,11 +267,9 @@ pub static mut extent_list: [Extent; 23] = [
 ];
 
 /// The stone ring positions, as sector x, y pairs.
-#[unsafe(no_mangle)]
 pub static mut stone_list: [u8; 22] = [54, 43, 71, 77, 78, 102, 66, 121, 12, 85, 79, 40, 107, 38, 73, 21, 12, 26, 26, 53, 84, 60];
 
 /// Every item: its picture, where it sits on the item list, how many show, and its name.
-#[unsafe(no_mangle)]
 pub static mut inv_list: [InvItem; 36] = [
     InvItem { image_number: 12, xoff: 10, yoff: 0, ydelta: 0, img_off: 0, img_height: 8, maxshown: 1, name: b"Dirk\0".as_ptr().cast::<c_char>() },
     InvItem { image_number: 9, xoff: 10, yoff: 10, ydelta: 0, img_off: 0, img_height: 8, maxshown: 1, name: b"Mace\0".as_ptr().cast::<c_char>() },
@@ -318,59 +310,40 @@ pub static mut inv_list: [InvItem; 36] = [
 ];
 
 /// The mouse pointer sprite.
-#[unsafe(no_mangle)]
 pub static mut pointer: SimpleSprite = SimpleSprite { posctldata: std::ptr::null_mut(), height: 16, x: 0, y: 0, num: 0 };
 
 /// The pointer sprite's image data (20 words, packed as 32 bit values).
-#[unsafe(no_mangle)]
 pub static mut _sprite_data: [u32; 20] = [0x0, 0x80060000, 0x60010002, 0x40012000, 0x10030000, 0x8FE0001, 0x581007F, 0x3000081, 0x6010101, 0xC800201, 0x8410401, 0x8200401, 0x8110401, 0x80C0401, 0x880F0401, 0x98074400, 0x75560FFC, 0x0, 0x0, 0x0];
 
 /// The text panel colours.
-#[unsafe(no_mangle)]
 pub static mut textcolors: [u16; 20] = [0x000, 0xFFF, 0xC00, 0xF60, 0x00F, 0xC0F, 0x090, 0xFF0, 0xF90, 0xF0C, 0xA50, 0xFDB, 0xEB7, 0xCCC, 0x888, 0x444, 0x000, 0xDB0, 0x740, 0xC70];
 
 /// The intro page colours.
-#[unsafe(no_mangle)]
 pub static mut introcolors: [u16; 32] = [0x000, 0xFFF, 0xE00, 0xA00, 0xD80, 0xEC0, 0x390, 0x021, 0xEEB, 0xEDA, 0xEEA, 0xCB8, 0xA95, 0x973, 0x840, 0x620, 0xA52, 0xC74, 0xD96, 0xFCA, 0x449, 0x444, 0xDC9, 0x668, 0x33F, 0x888, 0xA60, 0xAAF, 0xBBB, 0xCCF, 0xDDD, 0xEEE];
 
 /// All black, for fading out.
-#[unsafe(no_mangle)]
 pub static mut blackcolors: [u16; 32] = [0; 32];
 
 /// Scratch space for printing numbers (ends with a space).
-#[unsafe(no_mangle)]
 pub static mut numbuf: [i8; 11] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32];
 
 // The menu labels: fixed width fields of 5 characters, one after another.
-#[unsafe(no_mangle)]
 pub static mut label1: [u8; 26] = *b"ItemsMagicTalk Buy  Game \0";
-#[unsafe(no_mangle)]
 pub static mut label2: [u8; 26] = *b"List Take Look Use  Give \0";
-#[unsafe(no_mangle)]
 pub static mut label3: [u8; 16] = *b"Yell Say  Ask  \0";
-#[unsafe(no_mangle)]
 pub static mut label4: [u8; 26] = *b"PauseMusicSoundQuit Load \0";
-#[unsafe(no_mangle)]
 pub static mut label5: [u8; 36] = *b"Food ArrowVial Mace SwordBow  Totem\0";
-#[unsafe(no_mangle)]
 pub static mut label6: [u8; 36] = *b"StoneJewelVial Orb  TotemRing Skull\0";
-#[unsafe(no_mangle)]
 pub static mut label7: [u8; 51] = *b"Dirk Mace SwordBow  Wand LassoShellKey  Sun  Book \0";
-#[unsafe(no_mangle)]
 pub static mut label8: [u8; 11] = *b"Save Exit \0";
-#[unsafe(no_mangle)]
 pub static mut label9: [u8; 31] = *b"Gold GreenBlue Red  Grey White\0";
-#[unsafe(no_mangle)]
 pub static mut labelA: [u8; 21] = *b"Gold Book Writ Bone \0";
-#[unsafe(no_mangle)]
 pub static mut labelB: [u8; 41] = *b"  A    B    C    D    E    F    G    H  \0";
 
 /// The colour of each key in the key menu.
-#[unsafe(no_mangle)]
 pub static mut keycolors: [i8; 6] = [8, 6, 4, 2, 14, 1];
 
 /// The ten menus: labels, entry count, colour, and each entry's state (see `Menu`).
-#[unsafe(no_mangle)]
 pub static mut menus: [Menu; 10] = [
     Menu { label_list: &raw const label2 as *const c_char, num: 10, color: 6, enabled: [3, 2, 2, 2, 2, 10, 10, 10, 10, 10, 0, 0] },
     Menu { label_list: &raw const label6 as *const c_char, num: 12, color: 5, enabled: [2, 3, 2, 2, 2, 8, 8, 8, 8, 8, 8, 8] },
@@ -385,7 +358,6 @@ pub static mut menus: [Menu; 10] = [
 ];
 
 /// Keyboard shortcuts: the key, the menu and the entry it picks.
-#[unsafe(no_mangle)]
 pub static mut letter_list: [Letter; 37] = [
     Letter { letter: 73, menu: 0, choice: 5 },
     Letter { letter: 84, menu: 0, choice: 6 },
@@ -427,11 +399,9 @@ pub static mut letter_list: [Letter; 37] = [
 ];
 
 /// The brothers' names.
-#[unsafe(no_mangle)]
 pub static mut datanames: [*const c_char; 3] = [b"Julian\0".as_ptr().cast(), b"Phillip\0".as_ptr().cast(), b"Kevin\0".as_ptr().cast()];
 
 /// The disk blocks each of the ten map regions needs.
-#[unsafe(no_mangle)]
 pub static mut file_index: [Need; 10] = [
     Need { image: [320, 480, 520, 560], terra1: 0, terra2: 1, sector: 32, region: 160, setchar: 22 },
     Need { image: [320, 360, 400, 440], terra1: 2, terra2: 3, sector: 32, region: 160, setchar: 21 },
@@ -446,7 +416,6 @@ pub static mut file_index: [Need; 10] = [
 ];
 
 /// What the region loader has loaded so far (starts as "nothing useful").
-#[unsafe(no_mangle)]
 pub static mut current_loads: Need = Need { image: [0, 0, 0, 0], terra1: 1, terra2: 2, sector: 0, region: 0, setchar: 0 };
 
 /// The region the hero is in (the start is region 3).
@@ -454,11 +423,9 @@ pub static mut current_loads: Need = Need { image: [0, 0, 0, 0], terra1: 1, terr
 pub static mut region_num: u16 = 3;
 
 /// The font the text panel asks for.
-#[unsafe(no_mangle)]
 pub static mut topaz_ta: TextAttr = TextAttr { ta_Name: b"topaz.font\0".as_ptr(), ta_YSize: 8, ta_Style: 0, ta_Flags: 1 };
 
 /// The instrument waveforms for the music, as pairs of values.
-#[unsafe(no_mangle)]
 pub static mut new_wave: [i16; 12] = [0x0000, 0x0000, 0x0000, 0x0000, 0x0005, 0x0202, 0x0101, 0x0103, 0x0004, 0x0504, 0x0100, 0x0500];
 
 /// The random number seeds the game starts with.
@@ -468,15 +435,12 @@ pub static mut seed1: i32 = 19837325;
 pub static mut seed2: i32 = 23098324;
 
 /// The direction the compass shows (9 = none).
-#[unsafe(no_mangle)]
 pub static mut oldir: i16 = 9;
 
 /// The first sprite image of each facing (16 entries: walking, then fighting).
-#[unsafe(no_mangle)]
 pub static mut diroffs: [i8; 16] = [16, 16, 24, 24, 0, 0, 8, 8, 56, 56, 68, 68, 32, 32, 44, 44];
 
 /// The brothers' starting stats and their item lists.
-#[unsafe(no_mangle)]
 pub static mut blist: [Bro; 3] = [
     Bro { brave: 35, luck: 20, kind: 15, wealth: 20, stuff: &raw mut julstuff as *mut u8 },
     Bro { brave: 20, luck: 35, kind: 15, wealth: 15, stuff: &raw mut philstuff as *mut u8 },
