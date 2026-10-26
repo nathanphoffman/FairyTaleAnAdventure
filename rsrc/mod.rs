@@ -38,6 +38,8 @@ pub mod loading;
 pub mod messages;
 // Turning the object lists into actors, taking items.
 pub mod objects;
+// Which region is loaded and loading the next one.
+pub mod regions;
 // The game's random number generator.
 pub mod random;
 // Saving and loading the game.

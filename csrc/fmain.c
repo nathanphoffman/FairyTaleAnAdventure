@@ -3108,6 +3108,7 @@ setmood(now) char now;
 	else stopscore();
 }
 
+#ifndef RSRC_REGIONS /* PORT: ported to rsrc/regions.rs */
 gen_mini()
 {	register unsigned long xr,yr; register long xs, ys;
 
@@ -3141,6 +3142,7 @@ gen_mini()
 
 	genmini(img_x,img_y);
 }
+#endif /* RSRC_REGIONS */
 
 pagechange()
 {	register struct fpage *temp;
@@ -3696,6 +3698,7 @@ set_options()
 	menus[GIVE].enabled[8] = stuff_flag(29); /* bone */
 }
 
+#ifndef RSRC_REGIONS /* PORT: ported to rsrc/regions.rs */
 load_all()
 {	while (MAP_FLUX) load_new_region(); }
 
@@ -3766,6 +3769,7 @@ load_new_region()
 	region_num = new_region;
 	new_region = NO_REGION;
 }
+#endif /* RSRC_REGIONS */
 
 effect(num,speed) short num; long speed;
 {	if (menus[GAME].enabled[7] & 1)

@@ -102,6 +102,19 @@ pub struct FPage {
     pub wflag: i16,
 }
 
+/// The disk blocks one region needs (`struct need`): four image banks, two terrain tables, the
+/// sector data, the region map and the character set.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Need {
+    pub image: [u16; 4],
+    pub terra1: u16,
+    pub terra2: u16,
+    pub sector: u16,
+    pub region: u16,
+    pub setchar: u16,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -114,5 +127,6 @@ mod tests {
         assert_eq!(size_of::<Missile>(), 10);
         assert_eq!(size_of::<SeqInfo>(), 32);
         assert_eq!(size_of::<FPage>(), 64);
+        assert_eq!(size_of::<Need>(), 18);
     }
 }

@@ -34,6 +34,7 @@ fn main() {
         .flag("-Wno-missing-parameter-type")
         .flag("-Wno-unused-but-set-variable")
         .flag("-Wno-implicit-fallthrough")
+        .define("RSRC_REGIONS", None)
         // the C file with the game's main() is called from Rust as fta_main()
         .define("main", "fta_main")
         .compile("fta_c");

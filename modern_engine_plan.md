@@ -115,7 +115,7 @@ that move must keep their C name. Leaf files first, `fmain.c` / `fmain2.c` last.
 - [ ] Then `statedump.c`, `layout.c` (both stay C until the end: layout checks Rust against the C
       compiler's struct sizes, statedump reads game globals), `narr_data.c` (keep as generated data),
       `fmain2.c`, `fmain.c`.
-Left off: `fmain2.c` is fully ported and out of the build. `fmain.c` is next.
+Left off: `fmain2.c` is fully ported and out of the build. `fmain.c` is being ported in groups (see "`fmain.c` port" below).
 #### `fmain2.c` split (done)
 All functions are ported as groups, each into its own `rsrc/` file. The old C stays in `fmain2.c`
 inside `#ifndef RSRC_<GROUP>` (the macros are defined in `build.rs`), so the original is still
@@ -134,6 +134,14 @@ readable there and a group can be switched back to C for a bisect.
       as the reference (with its `RSRC_*` guards, which are off, so it reads as the original).
       `cargo build` is the check that catches a symbol the remaining C still needs (it found `s1`
       and `s2`); `cargo test` alone does not link the C.
+#### `fmain.c` port (in progress)
+`main()` is already cut into functions (step 2, done). Groups are ported the same way as `fmain2.c`: the C
+stays in `fmain.c` inside `#ifndef RSRC_<GROUP>` (macro defined in `build.rs`).
+- [x] `regions.rs`: `gen_mini`, `load_all`, `load_new_region` (+ `Need` struct in `types.rs`).
+- [ ] Small leftovers: `get_turtle`, `set_options`, `gomenu`, `mod1save`, `pagechange`, `add_device`,
+      `wrap_device`, `effect`, `read_sample`.
+- [ ] `open_all`, `close_all`, `load_actors`, `print_options`.
+- [ ] The `main()` pieces: `move_actor`, `draw_sprites`, world update, combat, and so on.
 Not covered by the regression scenarios yet: `win_colors`, `rescue`, `witch_fx`, the trackdisk
 path in `hdrive`. They were ported line by line; a scenario for each would be worth adding.
 
