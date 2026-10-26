@@ -15,11 +15,10 @@ unsafe extern "C" {
     static mut cmode: i16;
     static wealth: i16;
     static mut rp_text2: RastPort;
-    static real_options: [i8; 12];
+    static mut real_options: [i8; 12];
     static keycolors: [i8; 6];
     static label1: [c_char; 0];
 
-    fn print_options() -> i32;
     fn SetAPen(rp: *mut RastPort, pen: u32);
     fn SetBPen(rp: *mut RastPort, pen: u32);
     fn Move(rp: *mut RastPort, x: i32, y: i32);
@@ -73,6 +72,42 @@ pub extern "C" fn set_options() {
         menus[GIVE].enabled[6] = GREYED; // book
         menus[GIVE].enabled[7] = stuff_flag(WRIT) as i8;
         menus[GIVE].enabled[8] = stuff_flag(BONE) as i8;
+    }
+}
+
+/// Most entries a menu shows at once (two columns of six).
+const SLOTS: usize = 12;
+/// An entry with this bit set is shown.
+const SHOWN: i8 = 2;
+
+/// Draws the current menu (`cmode`): the entries that are switched on, in the order they are shown,
+/// and blanks over the slots that are left. `real_options` remembers which entry each slot is.
+#[unsafe(no_mangle)]
+pub extern "C" fn print_options() {
+    unsafe {
+        let menu = &menus[cmode as usize];
+        let mut slot = 0usize;
+        for entry in 0..menu.num as usize {
+            let enabled = menu.enabled[entry];
+            if enabled & SHOWN == 0 {
+                continue;
+            }
+            real_options[slot] = entry as i8;
+            propt(slot as i16, (enabled & 1) as i16);
+            slot += 1;
+            if slot > SLOTS - 1 {
+                break;
+            }
+        }
+        SetBPen(&raw mut rp_text2, 0);
+        while slot < SLOTS {
+            let x = if slot & 1 != 0 { RIGHT_COLUMN_X } else { LEFT_COLUMN_X };
+            let y = (slot / 2) as i32 * ROW_HEIGHT + FIRST_ROW_Y;
+            Move(&raw mut rp_text2, x, y);
+            Text(&raw mut rp_text2, c"      ".as_ptr(), 6);
+            real_options[slot] = -1;
+            slot += 1;
+        }
     }
 }
 

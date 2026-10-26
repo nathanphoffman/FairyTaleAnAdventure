@@ -50,6 +50,8 @@ pub mod ai;
 pub mod move_actor;
 // Drawing the actors and the witch's beam into the page.
 pub mod draw;
+// Opening and closing everything, the title and intro, and the main loop.
+pub mod startup;
 // Hits, collision between actors, enemy tactics.
 pub mod actors;
 // The sprite blitter, done in software.

@@ -6,7 +6,7 @@ use super::asm_text::{event, prq, speak};
 use super::hdrive::motor_off;
 use super::loading::{prep, read_shapes};
 use super::mood::setmood;
-use super::random::{bitrand, rand2, rand4};
+use super::random::{bitrand, rand2, rand4, rnd};
 use super::tables::weapon_probs;
 use super::types::{Extent, SeqInfo, Shape};
 
@@ -17,6 +17,8 @@ unsafe extern "C" {
     static mut seq_list: [SeqInfo; 0];
     static mut nextshape: *mut u8;
     static mut anix: i16;
+    static mut actors_loading: i8;
+    static mut encounter_number: u8;
     static mut actor_file: i16;
     static mut active_carrier: i16;
     static encounter_x: u16;
@@ -213,5 +215,24 @@ pub extern "C" fn load_carrier(n: i16) {
         active_carrier = n;
         actor_file = n;
         (*an).race = n as u8;
+    }
+}
+
+/// The actors' sprite file the monsters of this encounter need: sets how many appear and, if that
+/// file is not the one loaded, loads it (the carrier is dropped then).
+#[unsafe(no_mangle)]
+pub extern "C" fn load_actors() {
+    const FIRST_ENEMY_SLOT: i16 = 3;
+    unsafe {
+        encounter_number = ((*extn).v1 as i32 + rnd((*extn).v2 as i32)) as u8;
+        let file = encounter_chart[encounter_type as usize].file_id as i16;
+        if actor_file != file {
+            actor_file = file;
+            anix = FIRST_ENEMY_SLOT;
+            nextshape = (*(&raw const seq_list).cast::<SeqInfo>().add(ENEMY as usize)).location;
+            read_shapes(actor_file as i32);
+            actors_loading = 1;
+            active_carrier = 0;
+        }
     }
 }

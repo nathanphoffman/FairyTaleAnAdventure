@@ -18,24 +18,24 @@ use std::ffi::c_void;
 
 /// Mirror of `struct in_work` in csrc/ftale.h, the input handler's data area.
 #[repr(C)]
-struct InWork {
+pub struct InWork {
     // Pointer position, in lores pixels (x) and screen lines (y).
-    xsprite: i16,
-    ysprite: i16,
+    pub xsprite: i16,
+    pub ysprite: i16,
     // Which mouse buttons are down (bit 0x4000 left, 0x2000 right).
     qualifier: i16,
     // Ring buffer write position (where the next key goes).
-    laydown: u8,
+    pub laydown: u8,
     // Ring buffer read position (the next key `getkey` returns).
-    pickup: u8,
+    pub pickup: u8,
     // Set when a disk was inserted (only the Amiga needs this).
     newdisk: i8,
     // The last menu key sent, so its release can be sent with the same code.
     lastmenu: i8,
     // Amiga library pointers the original handler kept; unused now.
-    gbase: *mut c_void,
-    pbase: *mut c_void,
-    vbase: *mut c_void,
+    pub gbase: *mut c_void,
+    pub pbase: *mut c_void,
+    pub vbase: *mut c_void,
     // The key ring buffer.
     keybuf: [u8; KEY_BUFFER_SIZE],
     ticker: i16,

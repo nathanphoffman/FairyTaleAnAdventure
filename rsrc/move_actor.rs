@@ -207,7 +207,8 @@ fn terrain(x: u16, y: u16) -> i16 {
 /// carries the last terrain value from one actor to the next (a dead actor reads it without setting
 /// it), so it is passed in and written back.
 #[unsafe(no_mangle)]
-pub extern "C" fn move_actor(i: i64, cycle: i16, jp: *mut i16) {
+pub extern "C" fn move_actor(i: i32, cycle: i16, jp: *mut i16) {
+    let i = i as i64;
     unsafe {
         let an = &raw mut anim_list[i as usize];
         let mut c = Ctx {

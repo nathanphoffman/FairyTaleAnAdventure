@@ -716,6 +716,7 @@ BOOL			audio_open;
 
 struct BitMap work_bm;
 
+#ifndef RSRC_STARTUP /* PORT: ported to rsrc/startup.rs */
 open_all()
 {	register long i;
 	long file;
@@ -995,6 +996,7 @@ close_all()
 
 	exit(0);
 }
+#endif /* RSRC_STARTUP */
 
 short oldir = 9;
 short keydir = 0, keyfight;
@@ -2519,6 +2521,7 @@ static void move_actor(i, cycle, jp) long i; short cycle; short *jp;
 void move_actor(long i, short cycle, short *jp);
 #endif /* RSRC_MOVE_ACTOR */
 
+#ifndef RSRC_STARTUP /* PORT: ported to rsrc/startup.rs (fta_main) */
 void main(int argc,char argv[])
 {	register long i;
 	short j, k; char key;
@@ -2810,6 +2813,7 @@ quit_all:
 	SetRast(&rp_text,0);
 	close_all();
 }
+#endif /* RSRC_STARTUP */
 
 /* asm */
 
@@ -2915,6 +2919,7 @@ find_place(flag) short flag;
 }
 #endif /* RSRC_PLACES */
 
+#ifndef RSRC_ENCOUNTERS /* PORT: ported to rsrc/encounters.rs */
 load_actors()
 {	encounter_number = extn->v1 + rnd(extn->v2);
 	if ( actor_file != encounter_chart[encounter_type].file_id)
@@ -2926,6 +2931,7 @@ load_actors()
 		active_carrier = 0;
 	}
 }
+#endif /* RSRC_ENCOUNTERS */
 
 #define MAX_TRY 15
 
@@ -3261,6 +3267,7 @@ wrap_device()
 }
 #endif /* RSRC_DISPLAY */
 
+#ifndef RSRC_MENUS /* PORT: ported to rsrc/menus.rs */
 print_options()
 {	short i,j,x,y;
 	j = 0;
@@ -3282,6 +3289,7 @@ print_options()
 		real_options[j]=-1;
 	}
 }
+#endif /* RSRC_MENUS */
 
 #ifndef RSRC_MENUS /* PORT: ported to rsrc/menus.rs */
 propt(j,pena) short j,pena;

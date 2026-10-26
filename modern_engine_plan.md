@@ -159,7 +159,7 @@ yet: swan/turtle, key doors, searching a body, the freeze and fear spells, `win_
 
 #### Roadmap: what is left in `csrc/fmain.c`
 About 1,300 lines of functions (A and B are done) plus the data tables at the top. Six groups, in this
-order; two are left. Sizes are the C line counts.
+order; one is left. Sizes are the C line counts.
 - [x] **A. Menus and keys (~600).** Done: `propt` in `menus.rs`; `do_option` in `options.rs`
       (talk, buy, game, use, keys, save, give) with the Items menu in `items_menu.rs` and the Magic
       menu in `magic.rs`; `handle_key` and `update_hero` in `keys.rs` (guards `RSRC_MENUS`,
@@ -186,10 +186,13 @@ order; two are left. Sizes are the C line counts.
       `shift`, `aoff`, `boff`, `bmod`, `planesize`, `wmask`). `StateEntry` mirror added to `types.rs`.
       `main()` still sets `j = anix2` after the call (step 2). Checked by the 10 pixel tests and all
       41 state scenarios.
-- [ ] **E. Start-up and shutdown (~600).** `open_all` (~220: opens libraries, allocates memory, loads
-      fonts and pictures), `close_all` (~55), `load_actors` (~10), `print_options` (~20), and last
-      `main()` itself (~290: intro, start-up, the main loop that calls everything above, quit). When
-      `main()` is Rust, remove `-Dmain=fta_main` from `build.rs` and call it from `src/main.rs`.
+- [x] **E. Start-up and shutdown (~600).** Done: `startup.rs` (`open_all`, `close_all`, and the original
+      `main` as `fta_main`, split into `start_up`, `play_intro` and `main_loop`; guard `RSRC_STARTUP`),
+      `load_actors` in `encounters.rs`, `print_options` in `menus.rs`. `-Dmain=fta_main` stays in
+      `build.rs`: the Rust function is simply named `fta_main`, so `src/main.rs` is unchanged. Note that
+      `long` is 32 bit in this port (`#define long int` in `csrc/amiga.h`), so C `long` is `i32`
+      (`move_actor`'s `i` was changed to `i32` for that). The game and the `--intro` path both run; the
+      pixel and state tests cover the main loop, the intro is only checked by running it.
 - [ ] **F. Data tables, then drop `fmain.c` from the build.** Move the tables at the top of `fmain.c`
       to `rsrc/tables.rs` (or a new file): `setfig_table`, `doorlist`, `extent_list`, `inv_list`, the
       `menus` array and its labels, `blist`, `file_index`, `open_list`-style tables, `introcolors`,
