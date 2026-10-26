@@ -22,10 +22,10 @@
 #[repr(C)]
 pub struct SShape {
     pub backsave: *mut u8,
-    savesize: i16,
-    blitsize: i16,
-    coff: i16,
-    cmod: i16,
+    pub savesize: i16,
+    pub blitsize: i16,
+    pub coff: i16,
+    pub cmod: i16,
 }
 
 unsafe extern "C" {

@@ -159,7 +159,7 @@ yet: swan/turtle, key doors, searching a body, the freeze and fear spells, `win_
 
 #### Roadmap: what is left in `csrc/fmain.c`
 About 1,300 lines of functions (A and B are done) plus the data tables at the top. Six groups, in this
-order; three are left. Sizes are the C line counts.
+order; two are left. Sizes are the C line counts.
 - [x] **A. Menus and keys (~600).** Done: `propt` in `menus.rs`; `do_option` in `options.rs`
       (talk, buy, game, use, keys, save, give) with the Items menu in `items_menu.rs` and the Magic
       menu in `magic.rs`; `handle_key` and `update_hero` in `keys.rs` (guards `RSRC_MENUS`,
@@ -179,9 +179,13 @@ order; three are left. Sizes are the C line counts.
       (step 2). Quirks kept: the dragon's image is always 0, the `an->state == STILL` no-op for race 7.
       Scenarios added: `swan_ride`, `swan_no_lasso`, `turtle_shell`, `door_locked`, `door_wood`; their
       state hashes were identical on a worktree build of the C `move_actor`.
-- [ ] **D. Drawing (~260).** `draw_sprites` (~230: clipping, weapon pass, masking against scenery,
-      background save) and `repair_map_and_witch` (~20). Uses the blitter already in `asm_blit.rs`.
-      `main()` sets `j = anix2` after the call (see step 2); keep that.
+- [x] **D. Drawing (~260).** Done: `draw.rs` (`repair_map_and_witch`, `draw_sprites`; guard `RSRC_DRAW`,
+      prototypes in the C `#else`). `draw_sprites` is split into `weapon_passmode`, `draw_one`,
+      `drawn_in_front` and `mask_against_scenery`; an actor with a weapon is drawn in two passes as
+      before. It still writes the C globals the blitter reads (`shp`, `shapedata`, `mask_buffer`,
+      `shift`, `aoff`, `boff`, `bmod`, `planesize`, `wmask`). `StateEntry` mirror added to `types.rs`.
+      `main()` still sets `j = anix2` after the call (step 2). Checked by the 10 pixel tests and all
+      41 state scenarios.
 - [ ] **E. Start-up and shutdown (~600).** `open_all` (~220: opens libraries, allocates memory, loads
       fonts and pictures), `close_all` (~55), `load_actors` (~10), `print_options` (~20), and last
       `main()` itself (~290: intro, start-up, the main loop that calls everything above, quit). When

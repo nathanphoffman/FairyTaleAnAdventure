@@ -102,6 +102,16 @@ pub struct FPage {
     pub wflag: i16,
 }
 
+/// One animation frame of an actor (`struct state`, the C table `statelist`): which figure image to
+/// draw, which weapon image goes with it, and where the weapon sits relative to the actor.
+#[repr(C)]
+pub struct StateEntry {
+    pub figure: i8,
+    pub wpn_no: i8,
+    pub wpn_x: i8,
+    pub wpn_y: i8,
+}
+
 /// The disk blocks one region needs (`struct need`): four image banks, two terrain tables, the
 /// sector data, the region map and the character set.
 #[repr(C)]
@@ -189,5 +199,6 @@ mod tests {
         assert_eq!(size_of::<InvItem>(), 16);
         assert_eq!(size_of::<Letter>(), 3);
         assert_eq!(size_of::<Door>(), 10);
+        assert_eq!(size_of::<StateEntry>(), 4);
     }
 }

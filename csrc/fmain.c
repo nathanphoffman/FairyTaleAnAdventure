@@ -1837,6 +1837,7 @@ void queue_missiles();
 void sort_actors();
 #endif /* RSRC_WORLD */
 
+#ifndef RSRC_DRAW /* PORT: ported to rsrc/draw.rs */
 /* PORT: split out of main(): finishes the scrolled map edge (dif_x, dif_y = scroll step) and runs
    the witch effect and her damage. */
 static void repair_map_and_witch(dif_x, dif_y) short dif_x, dif_y;
@@ -2100,6 +2101,10 @@ static void draw_sprites(cycle) short cycle;
 		offscreen: if (pass == 1) goto newpass;
 	}
 }
+#else
+void repair_map_and_witch(short dif_x, short dif_y);
+void draw_sprites(short cycle);
+#endif /* RSRC_DRAW */
 
 #ifndef RSRC_MOVE_ACTOR /* PORT: ported to rsrc/move_actor.rs */
 /* PORT: split out of main(): moves and animates one actor (hero, raft, carrier, setfig, enemy), sets

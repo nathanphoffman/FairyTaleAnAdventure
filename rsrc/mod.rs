@@ -48,6 +48,8 @@ pub mod combat;
 pub mod ai;
 // Moving and animating each actor every frame.
 pub mod move_actor;
+// Drawing the actors and the witch's beam into the page.
+pub mod draw;
 // Hits, collision between actors, enemy tactics.
 pub mod actors;
 // The sprite blitter, done in software.
