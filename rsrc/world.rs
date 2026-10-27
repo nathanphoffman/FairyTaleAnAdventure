@@ -303,6 +303,41 @@ const HEAL_MASK: u16 = 0x3ff;
 const HEAL_BASE: i16 = 15;
 const WAKE_Y_MASK: u16 = 0xffe0;
 
+/// The day clock after one frame: it stands still while time is frozen and wraps to 0 once it
+/// is past `DAY_LENGTH`.
+fn clock_step(clock: u16, frozen: bool) -> u16 {
+    if frozen {
+        return clock;
+    }
+    if clock >= DAY_LENGTH { 0 } else { clock.wrapping_add(1) }
+}
+
+/// The light level for a clock value: it rises to `LIGHT_PEAK` at midday and falls again.
+fn light_level(clock: u16) -> u16 {
+    let level = clock / DARK;
+    if level >= LIGHT_PEAK { 2 * LIGHT_PEAK - level } else { level }
+}
+
+/// The lamp post is lit when it is dark.
+fn lamp_is_on(level: u16) -> bool {
+    level < DARK
+}
+
+/// Which part of the day (0..=11) the clock is in.
+fn day_period(clock: u16) -> i16 {
+    (clock / PERIOD_LENGTH) as i16
+}
+
+/// The message said when `period` starts, if it has one.
+fn period_event(period: i16) -> Option<i32> {
+    PERIOD_EVENTS.iter().find(|(p, _)| *p == period).map(|(_, e)| *e)
+}
+
+/// Slow healing: once per `HEAL_MASK + 1` clock ticks, if hurt and alive.
+fn heal_due(clock: u16, vitality: i16, bravery: i16, state: i8) -> bool {
+    clock & HEAL_MASK == 0 && vitality < HEAL_BASE + bravery / 4 && state != DEAD
+}
+
 /// Sleeping, the day clock, the light level, the messages for the time of day and slow healing.
 pub fn day_night_tick() {
     unsafe {
@@ -310,55 +345,59 @@ pub fn day_night_tick() {
         if (*hero).state == SLEEP {
             sleep_tick(hero);
         }
-        if the_world.freeze_timer == 0 {
-            let old = the_world.day_clock;
-            the_world.day_clock = old.wrapping_add(1);
-            if old >= DAY_LENGTH {
-                the_world.day_clock = 0;
-            }
-        }
-        the_world.light_level = the_world.day_clock / DARK;
-        if the_world.light_level >= LIGHT_PEAK {
-            the_world.light_level = 2 * LIGHT_PEAK - the_world.light_level;
-        }
-        ob_listg[LAMP_SLOT].ob_stat = if the_world.light_level < DARK {
+        the_world.day_clock = clock_step(the_world.day_clock, the_world.freeze_timer != 0);
+        the_world.light_level = light_level(the_world.day_clock);
+        ob_listg[LAMP_SLOT].ob_stat = if lamp_is_on(the_world.light_level) {
             LAMP_ON
         } else {
             LAMP_OFF
         };
-        let period = (the_world.day_clock / PERIOD_LENGTH) as i16;
+        let period = day_period(the_world.day_clock);
         if period != the_world.day_period {
             the_world.day_period = period;
-            if let Some((_, e)) = PERIOD_EVENTS.iter().find(|(p, _)| *p == period) {
-                show_event(*e);
+            if let Some(e) = period_event(period) {
+                show_event(e);
             }
         }
 
         day_fade();
 
-        if the_world.day_clock & HEAL_MASK == 0
-            && (*hero).vitality < HEAL_BASE + the_hero.brave / 4
-            && (*hero).state != DEAD
-        {
+        if heal_due(the_world.day_clock, (*hero).vitality, the_hero.brave, (*hero).state) {
             (*hero).vitality += 1;
             queue_print(PRQ_STATS);
         }
     }
 }
 
+/// One frame of sleep: returns the new clock, the new fatigue and whether the hero wakes.
+/// `fight_wakes` is only called (it draws a random number) when a battle is on and no other
+/// reason to wake applied.
+fn sleep_step(
+    clock: u16,
+    tired: i16,
+    battle: bool,
+    fight_wakes: impl FnOnce() -> bool,
+) -> (u16, i16, bool) {
+    let clock = clock.wrapping_add(SLEEP_TIME_STEP);
+    let tired = if tired != 0 { tired - 1 } else { tired };
+    let wake = tired == 0
+        || (tired < LITTLE_TIRED && clock > DAWN.0 && clock < DAWN.1)
+        || (battle && fight_wakes());
+    (clock, tired, wake)
+}
+
 /// While asleep time runs fast; the hero wakes when rested, at dawn, or when a fight starts.
 unsafe fn sleep_tick(hero: *mut Shape) {
     unsafe {
-        the_world.day_clock = the_world.day_clock.wrapping_add(SLEEP_TIME_STEP);
-        if the_hero.fatigue != 0 {
-            the_hero.fatigue -= 1;
-        }
-        if the_hero.fatigue == 0
-            || (the_hero.fatigue < LITTLE_TIRED
-                && the_world.day_clock > DAWN.0
-                && the_world.day_clock < DAWN.1)
-            || (the_actors.battle_flag != 0 && rand64() == 0)
-        {
+        let (clock, tired, wake) = sleep_step(
+            the_world.day_clock,
+            the_hero.fatigue,
+            the_actors.battle_flag != 0,
+            || rand64() == 0,
+        );
+        the_world.day_clock = clock;
+        the_hero.fatigue = tired;
+        if wake {
             (*hero).state = STILL;
             (*hero).abs_y &= WAKE_Y_MASK;
             the_hero.y = (*hero).abs_y;
@@ -511,11 +550,31 @@ const FAINT_HUNGER: i16 = 140;
 const FAINT_RESET: i16 = 130;
 const TIRED_AT: i16 = 70;
 
+/// Hunger, fatigue and the safe spot are checked when the clock is a multiple of 128; the
+/// music is picked when it is a multiple of 8.
+fn safe_check_due(clock: u16) -> bool {
+    clock & SAFE_CHECK_MASK == 0
+}
+
+fn mood_due(clock: u16, battle: bool) -> bool {
+    clock & 7 == 0 && !battle
+}
+
+/// The hero is hungrier and more tired on a safe-check frame while alive and awake.
+fn hunger_due(clock: u16, vitality: i16, state: i8) -> bool {
+    safe_check_due(clock) && vitality != 0 && state != SLEEP
+}
+
+/// Hungry enough to eat a piece of fruit at the safe spot (only when one is carried).
+fn eats_fruit(hungry: i16, fruit: u8) -> bool {
+    hungry > 30 && fruit != 0
+}
+
 /// Notes a safe spot, picks the music, and makes the hero hungrier and more tired.
 pub fn survival_tick() {
     unsafe {
         let hero = &raw mut the_actors.list[0];
-        if the_world.day_clock & SAFE_CHECK_MASK == 0
+        if safe_check_due(the_world.day_clock)
             && the_actors.on_screen == 0
             && the_actors.loading == 0
             && the_witch.on_screen == 0
@@ -526,19 +585,16 @@ pub fn survival_tick() {
             the_hero.safe_r = the_world.region;
             the_hero.safe_x = the_hero.x;
             the_hero.safe_y = the_hero.y;
-            if the_hero.hunger > 30 && *the_hero.stuff.add(FRUIT_SLOT) != 0 {
+            if eats_fruit(the_hero.hunger, *the_hero.stuff.add(FRUIT_SLOT)) {
                 *the_hero.stuff.add(FRUIT_SLOT) -= 1;
                 the_hero.hunger -= FRUIT_FOOD;
                 show_event(EVENT_ATE_FRUIT);
             }
         }
-        if the_world.day_clock & 7 == 0 && the_actors.battle_flag == 0 {
+        if mood_due(the_world.day_clock, the_actors.battle_flag != 0) {
             set_mood(0);
         }
-        if the_world.day_clock & SAFE_CHECK_MASK == 0
-            && (*hero).vitality != 0
-            && (*hero).state != SLEEP
-        {
+        if hunger_due(the_world.day_clock, (*hero).vitality, (*hero).state) {
             the_hero.hunger += 1;
             the_hero.fatigue += 1;
             let report = hunger_effects(&mut *(&raw mut the_hero), &mut *hero);
@@ -667,6 +723,88 @@ mod tests {
         hero.fatigue = fatigue;
         body.vitality = vitality;
         (hero, body)
+    }
+
+    #[test]
+    fn clock_counts_wraps_and_freezes() {
+        assert_eq!(clock_step(0, false), 1);
+        assert_eq!(clock_step(500, true), 500);
+        assert_eq!(clock_step(DAY_LENGTH - 1, false), DAY_LENGTH);
+        assert_eq!(clock_step(DAY_LENGTH, false), 0);
+    }
+
+    #[test]
+    fn light_follows_the_sun() {
+        assert_eq!(light_level(0), 0);
+        assert_eq!(light_level(39), 0);
+        assert_eq!(light_level(40), 1);
+        assert_eq!(light_level(300 * 40 - 1), 299);
+        assert_eq!(light_level(300 * 40), 300);
+        assert_eq!(light_level(301 * 40), 299);
+        assert_eq!(light_level(23999), 1);
+        assert!(lamp_is_on(light_level(0)) && lamp_is_on(light_level(39 * 40 + 39)));
+        assert!(!lamp_is_on(light_level(40 * 40)));
+    }
+
+    #[test]
+    fn day_periods_and_messages() {
+        assert_eq!(day_period(0), 0);
+        assert_eq!(day_period(1999), 0);
+        assert_eq!(day_period(2000), 1);
+        assert_eq!(day_period(23999), 11);
+        let said: Vec<_> = (0..12).filter_map(|p| period_event(p).map(|e| (p, e))).collect();
+        assert_eq!(said, vec![(0, 28), (4, 29), (6, 30), (9, 31)]);
+    }
+
+    #[test]
+    fn healing_every_1024_ticks() {
+        assert!(heal_due(0, 10, 0, STILL));
+        assert!(heal_due(1024, 10, 0, STILL));
+        assert!(!heal_due(1023, 10, 0, STILL));
+        assert!(!heal_due(1024, 15, 0, STILL));
+        assert!(heal_due(1024, 15, 4, STILL));
+        assert!(!heal_due(1024, 10, 0, DEAD));
+    }
+
+    #[test]
+    fn sleep_steps_fast_and_wakes() {
+        let mut drawn = 0;
+        let (clock, tired, wake) = sleep_step(100, 50, false, || {
+            drawn += 1;
+            true
+        });
+        assert_eq!((clock, tired, wake, drawn), (163, 49, false, 0));
+        assert!(sleep_step(100, 1, false, || false).2);
+        assert!(sleep_step(9000, 20, false, || false).2);
+        assert!(!sleep_step(9000, 40, false, || false).2);
+        assert!(!sleep_step(8000, 20, false, || false).2);
+        let mut drawn = 0;
+        assert!(
+            sleep_step(100, 50, true, || {
+                drawn += 1;
+                true
+            })
+            .2
+        );
+        assert_eq!(drawn, 1);
+        let mut drawn = 0;
+        sleep_step(100, 1, true, || {
+            drawn += 1;
+            true
+        });
+        assert_eq!(drawn, 0);
+        assert_eq!(sleep_step(0, 0, false, || false).1, 0);
+    }
+
+    #[test]
+    fn survival_schedule() {
+        let fires: Vec<u16> = (0..=384).filter(|c| hunger_due(*c, 10, STILL)).collect();
+        assert_eq!(fires, vec![0, 128, 256, 384]);
+        assert!(!hunger_due(128, 0, STILL));
+        assert!(!hunger_due(128, 10, SLEEP));
+        assert!(mood_due(8, false) && mood_due(0, false));
+        assert!(!mood_due(9, false) && !mood_due(8, true));
+        assert!(eats_fruit(31, 1) && !eats_fruit(30, 1) && !eats_fruit(50, 0));
     }
 
     #[test]

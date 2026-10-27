@@ -252,23 +252,23 @@ unsafe fn take_object() -> bool {
         let an = &raw mut the_actors.list[the_actors.nearest_object as usize];
         let id = (*an).index as u8 as u32;
         let owner = (*an).vitality as u32 & 0x7f;
-        match id {
-            GOLD_PILE => {
+        match classify_take(id, the_hero.hunger, the_world.region) {
+            Take::Gold => {
                 announce_treasure(c"50 gold pieces".as_ptr());
                 the_hero.wealth += GOLD_FOUND;
                 true
             }
-            SCRAP_OF_PAPER => {
+            Take::Paper { indoors } => {
                 show_event(EVENT_PAPER);
-                show_event(if the_world.region > FIRST_INDOOR_REGION {
+                show_event(if indoors {
                     EVENT_PAPER_INDOORS
                 } else {
                     EVENT_PAPER_OUTDOORS
                 });
                 true
             }
-            FRUIT => {
-                if the_hero.hunger < NOT_HUNGRY {
+            Take::Fruit { keep } => {
+                if keep {
                     add_stuff(FRUIT_SLOT, 1);
                     show_event(EVENT_FRUIT_KEPT);
                 } else {
@@ -276,8 +276,8 @@ unsafe fn take_object() -> bool {
                 }
                 true
             }
-            TURTLE_EGGS => false, // not taken
-            BROTHER_BONES => {
+            Take::Eggs => false, // not taken
+            Take::Bones => {
                 announce_treasure(c"his brother's bones.".as_ptr());
                 ob_listg[BONES.0].ob_stat = 0;
                 ob_listg[BONES.1].ob_stat = 0;
@@ -291,41 +291,90 @@ unsafe fn take_object() -> bool {
                 }
                 true
             }
-            _ => take_container(id),
+            Take::Container(name) => {
+                announce_container(name.as_ptr());
+                container_contents()
+            }
+            Take::Left => false,
+            Take::Plain => take_plain_item(id),
         }
     }
 }
 
-/// Opens a chest, urn or sacks (or picks up a plain item) and says what was inside.
-unsafe fn take_container(id: u32) -> bool {
-    unsafe {
-        match id {
-            CHEST => announce_container(c"a chest".as_ptr()),
-            URN => announce_container(c"a brass urn".as_ptr()),
-            SACKS => announce_container(c"some sacks".as_ptr()),
-            EMPTY_CHEST | FOOTSTOOL => return false,
-            _ => return take_plain_item(id),
+/// What taking an object does, from its id.
+#[derive(Debug, PartialEq, Eq)]
+enum Take {
+    Gold,
+    /// The scrap of paper; the second message depends on being indoors.
+    Paper { indoors: bool },
+    /// Fruit: kept in the pack when not hungry, otherwise eaten.
+    Fruit { keep: bool },
+    /// Turtle eggs cannot be taken.
+    Eggs,
+    Bones,
+    /// A chest, urn or sacks (with the name announced).
+    Container(&'static core::ffi::CStr),
+    /// An empty chest or a footstool: nothing happens.
+    Left,
+    /// Anything else: looked up in `itrans`.
+    Plain,
+}
+
+fn classify_take(id: u32, hunger: i16, region: u16) -> Take {
+    match id {
+        GOLD_PILE => Take::Gold,
+        SCRAP_OF_PAPER => Take::Paper { indoors: region > FIRST_INDOOR_REGION },
+        FRUIT => Take::Fruit { keep: hunger < NOT_HUNGRY },
+        TURTLE_EGGS => Take::Eggs,
+        BROTHER_BONES => Take::Bones,
+        CHEST => Take::Container(c"a chest"),
+        URN => Take::Container(c"a brass urn"),
+        SACKS => Take::Container(c"some sacks"),
+        EMPTY_CHEST | FOOTSTOOL => Take::Left,
+        _ => Take::Plain,
+    }
+}
+
+/// The inventory slot for object `id` in the (id, slot) pair table `itrans`, which ends with a 0 id.
+fn item_slot(id: u32, table: &[u8]) -> Option<usize> {
+    let mut k = 0;
+    while table[k] != 0 {
+        if id == table[k] as u32 {
+            return Some(table[k + 1] as usize);
         }
-        container_contents()
+        k += 2;
+    }
+    None
+}
+
+/// The item a container holds when it rolls `roll` (0-7) for one item: slot 8 means arrows.
+fn container_item(roll: i32) -> usize {
+    let i = roll as usize + 8;
+    if i == 8 { ARROWBASE } else { i }
+}
+
+/// A key found in a container: the two odd key types fold onto the first of their kind.
+fn container_key(roll: i32) -> i32 {
+    match roll + KEYBASE {
+        22 => 16,
+        23 => 20,
+        key => key,
     }
 }
 
 /// A single item lying about: the slot is found in the `itrans` table. Unknown objects are left.
 unsafe fn take_plain_item(id: u32) -> bool {
     unsafe {
-        let mut k = 0;
-        while itrans[k] != 0 {
-            if id == itrans[k] as u32 {
-                let slot = itrans[k + 1] as usize;
+        match item_slot(id, &itrans) {
+            Some(slot) => {
                 add_stuff(slot, 1);
                 announce_treasure(c"a ".as_ptr());
                 print_cont(item_name(slot));
                 print_cont(c".".as_ptr());
-                return true;
+                true
             }
-            k += 2;
+            None => false,
         }
-        false
     }
 }
 
@@ -336,10 +385,7 @@ unsafe fn container_contents() -> bool {
         match rand4() {
             0 => print(c"nothing.".as_ptr()),
             1 => {
-                let mut i = rand8() as usize + 8;
-                if i == 8 {
-                    i = ARROWBASE;
-                }
+                let i = container_item(rand8());
                 print(c"a ".as_ptr());
                 print_cont(item_name(i));
                 print_cont(c".".as_ptr());
@@ -389,13 +435,7 @@ unsafe fn three_things() {
         if i == 8 {
             print(c"3 keys.".as_ptr());
             for _ in 0..3 {
-                let mut key = rand8() + KEYBASE;
-                if key == 22 {
-                    key = 16;
-                }
-                if key == 23 {
-                    key = 20;
-                }
+                let key = container_key(rand8());
                 add_stuff(key as usize, 1);
             }
             return;
@@ -492,5 +532,47 @@ unsafe fn look_around() {
         } else {
             EVENT_NOTHING_HIDDEN
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn take_classes() {
+        assert_eq!(classify_take(GOLD_PILE, 0, 0), Take::Gold);
+        assert_eq!(classify_take(SCRAP_OF_PAPER, 0, FIRST_INDOOR_REGION), Take::Paper { indoors: false });
+        assert_eq!(classify_take(SCRAP_OF_PAPER, 0, FIRST_INDOOR_REGION + 1), Take::Paper { indoors: true });
+        assert_eq!(classify_take(FRUIT, NOT_HUNGRY - 1, 0), Take::Fruit { keep: true });
+        assert_eq!(classify_take(FRUIT, NOT_HUNGRY, 0), Take::Fruit { keep: false });
+        assert_eq!(classify_take(TURTLE_EGGS, 0, 0), Take::Eggs);
+        assert_eq!(classify_take(BROTHER_BONES, 0, 0), Take::Bones);
+        assert_eq!(classify_take(CHEST, 0, 0), Take::Container(c"a chest"));
+        assert_eq!(classify_take(URN, 0, 0), Take::Container(c"a brass urn"));
+        assert_eq!(classify_take(SACKS, 0, 0), Take::Container(c"some sacks"));
+        assert_eq!(classify_take(EMPTY_CHEST, 0, 0), Take::Left);
+        assert_eq!(classify_take(FOOTSTOOL, 0, 0), Take::Left);
+        assert_eq!(classify_take(1, 0, 0), Take::Plain);
+    }
+
+    #[test]
+    fn item_slot_lookup_stops_at_the_zero_pair() {
+        let table = [5u8, 35, 7, 9, 0, 0, 9, 1];
+        assert_eq!(item_slot(7, &table), Some(9));
+        assert_eq!(item_slot(5, &table), Some(35));
+        assert_eq!(item_slot(9, &table), None);
+        assert_eq!(item_slot(3, &table), None);
+    }
+
+    #[test]
+    fn container_rolls() {
+        assert_eq!(container_item(0), ARROWBASE);
+        assert_eq!(container_item(1), 9);
+        assert_eq!(container_item(7), 15);
+        assert_eq!(container_key(0), 16);
+        assert_eq!(container_key(5), 21);
+        assert_eq!(container_key(6), 16);
+        assert_eq!(container_key(7), 20);
     }
 }

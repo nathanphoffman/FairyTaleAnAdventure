@@ -118,7 +118,7 @@ unsafe fn think(i: usize, battle2: i8) {
         let xd = ((*an).abs_x as i32 - the_hero.x as i32) as i16;
         let yd = ((*an).abs_y as i32 - the_hero.y as i32) as i16;
         let (xd, yd) = (xd.wrapping_abs(), yd.wrapping_abs());
-        if xd < SCREEN_RANGE && yd < SCREEN_RANGE {
+        if on_screen(xd, yd) {
             the_actors.on_screen = 1;
             if (*an).vitality < 1 {
                 return;
@@ -168,20 +168,41 @@ unsafe fn think(i: usize, battle2: i8) {
 /// flee when nearly dead.
 unsafe fn adjust_mode_for_situation(an: *mut Shape, mode: i16) -> i16 {
     unsafe {
-        let hero_state = the_actors.list[0].state;
-        if hero_state == DEAD || hero_state == FALL {
-            if the_actors.leader == 0 {
-                FLEE
-            } else {
-                FOLLOWER
-            }
-        } else if (*an).vitality < NEARLY_DEAD
-            || (the_world.extent_type > SPECIAL_XTYPE && (*an).race != (*the_world.extent).v3)
-        {
-            FLEE // special encounters don't flee in the 60+ zones
-        } else {
-            mode
-        }
+        adjusted_mode(
+            mode,
+            the_actors.list[0].state,
+            the_actors.leader,
+            (*an).vitality,
+            the_world.extent_type,
+            (*an).race,
+            (*the_world.extent).v3,
+        )
+    }
+}
+
+/// Whether an actor `xd`, `yd` (absolute) pixels from the hero counts as on screen.
+fn on_screen(xd: i16, yd: i16) -> bool {
+    xd < SCREEN_RANGE && yd < SCREEN_RANGE
+}
+
+/// The mode after the hero's state and the actor's own health are taken into account: everyone
+/// flees (or follows the leader) when the hero is dead or falling, the nearly dead flee, and so do
+/// actors of a special encounter that are not the zone's own race in the 60+ zones.
+fn adjusted_mode(
+    mode: i16,
+    hero_state: i8,
+    leader_slot: i16,
+    vitality: i16,
+    extent_type: u16,
+    race: u8,
+    zone_race: u8,
+) -> i16 {
+    if hero_state == DEAD || hero_state == FALL {
+        if leader_slot == 0 { FLEE } else { FOLLOWER }
+    } else if vitality < NEARLY_DEAD || (extent_type > SPECIAL_XTYPE && race != zone_race) {
+        FLEE
+    } else {
+        mode
     }
 }
 
@@ -242,21 +263,44 @@ fn pick_tactic(
 /// A hostile enemy strikes if close enough, otherwise acts on its tactic.
 unsafe fn hostile_action(i: usize, an: *mut Shape, mode: i16, tactic: i16, xd: i16, yd: i16) {
     unsafe {
-        let mut thresh = STRIKE_BASE - mode;
-        if (*an).race == DKNIGHT {
-            thresh = DKNIGHT_STRIKE;
-        }
-        if (*an).weapon & BOW_BIT == 0 && xd < thresh && yd < thresh {
-            steer_actor(i as i32, the_hero.x as i32, the_hero.y as i32, 0);
-            if (*an).state >= WALKING {
-                (*an).state = FIGHTING;
+        match hostile_choice((*an).race, (*an).weapon, (*an).vitality, mode, xd, yd) {
+            Hostile::Strike => {
+                steer_actor(i as i32, the_hero.x as i32, the_hero.y as i32, 0);
+                if (*an).state >= WALKING {
+                    (*an).state = FIGHTING;
+                }
             }
-        } else if (*an).race == DKNIGHT && (*an).vitality != 0 {
-            (*an).state = STILL;
-            (*an).facing = DKNIGHT_FACING;
-        } else {
-            run_tactic(i as i32, tactic as i32);
+            Hostile::KnightGuard => {
+                (*an).state = STILL;
+                (*an).facing = DKNIGHT_FACING;
+            }
+            Hostile::Tactic => run_tactic(i as i32, tactic as i32),
         }
+    }
+}
+
+/// What a hostile enemy does this frame.
+#[derive(Debug, PartialEq, Eq)]
+enum Hostile {
+    /// Close enough with a hand weapon: face the hero and fight.
+    Strike,
+    /// The dark knight stands guard, facing one way.
+    KnightGuard,
+    /// Otherwise follow the tactic.
+    Tactic,
+}
+
+fn hostile_choice(race: u8, weapon: i8, vitality: i16, mode: i16, xd: i16, yd: i16) -> Hostile {
+    let mut thresh = STRIKE_BASE - mode;
+    if race == DKNIGHT {
+        thresh = DKNIGHT_STRIKE;
+    }
+    if weapon & BOW_BIT == 0 && xd < thresh && yd < thresh {
+        Hostile::Strike
+    } else if race == DKNIGHT && vitality != 0 {
+        Hostile::KnightGuard
+    } else {
+        Hostile::Tactic
     }
 }
 
@@ -342,5 +386,40 @@ mod tests {
             pick_tactic(&spider, ATTACK_MODE, 0, 0, || false).1,
             EGG_SEEK
         );
+    }
+
+    #[test]
+    fn mode_adjustments() {
+        assert_eq!(adjusted_mode(1, DEAD, 0, 10, 0, 0, 0), FLEE);
+        assert_eq!(adjusted_mode(1, FALL, 3, 10, 0, 0, 0), FOLLOWER);
+        assert_eq!(adjusted_mode(1, STILL, 0, NEARLY_DEAD - 1, 0, 0, 0), FLEE);
+        assert_eq!(adjusted_mode(1, STILL, 0, NEARLY_DEAD, 0, 0, 0), 1);
+        assert_eq!(adjusted_mode(1, STILL, 0, 10, SPECIAL_XTYPE + 1, 5, 6), FLEE);
+        assert_eq!(adjusted_mode(1, STILL, 0, 10, SPECIAL_XTYPE + 1, 6, 6), 1);
+        assert_eq!(adjusted_mode(1, STILL, 0, 10, SPECIAL_XTYPE, 5, 6), 1);
+    }
+
+    #[test]
+    fn screen_range_is_exclusive() {
+        assert!(on_screen(SCREEN_RANGE - 1, SCREEN_RANGE - 1));
+        assert!(!on_screen(SCREEN_RANGE, 0));
+    }
+
+    #[test]
+    fn strike_rules() {
+        let near = STRIKE_BASE - ATTACK_MODE;
+        assert_eq!(hostile_choice(0, 1, 10, ATTACK_MODE, near - 1, near - 1), Hostile::Strike);
+        assert_eq!(hostile_choice(0, 1, 10, ATTACK_MODE, near, 5), Hostile::Tactic);
+        // bows never strike
+        assert_eq!(hostile_choice(0, BOW_BIT, 10, ATTACK_MODE, 1, 1), Hostile::Tactic);
+        assert_eq!(
+            hostile_choice(DKNIGHT, 1, 10, ATTACK_MODE, DKNIGHT_STRIKE - 1, DKNIGHT_STRIKE - 1),
+            Hostile::Strike
+        );
+        assert_eq!(
+            hostile_choice(DKNIGHT, 1, 10, ATTACK_MODE, DKNIGHT_STRIKE, 5),
+            Hostile::KnightGuard
+        );
+        assert_eq!(hostile_choice(DKNIGHT, 1, 0, ATTACK_MODE, DKNIGHT_STRIKE, 5), Hostile::Tactic);
     }
 }

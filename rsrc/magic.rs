@@ -74,31 +74,36 @@ const ENEMY: i8 = 2;
 /// (the spell did not work, so the stone is not used up).
 pub unsafe fn magic_option(chosen_entry: i16) -> bool {
     unsafe {
-        if chosen_entry < FIRST_SPELL
-            || *the_hero.stuff.add(SPELL_SLOT_BASE + chosen_entry as usize) == 0
-        {
-            show_event(NO_SPELL_EVENT);
-            return true;
-        }
-        if (*the_world.extent).v3 == NO_MAGIC_ZONE {
-            speak(NO_MAGIC_SPEECH);
-            return true;
+        let count = if chosen_entry < FIRST_SPELL {
+            0
+        } else {
+            *the_hero.stuff.add(SPELL_SLOT_BASE + chosen_entry as usize)
+        };
+        let gate = spell_gate(
+            chosen_entry,
+            count,
+            (*the_world.extent).v3,
+            the_hero.riding,
+            the_ui.cheat_enabled,
+            the_world.region,
+        );
+        match gate {
+            SpellGate::NoSpell => {
+                show_event(NO_SPELL_EVENT);
+                return true;
+            }
+            SpellGate::QuietZone => {
+                speak(NO_MAGIC_SPEECH);
+                return true;
+            }
+            SpellGate::Refused => return false,
+            SpellGate::Proceed => {}
         }
         match chosen_entry {
             SPELL_LIGHT => the_world.light_timer += LIGHT_TIME,
             SPELL_SECRET => the_world.secret_timer += SECRET_TIME,
-            SPELL_FREEZE => {
-                if the_hero.riding > RIDING_BIG {
-                    return false;
-                }
-                the_world.freeze_timer += FREEZE_TIME;
-            }
-            SPELL_MAP => {
-                if the_ui.cheat_enabled == 0 && the_world.region > LAST_OUTDOOR_REGION {
-                    return false;
-                }
-                show_map();
-            }
+            SPELL_FREEZE => the_world.freeze_timer += FREEZE_TIME,
+            SPELL_MAP => show_map(),
             SPELL_STONE => {
                 if !stone_jump() {
                     return false;
@@ -116,6 +121,36 @@ pub unsafe fn magic_option(chosen_entry: i16) -> bool {
         }
         true
     }
+}
+
+/// What stands between the hero and a spell.
+#[derive(Debug, PartialEq, Eq)]
+enum SpellGate {
+    /// No such spell, or none of it left: the "no spell" event.
+    NoSpell,
+    /// In a quiet place: the hero says it does not work here.
+    QuietZone,
+    /// The spell cannot be cast now (freeze while riding, map indoors); nothing is used up.
+    Refused,
+    Proceed,
+}
+
+/// The checks before a spell is cast: `count` is how many of the spell's item the hero has and
+/// `zone` the `v3` of the current extent.
+fn spell_gate(entry: i16, count: u8, zone: u8, riding: i16, cheat: i16, region: u16) -> SpellGate {
+    if entry < FIRST_SPELL || count == 0 {
+        return SpellGate::NoSpell;
+    }
+    if zone == NO_MAGIC_ZONE {
+        return SpellGate::QuietZone;
+    }
+    if entry == SPELL_FREEZE && riding > RIDING_BIG {
+        return SpellGate::Refused;
+    }
+    if entry == SPELL_MAP && cheat == 0 && region > LAST_OUTDOOR_REGION {
+        return SpellGate::Refused;
+    }
+    SpellGate::Proceed
 }
 
 /// Draws the overview map with a "+" where the hero is, and shows it.
@@ -147,25 +182,17 @@ unsafe fn show_map() {
 /// the next circle in the direction faced. Returns false if the spell did not work.
 unsafe fn stone_jump() -> bool {
     unsafe {
-        if the_hero.sector != STONE_SECTOR {
-            return false;
-        }
-        if (the_hero.x & 255) / STONE_COLUMN_WIDTH != 1
-            || (the_hero.y & 255) / STONE_ROW_HEIGHT != 1
-        {
-            return false;
-        }
-        let (sector_x, sector_y) = (the_hero.x >> 8, the_hero.y >> 8);
-        for ring in 0..STONE_CIRCLES {
-            if stone_ring_sectors[ring * 2] as u16 == sector_x
-                && stone_ring_sectors[ring * 2 + 1] as u16 == sector_y
-            {
-                let mut target = ring + (the_actors.list[0].facing + 1) as usize;
-                if target > STONE_CIRCLES - 1 {
-                    target -= STONE_CIRCLES;
-                }
-                let x = ((stone_ring_sectors[target * 2] as u16) << 8) + (the_hero.x & 255);
-                let y = ((stone_ring_sectors[target * 2 + 1] as u16) << 8) + (the_hero.y & 255);
+        let ring_list = stone_ring_sectors;
+        match stone_target(
+            the_hero.sector,
+            the_hero.x,
+            the_hero.y,
+            the_actors.list[0].facing,
+            &ring_list,
+        ) {
+            StoneJump::Refused => false,
+            StoneJump::NoRing => true,
+            StoneJump::To(x, y) => {
                 flicker_colors();
                 transfer_hero(x, y, 1);
                 if the_hero.riding != 0 {
@@ -174,11 +201,45 @@ unsafe fn stone_jump() -> bool {
                     the_actors.list[the_actors.carrier_slot as usize].abs_y =
                         the_actors.list[0].abs_y;
                 }
-                break;
+                true
             }
         }
-        true
     }
+}
+
+/// Where the stone ring spell takes the hero.
+#[derive(Debug, PartialEq, Eq)]
+enum StoneJump {
+    /// Not standing in the middle of a stone circle: the spell fails.
+    Refused,
+    /// In the right sector but at no circle of the list: the stone is used up, nothing happens.
+    NoRing,
+    /// Jump to this position (the same spot inside the sector of the target circle).
+    To(u16, u16),
+}
+
+/// The pure part of `stone_jump`: the hero goes `facing + 1` circles further along the list,
+/// wrapping around after the last one.
+fn stone_target(sector: i16, px: u16, py: u16, facing: i8, list: &[u8]) -> StoneJump {
+    if sector != STONE_SECTOR {
+        return StoneJump::Refused;
+    }
+    if (px & 255) / STONE_COLUMN_WIDTH != 1 || (py & 255) / STONE_ROW_HEIGHT != 1 {
+        return StoneJump::Refused;
+    }
+    let (sector_x, sector_y) = (px >> 8, py >> 8);
+    for ring in 0..STONE_CIRCLES {
+        if list[ring * 2] as u16 == sector_x && list[ring * 2 + 1] as u16 == sector_y {
+            let mut target = ring + (facing + 1) as usize;
+            if target > STONE_CIRCLES - 1 {
+                target -= STONE_CIRCLES;
+            }
+            let x = ((list[target * 2] as u16) << 8) + (px & 255);
+            let y = ((list[target * 2 + 1] as u16) << 8) + (py & 255);
+            return StoneJump::To(x, y);
+        }
+    }
+    StoneJump::NoRing
 }
 
 /// Heals the hero a little, up to a limit set by bravery.
@@ -233,6 +294,41 @@ unsafe fn scare_enemies() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const LIST: [u8; 22] = [
+        54, 43, 71, 77, 78, 102, 66, 121, 12, 85, 79, 40, 107, 38, 73, 21, 12, 26, 26, 53, 84, 60,
+    ];
+
+    #[test]
+    fn spell_gate_checks_in_order() {
+        assert_eq!(spell_gate(4, 1, 0, 0, 0, 0), SpellGate::NoSpell);
+        assert_eq!(spell_gate(SPELL_LIGHT, 0, 0, 0, 0, 0), SpellGate::NoSpell);
+        assert_eq!(spell_gate(SPELL_LIGHT, 1, NO_MAGIC_ZONE, 0, 0, 0), SpellGate::QuietZone);
+        assert_eq!(spell_gate(SPELL_FREEZE, 1, 0, 2, 0, 0), SpellGate::Refused);
+        assert_eq!(spell_gate(SPELL_FREEZE, 1, 0, 1, 0, 0), SpellGate::Proceed);
+        assert_eq!(spell_gate(SPELL_LIGHT, 1, 0, 5, 0, 9), SpellGate::Proceed);
+        assert_eq!(spell_gate(SPELL_MAP, 1, 0, 0, 0, 8), SpellGate::Refused);
+        assert_eq!(spell_gate(SPELL_MAP, 1, 0, 0, 1, 8), SpellGate::Proceed);
+        assert_eq!(spell_gate(SPELL_MAP, 1, 0, 0, 0, 7), SpellGate::Proceed);
+    }
+
+    #[test]
+    fn stone_jump_rules() {
+        // Middle of the first circle: x&255 in 85..170, y&255 in 64..128.
+        let (x, y) = ((54 << 8) + 100, (43 << 8) + 70);
+        assert_eq!(stone_target(143, x, y, 0, &LIST), StoneJump::Refused);
+        assert_eq!(stone_target(144, x + 100, y, 0, &LIST), StoneJump::Refused);
+        assert_eq!(stone_target(144, x, y + 100, 0, &LIST), StoneJump::Refused);
+        assert_eq!(stone_target(144, 0x0500 + 100, 0x0500 + 70, 0, &LIST), StoneJump::NoRing);
+        // Facing 0 goes one circle on, same offset inside the sector.
+        assert_eq!(stone_target(144, x, y, 0, &LIST), StoneJump::To((71 << 8) + 100, (77 << 8) + 70));
+        // From the last circle the list wraps: 10 + 8 - 11 = 7.
+        let (x, y) = ((84 << 8) + 90, (60 << 8) + 65);
+        assert_eq!(stone_target(144, x, y, 7, &LIST), StoneJump::To((73 << 8) + 90, (21 << 8) + 65));
+        // Landing exactly on the last index does not wrap.
+        let (x, y) = ((54 << 8) + 90, (43 << 8) + 65);
+        assert_eq!(stone_target(144, x, y, 9, &LIST), StoneJump::To((84 << 8) + 90, (60 << 8) + 65));
+    }
 
     #[test]
     fn heal_adds_four_plus_the_roll() {

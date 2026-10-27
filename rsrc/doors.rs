@@ -91,17 +91,12 @@ pub fn open_door_near(x: u16, y: u16, keytype: u32) -> i32 {
         // we know where the door starts; now which type is it?
         let sector_id = *tile(x, y);
         let map_id = loaded_blocks.image[(sector_id >> 6) as usize];
-        for open in OPEN_LIST.iter() {
-            if open.map_id != map_id || open.door_id != sector_id {
-                continue;
-            }
-            if open.keytype == NOKEY || open.keytype as u32 == keytype {
-                swap_in_open_door_tiles(open, x, y);
-                the_screen.view_status = REDRAW_MAP;
-                the_ui.held_direction = 0;
-                print(c"It opened.".as_ptr());
-                return 1;
-            }
+        if let Some(open) = find_open(sector_id, map_id, keytype) {
+            swap_in_open_door_tiles(open, x, y);
+            the_screen.view_status = REDRAW_MAP;
+            the_ui.held_direction = 0;
+            print(c"It opened.".as_ptr());
+            return 1;
         }
         if bumped_locked_door == 0 && keytype == 0 {
             print(c"It's locked.".as_ptr());
@@ -144,25 +139,87 @@ fn find_door_corner(x: u16, y: u16) -> Option<(i32, i32)> {
 /// the door covers (which ones depends on the door's layout).
 unsafe fn swap_in_open_door_tiles(open: &DoorOpen, x: i32, y: i32) {
     unsafe {
-        *tile(x, y) = open.new1;
-        let second = open.new2;
-        if second == 0 {
-            return;
+        let (changes, count) = open_changes(open, x, y);
+        for &(tx, ty, value) in &changes[..count] {
+            *tile(tx, ty) = value;
         }
+    }
+}
+
+/// The door kind that `sector_id` (in map set `map_id`) is, if the key `keytype` opens it (a door
+/// that needs no key opens for anything). A door of the right kind with the wrong key is skipped.
+fn find_open(sector_id: u8, map_id: u16, keytype: u32) -> Option<&'static DoorOpen> {
+    OPEN_LIST.iter().find(|open| {
+        open.map_id == map_id
+            && open.door_id == sector_id
+            && (open.keytype == NOKEY || open.keytype as u32 == keytype)
+    })
+}
+
+/// The tiles an opened door changes, as (x, y, new tile), and how many of them are used. The
+/// door's top-left tile is (x, y).
+fn open_changes(open: &DoorOpen, x: i32, y: i32) -> ([(i32, i32, u8); 4], usize) {
+    let mut changes = [(x, y, open.new1), (0, 0, 0), (0, 0, 0), (0, 0, 0)];
+    let mut count = 1;
+    let second = open.new2;
+    if second != 0 {
         match open.above {
-            ABOVE => *tile(x, y - 1) = second,
-            BACK => *tile(x - 1, y) = second,
+            ABOVE => {
+                changes[1] = (x, y - 1, second);
+                count = 2;
+            }
+            BACK => {
+                changes[1] = (x - 1, y, second);
+                count = 2;
+            }
             CABINET_LAYOUT => {
-                *tile(x, y - 1) = 87;
-                *tile(x + 1, y) = 86;
-                *tile(x + 1, y - 1) = 88;
+                changes[1] = (x, y - 1, 87);
+                changes[2] = (x + 1, y, 86);
+                changes[3] = (x + 1, y - 1, 88);
+                count = 4;
             }
             layout => {
-                *tile(x + 1, y) = second;
+                changes[1] = (x + 1, y, second);
+                count = 2;
                 if layout != SIDE {
-                    *tile(x + 2, y) = layout;
+                    changes[2] = (x + 2, y, layout);
+                    count = 3;
                 }
             }
         }
+    }
+    (changes, count)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn keys_must_match_unless_none_is_needed() {
+        assert!(find_open(64, 360, GREEN as u32).is_some());
+        assert!(find_open(64, 360, 0).is_none());
+        assert!(find_open(64, 360, GOLD as u32).is_none());
+        // A wooden door needs no key: walking into it (key 0) opens it.
+        assert_eq!(find_open(120, 360, 0).unwrap().new1, 125);
+        // The same door tile in another map set is a different door.
+        assert_eq!(find_open(64, 280, GREY as u32).unwrap().new1, 124);
+        assert!(find_open(64, 999, GREEN as u32).is_none());
+    }
+
+    #[test]
+    fn open_tile_layouts() {
+        let (c, n) = open_changes(find_open(64, 360, GREEN as u32).unwrap(), 10, 5);
+        assert_eq!(&c[..n], &[(10, 5, 123), (11, 5, 124)]);
+        let (c, n) = open_changes(find_open(122, 360, 0).unwrap(), 10, 5);
+        assert_eq!(&c[..n], &[(10, 5, 127)]);
+        let (c, n) = open_changes(find_open(128, 240, WHITE as u32).unwrap(), 10, 5);
+        assert_eq!(&c[..n], &[(10, 5, 154), (10, 4, 155)]);
+        let (c, n) = open_changes(find_open(25, 680, GOLD as u32).unwrap(), 10, 5);
+        assert_eq!(&c[..n], &[(10, 5, 27), (9, 5, 26)]);
+        let (c, n) = open_changes(find_open(136, 800, GOLD as u32).unwrap(), 10, 5);
+        assert_eq!(&c[..n], &[(10, 5, 133), (11, 5, 134), (12, 5, 135)]);
+        let (c, n) = open_changes(find_open(165, 800, GREEN as u32).unwrap(), 10, 5);
+        assert_eq!(&c[..n], &[(10, 5, 85), (10, 4, 87), (11, 5, 86), (11, 4, 88)]);
     }
 }

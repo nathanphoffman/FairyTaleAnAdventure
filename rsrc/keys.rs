@@ -323,10 +323,13 @@ pub fn update_hero(cycle: i16) {
 
 unsafe fn count_down(timer: *mut i16) {
     unsafe {
-        if *timer != 0 {
-            *timer -= 1;
-        }
+        *timer = timer_step(*timer);
     }
+}
+
+/// A light, secret or freeze timer after one frame: it counts down to 0 and stays there.
+fn timer_step(timer: i16) -> i16 {
+    if timer != 0 { timer - 1 } else { timer }
 }
 
 /// The hero is dead or falling: the fairy flies in, then the hero revives (or, with no luck left,
@@ -489,6 +492,19 @@ unsafe fn walking_state(state: i8) -> i8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn timers_count_down_and_stop_at_zero() {
+        assert_eq!(timer_step(3), 2);
+        assert_eq!(timer_step(1), 0);
+        assert_eq!(timer_step(0), 0);
+        let (mut t, mut active) = (5, 0);
+        while t != 0 {
+            active += 1;
+            t = timer_step(t);
+        }
+        assert_eq!(active, 5);
+    }
 
     #[test]
     fn the_hero_revives_when_the_countdown_reaches_one() {

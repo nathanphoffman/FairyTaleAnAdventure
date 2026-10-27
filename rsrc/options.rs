@@ -280,40 +280,95 @@ unsafe fn sorceress_speaks() {
 /// The priest gives the writ's reward, scolds the unkind, or heals.
 unsafe fn priest_speaks() {
     unsafe {
-        if *the_hero.stuff.add(WRIT) != 0 {
-            if ob_listg[PRIEST_WRIT_SLOT].ob_stat == 0 {
+        let has_writ = *the_hero.stuff.add(WRIT) != 0;
+        match priest_action(
+            has_writ,
+            ob_listg[PRIEST_WRIT_SLOT].ob_stat,
+            the_hero.kindness,
+            the_world.day_clock,
+        ) {
+            PriestAction::WritReward => {
                 speak(39);
                 ob_listg[PRIEST_WRIT_SLOT].ob_stat = 1;
-            } else {
-                speak(19);
             }
-        } else if the_hero.kindness < KIND_ENOUGH {
-            speak(40);
-        } else {
-            speak(36 + (the_world.day_clock % PRIEST_BLESSINGS) as i32);
-            the_actors.list[0].vitality = FULL_VITALITY_BASE + the_hero.brave / 4;
-            queue_print(PRQ_STATS);
+            PriestAction::WritAgain => speak(19),
+            PriestAction::Scold => speak(40),
+            PriestAction::Bless { speech } => {
+                speak(speech);
+                the_actors.list[0].vitality = FULL_VITALITY_BASE + the_hero.brave / 4;
+                queue_print(PRQ_STATS);
+            }
         }
     }
+}
+
+/// What the priest does for the hero.
+#[derive(Debug, PartialEq, Eq)]
+enum PriestAction {
+    /// Has the writ and the reward (object list slot) is still hidden: it appears.
+    WritReward,
+    /// Has the writ, reward already given.
+    WritAgain,
+    /// Not kind enough.
+    Scold,
+    /// Heals fully, with one of three blessings picked by the time of day.
+    Bless { speech: i32 },
+}
+
+fn priest_action(has_writ: bool, reward_stat: i8, kindness: i16, clock: u16) -> PriestAction {
+    if has_writ {
+        if reward_stat == 0 {
+            PriestAction::WritReward
+        } else {
+            PriestAction::WritAgain
+        }
+    } else if kindness < KIND_ENOUGH {
+        PriestAction::Scold
+    } else {
+        PriestAction::Bless { speech: 36 + (clock % PRIEST_BLESSINGS) as i32 }
+    }
+}
+
+/// What a click in the Buy menu does.
+#[derive(Debug, PartialEq, Eq)]
+enum BuyGate {
+    /// Nobody (or not a bartender) near: nothing happens, the menu stays.
+    Nothing,
+    /// An entry past the last one: not handled here.
+    NotHandled,
+    /// Offers `item` for `price`.
+    Offer { item: usize, price: i16 },
+}
+
+/// `race` is that of the nearest person (only looked at when `person` is not 0).
+fn buy_gate(person: i16, race: u8, entry: i16, table: &[i8]) -> BuyGate {
+    if person == 0 || race != BARTENDER_RACE {
+        return BuyGate::Nothing;
+    }
+    if entry > LAST_BUY_ENTRY {
+        return BuyGate::NotHandled;
+    }
+    let pair = ((entry - FIRST_MENU_ENTRY) * 2) as usize;
+    BuyGate::Offer { item: table[pair] as u8 as usize, price: table[pair + 1] as i16 }
+}
+
+/// The hero must have strictly more gold than the price.
+fn can_afford(gold: i16, price: i16) -> bool {
+    gold > price
 }
 
 /// Buys what the bartender sells, if the hero can pay.
 unsafe fn buy_option(chosen_entry: i16) -> bool {
     unsafe {
         the_actors.nearest_object = the_actors.nearest_person;
-        if the_actors.nearest_object == 0 {
-            return true;
-        }
-        if the_actors.list[the_actors.nearest_object as usize].race != BARTENDER_RACE {
-            return true;
-        }
-        if chosen_entry > LAST_BUY_ENTRY {
-            return false;
-        }
-        let pair = ((chosen_entry - FIRST_MENU_ENTRY) * 2) as isize;
-        let item = *jtrans.as_ptr().offset(pair) as u8 as usize;
-        let price = *jtrans.as_ptr().offset(pair + 1) as i16;
-        if the_hero.wealth > price {
+        let near = the_actors.nearest_object;
+        let race = if near == 0 { 0 } else { the_actors.list[near as usize].race };
+        let (item, price) = match buy_gate(near as i16, race, chosen_entry, &jtrans) {
+            BuyGate::Nothing => return true,
+            BuyGate::NotHandled => return false,
+            BuyGate::Offer { item, price } => (item, price),
+        };
+        if can_afford(the_hero.wealth, price) {
             the_hero.wealth -= price;
             queue_print(PRQ_VITALITY);
             if item == FOOD {
@@ -469,5 +524,48 @@ unsafe fn give_option(chosen_entry: i16) -> bool {
         }
         go_to_menu(ITEMS as i16);
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SHOP: [i8; 14] = [0, 3, 8, 10, 11, 15, 1, 30, 2, 45, 3, 75, 13, 20];
+
+    #[test]
+    fn priest_rules() {
+        assert_eq!(priest_action(true, 0, 0, 0), PriestAction::WritReward);
+        assert_eq!(priest_action(true, 1, 99, 0), PriestAction::WritAgain);
+        assert_eq!(priest_action(false, 0, KIND_ENOUGH - 1, 0), PriestAction::Scold);
+        assert_eq!(priest_action(false, 0, KIND_ENOUGH, 0), PriestAction::Bless { speech: 36 });
+        assert_eq!(priest_action(false, 0, KIND_ENOUGH, 1), PriestAction::Bless { speech: 37 });
+        let wrap = PRIEST_BLESSINGS;
+        assert_eq!(priest_action(false, 0, KIND_ENOUGH, wrap), PriestAction::Bless { speech: 36 });
+    }
+
+    #[test]
+    fn buy_gate_rules() {
+        let first = FIRST_MENU_ENTRY;
+        assert_eq!(buy_gate(0, BARTENDER_RACE, first, &SHOP), BuyGate::Nothing);
+        assert_eq!(buy_gate(3, BARTENDER_RACE + 1, first, &SHOP), BuyGate::Nothing);
+        assert_eq!(buy_gate(3, BARTENDER_RACE, LAST_BUY_ENTRY + 1, &SHOP), BuyGate::NotHandled);
+        assert_eq!(
+            buy_gate(3, BARTENDER_RACE, first, &SHOP),
+            BuyGate::Offer { item: 0, price: 3 }
+        );
+        assert_eq!(
+            buy_gate(3, BARTENDER_RACE, first + 1, &SHOP),
+            BuyGate::Offer { item: 8, price: 10 }
+        );
+        // not a bartender wins over an entry past the end
+        assert_eq!(buy_gate(3, BARTENDER_RACE + 1, LAST_BUY_ENTRY + 1, &SHOP), BuyGate::Nothing);
+    }
+
+    #[test]
+    fn price_must_be_strictly_less_than_wealth() {
+        assert!(!can_afford(3, 3));
+        assert!(can_afford(4, 3));
+        assert!(!can_afford(0, 3));
     }
 }
