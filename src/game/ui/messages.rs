@@ -11,7 +11,6 @@ use crate::game::data::tables::brother_names;
 use crate::game::render::screen::screen;
 use crate::game::ui::text::{draw_text, move_to};
 use crate::gfx::bitmap::Rect;
-use std::ffi::{CStr, c_char};
 
 // The scrolling message area of the text panel.
 const TEXT_X_MIN: i32 = 16;
@@ -31,170 +30,190 @@ const END_COLUMN: i16 = 38;
 
 /// Set when the message text ends, to leave the line loop.
 const MESSAGE_ENDED: i16 = 1000;
-const CARRIAGE_RETURN: c_char = 13;
+const CARRIAGE_RETURN: u8 = 13;
 
 /// In message text: replaced by the current brother's name.
-const NAME_MARK: c_char = b'%' as c_char;
+const NAME_MARK: u8 = b'%';
 
-pub static mut MBUF: *mut c_char = std::ptr::null_mut();
-pub static mut MESBUF: [c_char; 200] = [0; 200];
-
-/// Length of a C string.
-unsafe fn length(s: *const c_char) -> i32 {
-    unsafe { CStr::from_ptr(s).to_bytes().len() as i32 }
-}
+/// Characters in the line buffer of `print_wrapped`.
+const LINE_BUFFER: usize = 200;
 
 /// The current brother's name.
-unsafe fn brother_name() -> *const c_char {
-    unsafe { brother_names[the_hero.brother as usize - 1] }
+fn brother_name() -> &'static str {
+    brother_names[unsafe { the_hero.brother } as usize - 1]
 }
 
 /// Starts a new line in the panel and prints `s` on it.
 /// The old lines scroll up by one text line (10 pixels) inside the message area.
-pub fn print(s: *const c_char) {
-    unsafe {
-        let screen = screen();
-        let area = Rect {
-            x: TEXT_X_MIN,
-            y: TEXT_Y_MIN,
-            width: TEXT_X_MAX - TEXT_X_MIN + 1,
-            height: TEXT_Y_MAX - TEXT_Y_MIN + 1,
-        };
+pub fn print(s: &str) {
+    print_bytes(s.as_bytes());
+}
 
-        screen.scroll(screen.current_port, area, (0, LINE_HEIGHT));
+fn print_bytes(s: &[u8]) {
+    let screen = screen();
+    let area = Rect {
+        x: TEXT_X_MIN,
+        y: TEXT_Y_MIN,
+        width: TEXT_X_MAX - TEXT_X_MIN + 1,
+        height: TEXT_Y_MAX - TEXT_Y_MIN + 1,
+    };
 
-        move_to(TEXT_X_MIN, NEW_LINE_Y);
-        draw_text(s, length(s));
-    }
+    screen.scroll(screen.current_port, area, (0, LINE_HEIGHT));
+
+    move_to(TEXT_X_MIN, NEW_LINE_Y);
+    draw_text(s);
 }
 
 /// Continues the current line with `s`.
-pub fn print_cont(s: *const c_char) {
-    unsafe { draw_text(s, length(s)) };
+pub fn print_cont(s: &str) {
+    draw_text(s.as_bytes());
 }
 
-/// Copies the current brother's name into the line being built at `MBUF`. Returns its length.
-unsafe fn append_brother_name() -> i16 {
-    unsafe {
-        let mut length = 0;
-        let mut name = brother_name();
+/// The line buffer of `print_wrapped`: message characters are collected here, and `end` is where the
+/// next one goes.
+struct LineBuffer {
+    bytes: [u8; LINE_BUFFER],
+    end: usize,
+}
 
-        while *name != 0 {
-            *MBUF = *name;
-            MBUF = MBUF.add(1);
-            name = name.add(1);
-            length += 1;
+impl LineBuffer {
+    fn put(&mut self, c: u8) {
+        if let Some(byte) = self.bytes.get_mut(self.end) {
+            *byte = c;
         }
 
-        length
+        self.end += 1;
+    }
+
+    /// Ends the text at the position `at` (without moving the end).
+    fn terminate(&mut self, at: usize) {
+        if let Some(byte) = self.bytes.get_mut(at) {
+            *byte = 0;
+        }
+    }
+
+    /// The line that starts at `start` and runs to the zero byte.
+    fn line(&self, start: usize) -> &[u8] {
+        let rest = self.bytes.get(start..).unwrap_or(&[]);
+        let length = rest.iter().position(|&b| b == 0).unwrap_or(rest.len());
+
+        &rest[..length]
+    }
+
+    /// Adds the current brother's name. Returns its length.
+    fn put_brother_name(&mut self) -> i16 {
+        let name = brother_name();
+
+        for c in name.bytes() {
+            self.put(c);
+        }
+
+        name.len() as i16
     }
 }
 
 /// Prints message text, wrapping it into lines at spaces. A carriage return (13) starts a new
 /// line and a `%` is replaced by the current brother's name.
 ///
-/// How it works: characters are copied into `message_buffer`, remembering where the last space was. When
+/// How it works: characters are copied into a buffer, remembering where the last space was. When
 /// a line reaches 37 characters it is cut at that space (the space becomes the end of the string)
-/// and printed, and the leftover characters start the next line. The message ends at a zero byte.
-pub fn print_wrapped(mut start: *const c_char) {
-    unsafe {
-        let mut line_start = (&raw mut MESBUF).cast::<c_char>();
-        MBUF = line_start;
-        let mut i: i16 = 0;
+/// and printed, and the leftover characters start the next line. The message ends at a zero byte
+/// (or the end of `message`).
+pub fn print_wrapped(message: impl AsRef<[u8]>) {
+    let message = message.as_ref();
+    let mut buffer = LineBuffer {
+        bytes: [0; LINE_BUFFER],
+        end: 0,
+    };
+    let mut chars = message.iter().copied().chain(std::iter::repeat(0));
+    let mut line_start = 0;
+    let mut i: i16 = 0;
 
-        loop {
-            let mut line_break = copy_up_to_a_line(&mut start, &mut i);
+    loop {
+        let line_break = copy_up_to_a_line(&mut chars, &mut buffer, &mut i);
 
-            if !line_break.is_null() {
-                // found a wrap point: end the line and print it
-                *line_break = 0;
-                line_break = line_break.add(1);
-                print(line_start);
+        if let Some(line_break) = line_break {
+            // found a wrap point: end the line and print it
+            buffer.terminate(line_break);
+            print_bytes(buffer.line(line_start));
 
-                if i > END_COLUMN {
-                    break;
-                }
-
-                i = MBUF.offset_from(line_break) as i16;
-                line_start = line_break;
-            } else {
-                // no wrap point, so print the whole thing
-                *MBUF = 0;
-                MBUF = MBUF.add(1);
-
-                if i > END_COLUMN {
-                    break;
-                }
-
-                print(line_start);
-                i = 0;
-                line_start = MBUF;
+            if i > END_COLUMN {
+                break;
             }
+
+            i = (buffer.end as isize - (line_break + 1) as isize) as i16;
+            line_start = line_break + 1;
+        } else {
+            // no wrap point, so print the whole thing
+            buffer.put(0);
+
+            if i > END_COLUMN {
+                break;
+            }
+
+            print_bytes(buffer.line(line_start));
+            i = 0;
+            line_start = buffer.end;
         }
     }
 }
 
 /// Copies message characters into the buffer until a line is full or the text ends, counting them in
-/// `i` and returning where the last space (or the end) was, or null if there was none.
-unsafe fn copy_up_to_a_line(start: &mut *const c_char, i: &mut i16) -> *mut c_char {
-    unsafe {
-        let mut line_break: *mut c_char = std::ptr::null_mut(); // end of the current line
+/// `i` and returning where the last space (or the end) was, or `None` if there was none.
+fn copy_up_to_a_line(
+    chars: &mut impl Iterator<Item = u8>,
+    buffer: &mut LineBuffer,
+    i: &mut i16,
+) -> Option<usize> {
+    let mut line_break = None; // end of the current line
 
-        while *i < WRAP_COLUMN {
-            let c = **start;
-            *start = start.add(1);
+    while *i < WRAP_COLUMN {
+        let c = chars.next().unwrap_or(0);
 
-            if c == b' ' as c_char {
-                line_break = MBUF;
-            }
-
-            if c == 0 {
-                line_break = MBUF;
-                *line_break = 0;
-                *i = MESSAGE_ENDED;
-            }
-
-            if c == CARRIAGE_RETURN {
-                line_break = MBUF;
-
-                *line_break = 0;
-                break;
-            }
-
-            if c == NAME_MARK {
-                *i += append_brother_name();
-            } else {
-                *MBUF = c;
-                MBUF = MBUF.add(1);
-            }
-
-            *i += 1;
+        if c == b' ' {
+            line_break = Some(buffer.end);
         }
 
-        line_break
+        if c == 0 {
+            line_break = Some(buffer.end);
+            buffer.terminate(buffer.end);
+            *i = MESSAGE_ENDED;
+        }
+
+        if c == CARRIAGE_RETURN {
+            line_break = Some(buffer.end);
+            buffer.terminate(buffer.end);
+            break;
+        }
+
+        if c == NAME_MARK {
+            *i += buffer.put_brother_name();
+        } else {
+            buffer.put(c);
+        }
+
+        *i += 1;
     }
+
+    line_break
 }
 
 /// Prints "<Brother> found <container> containing ", ready for the contents to be added.
-pub fn announce_container(s: *const c_char) {
-    unsafe {
-        print(brother_name());
-        print_cont(c" found ".as_ptr());
-        print_cont(s);
-        print_cont(c" containing ".as_ptr());
-    }
+pub fn announce_container(s: &str) {
+    print(brother_name());
+    print_cont(" found ");
+    print_cont(s);
+    print_cont(" containing ");
 }
 
 /// Prints "<Brother> found <treasure>".
-pub fn announce_treasure(s: *const c_char) {
-    unsafe {
-        print(brother_name());
-        print_cont(c" found ".as_ptr());
-        print_cont(s);
-    }
+pub fn announce_treasure(s: &str) {
+    print(brother_name());
+    print_cont(" found ");
+    print_cont(s);
 }
 
 /// Adds the current brother's name to the line being printed.
 pub fn name() {
-    unsafe { print_cont(brother_name()) };
+    print_cont(brother_name());
 }

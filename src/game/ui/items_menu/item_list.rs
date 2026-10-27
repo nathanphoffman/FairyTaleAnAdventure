@@ -74,7 +74,7 @@ fn item_pictures() -> Bitmap {
 /// stacked down the item's column. The pictures are read from `Items`.
 fn draw_item_icons(page: BitmapId) {
     for slot in 0..GOLDBASE {
-        let it = unsafe { item(slot) };
+        let it = item(slot);
         let shown = unsafe { (*the_hero.stuff.add(slot)).min(it.maxshown) };
         let x = it.xoff as i32 + ITEM_X_MARGIN;
         let mut y = it.yoff as u16;

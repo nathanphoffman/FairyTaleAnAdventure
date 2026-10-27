@@ -112,7 +112,7 @@ unsafe fn take_object() -> bool {
 
         match classify_take(id, the_hero.hunger, the_world.region) {
             Take::Gold => {
-                announce_treasure(c"50 gold pieces".as_ptr());
+                announce_treasure("50 gold pieces");
                 the_hero.wealth += GOLD_FOUND;
 
                 true
@@ -124,7 +124,7 @@ unsafe fn take_object() -> bool {
             Take::Bones => take_brothers_goods(owner),
 
             Take::Container(name) => {
-                announce_container(name.as_ptr());
+                announce_container(name);
 
                 container_contents()
             }
@@ -165,7 +165,7 @@ unsafe fn take_fruit(keep: bool) -> bool {
 /// Phillip).
 unsafe fn take_brothers_goods(owner: u32) -> bool {
     unsafe {
-        announce_treasure(c"his brother's bones.".as_ptr());
+        announce_treasure("his brother's bones.");
         ob_listg[BONES.0].ob_stat = 0;
         ob_listg[BONES.1].ob_stat = 0;
 
@@ -199,7 +199,7 @@ enum Take {
     Eggs,
     Bones,
     /// A chest, urn or sacks (with the name announced).
-    Container(&'static core::ffi::CStr),
+    Container(&'static str),
     /// An empty chest or a footstool: nothing happens.
     Left,
     /// Anything else: looked up in `itrans`.
@@ -219,9 +219,9 @@ fn classify_take(id: u32, hunger: i16, region: u16) -> Take {
         },
         TURTLE_EGGS => Take::Eggs,
         BROTHER_BONES => Take::Bones,
-        CHEST => Take::Container(c"a chest"),
-        URN => Take::Container(c"a brass urn"),
-        SACKS => Take::Container(c"some sacks"),
+        CHEST => Take::Container("a chest"),
+        URN => Take::Container("a brass urn"),
+        SACKS => Take::Container("some sacks"),
         EMPTY_CHEST | FOOTSTOOL => Take::Left,
         _ => Take::Plain,
     }
@@ -248,9 +248,9 @@ unsafe fn take_plain_item(id: u32) -> bool {
         match item_slot(id, &itrans) {
             Some(slot) => {
                 add_stuff(slot, 1);
-                announce_treasure(c"a ".as_ptr());
+                announce_treasure("a ");
                 print_cont(item_name(slot));
-                print_cont(c".".as_ptr());
+                print_cont(".");
 
                 true
             }
@@ -292,9 +292,9 @@ mod tests {
 
         assert_eq!(classify_take(TURTLE_EGGS, 0, 0), Take::Eggs);
         assert_eq!(classify_take(BROTHER_BONES, 0, 0), Take::Bones);
-        assert_eq!(classify_take(CHEST, 0, 0), Take::Container(c"a chest"));
-        assert_eq!(classify_take(URN, 0, 0), Take::Container(c"a brass urn"));
-        assert_eq!(classify_take(SACKS, 0, 0), Take::Container(c"some sacks"));
+        assert_eq!(classify_take(CHEST, 0, 0), Take::Container("a chest"));
+        assert_eq!(classify_take(URN, 0, 0), Take::Container("a brass urn"));
+        assert_eq!(classify_take(SACKS, 0, 0), Take::Container("some sacks"));
         assert_eq!(classify_take(EMPTY_CHEST, 0, 0), Take::Left);
         assert_eq!(classify_take(FOOTSTOOL, 0, 0), Take::Left);
         assert_eq!(classify_take(1, 0, 0), Take::Plain);

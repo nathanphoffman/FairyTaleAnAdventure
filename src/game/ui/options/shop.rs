@@ -103,7 +103,7 @@ pub(super) unsafe fn buy_option(chosen_entry: i16) -> bool {
         };
 
         match purchase(the_hero.wealth, price, item) {
-            Purchase::TooPoor => print(c"Not enough money!".as_ptr()),
+            Purchase::TooPoor => print("Not enough money!"),
             Purchase::Bought { wealth_left, what } => {
                 the_hero.wealth = wealth_left;
                 queue_print(PRQ_VITALITY);
@@ -132,9 +132,9 @@ unsafe fn receive_purchase(item: usize, what: Bought) {
 
             Bought::Item => {
                 add_stuff(item, 1);
-                print_wrapped(c"% bought a ".as_ptr());
+                print_wrapped("% bought a ");
                 print_cont(item_name(item));
-                print_cont(c".".as_ptr());
+                print_cont(".");
             }
         }
     }

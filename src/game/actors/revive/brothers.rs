@@ -229,7 +229,7 @@ pub(super) unsafe fn announce_brother() {
             show_event(EVENT_SETTING_OUT);
 
             if the_hero.brother == JULIAN {
-                print_cont(c".".as_ptr());
+                print_cont(".");
             } else if the_hero.brother == PHILLIP {
                 show_event(EVENT_PHILLIP_SETS_OUT);
             } else if the_hero.brother == KEVIN {

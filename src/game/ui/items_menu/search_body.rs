@@ -14,8 +14,8 @@ use crate::game::ui::text::print_number;
 pub(super) unsafe fn search_body() {
     unsafe {
         let actor = &raw mut the_actors.list[the_actors.nearest_object as usize];
-        print_wrapped(c"% searched the body and found".as_ptr());
-        print(c"".as_ptr());
+        print_wrapped("% searched the body and found");
+        print("");
         let loot = body_loot(
             (*actor).weapon,
             the_actors.list[0].weapon,
@@ -28,16 +28,16 @@ pub(super) unsafe fn search_body() {
         take_found_weapon(&loot);
 
         if let Some(arrows) = loot.arrows {
-            print_cont(c" and ".as_ptr());
+            print_cont(" and ");
             print_number(arrows, 1);
-            print_cont(c" Arrows.".as_ptr());
+            print_cont(" Arrows.");
             add_stuff(ARROWS, arrows as u8);
 
             return;
         }
 
         take_treasure(&loot);
-        print_cont(c".".as_ptr());
+        print_cont(".");
     }
 }
 
@@ -45,7 +45,7 @@ pub(super) unsafe fn search_body() {
 unsafe fn take_found_weapon(loot: &BodyLoot) {
     unsafe {
         if loot.weapon != 0 {
-            print_cont(c"a ".as_ptr());
+            print_cont("a ");
             print_cont(item_name(loot.weapon as usize - 1));
             add_stuff(loot.weapon as usize - 1, 1);
             the_actors.list[0].weapon = loot.hero_weapon;
@@ -59,11 +59,11 @@ unsafe fn take_treasure(loot: &BodyLoot) {
     unsafe {
         if loot.treasure != 0 {
             if loot.weapon != 0 {
-                print_cont(c" and ".as_ptr());
+                print_cont(" and ");
             }
 
             if loot.treasure < GOLDBASE as u32 {
-                print_cont(c"a ".as_ptr());
+                print_cont("a ");
             }
 
             print_cont(item_name(loot.treasure as usize));
@@ -74,7 +74,7 @@ unsafe fn take_treasure(loot: &BodyLoot) {
                 add_stuff(loot.treasure as usize, 1);
             }
         } else if loot.weapon == 0 {
-            print_cont(c"nothing".as_ptr());
+            print_cont("nothing");
         }
     }
 }

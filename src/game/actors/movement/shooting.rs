@@ -104,7 +104,7 @@ impl Ctx {
                 self.image = diroff(d8);
                 play_effect(EFFECT_FIREBALL, EFFECT_FIREBALL_PITCH + rand256());
             } else if self.slot == 0 && *the_hero.stuff.add(STUFF_ARROWS) == 0 {
-                print(c"No Arrows!".as_ptr());
+                print("No Arrows!");
 
                 return Some(Pc::Cpx);
             } else {

@@ -41,7 +41,7 @@ pub(super) unsafe fn use_option(chosen_entry: i16) -> bool {
             if the_ui.menu_hit_enabled != 0 {
                 go_to_menu(KEYS as i16);
             } else {
-                print_wrapped(c"% has no keys!".as_ptr());
+                print_wrapped("% has no keys!");
             }
 
             return false;
@@ -51,7 +51,7 @@ pub(super) unsafe fn use_option(chosen_entry: i16) -> bool {
             if the_ui.menu_hit_enabled != 0 {
                 the_actors.list[0].weapon = (chosen_entry + 1) as i8;
             } else {
-                print_wrapped(c"% doesn't have one.".as_ptr());
+                print_wrapped("% doesn't have one.");
             }
         }
 
@@ -95,10 +95,10 @@ pub(super) unsafe fn keys_option(chosen_entry: i16) -> bool {
             }
 
             if direction >= DIRECTIONS {
-                print_wrapped(c"% tried a ".as_ptr());
+                print_wrapped("% tried a ");
                 print_cont(item_name(KEYBASE + key));
-                print_cont(c" but it didn't".as_ptr());
-                print(c"fit.".as_ptr());
+                print_cont(" but it didn't");
+                print("fit.");
             }
         }
 

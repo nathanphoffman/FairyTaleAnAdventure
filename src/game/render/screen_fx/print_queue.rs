@@ -16,8 +16,6 @@ const EXTENT_DIGITS: i32 = 2;
 const VITALITY_DIGITS: i32 = 3;
 const STAT_DIGITS: i32 = 3;
 const SECTOR_PIXELS: i32 = 256;
-const EXTENT_LABEL_LEN: i32 = 10;
-const VITALITY_LABEL_LEN: i32 = 4;
 
 // The print queue requests.
 const REQUEST_DEBUG_COORDS: i32 = 2;
@@ -56,7 +54,7 @@ pub fn handle_print_request() {
             REQUEST_VITALITY => draw_vitality(),
             REQUEST_OPTIONS => print_options(),
             REQUEST_STATS => draw_stats(),
-            REQUEST_TAKE_WHAT => print(c"Take What?".as_ptr()),
+            REQUEST_TAKE_WHAT => print("Take What?"),
             _ => {}
         }
     }
@@ -65,10 +63,10 @@ pub fn handle_print_request() {
 /// Debug information: the hero's map position and the memory left.
 unsafe fn show_debug_coords() {
     unsafe {
-        print(c"Coords = ".as_ptr());
+        print("Coords = ");
         print_number(the_hero.x as i32, COORD_DIGITS);
         print_number(the_hero.y as i32, COORD_DIGITS);
-        print(c"Memory Available: ".as_ptr());
+        print("Memory Available: ");
         print_number(FAKE_FREE_BYTES, COORD_DIGITS);
     }
 }
@@ -76,12 +74,12 @@ unsafe fn show_debug_coords() {
 /// Debug information: the hero's sector and the type of the extent the hero is in.
 unsafe fn show_debug_sector() {
     unsafe {
-        print(c"You are at: ".as_ptr());
+        print("You are at: ");
         print_number(the_hero.x as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
         print_number(the_hero.y as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
-        print(c"H/Sector = ".as_ptr());
+        print("H/Sector = ");
         print_number(the_hero.sector as i32, SECTOR_DIGITS);
-        draw_text(c" Extent = ".as_ptr(), EXTENT_LABEL_LEN);
+        draw_text(b" Extent = ");
         print_number(the_world.extent_type as i32, EXTENT_DIGITS);
     }
 }
@@ -90,7 +88,7 @@ unsafe fn show_debug_sector() {
 unsafe fn draw_vitality() {
     unsafe {
         move_to(VITALITY_POSITION.0, VITALITY_POSITION.1);
-        draw_text(c"Vit:".as_ptr(), VITALITY_LABEL_LEN);
+        draw_text(b"Vit:");
         print_number(the_actors.list[0].vitality as i32, VITALITY_DIGITS);
     }
 }
@@ -102,14 +100,14 @@ unsafe fn draw_stats() {
             the_hero.luck = 0;
         }
 
-        for (x, label, len, value) in [
-            (BRAVERY_X, c"Brv:", 4, the_hero.brave),
-            (LUCK_X, c"Lck:", 4, the_hero.luck),
-            (KINDNESS_X, c"Knd:", 4, the_hero.kindness),
-            (WEALTH_X, c"Wlth:", 5, the_hero.wealth),
+        for (x, label, value) in [
+            (BRAVERY_X, b"Brv:".as_slice(), the_hero.brave),
+            (LUCK_X, b"Lck:", the_hero.luck),
+            (KINDNESS_X, b"Knd:", the_hero.kindness),
+            (WEALTH_X, b"Wlth:", the_hero.wealth),
         ] {
             move_to(x, STATS_Y);
-            draw_text(label.as_ptr(), len);
+            draw_text(label);
             print_number(value as i32, STAT_DIGITS);
         }
     }

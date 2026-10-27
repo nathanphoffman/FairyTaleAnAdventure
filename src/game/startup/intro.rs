@@ -132,7 +132,7 @@ fn show_title_screen() {
 
     let pen = screen.port(PortId::Map).pen.fg;
     screen.set_a_pen(PortId::Map, TITLE_PEN);
-    print_positioned(TITLE_TEXT.as_ptr());
+    print_positioned(TITLE_TEXT);
     screen.set_a_pen(PortId::Map, pen);
 
     delay(TITLE_WAIT);

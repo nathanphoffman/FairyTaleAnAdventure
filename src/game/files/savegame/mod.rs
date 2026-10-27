@@ -35,11 +35,11 @@ pub fn savegame(slot: i16, saving: bool) {
 
     if saving {
         if write_game(&name).is_err() {
-            print(c"ERROR: Couldn't save game.".as_ptr());
+            print("ERROR: Couldn't save game.");
         }
     } else {
         if read_game(&name).is_err() {
-            print(c"ERROR: Couldn't load game.".as_ptr());
+            print("ERROR: Couldn't load game.");
         }
 
         reset_after_load();
@@ -84,9 +84,9 @@ fn reset_after_load() {
         the_screen.view_status = VIEW_CORRUPT;
         queue_print(PRINT_VITALITY);
         queue_print(PRINT_STATS);
-        print(c"".as_ptr());
-        print(c"".as_ptr());
-        print(c"".as_ptr());
+        print("");
+        print("");
+        print("");
         the_encounter.kind = 0;
         the_actors.loading = 0;
     }

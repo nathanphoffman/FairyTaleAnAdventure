@@ -8,7 +8,6 @@
 use crate::game::actors::encounters::Encounter;
 use crate::game::world::objects::SetFigEntry;
 use crate::game::data::types::{Bro, Door, Extent, InvItem, Letter, Menu, Need, StateEntry};
-use std::ffi::c_char;
 use crate::game::data::state::{the_hero};
 
 /// The kinds of people (setfigs): which sprite file, the first image, and whether they can talk.
@@ -269,43 +268,43 @@ pub static mut extent_list: [Extent; 23] = [
 pub static mut stone_ring_sectors: [u8; 22] = [54, 43, 71, 77, 78, 102, 66, 121, 12, 85, 79, 40, 107, 38, 73, 21, 12, 26, 26, 53, 84, 60];
 
 /// Every item: its picture, where it sits on the item list, how many show, and its name.
-pub static mut item_list: [InvItem; 36] = [
-    InvItem { image_number: 12, xoff: 10, yoff: 0, ydelta: 0, img_off: 0, img_height: 8, maxshown: 1, name: c"Dirk".as_ptr() },
-    InvItem { image_number: 9, xoff: 10, yoff: 10, ydelta: 0, img_off: 0, img_height: 8, maxshown: 1, name: c"Mace".as_ptr() },
-    InvItem { image_number: 8, xoff: 10, yoff: 20, ydelta: 0, img_off: 0, img_height: 8, maxshown: 1, name: c"Sword".as_ptr() },
-    InvItem { image_number: 10, xoff: 10, yoff: 30, ydelta: 0, img_off: 0, img_height: 8, maxshown: 1, name: c"Bow".as_ptr() },
-    InvItem { image_number: 17, xoff: 10, yoff: 40, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: c"Magic Wand".as_ptr() },
-    InvItem { image_number: 27, xoff: 10, yoff: 50, ydelta: 0, img_off: 0, img_height: 8, maxshown: 1, name: c"Golden Lasso".as_ptr() },
-    InvItem { image_number: 23, xoff: 10, yoff: 60, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: c"Sea Shell".as_ptr() },
-    InvItem { image_number: 27, xoff: 10, yoff: 70, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: c"Sun Stone".as_ptr() },
-    InvItem { image_number: 3, xoff: 30, yoff: 0, ydelta: 3, img_off: 7, img_height: 1, maxshown: 45, name: c"Arrows".as_ptr() },
-    InvItem { image_number: 18, xoff: 50, yoff: 0, ydelta: 9, img_off: 0, img_height: 8, maxshown: 15, name: c"Blue Stone".as_ptr() },
-    InvItem { image_number: 19, xoff: 65, yoff: 0, ydelta: 6, img_off: 0, img_height: 5, maxshown: 23, name: c"Green Jewel".as_ptr() },
-    InvItem { image_number: 22, xoff: 80, yoff: 0, ydelta: 8, img_off: 0, img_height: 7, maxshown: 17, name: c"Glass Vial".as_ptr() },
-    InvItem { image_number: 21, xoff: 95, yoff: 0, ydelta: 7, img_off: 0, img_height: 6, maxshown: 20, name: c"Crystal Orb".as_ptr() },
-    InvItem { image_number: 23, xoff: 110, yoff: 0, ydelta: 10, img_off: 0, img_height: 9, maxshown: 14, name: c"Bird Totem".as_ptr() },
-    InvItem { image_number: 17, xoff: 125, yoff: 0, ydelta: 6, img_off: 0, img_height: 5, maxshown: 23, name: c"Gold Ring".as_ptr() },
-    InvItem { image_number: 24, xoff: 140, yoff: 0, ydelta: 10, img_off: 0, img_height: 9, maxshown: 14, name: c"Jade Skull".as_ptr() },
-    InvItem { image_number: 25, xoff: 160, yoff: 0, ydelta: 5, img_off: 0, img_height: 5, maxshown: 25, name: c"Gold Key".as_ptr() },
-    InvItem { image_number: 25, xoff: 172, yoff: 0, ydelta: 5, img_off: 8, img_height: 5, maxshown: 25, name: c"Green Key".as_ptr() },
-    InvItem { image_number: 114, xoff: 184, yoff: 0, ydelta: 5, img_off: 0, img_height: 5, maxshown: 25, name: c"Blue Key".as_ptr() },
-    InvItem { image_number: 114, xoff: 196, yoff: 0, ydelta: 5, img_off: 8, img_height: 5, maxshown: 25, name: c"Red Key".as_ptr() },
-    InvItem { image_number: 26, xoff: 208, yoff: 0, ydelta: 5, img_off: 0, img_height: 5, maxshown: 25, name: c"Grey Key".as_ptr() },
-    InvItem { image_number: 26, xoff: 220, yoff: 0, ydelta: 5, img_off: 8, img_height: 5, maxshown: 25, name: c"White Key".as_ptr() },
-    InvItem { image_number: 11, xoff: 0, yoff: 80, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: c"Talisman".as_ptr() },
-    InvItem { image_number: 19, xoff: 0, yoff: 90, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: c"Rose".as_ptr() },
-    InvItem { image_number: 20, xoff: 0, yoff: 100, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: c"Fruit".as_ptr() },
-    InvItem { image_number: 21, xoff: 232, yoff: 0, ydelta: 10, img_off: 8, img_height: 8, maxshown: 5, name: c"Gold Statue".as_ptr() },
-    InvItem { image_number: 22, xoff: 0, yoff: 110, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: c"Book".as_ptr() },
-    InvItem { image_number: 8, xoff: 14, yoff: 80, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: c"Herb".as_ptr() },
-    InvItem { image_number: 9, xoff: 14, yoff: 90, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: c"Writ".as_ptr() },
-    InvItem { image_number: 10, xoff: 14, yoff: 100, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: c"Bone".as_ptr() },
-    InvItem { image_number: 12, xoff: 14, yoff: 110, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: c"Shard".as_ptr() },
-    InvItem { image_number: 0, xoff: 0, yoff: 0, ydelta: 0, img_off: 0, img_height: 0, maxshown: 2, name: c"2 Gold Pieces".as_ptr() },
-    InvItem { image_number: 0, xoff: 0, yoff: 0, ydelta: 0, img_off: 0, img_height: 0, maxshown: 5, name: c"5 Gold Pieces".as_ptr() },
-    InvItem { image_number: 0, xoff: 0, yoff: 0, ydelta: 0, img_off: 0, img_height: 0, maxshown: 10, name: c"10 Gold Pieces".as_ptr() },
-    InvItem { image_number: 0, xoff: 0, yoff: 0, ydelta: 0, img_off: 0, img_height: 0, maxshown: 100, name: c"100 Gold Pieces".as_ptr() },
-    InvItem { image_number: 0, xoff: 0, yoff: 0, ydelta: 0, img_off: 0, img_height: 0, maxshown: 0, name: c"quiver of arrows".as_ptr() },
+pub static item_list: [InvItem; 36] = [
+    InvItem { image_number: 12, xoff: 10, yoff: 0, ydelta: 0, img_off: 0, img_height: 8, maxshown: 1, name: "Dirk" },
+    InvItem { image_number: 9, xoff: 10, yoff: 10, ydelta: 0, img_off: 0, img_height: 8, maxshown: 1, name: "Mace" },
+    InvItem { image_number: 8, xoff: 10, yoff: 20, ydelta: 0, img_off: 0, img_height: 8, maxshown: 1, name: "Sword" },
+    InvItem { image_number: 10, xoff: 10, yoff: 30, ydelta: 0, img_off: 0, img_height: 8, maxshown: 1, name: "Bow" },
+    InvItem { image_number: 17, xoff: 10, yoff: 40, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: "Magic Wand" },
+    InvItem { image_number: 27, xoff: 10, yoff: 50, ydelta: 0, img_off: 0, img_height: 8, maxshown: 1, name: "Golden Lasso" },
+    InvItem { image_number: 23, xoff: 10, yoff: 60, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: "Sea Shell" },
+    InvItem { image_number: 27, xoff: 10, yoff: 70, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: "Sun Stone" },
+    InvItem { image_number: 3, xoff: 30, yoff: 0, ydelta: 3, img_off: 7, img_height: 1, maxshown: 45, name: "Arrows" },
+    InvItem { image_number: 18, xoff: 50, yoff: 0, ydelta: 9, img_off: 0, img_height: 8, maxshown: 15, name: "Blue Stone" },
+    InvItem { image_number: 19, xoff: 65, yoff: 0, ydelta: 6, img_off: 0, img_height: 5, maxshown: 23, name: "Green Jewel" },
+    InvItem { image_number: 22, xoff: 80, yoff: 0, ydelta: 8, img_off: 0, img_height: 7, maxshown: 17, name: "Glass Vial" },
+    InvItem { image_number: 21, xoff: 95, yoff: 0, ydelta: 7, img_off: 0, img_height: 6, maxshown: 20, name: "Crystal Orb" },
+    InvItem { image_number: 23, xoff: 110, yoff: 0, ydelta: 10, img_off: 0, img_height: 9, maxshown: 14, name: "Bird Totem" },
+    InvItem { image_number: 17, xoff: 125, yoff: 0, ydelta: 6, img_off: 0, img_height: 5, maxshown: 23, name: "Gold Ring" },
+    InvItem { image_number: 24, xoff: 140, yoff: 0, ydelta: 10, img_off: 0, img_height: 9, maxshown: 14, name: "Jade Skull" },
+    InvItem { image_number: 25, xoff: 160, yoff: 0, ydelta: 5, img_off: 0, img_height: 5, maxshown: 25, name: "Gold Key" },
+    InvItem { image_number: 25, xoff: 172, yoff: 0, ydelta: 5, img_off: 8, img_height: 5, maxshown: 25, name: "Green Key" },
+    InvItem { image_number: 114, xoff: 184, yoff: 0, ydelta: 5, img_off: 0, img_height: 5, maxshown: 25, name: "Blue Key" },
+    InvItem { image_number: 114, xoff: 196, yoff: 0, ydelta: 5, img_off: 8, img_height: 5, maxshown: 25, name: "Red Key" },
+    InvItem { image_number: 26, xoff: 208, yoff: 0, ydelta: 5, img_off: 0, img_height: 5, maxshown: 25, name: "Grey Key" },
+    InvItem { image_number: 26, xoff: 220, yoff: 0, ydelta: 5, img_off: 8, img_height: 5, maxshown: 25, name: "White Key" },
+    InvItem { image_number: 11, xoff: 0, yoff: 80, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: "Talisman" },
+    InvItem { image_number: 19, xoff: 0, yoff: 90, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: "Rose" },
+    InvItem { image_number: 20, xoff: 0, yoff: 100, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: "Fruit" },
+    InvItem { image_number: 21, xoff: 232, yoff: 0, ydelta: 10, img_off: 8, img_height: 8, maxshown: 5, name: "Gold Statue" },
+    InvItem { image_number: 22, xoff: 0, yoff: 110, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: "Book" },
+    InvItem { image_number: 8, xoff: 14, yoff: 80, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: "Herb" },
+    InvItem { image_number: 9, xoff: 14, yoff: 90, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: "Writ" },
+    InvItem { image_number: 10, xoff: 14, yoff: 100, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: "Bone" },
+    InvItem { image_number: 12, xoff: 14, yoff: 110, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: "Shard" },
+    InvItem { image_number: 0, xoff: 0, yoff: 0, ydelta: 0, img_off: 0, img_height: 0, maxshown: 2, name: "2 Gold Pieces" },
+    InvItem { image_number: 0, xoff: 0, yoff: 0, ydelta: 0, img_off: 0, img_height: 0, maxshown: 5, name: "5 Gold Pieces" },
+    InvItem { image_number: 0, xoff: 0, yoff: 0, ydelta: 0, img_off: 0, img_height: 0, maxshown: 10, name: "10 Gold Pieces" },
+    InvItem { image_number: 0, xoff: 0, yoff: 0, ydelta: 0, img_off: 0, img_height: 0, maxshown: 100, name: "100 Gold Pieces" },
+    InvItem { image_number: 0, xoff: 0, yoff: 0, ydelta: 0, img_off: 0, img_height: 0, maxshown: 0, name: "quiver of arrows" },
 ];
 
 /// The mouse pointer sprite.
@@ -321,37 +320,34 @@ pub static intro_colors: [u16; 32] = [0x000, 0xFFF, 0xE00, 0xA00, 0xD80, 0xEC0, 
 /// All black, for fading out.
 pub static black_colors: [u16; 32] = [0; 32];
 
-/// Scratch space for printing numbers (ends with a space).
-pub static mut number_buffer: [i8; 11] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32];
-
 // The menu labels: fixed width fields of 5 characters, one after another.
-pub static mut label1: [u8; 26] = *b"ItemsMagicTalk Buy  Game \0";
-pub static mut label2: [u8; 26] = *b"List Take Look Use  Give \0";
-pub static mut label3: [u8; 16] = *b"Yell Say  Ask  \0";
-pub static mut label4: [u8; 26] = *b"PauseMusicSoundQuit Load \0";
-pub static mut label5: [u8; 36] = *b"Food ArrowVial Mace SwordBow  Totem\0";
-pub static mut label6: [u8; 36] = *b"StoneJewelVial Orb  TotemRing Skull\0";
-pub static mut label7: [u8; 51] = *b"Dirk Mace SwordBow  Wand LassoShellKey  Sun  Book \0";
-pub static mut label8: [u8; 11] = *b"Save Exit \0";
-pub static mut label9: [u8; 31] = *b"Gold GreenBlue Red  Grey White\0";
-pub static mut labelA: [u8; 21] = *b"Gold Book Writ Bone \0";
-pub static mut labelB: [u8; 41] = *b"  A    B    C    D    E    F    G    H  \0";
+pub static label1: &[u8] = b"ItemsMagicTalk Buy  Game \0";
+pub static label2: &[u8] = b"List Take Look Use  Give \0";
+pub static label3: &[u8] = b"Yell Say  Ask  \0";
+pub static label4: &[u8] = b"PauseMusicSoundQuit Load \0";
+pub static label5: &[u8] = b"Food ArrowVial Mace SwordBow  Totem\0";
+pub static label6: &[u8] = b"StoneJewelVial Orb  TotemRing Skull\0";
+pub static label7: &[u8] = b"Dirk Mace SwordBow  Wand LassoShellKey  Sun  Book \0";
+pub static label8: &[u8] = b"Save Exit \0";
+pub static label9: &[u8] = b"Gold GreenBlue Red  Grey White\0";
+pub static labelA: &[u8] = b"Gold Book Writ Bone \0";
+pub static labelB: &[u8] = b"  A    B    C    D    E    F    G    H  \0";
 
 /// The colour of each key in the key menu.
 pub static mut key_colors: [i8; 6] = [8, 6, 4, 2, 14, 1];
 
 /// The ten menus: labels, entry count, colour, and each entry's state (see `Menu`).
 pub static mut menus: [Menu; 10] = [
-    Menu { label_list: &raw const label2 as *const c_char, num: 10, color: 6, enabled: [3, 2, 2, 2, 2, 10, 10, 10, 10, 10, 0, 0] },
-    Menu { label_list: &raw const label6 as *const c_char, num: 12, color: 5, enabled: [2, 3, 2, 2, 2, 8, 8, 8, 8, 8, 8, 8] },
-    Menu { label_list: &raw const label3 as *const c_char, num: 8, color: 9, enabled: [2, 2, 3, 2, 2, 10, 10, 10, 0, 0, 0, 0] },
-    Menu { label_list: &raw const label5 as *const c_char, num: 12, color: 10, enabled: [2, 2, 2, 3, 2, 10, 10, 10, 10, 10, 10, 10] },
-    Menu { label_list: &raw const label4 as *const c_char, num: 10, color: 2, enabled: [2, 2, 2, 2, 3, 6, 7, 7, 10, 10, 0, 0] },
-    Menu { label_list: &raw const label8 as *const c_char, num: 7, color: 0, enabled: [2, 2, 2, 2, 2, 10, 10, 0, 0, 0, 0, 0] },
-    Menu { label_list: &raw const label9 as *const c_char, num: 11, color: 8, enabled: [2, 2, 2, 2, 2, 10, 10, 10, 10, 10, 10, 0] },
-    Menu { label_list: &raw const labelA as *const c_char, num: 9, color: 10, enabled: [2, 2, 2, 2, 2, 10, 0, 0, 0, 0, 0, 0] },
-    Menu { label_list: &raw const label7 as *const c_char, num: 10, color: 8, enabled: [10, 10, 10, 10, 10, 10, 10, 10, 10, 0, 10, 10] },
-    Menu { label_list: &raw const labelB as *const c_char, num: 10, color: 5, enabled: [10, 10, 10, 10, 10, 10, 10, 10, 0, 0, 0, 0] },
+    Menu { label_list: label2, num: 10, color: 6, enabled: [3, 2, 2, 2, 2, 10, 10, 10, 10, 10, 0, 0] },
+    Menu { label_list: label6, num: 12, color: 5, enabled: [2, 3, 2, 2, 2, 8, 8, 8, 8, 8, 8, 8] },
+    Menu { label_list: label3, num: 8, color: 9, enabled: [2, 2, 3, 2, 2, 10, 10, 10, 0, 0, 0, 0] },
+    Menu { label_list: label5, num: 12, color: 10, enabled: [2, 2, 2, 3, 2, 10, 10, 10, 10, 10, 10, 10] },
+    Menu { label_list: label4, num: 10, color: 2, enabled: [2, 2, 2, 2, 3, 6, 7, 7, 10, 10, 0, 0] },
+    Menu { label_list: label8, num: 7, color: 0, enabled: [2, 2, 2, 2, 2, 10, 10, 0, 0, 0, 0, 0] },
+    Menu { label_list: label9, num: 11, color: 8, enabled: [2, 2, 2, 2, 2, 10, 10, 10, 10, 10, 10, 0] },
+    Menu { label_list: labelA, num: 9, color: 10, enabled: [2, 2, 2, 2, 2, 10, 0, 0, 0, 0, 0, 0] },
+    Menu { label_list: label7, num: 10, color: 8, enabled: [10, 10, 10, 10, 10, 10, 10, 10, 10, 0, 10, 10] },
+    Menu { label_list: labelB, num: 10, color: 5, enabled: [10, 10, 10, 10, 10, 10, 10, 10, 0, 0, 0, 0] },
 ];
 
 /// Keyboard shortcuts: the key, the menu and the entry it picks.
@@ -396,7 +392,7 @@ pub static mut menu_shortcuts: [Letter; 37] = [
 ];
 
 /// The brothers' names.
-pub static mut brother_names: [*const c_char; 3] = [c"Julian".as_ptr(), c"Phillip".as_ptr(), c"Kevin".as_ptr()];
+pub static brother_names: [&str; 3] = ["Julian", "Phillip", "Kevin"];
 
 /// The disk blocks each of the ten map regions needs.
 pub static mut region_disk_blocks: [Need; 10] = [
@@ -441,7 +437,6 @@ pub static mut brother_stats: [Bro; 3] = unsafe {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::ffi::CStr;
     use std::collections::HashSet;
 
     #[test]
@@ -476,9 +471,8 @@ mod tests {
         let all_menus = unsafe { &*(&raw const menus) };
 
         for (n, menu) in all_menus.iter().enumerate() {
-            let label = unsafe { CStr::from_ptr(menu.label_list) };
             let needed = (menu.num as usize).saturating_sub(5) * 5;
-            assert!(label.to_bytes().len() >= needed, "menu {n}");
+            assert!(menu.label_list.len() >= needed, "menu {n}");
             assert!(menu.num as usize <= menu.enabled.len(), "menu {n}");
         }
     }
@@ -510,15 +504,13 @@ mod tests {
 
     #[test]
     fn every_item_has_a_name() {
-        let items = unsafe { &*(&raw const item_list) };
-        assert_eq!(items.len(), 36);
+        assert_eq!(item_list.len(), 36);
 
-        for (n, item) in items.iter().enumerate() {
-            let name = unsafe { CStr::from_ptr(item.name) };
-            assert!(!name.to_bytes().is_empty(), "item {n}");
+        for (n, item) in item_list.iter().enumerate() {
+            assert!(!item.name.is_empty(), "item {n}");
         }
 
-        assert_eq!(unsafe { CStr::from_ptr(items[0].name) }.to_str(), Ok("Dirk"));
+        assert_eq!(item_list[0].name, "Dirk");
     }
 
     #[test]
@@ -527,8 +519,7 @@ mod tests {
         let lists: HashSet<_> = brothers.iter().map(|b| b.stuff as usize).collect();
         assert_eq!(lists.len(), 3);
 
-        let names = unsafe { &*(&raw const brother_names) };
-        assert_eq!(unsafe { CStr::from_ptr(names[0]) }.to_str(), Ok("Julian"));
+        assert_eq!(brother_names[0], "Julian");
     }
 
     #[test]

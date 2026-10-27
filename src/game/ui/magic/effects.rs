@@ -167,7 +167,7 @@ pub(super) unsafe fn heal() {
         (*hero).vitality = vitality;
 
         if !capped {
-            print(c"That feels a lot better!".as_ptr());
+            print("That feels a lot better!");
         }
 
         queue_print(PRQ_STATS);

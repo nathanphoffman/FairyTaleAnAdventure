@@ -12,10 +12,8 @@
 use crate::game::data::object_tables::{pplay, prec, print_que};
 use crate::game::data::state::the_hero;
 use crate::game::data::story_text::{EVENT_MSG, PLACARD_MSGS, SPEECHES};
-use crate::game::data::tables::number_buffer;
 use crate::game::render::screen::{PortId, screen};
 use crate::game::ui::messages::print_wrapped;
-use std::ffi::c_char;
 
 /// In a string: followed by x/2 and y, moves the text position.
 const XY: u8 = 128;
@@ -32,41 +30,31 @@ const NUMBER_DIGITS: usize = 10;
 /// Size of the print queue; the indexes wrap with this mask.
 const PRINT_QUEUE_MASK: i16 = 31;
 
-/// Right-aligned decimal in the first 10 characters of `number_buffer`, leading positions blank.
-/// (The 11th character is a space, which `print_number` prints after the number.)
-pub fn format_number(mut value: u32) -> i32 {
-    unsafe {
-        let digits = &mut (&mut *(&raw mut number_buffer))[..NUMBER_DIGITS];
-        let mut i = NUMBER_DIGITS;
+/// Right-aligned decimal in 10 characters, leading positions blank, and a trailing space (which
+/// `print_number` prints after the number).
+pub fn format_number(mut value: u32) -> [u8; NUMBER_DIGITS + 1] {
+    let mut text = [b' '; NUMBER_DIGITS + 1];
+    let mut i = NUMBER_DIGITS;
 
-        loop {
-            i -= 1;
-            digits[i] = b'0' as c_char + (value % DECIMAL_BASE) as c_char;
-            value /= DECIMAL_BASE;
+    loop {
+        i -= 1;
+        text[i] = b'0' + (value % DECIMAL_BASE) as u8;
+        value /= DECIMAL_BASE;
 
-            if value == 0 || i == 0 {
-                break;
-            }
+        if value == 0 || i == 0 {
+            break;
         }
-
-        digits[..i].fill(b' ' as c_char);
     }
 
-    0
+    text
 }
 
 /// Prints the number in a field of `len` characters, plus the trailing space.
 pub fn print_number(value: i32, len: i32) {
-    format_number(value as u32);
-    unsafe {
-        draw_text(
-            (&raw const number_buffer)
-                .cast::<c_char>()
-                .add(NUMBER_DIGITS)
-                .offset(-(len as isize)),
-            len + 1,
-        )
-    };
+    let text = format_number(value as u32);
+    let from = (NUMBER_DIGITS as i32 - len).max(0) as usize;
+
+    draw_text(&text[from..]);
 }
 
 // `move` is a Rust keyword, so this one is exported under the C name.
@@ -76,36 +64,36 @@ pub fn move_to(x: i32, y: i32) {
     screen.move_to(screen.current_port, x, y);
 }
 
-/// Prints `len` characters at the text position.
-pub fn draw_text(s: *const c_char, len: i32) {
-    let bytes = unsafe { std::slice::from_raw_parts(s.cast::<u8>(), len.max(0) as usize) };
+/// Prints the characters at the text position.
+pub fn draw_text(bytes: &[u8]) {
     let screen = screen();
     screen.text(screen.current_port, bytes);
 }
 
 /// Prints a string that may hold XY escapes (128, x/2, y) to move the text position. A string
-/// ends at a zero byte; bytes of 128 and above end each plain run of text.
+/// ends at a zero byte (or its end); bytes of 128 and above end each plain run of text.
 /// (The x position is stored halved so it fits in a byte.)
-pub fn print_positioned(mut s: *const u8) {
-    unsafe {
-        while *s != 0 {
-            if *s == XY {
-                move_to(*s.add(1) as i32 * XY_X_SCALE, *s.add(2) as i32);
+pub fn print_positioned(s: &[u8]) {
+    let mut at = 0;
+    let byte = |i: usize| s.get(i).copied().unwrap_or(0);
 
-                s = s.add(XY_BYTES);
-            } else {
-                let mut n = 0;
+    while byte(at) != 0 {
+        if byte(at) == XY {
+            move_to(byte(at + 1) as i32 * XY_X_SCALE, byte(at + 2) as i32);
 
-                while *s.add(n) != 0 && *s.add(n) < XY {
-                    n += 1;
-                }
+            at += XY_BYTES;
+        } else {
+            let mut n = 0;
 
-                draw_text(s.cast(), n as i32);
-                s = s.add(n);
+            while byte(at + n) != 0 && byte(at + n) < XY {
+                n += 1;
+            }
 
-                if n == 0 {
-                    s = s.add(1); // stray byte >= 128 that is not XY
-                }
+            draw_text(&s[at..at + n]);
+            at += n;
+
+            if n == 0 {
+                at += 1; // stray byte >= 128 that is not XY
             }
         }
     }
@@ -113,12 +101,12 @@ pub fn print_positioned(mut s: *const u8) {
 
 /// Prints story page text number `n` (the strings use position escapes, see `print_positioned`).
 pub fn placard_text(n: i32) {
-    print_positioned(PLACARD_MSGS[n as usize].as_ptr());
+    print_positioned(PLACARD_MSGS[n as usize]);
 }
 
 /// The `n`-th zero-terminated string of a list of messages (the first is number 0). A number past
 /// the end gives the final zero byte, an empty string.
-fn nth_string(list: &[u8], n: i32) -> *const c_char {
+fn nth_string(list: &[u8], n: i32) -> &[u8] {
     let mut at = 0;
 
     for _ in 0..n {
@@ -126,7 +114,7 @@ fn nth_string(list: &[u8], n: i32) -> *const c_char {
         at = (at + length + 1).min(list.len() - 1);
     }
 
-    list[at..].as_ptr().cast()
+    &list[at..]
 }
 
 /// Shows the `num`-th string of a list of messages, word-wrapped (see `print_wrapped`).
@@ -155,7 +143,7 @@ pub fn queue_print(x: i32) {
             return;
         }
 
-        (*(&raw mut print_que))[prec as usize] = x as c_char;
+        (*(&raw mut print_que))[prec as usize] = x as i8;
         prec = next;
     }
 }
@@ -262,7 +250,6 @@ const ERROR_SCREEN_Y: i32 = 90;
 
 /// Error number meaning graphics are not open, so nothing can be printed.
 const ERROR_NO_GRAPHICS: i32 = 2;
-const ERROR_LABEL_LEN: i32 = 6;
 
 /// Shows "ERROR n" on the text panel (startup failures). Error 2 (no graphics) cannot be shown.
 pub fn show_error(n: i32) {
@@ -271,6 +258,6 @@ pub fn show_error(n: i32) {
     }
 
     move_to(ERROR_SCREEN_X, ERROR_SCREEN_Y);
-    draw_text(c"ERROR ".as_ptr(), ERROR_LABEL_LEN);
+    draw_text(b"ERROR ");
     print_number(n, 2);
 }

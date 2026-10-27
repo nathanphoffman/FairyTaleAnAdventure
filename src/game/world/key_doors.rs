@@ -120,13 +120,13 @@ pub fn open_door_near(x: u16, y: u16, keytype: u32) -> i32 {
             swap_in_open_door_tiles(open, x, y);
             the_screen.view_status = REDRAW_MAP;
             the_ui.held_direction = 0;
-            print(c"It opened.".as_ptr());
+            print("It opened.");
 
             return 1;
         }
 
         if bumped_locked_door == 0 && keytype == 0 {
-            print(c"It's locked.".as_ptr());
+            print("It's locked.");
         }
 
         bumped_locked_door = 1;

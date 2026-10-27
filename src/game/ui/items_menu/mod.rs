@@ -19,7 +19,6 @@ use crate::game::data::state::the_hero;
 use crate::game::data::tables::item_list;
 use crate::game::data::types::InvItem;
 use crate::game::ui::menus::go_to_menu;
-use std::ffi::c_char;
 
 // Menu numbers and the entries of the Items menu.
 const USE: i16 = 8;
@@ -46,12 +45,12 @@ const SACKS: u32 = 0x10;
 const PRQ_VITALITY: i32 = 7;
 
 /// The name of inventory item `i`.
-pub(in crate::game::ui) unsafe fn item_name(i: usize) -> *const c_char {
-    unsafe { (*(&raw const item_list).cast::<InvItem>().add(i)).name }
+pub(in crate::game::ui) fn item_name(i: usize) -> &'static str {
+    item(i).name
 }
 
-unsafe fn item(i: usize) -> &'static InvItem {
-    unsafe { &*(&raw const item_list).cast::<InvItem>().add(i) }
+fn item(i: usize) -> &'static InvItem {
+    &item_list[i]
 }
 
 /// Adds `amount` to the hero's count of inventory slot `slot`.

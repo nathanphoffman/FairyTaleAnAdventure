@@ -45,17 +45,17 @@ fn container_key(roll: i32) -> i32 {
 pub(super) unsafe fn container_contents() -> bool {
     unsafe {
         match roll_contents(rand4, rand8) {
-            Contents::Nothing => print(c"nothing.".as_ptr()),
+            Contents::Nothing => print("nothing."),
             Contents::One(i) => {
-                print(c"a ".as_ptr());
+                print("a ");
                 print_cont(item_name(i));
-                print_cont(c".".as_ptr());
+                print_cont(".");
                 add_stuff(i, 1);
             }
 
             Contents::Two { first, second } => take_two_things(first, second),
             Contents::ThreeKeys(keys) => {
-                print(c"3 keys.".as_ptr());
+                print("3 keys.");
 
                 for key in keys {
                     add_stuff(key as usize, 1);
@@ -63,9 +63,9 @@ pub(super) unsafe fn container_contents() -> bool {
             }
 
             Contents::ThreeOf(i) => {
-                print(c"3 ".as_ptr());
+                print("3 ");
                 print_cont(item_name(i));
-                print_cont(c"s.".as_ptr());
+                print_cont("s.");
                 add_stuff(i, MANY as u8);
             }
         }
@@ -80,11 +80,11 @@ unsafe fn take_two_things(first: usize, second: usize) {
         if first == HUNDRED_GOLD as usize {
             the_hero.wealth += CONTAINER_GOLD;
         } else {
-            print_cont(c" a".as_ptr());
+            print_cont(" a");
         }
 
         print(item_name(first));
-        print_cont(c" and a ".as_ptr());
+        print_cont(" and a ");
         print_cont(item_name(second));
 
         if first < GOLDBASE {

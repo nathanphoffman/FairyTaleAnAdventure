@@ -10,7 +10,6 @@ use crate::game::data::tables::{key_colors, label1, menus};
 use crate::game::input::handler::forget_last_menu;
 use crate::game::render::screen::{PortId, screen};
 use crate::game::ui::text::item_menu_state;
-use std::ffi::c_char;
 
 // Menu numbers (`enum cmodes` in csrc/fmain.c).
 const MAGIC: usize = 1;
@@ -199,8 +198,7 @@ pub fn print_menu_entry(j: i16, pena: i16) {
         };
 
         let y = (j as i32 / 2) * ROW_HEIGHT + FIRST_ROW_Y;
-        let label =
-            std::slice::from_raw_parts(entry_label(offset).cast::<u8>(), LABEL_LEN as usize);
+        let label = entry_label(offset);
         let screen = screen();
         screen.move_to(PortId::Text2, x, y);
         screen.text(PortId::Text2, BOX);
@@ -233,16 +231,18 @@ unsafe fn entry_box_pen(entry: i32) -> u32 {
 
 /// The label text `offset` bytes into the current menu's labels. The main names come from `label1`;
 /// the other menus have their own list, which for the first 5 slots is skipped over.
-unsafe fn entry_label(offset: i32) -> *const c_char {
-    unsafe {
-        let labels = menus[the_ui.current_menu as usize].label_list;
+fn entry_label(offset: i32) -> &'static [u8] {
+    let current = unsafe { the_ui.current_menu } as usize;
+    let labels = unsafe { menus[current].label_list };
 
-        if the_ui.current_menu as usize >= USE {
-            labels.offset(offset as isize)
-        } else if offset < MAIN_ENTRIES * LABEL_LEN {
-            (&raw const label1).cast::<c_char>().offset(offset as isize)
-        } else {
-            labels.offset((offset - MAIN_ENTRIES * LABEL_LEN) as isize)
-        }
-    }
+    let (list, from) = if current >= USE {
+        (labels, offset)
+    } else if offset < MAIN_ENTRIES * LABEL_LEN {
+        (label1, offset)
+    } else {
+        (labels, offset - MAIN_ENTRIES * LABEL_LEN)
+    };
+
+    list.get(from as usize..from as usize + LABEL_LEN as usize)
+        .unwrap_or(&[b' '; LABEL_LEN as usize])
 }

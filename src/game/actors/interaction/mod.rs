@@ -73,7 +73,7 @@ pub fn eat_food(amt: i32) {
             the_hero.hunger = 0;
             show_event(HUNGER_FULL_MESSAGE);
         } else {
-            print(c"Yum!".as_ptr());
+            print("Yum!");
         }
     }
 }

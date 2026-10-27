@@ -173,18 +173,18 @@ pub fn report_battle_result() {
 
         match battle_report(vitality, dead, fled, the_world.extent_type) {
             BattleReport::Silent => {}
-            BattleReport::Bravely => print(c"Bravely done!".as_ptr()),
+            BattleReport::Bravely => print("Bravely done!"),
             BattleReport::Foes { dead, fled } => {
                 if dead != 0 {
-                    print(c"".as_ptr());
+                    print("");
                     print_number(dead, 1);
-                    print_cont(c"foes were defeated in battle.".as_ptr());
+                    print_cont("foes were defeated in battle.");
                 }
 
                 if fled != 0 {
-                    print(c"".as_ptr());
+                    print("");
                     print_number(fled, 1);
-                    print_cont(c"foes fled in retreat.".as_ptr());
+                    print_cont("foes fled in retreat.");
                 }
             }
         }
