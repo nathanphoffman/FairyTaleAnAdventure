@@ -195,22 +195,8 @@ pub fn print_menu_entry(j: i16, pena: i16) {
     unsafe {
         let r = &raw mut the_screen.rp_text2;
         let entry = the_ui.slot_entries[j as usize] as i32;
-        let box_pen = if the_ui.current_menu as usize == USE {
-            USE_PEN
-        } else if the_ui.current_menu as usize == FILE {
-            FILE_PEN
-        } else if entry < MAIN_ENTRIES {
-            MAIN_PEN
-        } else if the_ui.current_menu as usize == KEYS {
-            key_colors[(entry - MAIN_ENTRIES) as usize] as u32
-        } else if the_ui.current_menu as usize == SAVEX {
-            entry as u32
-        } else {
-            menus[the_ui.current_menu as usize].color as u32
-        };
-
         SetAPen(r, pena as u32);
-        SetBPen(r, box_pen);
+        SetBPen(r, entry_box_pen(entry));
 
         let offset = entry * LABEL_LEN;
         let x = if j & 1 != 0 {
@@ -223,18 +209,44 @@ pub fn print_menu_entry(j: i16, pena: i16) {
         Move(r, x, y);
         Text(r, BOX.as_ptr().cast(), BOX.len() as i32);
         Move(r, x + TEXT_INSET, y);
+        Text(r, entry_label(offset), LABEL_LEN);
+    }
+}
+
+/// The colour of the box behind an entry of the current menu: fixed for the use and file menus and
+/// the main names, from a table for keys and the save slots, else the menu's own.
+unsafe fn entry_box_pen(entry: i32) -> u32 {
+    unsafe {
+        let menu = the_ui.current_menu as usize;
+
+        if menu == USE {
+            USE_PEN
+        } else if menu == FILE {
+            FILE_PEN
+        } else if entry < MAIN_ENTRIES {
+            MAIN_PEN
+        } else if menu == KEYS {
+            key_colors[(entry - MAIN_ENTRIES) as usize] as u32
+        } else if menu == SAVEX {
+            entry as u32
+        } else {
+            menus[menu].color as u32
+        }
+    }
+}
+
+/// The label text `offset` bytes into the current menu's labels. The main names come from `label1`;
+/// the other menus have their own list, which for the first 5 slots is skipped over.
+unsafe fn entry_label(offset: i32) -> *const c_char {
+    unsafe {
         let labels = menus[the_ui.current_menu as usize].label_list;
 
-        // The main names come from `label1`; the other menus have their own list, which for the
-        // first 5 slots is skipped over.
-        let label = if the_ui.current_menu as usize >= USE {
+        if the_ui.current_menu as usize >= USE {
             labels.offset(offset as isize)
         } else if offset < MAIN_ENTRIES * LABEL_LEN {
             (&raw const label1).cast::<c_char>().offset(offset as isize)
         } else {
             labels.offset((offset - MAIN_ENTRIES * LABEL_LEN) as isize)
-        };
-
-        Text(r, label, LABEL_LEN);
+        }
     }
 }

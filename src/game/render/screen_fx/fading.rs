@@ -43,30 +43,9 @@ const RANDOM_COLOR_MASK: i32 = 0xfff;
 /// Colour 31 is changed first because it depends on where the hero is (swamp, secret room).
 pub fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: *const u16) {
     unsafe {
-        page_colors[COLOR_31] = match the_world.region {
-            REGION_SWAMP => SWAMP_COLOR,
-            REGION_SECRET if the_world.secret_timer != 0 => SECRET_OPEN_COLOR,
-            REGION_SECRET => SECRET_SHUT_COLOR,
-            _ => DEFAULT_COLOR_31,
-        };
+        page_colors[COLOR_31] = color_31_here();
 
-        let (mut r, mut g, mut b) = (r as i32, g as i32, b as i32);
-        r = r.min(FULL_LEVEL);
-        g = g.min(FULL_LEVEL);
-        b = b.min(FULL_LEVEL);
-        let g2;
-
-        if limit != 0 {
-            r = r.max(NIGHT_MIN.0);
-            g = g.max(NIGHT_MIN.1);
-            b = b.max(NIGHT_MIN.2);
-            g2 = (FULL_LEVEL - g) / NIGHT_BLUE_SHARE;
-        } else {
-            r = r.max(0);
-            g = g.max(0);
-            b = b.max(0);
-            g2 = 0;
-        }
+        let ((r, g, b), g2) = clamp_levels((r as i32, g as i32, b as i32), limit != 0);
 
         for (i, slot) in (*(&raw mut fader)).iter_mut().take(COLOR_COUNT).enumerate() {
             *slot = faded_color(
@@ -84,6 +63,32 @@ pub fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: *const u16) {
             (&raw const fader).cast(),
             COLOR_COUNT as i32,
         );
+    }
+}
+
+/// Colour 31 depends on where the hero is: the swamp, the secret room (open or shut), or neither.
+unsafe fn color_31_here() -> u16 {
+    unsafe {
+        match the_world.region {
+            REGION_SWAMP => SWAMP_COLOR,
+            REGION_SECRET if the_world.secret_timer != 0 => SECRET_OPEN_COLOR,
+            REGION_SECRET => SECRET_SHUT_COLOR,
+            _ => DEFAULT_COLOR_31,
+        }
+    }
+}
+
+/// Keeps the levels between 0 and 100 percent, or at night between the night limits, and works out
+/// how much blue is mixed in from green (`g2`, only at night).
+fn clamp_levels((r, g, b): (i32, i32, i32), night: bool) -> ((i32, i32, i32), i32) {
+    let (r, g, b) = (r.min(FULL_LEVEL), g.min(FULL_LEVEL), b.min(FULL_LEVEL));
+
+    if night {
+        let (r, g, b) = (r.max(NIGHT_MIN.0), g.max(NIGHT_MIN.1), b.max(NIGHT_MIN.2));
+
+        ((r, g, b), (FULL_LEVEL - g) / NIGHT_BLUE_SHARE)
+    } else {
+        ((r.max(0), g.max(0), b.max(0)), 0)
     }
 }
 
