@@ -219,7 +219,7 @@ The port is finished. What remains afterwards (optional, no firm end) is the cle
 - Unit tests instead of playtests (done): the rules are plain functions that take values or the state
   structs and return what should happen (hunger, tactics, melee and missile hits, death, revive,
   talking, shops, loot, doors, spells, riding, water, beds, the day clock). The callers do the sounds,
-  text and drawing. 192 unit tests. The playtests went from 49 to 24 (13 pixel, 11 state); the ones
+  text and drawing. 192 unit tests. The playtests went from 49 to 21 (13 pixel, 8 state); the ones
   left check drawing, save/load and that the game reaches the rules. `cargo clippy` is clean.
 - `FTA_MUSIC_EXPORT=dir` writes every tune as a WAV file and quits (`rsrc/mood.rs`).
 - See the note below on keeping an all-C "original" build possible while doing this.
