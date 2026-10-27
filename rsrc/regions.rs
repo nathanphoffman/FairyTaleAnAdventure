@@ -6,14 +6,12 @@
 //! `new_region` is the one being loaded, or `NO_REGION` when nothing is waiting to load.
 
 use super::asm_map::fill_minimap;
-use super::game_tables::{loaded_blocks, region_disk_blocks, region_num};
-use super::globals::{
-    image_mem, map_mem, map_x, map_y, new_region, region_origin_x, region_origin_y, sector_mem,
-    stuff, target_region, terrain_mem, tile_x, tile_y,
-};
+use super::game_tables::{loaded_blocks, region_disk_blocks};
+use super::globals::{image_mem, map_mem, sector_mem, terrain_mem};
 use super::hdrive::{
     is_read_pending, load_track_range, mark_read_unused, motor_off, read_finished, wait_for_read,
 };
+use super::state::{the_hero, the_world};
 use super::types::Need;
 use std::ffi::c_void;
 
@@ -54,46 +52,46 @@ const BLOCKED_TILE: u8 = 254;
 /// west or east, and two bits of the sector row give which of four rows.
 pub fn refresh_minimap() {
     unsafe {
-        if region_num < FIRST_INDOOR_REGION {
-            if new_region < NO_REGION {
-                let xs = map_x as u32 & 0x3fff;
-                let ys = map_y as u32 & 0x1fff;
+        if the_world.region < FIRST_INDOOR_REGION {
+            if the_world.new_region < NO_REGION {
+                let xs = the_world.map_x as u32 & 0x3fff;
+                let ys = the_world.map_y as u32 & 0x1fff;
                 if (ys > 109 && ys < 7936) && (xs > 16156 || xs < 16128) {
                     load_region_now();
                 }
             }
-            let xs = (map_x as u32 + 151) >> 8;
-            let ys = (map_y as u32 + 64) >> 8;
+            let xs = (the_world.map_x as u32 + 151) >> 8;
+            let ys = (the_world.map_y as u32 + 64) >> 8;
             let xr = (xs >> 6) & 1;
             let yr = (ys >> 5) & 3;
-            target_region = (xr + yr + yr) as u16;
-            if target_region != region_num {
-                new_region = target_region;
+            the_world.target_region = (xr + yr + yr) as u16;
+            if the_world.target_region != the_world.region {
+                the_world.new_region = the_world.target_region;
                 load_region_now();
             }
         } else {
-            target_region = region_num;
+            the_world.target_region = the_world.region;
         }
 
-        if (read_finished(2) != 0 && read_finished(0) != 0) || new_region >= NO_REGION {
-            let yr = target_region >> 1;
-            let xr = if target_region > 7 {
+        if (read_finished(2) != 0 && read_finished(0) != 0) || the_world.new_region >= NO_REGION {
+            let yr = the_world.target_region >> 1;
+            let xr = if the_world.target_region > 7 {
                 0
             } else {
-                target_region & 1
+                the_world.target_region & 1
             };
-            region_origin_x = xr << 6;
-            region_origin_y = yr << 5;
+            the_world.origin_x = xr << 6;
+            the_world.origin_y = yr << 5;
         }
 
-        fill_minimap(tile_x as i32, tile_y as i32);
+        fill_minimap(the_world.tile_x as i32, the_world.tile_y as i32);
     }
 }
 
 /// Loads the pending region completely (`load_region_piece` does one piece per call).
 pub fn load_region_now() {
     unsafe {
-        while new_region < NO_REGION {
+        while the_world.new_region < NO_REGION {
             load_region_piece();
         }
     }
@@ -105,10 +103,10 @@ pub fn load_region_now() {
 /// off, and `new_region` becomes the current region.
 pub fn load_region_piece() {
     unsafe {
-        if new_region >= NO_REGION {
+        if the_world.new_region >= NO_REGION {
             return;
         }
-        let need = &region_disk_blocks[new_region as usize];
+        let need = &region_disk_blocks[the_world.new_region as usize];
         if need.sector != loaded_blocks.sector {
             load_track_range(
                 need.sector as i16,
@@ -147,8 +145,8 @@ pub fn load_region_piece() {
         block_desert_door_without_statues();
         wait_for_all_reads();
         motor_off();
-        region_num = new_region;
-        new_region = NO_REGION;
+        the_world.region = the_world.new_region;
+        the_world.new_region = NO_REGION;
     }
 }
 
@@ -182,7 +180,9 @@ unsafe fn load_next_image_bank(need: &Need) -> bool {
 /// Until the hero has enough statues, the desert fort door is covered with blocked tiles.
 unsafe fn block_desert_door_without_statues() {
     unsafe {
-        if new_region == DESERT_REGION && *stuff.add(STATUE_SLOT) < STATUES_NEEDED {
+        if the_world.new_region == DESERT_REGION
+            && *the_hero.stuff.add(STATUE_SLOT) < STATUES_NEEDED
+        {
             for offset in [0, 1, 128, 129] {
                 *map_mem.add(DESERT_DOOR_TILE + offset) = BLOCKED_TILE;
             }

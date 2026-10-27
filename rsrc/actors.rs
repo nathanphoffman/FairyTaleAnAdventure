@@ -11,16 +11,13 @@ use super::asm_text::{
 };
 use super::encounters::{check_death, load_carrier};
 use super::game_tables::extent_list;
-use super::globals::{
-    active_actor_count, actor_list, current_rastport, drawn_actor_count, encounter_x, encounter_y,
-    extent_type, hero_x, hero_y, hunger, i as c_i, leader, nearest_object, princess, story_font,
-    stuff, wealth,
-};
+use super::globals::{current_rastport, i as c_i, princess, story_font};
 use super::loading::play_effect;
 use super::messages::{name, print, print_cont};
 use super::places::transfer_hero;
 use super::random::{bitrand, fta_rand, rand8, rand64, rand256};
 use super::screen_fx::{map_message, message_off};
+use super::state::{the_actors, the_encounter, the_hero, the_world};
 use super::tables::ob_list8;
 use super::types::{Extent, Shape, WorldObject};
 use crate::amiga::{RastPort, TextFont};
@@ -99,9 +96,11 @@ pub static mut turtle_eggs: i8 = 0;
 
 /// Actor `i`. A raw pointer, because the functions called while it is in use change actors too.
 fn actor(i: i32) -> *mut Shape {
-    (&raw mut actor_list)
-        .cast::<Shape>()
-        .wrapping_add(i as usize)
+    unsafe {
+        (&raw mut the_actors.list)
+            .cast::<Shape>()
+            .wrapping_add(i as usize)
+    }
 }
 
 /// A hit from actor `i` on actor `j`: `wt` damage, then the target is pushed back in direction `fc`.
@@ -116,7 +115,8 @@ pub fn hit_actor(i: i32, j: i32, fc: i32, wt: i16) {
         let target = actor(j);
         if (*actor(HERO as i32)).weapon < MIN_HURT_WEAPON
             && ((*target).race == RACE_SPIRIT
-                || ((*target).race == RACE_GHOST_KEEPER && *stuff.add(SPIRIT_HURT_ITEM) == 0))
+                || ((*target).race == RACE_GHOST_KEEPER
+                    && *the_hero.stuff.add(SPIRIT_HURT_ITEM) == 0))
         {
             speak(MESSAGE_NEEDS_WEAPON);
             return;
@@ -148,7 +148,7 @@ pub fn hit_actor(i: i32, j: i32, fc: i32, wt: i16) {
 pub fn report_battle_result() {
     unsafe {
         let (mut dead, mut fled) = (0, 0);
-        for i in 3..active_actor_count as i32 {
+        for i in 3..the_actors.active as i32 {
             let a = actor(i);
             if (*a).kind != ENEMY {
                 continue;
@@ -164,7 +164,7 @@ pub fn report_battle_result() {
             // dead, so no message
         } else if vitality < BRAVE_LOW_VITALITY && dead != 0 {
             print(c"Bravely done!".as_ptr());
-        } else if extent_type < PEACEFUL_EXTENT {
+        } else if the_world.extent_type < PEACEFUL_EXTENT {
             if dead != 0 {
                 print(c"".as_ptr());
                 print_number(dead, 1);
@@ -201,7 +201,7 @@ pub fn blocked_at(x: i16, y: i16, i: i16) -> i32 {
                 return terrain;
             }
         }
-        for j in 0..active_actor_count as i32 {
+        for j in 0..the_actors.active as i32 {
             let other = actor(j);
             // dead actors and rafts can be walked over
             if i as i32 != j
@@ -230,15 +230,15 @@ pub fn find_nearest_figure(constraint: c_char, mut dist: i16) -> i32 {
     /// Index of the "still" object type that always counts.
     const ALWAYS_COUNTED_OBJECT: i8 = 0x1d;
     unsafe {
-        nearest_object = 0;
-        for i in 1..drawn_actor_count as i32 {
+        the_actors.nearest_object = 0;
+        for i in 1..the_actors.drawn as i32 {
             let a = actor(i);
             if (*a).kind == OBJECTS && (constraint != 0 || (*a).index == ALWAYS_COUNTED_OBJECT) {
                 continue;
             }
             let d = actor_distance(i, 0);
             if d < dist as i32 {
-                nearest_object = i as i16;
+                the_actors.nearest_object = i as i16;
                 dist = d as i16;
             }
         }
@@ -307,7 +307,7 @@ pub fn run_tactic(i: i32, tactic: i32) {
         if (*an).goal == ATTACK2 {
             acts_now = fta_rand() & 3 == 0;
         }
-        let (hx, hy) = (hero_x as i32, hero_y as i32);
+        let (hx, hy) = (the_hero.x as i32, the_hero.y as i32);
         match tactic {
             PURSUE => steer_if(acts_now, i, hx, hy, COURSE_TOWARD),
             SHOOT => shoot_or_approach(i, an, hx, hy),
@@ -367,7 +367,7 @@ unsafe fn wander(an: *mut Shape, acts_now: bool) {
 /// Stay near the leader (an enemy cannot follow itself, so it wanders instead).
 unsafe fn follow_leader(i: i32, an: *mut Shape, acts_now: bool) {
     unsafe {
-        let leader_slot = leader as i32;
+        let leader_slot = the_actors.leader as i32;
         if i == leader_slot {
             (*an).tactic = RANDOM as i8; // can't follow self
         }
@@ -380,7 +380,7 @@ unsafe fn follow_leader(i: i32, an: *mut Shape, acts_now: bool) {
 /// Keep away from another enemy (the one before the last, or the one at twice this slot number).
 unsafe fn evade_neighbour(i: i32, acts_now: bool) {
     unsafe {
-        let other = if i == active_actor_count as i32 {
+        let other = if i == the_actors.active as i32 {
             i - 1
         } else {
             i + i
@@ -416,7 +416,7 @@ pub fn summon_turtle() {
         c_i = 0;
         while c_i < TRIES {
             pick_encounter_spot();
-            if terrain_at(encounter_x as i32, encounter_y as i32) == WATER {
+            if terrain_at(the_encounter.x as i32, the_encounter.y as i32) == WATER {
                 break;
             }
             c_i += 1;
@@ -424,7 +424,11 @@ pub fn summon_turtle() {
         if c_i == TRIES {
             return;
         }
-        center_extent_on(TURTLE_EXTENT, encounter_x as i16, encounter_y as i16);
+        center_extent_on(
+            TURTLE_EXTENT,
+            the_encounter.x as i16,
+            the_encounter.y as i16,
+        );
         load_carrier(TURTLE_CARRIER);
     }
 }
@@ -493,12 +497,12 @@ pub fn rescue_princess() {
         center_extent_on(0, PRINCESS_EXTENT.0, PRINCESS_EXTENT.1);
         let objects = (&raw mut ob_list8).cast::<WorldObject>();
         (*objects.add(PRINCESS_OBJECT)).ob_id = PRINCESS_OBJECT_ID;
-        *stuff.add(PRINCESS_STUFF) = 1;
+        *the_hero.stuff.add(PRINCESS_STUFF) = 1;
         speak(REWARD_MESSAGE);
-        wealth = wealth.wrapping_add(REWARD_GOLD);
+        the_hero.wealth = the_hero.wealth.wrapping_add(REWARD_GOLD);
         (*objects.add(CAPTIVE_OBJECT)).ob_stat = 0;
         for item in KEY_ITEMS {
-            *stuff.add(item) = (*stuff.add(item)).wrapping_add(KEYS_REWARD);
+            *the_hero.stuff.add(item) = (*the_hero.stuff.add(item)).wrapping_add(KEYS_REWARD);
         }
     }
 }
@@ -508,9 +512,9 @@ pub fn rescue_princess() {
 pub fn eat_food(amt: i32) {
     const HUNGER_FULL_MESSAGE: i32 = 13;
     unsafe {
-        hunger = (hunger as i32 - amt) as i16;
-        if hunger < 0 {
-            hunger = 0;
+        the_hero.hunger = (the_hero.hunger as i32 - amt) as i16;
+        if the_hero.hunger < 0 {
+            the_hero.hunger = 0;
             show_event(HUNGER_FULL_MESSAGE);
         } else {
             print(c"Yum!".as_ptr());
@@ -527,8 +531,8 @@ pub fn pick_encounter_spot() {
     unsafe {
         let direction = rand8();
         let distance = ENCOUNTER_MIN_DISTANCE + rand64();
-        encounter_x = step_x(hero_x as i32, direction, distance) as u16;
-        encounter_y = step_y(hero_y as i32, direction, distance) as u16;
+        the_encounter.x = step_x(the_hero.x as i32, direction, distance) as u16;
+        the_encounter.y = step_y(the_hero.y as i32, direction, distance) as u16;
     }
 }
 

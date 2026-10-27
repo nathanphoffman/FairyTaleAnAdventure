@@ -8,17 +8,16 @@
 
 use super::asm_text::{draw_placard_border, draw_text, move_to, placard_text, print_number};
 use super::display::flip_pages;
-use super::game_tables::{black_colors, intro_colors, region_num};
+use super::game_tables::{black_colors, intro_colors};
 use super::globals::{
-    actor_list, bm_draw, bm_source, bm_text, brave, current_rastport, day_clock, drawing_page,
-    extent_type, hero_sector, hero_x, hero_y, kind as hero_kind, light_level, light_timer, luck,
-    nhinor, nhivar, ri_page1, ri_page2, rp_map, rp_text, secret_timer, v, view_status, vp_page,
-    vp_text, wealth,
+    bm_draw, bm_source, bm_text, current_rastport, drawing_page, nhinor, nhivar, ri_page1,
+    ri_page2, rp_map, rp_text, v, view_status, vp_page, vp_text,
 };
 use super::iffsubs::load_picture;
 use super::menus::print_options;
 use super::messages::{name, print};
 use super::random::bitrand;
+use super::state::{the_actors, the_hero, the_world};
 use super::tables::{comptable, fader, page_colors, pplay, prec, print_que, sun_colors};
 use crate::amiga::{BitMap, RastPort, View, ViewPort};
 
@@ -116,9 +115,9 @@ const MAX_COMPONENT: i32 = 15;
 /// Colour 31 is changed first because it depends on where the hero is (swamp, secret room).
 pub fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: *const u16) {
     unsafe {
-        page_colors[COLOR_31] = match region_num {
+        page_colors[COLOR_31] = match the_world.region {
             REGION_SWAMP => SWAMP_COLOR,
-            REGION_SECRET if secret_timer != 0 => SECRET_OPEN_COLOR,
+            REGION_SECRET if the_world.secret_timer != 0 => SECRET_OPEN_COLOR,
             REGION_SECRET => SECRET_SHUT_COLOR,
             _ => DEFAULT_COLOR_31,
         };
@@ -146,7 +145,7 @@ pub fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: *const u16) {
                 (r, g, b),
                 g2,
                 limit != 0,
-                light_timer != 0,
+                the_world.light_timer != 0,
             );
         }
         LoadRGB4(
@@ -233,24 +232,24 @@ pub fn handle_print_request() {
         match request {
             REQUEST_DEBUG_COORDS => {
                 print(c"Coords = ".as_ptr());
-                print_number(hero_x as i32, 6);
-                print_number(hero_y as i32, 6);
+                print_number(the_hero.x as i32, 6);
+                print_number(the_hero.y as i32, 6);
                 print(c"Memory Available: ".as_ptr());
                 print_number(AvailMem(0) as i32, 6);
             }
             REQUEST_DEBUG_SECTOR => {
                 print(c"You are at: ".as_ptr());
-                print_number(hero_x as i32 / 256, 3);
-                print_number(hero_y as i32 / 256, 3);
+                print_number(the_hero.x as i32 / 256, 3);
+                print_number(the_hero.y as i32 / 256, 3);
                 print(c"H/Sector = ".as_ptr());
-                print_number(hero_sector as i32, 3);
+                print_number(the_hero.sector as i32, 3);
                 draw_text(c" Extent = ".as_ptr(), 10);
-                print_number(extent_type as i32, 2);
+                print_number(the_world.extent_type as i32, 2);
             }
             REQUEST_VITALITY => {
                 move_to(VITALITY_POSITION.0, VITALITY_POSITION.1);
                 draw_text(c"Vit:".as_ptr(), 4);
-                print_number(actor_list[0].vitality as i32, 3);
+                print_number(the_actors.list[0].vitality as i32, 3);
             }
             REQUEST_OPTIONS => {
                 print_options();
@@ -265,14 +264,14 @@ pub fn handle_print_request() {
 /// Draws the hero's four stats (bravery, luck, kindness, wealth) along the stats line.
 unsafe fn draw_stats() {
     unsafe {
-        if luck < 0 {
-            luck = 0;
+        if the_hero.luck < 0 {
+            the_hero.luck = 0;
         }
         for (x, label, len, value) in [
-            (14, c"Brv:", 4, brave),
-            (90, c"Lck:", 4, luck),
-            (168, c"Knd:", 4, hero_kind),
-            (321, c"Wlth:", 5, wealth),
+            (14, c"Brv:", 4, the_hero.brave),
+            (90, c"Lck:", 4, the_hero.luck),
+            (168, c"Knd:", 4, the_hero.kindness),
+            (321, c"Wlth:", 5, the_hero.wealth),
         ] {
             move_to(x, STATS_Y);
             draw_text(label.as_ptr(), len);
@@ -454,15 +453,15 @@ const VIEW_REBUILD: i8 = 97;
 /// inside buildings (regions 8 and 9) it is always bright.
 pub fn day_fade() {
     unsafe {
-        let bonus = if light_timer != 0 {
+        let bonus = if the_world.light_timer != 0 {
             LIGHT_SPELL_BONUS
         } else {
             0
         };
-        if day_clock & 3 == 0 || view_status > VIEW_REBUILD {
+        if the_world.day_clock & 3 == 0 || view_status > VIEW_REBUILD {
             let colors = (&raw const page_colors).cast();
-            if region_num < FIRST_INDOOR_REGION {
-                let level = light_level as i32;
+            if the_world.region < FIRST_INDOOR_REGION {
+                let level = the_world.light_level as i32;
                 fade_page(
                     (level - DAY_DARKEN.0 + bonus) as i16,
                     (level - DAY_DARKEN.1) as i16,
@@ -525,18 +524,16 @@ mod tests {
 
     #[test]
     fn sunrise_palette_keeps_fixed_colours_and_fades_the_glow() {
-        unsafe {
-            let early = sunrise_palette(SUNRISE_START);
-            assert_eq!(
-                (early[0], early[1], early[28], early[31]),
-                (0, 0xfff, 0xfff, 0)
-            );
-            assert_eq!((early[29], early[30]), (0x800, 0x400));
-            let late = sunrise_palette(SUN_GLOW_UNTIL);
-            assert_eq!((late[29], late[30]), (0x100 * 8, 0x100 * 4));
-            // the sky colours at the very end (index <= 0) are black
-            assert!(sunrise_palette(-30)[2..28].iter().all(|&c| c == 0));
-        }
+        let early = sunrise_palette(SUNRISE_START);
+        assert_eq!(
+            (early[0], early[1], early[28], early[31]),
+            (0, 0xfff, 0xfff, 0)
+        );
+        assert_eq!((early[29], early[30]), (0x800, 0x400));
+        let late = sunrise_palette(SUN_GLOW_UNTIL);
+        assert_eq!((late[29], late[30]), (0x100 * 8, 0x100 * 4));
+        // the sky colours at the very end (index <= 0) are black
+        assert!(sunrise_palette(-30)[2..28].iter().all(|&c| c == 0));
     }
 }
 

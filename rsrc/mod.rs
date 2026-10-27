@@ -84,6 +84,10 @@ pub mod regions;
 pub mod random;
 // Saving and loading the game.
 pub mod savegame;
+// The main game state: hero, world, encounters, actors.
+pub mod state;
+// Test helpers: state dump and scripted commands.
+pub mod statedump;
 // Colour fades, the compass, the print queue, the win sequence.
 pub mod screen_fx;
 // Constant tables and per-region object lists.

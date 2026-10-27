@@ -11,11 +11,10 @@ use super::asm_map::{move_camera_to, step_x, step_y, terrain_at, wrap_coordinate
 use super::asm_text::steer_actor;
 use super::doors::{bumped_locked_door, open_door_near};
 use super::encounters::check_death;
-use super::game_tables::{facing_frame_offsets, region_num, setfig_table, swing_transitions};
+use super::game_tables::{facing_frame_offsets, setfig_table, swing_transitions};
 use super::globals::{
-    actor_list, brother, carrier_slot, extent_type, fiery_death, freeze_timer, frustration,
-    hero_sector, hero_x, hero_y, loaded_actor_file, luck, map_x, map_y, missile_slots, new_region,
-    next_missile, raft_nearness, riding, safe_flag, stuff, witch_on_screen,
+    carrier_slot, fiery_death, frustration, loaded_actor_file, raft_nearness, safe_flag,
+    witch_on_screen,
 };
 use super::loading::play_effect;
 use super::messages::print;
@@ -23,6 +22,7 @@ use super::mood::set_mood;
 use super::objects::{SetFigEntry, leave_item};
 use super::places::{find_place, transfer_hero};
 use super::random::{rand2, rand4, rand256};
+use super::state::{the_actors, the_hero, the_world};
 use super::tables::{bowshotx, bowshoty, fallstates, gunshoty};
 use super::types::{Missile, Shape};
 
@@ -185,10 +185,10 @@ fn terrain(x: u16, y: u16) -> i16 {
 /// it), so it is passed in and written back.
 pub fn move_actor(i: i32, cycle: i16, jp: *mut i16) {
     unsafe {
-        let an = &raw mut actor_list[i as usize];
+        let an = &raw mut the_actors.list[i as usize];
         let mut c = Ctx {
             an,
-            ms: (&raw mut missile_slots as *mut Missile).offset(0),
+            ms: (&raw mut the_actors.missiles as *mut Missile).offset(0),
             i,
             cycle,
             k: 0,
@@ -199,7 +199,7 @@ pub fn move_actor(i: i32, cycle: i16, jp: *mut i16) {
             j: *jp,
             e: 0,
         };
-        let mut pc = if freeze_timer != 0 && i > 0 {
+        let mut pc = if the_world.freeze_timer != 0 && i > 0 {
             Pc::Statc
         } else {
             c.k = (*an).environ;
@@ -207,7 +207,8 @@ pub fn move_actor(i: i32, cycle: i16, jp: *mut i16) {
             c.s = (*an).state as i16;
             c.dex = (*an).index as i16;
             c.inum = diroff(c.d);
-            c.ms = (&raw mut missile_slots as *mut Missile).offset(next_missile as isize);
+            c.ms = (&raw mut the_actors.missiles as *mut Missile)
+                .offset(the_actors.next_missile as isize);
             Pc::Dispatch
         };
         loop {
@@ -279,7 +280,7 @@ impl Ctx {
                 self.dex = 4;
             } else if rand4() == 0 {
                 (*self.ms).speed = MISSILE_SPEED_FIREBALL;
-                next_missile = next_missile.wrapping_add(1);
+                the_actors.next_missile = the_actors.next_missile.wrapping_add(1);
                 self.dex = (rand2() + 1) as i16;
                 play_effect(5, 1800 + rand256());
                 (*an).facing = DRAGON_BREATH_FACING;
@@ -297,18 +298,18 @@ impl Ctx {
             let an = self.an;
             self.k = 0;
             self.j = 0;
-            let hero = &raw const actor_list[0];
+            let hero = &raw const the_actors.list[0];
             if loaded_actor_file == SWAN_FILE {
                 if raft_nearness != 0
                     && carrier_slot == CARRIER_SLOT as i16
-                    && *stuff.add(STUFF_SWAN_ITEM) != 0
+                    && *the_hero.stuff.add(STUFF_SWAN_ITEM) != 0
                 {
                     self.d = (*hero).facing as i16;
                     (*an).abs_x = (*hero).abs_x;
                     XTEST = (*hero).abs_x;
                     (*an).abs_y = (*hero).abs_y;
                     YTEST = (*hero).abs_y;
-                    riding = RIDING_SWAN;
+                    the_hero.riding = RIDING_SWAN;
                 } else {
                     XTEST = (*an).abs_x;
                     YTEST = (*an).abs_y;
@@ -320,7 +321,7 @@ impl Ctx {
                     self.d = (*hero).facing as i16;
                     XTEST = (*hero).abs_x;
                     YTEST = (*hero).abs_y;
-                    riding = RIDING_TURTLE;
+                    the_hero.riding = RIDING_TURTLE;
                     self.dex = self.d + self.d;
                     if (*hero).state as i16 == WALKING {
                         self.dex += self.cycle & 1;
@@ -363,7 +364,7 @@ impl Ctx {
                     }
                 }
             }
-            riding = 0;
+            the_hero.riding = 0;
             self.dex = self.d + self.d + (self.cycle & 1);
         }
     }
@@ -389,7 +390,7 @@ impl Ctx {
                     self.dex += 2;
                 }
             } else if witch {
-                steer_actor(self.i as i32, hero_x as i32, hero_y as i32, 0);
+                steer_actor(self.i as i32, the_hero.x as i32, the_hero.y as i32, 0);
                 self.dex = ((*an).facing / 2) as i16;
                 witch_on_screen = 1;
             } else if self.s == TALKING {
@@ -411,19 +412,19 @@ impl Ctx {
     unsafe fn raft(&mut self) -> Pc {
         unsafe {
             let an = self.an;
-            riding = 0;
+            the_hero.riding = 0;
             if carrier_slot != RIDING_RAFT || raft_nearness != 2 {
                 return Pc::Statc;
             }
-            XTEST = actor_list[0].abs_x;
-            YTEST = actor_list[0].abs_y;
+            XTEST = the_actors.list[0].abs_x;
+            YTEST = the_actors.list[0].abs_y;
             self.j = terrain(XTEST, YTEST);
             if self.j < 3 || self.j > 5 {
                 return Pc::Statc;
             }
             (*an).abs_x = XTEST;
             (*an).abs_y = YTEST;
-            riding = RIDING_RAFT;
+            the_hero.riding = RIDING_RAFT;
             Pc::Statc
         }
     }
@@ -439,7 +440,7 @@ impl Ctx {
                 self.k = 0;
             }
             let k = self.k;
-            self.e = if self.i == 0 && riding == RIDING_TURTLE {
+            self.e = if self.i == 0 && the_hero.riding == RIDING_TURTLE {
                 3
             } else if k == ENVIRON_BACKWARDS {
                 -2
@@ -459,7 +460,9 @@ impl Ctx {
                 } else {
                     bumped_locked_door = 0;
                 }
-                if *stuff.add(STUFF_GOLD_KEY_SLOT) != 0 && self.j == BLOCK_PASSABLE_WITH_KEY {
+                if *the_hero.stuff.add(STUFF_GOLD_KEY_SLOT) != 0
+                    && self.j == BLOCK_PASSABLE_WITH_KEY
+                {
                     return Pc::NewLoc;
                 }
             }
@@ -477,7 +480,11 @@ impl Ctx {
     unsafe fn slide_on_ice(&mut self) -> Option<Pc> {
         unsafe {
             let an = self.an;
-            self.e = if riding == RIDING_SWAN { 40 } else { 42 };
+            self.e = if the_hero.riding == RIDING_SWAN {
+                40
+            } else {
+                42
+            };
             let nvx = ((*an).vel_x as i32 + step_x(20, self.d as i32, 2) - 20) as i16;
             let nvy = ((*an).vel_y as i32 + step_y(20, self.d as i32, 2) - 20) as i16;
             if nvx.abs() < self.e - 8 {
@@ -488,7 +495,7 @@ impl Ctx {
             }
             XTEST = ((*an).abs_x as i32 + (*an).vel_x as i32 / 4) as u16;
             YTEST = ((*an).abs_y as i32 + (*an).vel_y as i32 / 4) as u16;
-            if riding == RIDING_SWAN {
+            if the_hero.riding == RIDING_SWAN {
                 steer_actor(0, -(nvx as i32), -(nvy as i32), 6);
                 self.d = (*an).facing as i16;
                 return Some(Pc::NewLoc);
@@ -538,7 +545,7 @@ impl Ctx {
             (*an).facing = self.d as i8;
             self.inum = diroff(self.d);
             self.dex = self.inum;
-            if !(riding != 0 && self.i == 0) && (*an).race != RACE_WRAITH {
+            if !(the_hero.riding != 0 && self.i == 0) && (*an).race != RACE_WRAITH {
                 self.dex = (self.dex as i32 + ((self.cycle as i32 + self.i) & 7)) as i16;
             }
             if self.k == ENVIRON_ICE {
@@ -557,7 +564,7 @@ impl Ctx {
             }
             let (k, j) = (self.k, self.j);
             if k > 2 && (j == 0 || (j == 3 && k > 5) || (j == 4 && k > 10)) {
-                if hero_sector != PIT_SECTOR {
+                if the_hero.sector != PIT_SECTOR {
                     self.k -= 1;
                 }
                 return Pc::Raise;
@@ -607,7 +614,7 @@ impl Ctx {
             let an = self.an;
             let ms = self.ms;
             let d8 = self.d + 8;
-            if self.k > ENVIRON_SINKING || extent_type > NO_SHOOT_XTYPE {
+            if self.k > ENVIRON_SINKING || the_world.extent_type > NO_SHOOT_XTYPE {
                 return Pc::Cpx;
             }
             if self.s == SHOOT3 {
@@ -618,23 +625,23 @@ impl Ctx {
                 self.dex = diroff(d8) + 11;
                 (*an).state = STILL;
                 if self.i == 0 {
-                    if *stuff.add(STUFF_ARROWS) == 0 {
+                    if *the_hero.stuff.add(STUFF_ARROWS) == 0 {
                         return Pc::Cpx;
                     }
-                    *stuff.add(STUFF_ARROWS) -= 1;
+                    *the_hero.stuff.add(STUFF_ARROWS) -= 1;
                 }
                 (*ms).speed = MISSILE_SPEED_ARROW;
-                next_missile = next_missile.wrapping_add(1);
+                the_actors.next_missile = the_actors.next_missile.wrapping_add(1);
                 play_effect(4, 400 + rand256());
             } else if self.s == SHOOT1 {
                 self.dex = diroff(d8) + if (*an).kind == ENEMY { 11 } else { 10 };
                 if (*an).weapon == WEAPON_FIREBALL {
                     (*ms).speed = MISSILE_SPEED_FIREBALL;
-                    next_missile = next_missile.wrapping_add(1);
+                    the_actors.next_missile = the_actors.next_missile.wrapping_add(1);
                     (*an).state = SHOOT3 as i8;
                     self.dex = diroff(d8);
                     play_effect(5, 1800 + rand256());
-                } else if self.i == 0 && *stuff.add(STUFF_ARROWS) == 0 {
+                } else if self.i == 0 && *the_hero.stuff.add(STUFF_ARROWS) == 0 {
                     print(c"No Arrows!".as_ptr());
                     return Pc::Cpx;
                 } else {
@@ -665,8 +672,8 @@ impl Ctx {
             (*ms).time_of_flight = 0;
             (*ms).direction = (*an).facing;
             (*ms).archer = self.i as i8;
-            if next_missile > MAX_MISSILE {
-                next_missile = 0;
+            if the_actors.next_missile > MAX_MISSILE {
+                the_actors.next_missile = 0;
             }
             frustration = 0;
             Pc::Cpx
@@ -715,7 +722,7 @@ impl Ctx {
             } else if s == SLEEP {
                 self.dex = FRAME_SLEEP;
             } else if s == FALL && (*an).tactic < 30 {
-                self.j = (*an).tactic as i16 / 5 + brother * 6;
+                self.j = (*an).tactic as i16 / 5 + the_hero.brother * 6;
                 self.dex = fallstates.get(self.j as usize).copied().unwrap_or(0) as i16;
                 (*an).tactic += 1;
                 (*an).vel_x = ((*an).vel_x as i32 * 3 / 4) as i8;
@@ -771,12 +778,12 @@ impl Ctx {
                 self.k = ENVIRON_ICE;
             } else if j == 8 {
                 self.k = ENVIRON_BACKWARDS;
-            } else if j == 9 && i == 0 && extent_type == PIT_XTYPE {
+            } else if j == 9 && i == 0 && the_world.extent_type == PIT_XTYPE {
                 if (*an).state as i16 != FALL {
-                    self.dex = fallstates[(brother * 6) as usize] as i16;
+                    self.dex = fallstates[(the_hero.brother * 6) as usize] as i16;
                     (*an).state = FALL as i8;
                     (*an).tactic = 0;
-                    luck = luck.wrapping_sub(PIT_LUCK_COST);
+                    the_hero.luck = the_hero.luck.wrapping_sub(PIT_LUCK_COST);
                     set_mood(1);
                 }
                 self.k = ENVIRON_ICE;
@@ -811,10 +818,10 @@ impl Ctx {
                 if self.s == DYING || self.s == DEAD {
                     // no change to the state of the dead
                 } else if self.k == ENVIRON_DROWNED {
-                    if hero_sector == PIT_SECTOR {
+                    if the_hero.sector == PIT_SECTOR {
                         if self.i == 0 {
                             self.k = 0;
-                            new_region = 9;
+                            the_world.new_region = 9;
                             transfer_hero(0x1080, 34950, 0);
                             find_place(1);
                         } else {
@@ -836,7 +843,7 @@ impl Ctx {
             let an = self.an;
             let i = self.i;
             let cycle = self.cycle as i32;
-            if new_region >= NO_REGION {
+            if the_world.new_region >= NO_REGION {
                 (*an).environ = self.k;
             }
             let race = (*an).race as i8;
@@ -846,16 +853,16 @@ impl Ctx {
             (*an).index = self.dex as i8;
             if i == 0 {
                 self.hero_wrap();
-                hero_x = (*an).abs_x;
-                hero_y = (*an).abs_y;
-                move_camera_to(hero_x as i32, hero_y as i32);
+                the_hero.x = (*an).abs_x;
+                the_hero.y = (*an).abs_y;
+                move_camera_to(the_hero.x as i32, the_hero.y as i32);
                 safe_flag = self.j as i8;
             }
             if (*an).vitality == 0 {
                 return Pc::Statc;
             }
             if fiery_death != 0 {
-                if i == 0 && *stuff.add(STUFF_FIREPROOF) != 0 {
+                if i == 0 && *the_hero.stuff.add(STUFF_FIREPROOF) != 0 {
                     (*an).environ = 0;
                 } else if (*an).environ > ENVIRON_SINKING {
                     (*an).vitality = 0;
@@ -911,7 +918,7 @@ impl Ctx {
     unsafe fn hero_wrap(&mut self) {
         unsafe {
             let an = self.an;
-            if region_num >= OUTDOOR_REGIONS {
+            if the_world.region >= OUTDOOR_REGIONS {
                 return;
             }
             if (*an).abs_x < WORLD_MIN {
@@ -925,9 +932,9 @@ impl Ctx {
             } else {
                 return;
             }
-            if riding > 1 {
-                actor_list[CARRIER_SLOT].abs_x = (*an).abs_x;
-                actor_list[CARRIER_SLOT].abs_y = (*an).abs_y;
+            if the_hero.riding > 1 {
+                the_actors.list[CARRIER_SLOT].abs_x = (*an).abs_x;
+                the_actors.list[CARRIER_SLOT].abs_y = (*an).abs_y;
             }
         }
     }
@@ -936,15 +943,15 @@ impl Ctx {
     unsafe fn statc(&mut self) {
         unsafe {
             let an = self.an;
-            let (ox, oy) = if (*an).kind == CARRIER && riding == RIDING_SWAN {
+            let (ox, oy) = if (*an).kind == CARRIER && the_hero.riding == RIDING_SWAN {
                 (32, 40)
             } else if (*an).kind == RAFT || (*an).kind == CARRIER || (*an).kind == DRAGON {
                 (16, 16)
             } else {
                 (8, 26)
             };
-            (*an).rel_x = wrap_coordinate((*an).abs_x as i32 - map_x as i32 - ox) as u16;
-            (*an).rel_y = wrap_coordinate((*an).abs_y as i32 - map_y as i32 - oy) as u16;
+            (*an).rel_x = wrap_coordinate((*an).abs_x as i32 - the_world.map_x as i32 - ox) as u16;
+            (*an).rel_y = wrap_coordinate((*an).abs_y as i32 - the_world.map_y as i32 - oy) as u16;
         }
     }
 }

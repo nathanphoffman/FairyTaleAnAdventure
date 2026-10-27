@@ -211,7 +211,11 @@ order; all six are done. Sizes are the C line counts.
 The port is finished. What remains afterwards (optional, no firm end) is the cleanup pass:
 - Give the Rust functions readable names with thin wrappers that keep the C names for any C still
   left (`layout.c`, `statedump.c`), then delete the wrappers.
-- Replace the `static mut` globals and raw pointers with proper structs (this is step 3).
+- Replace the `static mut` globals and raw pointers with proper structs (this is step 3). Started:
+  `rsrc/state.rs` has `Hero`, `World`, `Encounters` and `Actors` (statics `the_hero`, `the_world`,
+  `the_encounter`, `the_actors`); the rest of the loose variables (screen structures, memory areas,
+  flags) are still in `globals.rs`. `statedump.c` is now `rsrc/statedump.rs`, so no C reads Rust
+  variables any more. All long functions are split (done).
 - Scenarios: done for swan/turtle, key doors, `win_colors`, `rescue`, `witch_fx` (see above); the freeze and
   fear spells are still open.
 - See the note below on keeping an all-C "original" build possible while doing this.

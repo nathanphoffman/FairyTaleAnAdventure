@@ -25,15 +25,14 @@ use super::game_tables::{
     topaz_attr,
 };
 use super::globals::{
-    GfxBase as gfx_base, LayersBase as layers_base, active_actor_count, actor_list, audio_open,
-    audioport, bm_lim, bm_page1, bm_page2, bm_scroll, bm_source, bm_text, bmask_mem, cheat_enabled,
-    current_menu, current_rastport, current_viewport, drawing_page, drawn_actor_count, flasher,
-    font, fp_page1, fp_page2, freeze_timer, handler_data, hero_x, hero_y, image_mem, ioaudio, li,
-    light_timer, map_mem, map_x, map_y, new_region, nhinor, nhivar, oldview, openflags, origDir,
+    GfxBase as gfx_base, LayersBase as layers_base, audio_open, audioport, bm_lim, bm_page1,
+    bm_page2, bm_scroll, bm_source, bm_text, bmask_mem, cheat_enabled, current_menu,
+    current_rastport, current_viewport, drawing_page, flasher, font, fp_page1, fp_page2,
+    handler_data, image_mem, ioaudio, li, map_mem, nhinor, nhivar, oldview, openflags, origDir,
     pagea, pageb, panel_font, queue_mem, quit_requested, ri_page1, ri_page2, ri_text, rp_map,
     rp_text, rp_text2, sample_mem, scoremem, sector_mem, seg, shadow_mem, shape_mem, sprite_data,
-    story_font, terrain_mem, thistask, tile_x, tile_y, track, v, view_status, viewing_page, volmem,
-    vp_page, vp_text, wavmem, wb_bmap, work_bm,
+    story_font, terrain_mem, thistask, track, v, view_status, viewing_page, volmem, vp_page,
+    vp_text, wavmem, wb_bmap, work_bm,
 };
 use super::hdrive::{
     close_disk, load_track_range, mark_last_read_unused, open_disk, wait_for_last_read,
@@ -50,6 +49,7 @@ use super::objects::spawn_object_actors;
 use super::regions::refresh_minimap;
 use super::revive::revive;
 use super::screen_fx::{fade_normal, handle_print_request, set_intro_zoom, show_still_screen};
+use super::state::{the_actors, the_hero, the_world};
 use super::world::{
     check_bed, check_door, day_night_tick, raft_proximity, sort_actors, spawn_encounters,
     speak_nearby, survival_tick, undo_sprites,
@@ -688,7 +688,6 @@ unsafe fn free_chip(new: *mut u8, old: *mut u8, size: u32) {
 unsafe extern "C" {
     static titletext: [u8; 0];
     fn playscore(t1: *const u8, t2: *const u8, t3: *const u8, t4: *const u8);
-    fn fta_test_hook();
 }
 
 // Screen modes (`view_status`).
@@ -750,7 +749,7 @@ pub extern "C" fn fta_main(argc: i32, _argv: *mut c_char) {
             origDir = CurrentDir((*(*WBenchMsg.cast::<WBStartup>()).sm_arglist).wa_lock);
         }
 
-        light_timer = 0;
+        the_world.light_timer = 0;
         let err = open_all();
         if err != 0 {
             show_error(err);
@@ -943,32 +942,8 @@ unsafe fn start_first_brother() {
 unsafe fn play_intro() {
     unsafe {
         load_picture(c"page0".as_ptr(), &raw mut pageb, 0, 0);
-        BltBitMap(
-            &raw mut pageb,
-            0,
-            0,
-            bm_page1,
-            0,
-            0,
-            320,
-            200,
-            0xC0,
-            0x1f,
-            std::ptr::null_mut(),
-        );
-        BltBitMap(
-            &raw mut pageb,
-            0,
-            0,
-            bm_page2,
-            0,
-            0,
-            320,
-            200,
-            0xC0,
-            0x1f,
-            std::ptr::null_mut(),
-        );
+        copy_title_picture_to(bm_page1);
+        copy_title_picture_to(bm_page2);
 
         fp_page2.ri_page = &raw mut ri_page1;
         for x in (0..=ZOOM_FULL).step_by(ZOOM_STEP) {
@@ -991,13 +966,32 @@ unsafe fn play_intro() {
     }
 }
 
+/// Copies the whole title picture (loaded into `pageb`) onto the bitmap of a display page.
+unsafe fn copy_title_picture_to(bitmap: *mut BitMap) {
+    unsafe {
+        BltBitMap(
+            &raw mut pageb,
+            0,
+            0,
+            bitmap,
+            0,
+            0,
+            320,
+            200,
+            0xC0,
+            0x1f,
+            std::ptr::null_mut(),
+        );
+    }
+}
+
 /// How the map moved since the last frame, in sectors (x wraps at 10 bits).
 unsafe fn scroll_step() -> (i16, i16) {
     unsafe {
-        tile_x = map_x >> 4;
-        tile_y = map_y >> 5;
-        let dif_x = (tile_x as i32 - (*drawing_page).isv_x) as i16;
-        let dif_y = (tile_y as i32 - (*drawing_page).isv_y) as i16;
+        the_world.tile_x = the_world.map_x >> 4;
+        the_world.tile_y = the_world.map_y >> 5;
+        let dif_x = (the_world.tile_x as i32 - (*drawing_page).isv_x) as i16;
+        let dif_y = (the_world.tile_y as i32 - (*drawing_page).isv_y) as i16;
         (wrap_scroll_difference(dif_x), dif_y)
     }
 }
@@ -1040,7 +1034,7 @@ unsafe fn run_frame(state: &mut FrameState) {
     unsafe {
         state.cycle = state.cycle.wrapping_add(1);
         flasher = flasher.wrapping_add(1);
-        fta_test_hook(); // test commands, does nothing normally
+        super::statedump::run_pending_command(); // test commands, does nothing normally
 
         read_keyboard();
         if handle_view_status() {
@@ -1058,8 +1052,8 @@ unsafe fn run_frame(state: &mut FrameState) {
         check_bed();
         check_door();
 
-        hero_x = actor_list[0].abs_x;
-        hero_y = actor_list[0].abs_y;
+        the_hero.x = the_actors.list[0].abs_x;
+        the_hero.y = the_actors.list[0].abs_y;
 
         undo_sprites();
         let (scroll_x, scroll_y, world_update) = update_map_view();
@@ -1107,7 +1101,7 @@ unsafe fn move_everything(state: &mut FrameState) {
     unsafe {
         raft_proximity();
         let mut i = 0;
-        while i < active_actor_count as i32 {
+        while i < the_actors.active as i32 {
             move_actor(i, state.cycle, &mut state.last_terrain);
             i += 1;
         }
@@ -1136,7 +1130,7 @@ unsafe fn update_map_view() -> (i16, i16, bool) {
     unsafe {
         let (mut scroll_x, mut scroll_y) = scroll_step();
 
-        if new_region < NO_REGION {
+        if the_world.new_region < NO_REGION {
             load_pending_region();
         }
 
@@ -1177,7 +1171,7 @@ unsafe fn update_map_view() -> (i16, i16, bool) {
 unsafe fn run_world_update() {
     unsafe {
         day_night_tick();
-        if freeze_timer == 0 {
+        if the_world.freeze_timer == 0 {
             spawn_encounters();
             speak_nearby();
             update_enemy_goals();
@@ -1189,15 +1183,15 @@ unsafe fn run_world_update() {
 /// Fights, missiles and drawing, then shows the page that was just drawn.
 unsafe fn draw_frame(state: &mut FrameState, scroll_x: i16, scroll_y: i16) {
     unsafe {
-        (*drawing_page).isv_x = tile_x as i32;
-        (*drawing_page).isv_y = tile_y as i32;
+        (*drawing_page).isv_x = the_world.tile_x as i32;
+        (*drawing_page).isv_y = the_world.tile_y as i32;
 
         SetAPen(&raw mut rp_map, SPRITE_PEN);
 
         resolve_melee();
         advance_missiles();
 
-        drawn_actor_count = active_actor_count;
+        the_actors.drawn = the_actors.active;
         spawn_object_actors();
 
         // the flying missiles, then sort the actors by position
@@ -1209,10 +1203,10 @@ unsafe fn draw_frame(state: &mut FrameState, scroll_x: i16, scroll_y: i16) {
 
         draw_sprites(state.cycle);
         // The drawing loop used to leave `j` here; the next frame's actor loop reads it.
-        state.last_terrain = drawn_actor_count;
+        state.last_terrain = the_actors.drawn;
         WaitBlit();
-        (*(*drawing_page).ri_page).RxOffset = (map_x & 15) as i16; // modulus 16
-        (*(*drawing_page).ri_page).RyOffset = (map_y & 31) as i16; // modulus 32
+        (*(*drawing_page).ri_page).RxOffset = (the_world.map_x & 15) as i16; // modulus 16
+        (*(*drawing_page).ri_page).RyOffset = (the_world.map_y & 31) as i16; // modulus 32
         flip_pages();
         if view_status == VIEW_CHANGED {
             fade_normal();

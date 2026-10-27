@@ -8,7 +8,8 @@
 
 use super::asm_text::{draw_text, move_to};
 use super::game_tables::brother_names;
-use super::globals::{brother, current_rastport};
+use super::globals::current_rastport;
+use super::state::the_hero;
 use crate::amiga::RastPort;
 use std::ffi::{CStr, c_char};
 
@@ -53,7 +54,7 @@ unsafe fn length(s: *const c_char) -> i32 {
 
 /// The current brother's name.
 unsafe fn brother_name() -> *const c_char {
-    unsafe { brother_names[brother as usize - 1] }
+    unsafe { brother_names[the_hero.brother as usize - 1] }
 }
 
 /// Starts a new line in the panel and prints `s` on it.
@@ -77,6 +78,21 @@ pub fn print(s: *const c_char) {
 /// Continues the current line with `s`.
 pub fn print_cont(s: *const c_char) {
     unsafe { draw_text(s, length(s)) };
+}
+
+/// Copies the current brother's name into the line being built at `MBUF`. Returns its length.
+unsafe fn append_brother_name() -> i16 {
+    unsafe {
+        let mut length = 0;
+        let mut name = brother_name();
+        while *name != 0 {
+            *MBUF = *name;
+            MBUF = MBUF.add(1);
+            name = name.add(1);
+            length += 1;
+        }
+        length
+    }
 }
 
 /// Prints message text, wrapping it into lines at spaces. A carriage return (13) starts a new
@@ -109,13 +125,7 @@ pub fn print_wrapped(mut start: *const c_char) {
                     break;
                 }
                 if c == NAME_MARK {
-                    let mut name = brother_name();
-                    while *name != 0 {
-                        *MBUF = *name;
-                        MBUF = MBUF.add(1);
-                        name = name.add(1);
-                        i += 1;
-                    }
+                    i += append_brother_name();
                 } else {
                     *MBUF = c;
                     MBUF = MBUF.add(1);

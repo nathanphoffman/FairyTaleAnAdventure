@@ -9,17 +9,15 @@ use super::actors::{blocked_at, rescue_princess};
 use super::asm_text::show_message;
 use super::encounters::load_enemy_sprites;
 use super::encounters::{load_carrier, place_encounter};
-use super::game_tables::{extent_list, region_num};
+use super::game_tables::extent_list;
 use super::globals::{
-    active_actor_count, active_carrier, actor_list, actors_loading, current_extent,
-    encounter_number, encounter_type, encounter_x, encounter_y, extent_type, held_direction,
-    hero_place, hero_sector, hero_x, hero_y, j as c_j, loaded_actor_file, map_x, map_y, mixflag,
-    new_region, region_origin_x, region_origin_y, riding, view_status, wt,
+    active_carrier, actors_loading, held_direction, j as c_j, loaded_actor_file, view_status,
 };
 use super::hdrive::motor_off;
 use super::loading::finish_sprite_load;
 use super::mood::set_mood;
 use super::regions::{load_region_now, refresh_minimap};
+use super::state::{the_actors, the_encounter, the_hero, the_world};
 use super::tables::ob_list8;
 use super::types::Extent;
 use std::ffi::c_char;
@@ -66,31 +64,30 @@ const SPIDER_ENCOUNTER: u16 = 8;
 /// Moves the hero to the world position (x, y) and reloads what is needed there. With `flag`
 /// set the region is worked out from the position (like walking through a door); otherwise
 /// `new_region` must already be set. If the spot is blocked the hero is moved down until it is free.
-#[unsafe(export_name = "xfer")]
 pub extern "C" fn transfer_hero(xtest: u16, ytest: u16, flag: u16) -> i32 {
     unsafe {
-        map_x = map_x.wrapping_add(xtest.wrapping_sub(hero_x));
-        map_y = map_y.wrapping_add(ytest.wrapping_sub(hero_y));
-        hero_x = xtest;
-        actor_list[0].abs_x = xtest;
-        hero_y = ytest;
-        actor_list[0].abs_y = ytest;
+        the_world.map_x = the_world.map_x.wrapping_add(xtest.wrapping_sub(the_hero.x));
+        the_world.map_y = the_world.map_y.wrapping_add(ytest.wrapping_sub(the_hero.y));
+        the_hero.x = xtest;
+        the_actors.list[0].abs_x = xtest;
+        the_hero.y = ytest;
+        the_actors.list[0].abs_y = ytest;
 
-        encounter_number = 0;
+        the_encounter.number = 0;
         if flag != 0 {
-            let sector_x = (map_x as u32 + 151) >> 8;
-            let sector_y = (map_y as u32 + 64) >> 8;
+            let sector_x = (the_world.map_x as u32 + 151) >> 8;
+            let sector_y = (the_world.map_y as u32 + 64) >> 8;
             let column = (sector_x >> 6) & 1; // 64 sectors across
             let row = (sector_y >> 5) & 7; // 32 sectors down
-            new_region = (column + row + row) as u16;
+            the_world.new_region = (column + row + row) as u16;
         }
         held_direction = 0;
         load_region_now();
         refresh_minimap(); // to set region_origin_x and region_origin_y
         view_status = 99;
         set_mood(1);
-        while blocked_at(hero_x as i16, hero_y as i16, 0) != 0 {
-            hero_y = hero_y.wrapping_add(1);
+        while blocked_at(the_hero.x as i16, the_hero.y as i16, 0) != 0 {
+            the_hero.y = the_hero.y.wrapping_add(1);
         }
         0
     }
@@ -100,20 +97,20 @@ pub extern "C" fn transfer_hero(xtest: u16, ytest: u16, flag: u16) -> i32 {
 /// of them (there must be room before the carrier slots).
 unsafe fn start_forced_encounter() {
     unsafe {
-        encounter_type = (*current_extent).v3 as u16;
-        mixflag = 0;
-        wt = 0;
+        the_encounter.kind = (*the_world.extent).v3 as u16;
+        the_encounter.mix_flag = 0;
+        the_encounter.weapon_type = 0;
         load_enemy_sprites();
         finish_sprite_load(ENEMY_SLOT);
         motor_off();
         actors_loading = 0;
-        encounter_number = (*current_extent).v1;
-        active_actor_count = FIRST_MONSTER;
-        while encounter_number != 0 && active_actor_count < MONSTER_SLOTS_END {
-            if place_encounter(active_actor_count as u16, ENCOUNTER_SPREAD) != 0 {
-                active_actor_count += 1;
+        the_encounter.number = (*the_world.extent).v1;
+        the_actors.active = FIRST_MONSTER;
+        while the_encounter.number != 0 && the_actors.active < MONSTER_SLOTS_END {
+            if place_encounter(the_actors.active as u16, ENCOUNTER_SPREAD) != 0 {
+                the_actors.active += 1;
             }
-            encounter_number -= 1;
+            the_encounter.number -= 1;
         }
     }
 }
@@ -144,11 +141,11 @@ pub fn find_place(flag: i16) -> i32 {
 /// when the hero is on the edge of the loaded one.
 unsafe fn place_message_number() -> u8 {
     unsafe {
-        hero_sector &= 255;
-        c_j = hero_sector;
-        let sector = hero_sector as u8;
-        let table = if region_num >= FIRST_INDOOR_REGION {
-            hero_sector += INSIDE_SECTOR_OFFSET;
+        the_hero.sector &= 255;
+        c_j = the_hero.sector;
+        let sector = the_hero.sector as u8;
+        let table = if the_world.region >= FIRST_INDOOR_REGION {
+            the_hero.sector += INSIDE_SECTOR_OFFSET;
             inside_tbl.as_ptr()
         } else {
             place_tbl.as_ptr()
@@ -164,16 +161,16 @@ unsafe fn place_message_number() -> u8 {
         }
         let mut message = *row.add(2);
         if message == MOUNTAINS_MESSAGE {
-            if region_num >= FIRST_INDOOR_REGION {
-            } else if region_num & 1 != 0 {
+            if the_world.region >= FIRST_INDOOR_REGION {
+            } else if the_world.region & 1 != 0 {
                 message = NORTHERN_MOUNTAINS_MESSAGE;
-            } else if region_num > 3 {
+            } else if the_world.region > 3 {
                 message = SOUTHERN_MOUNTAINS_MESSAGE;
             }
         }
-        let hero_column = (hero_x >> 8).wrapping_sub(region_origin_x);
-        let hero_row = (hero_y >> 8).wrapping_sub(region_origin_y);
-        if new_region < NO_REGION || hero_column & 64 != 0 || hero_row & 32 != 0 {
+        let hero_column = (the_hero.x >> 8).wrapping_sub(the_world.origin_x);
+        let hero_row = (the_hero.y >> 8).wrapping_sub(the_world.origin_y);
+        if the_world.new_region < NO_REGION || hero_column & 64 != 0 || hero_row & 32 != 0 {
             message = 0;
         }
         message
@@ -184,10 +181,10 @@ unsafe fn place_message_number() -> u8 {
 unsafe fn announce_place(flag: i16) {
     unsafe {
         let message = place_message_number();
-        if message != 0 && message as u16 != hero_place {
-            hero_place = message as u16;
+        if message != 0 && message as u16 != the_hero.place {
+            the_hero.place = message as u16;
             if flag != 0 {
-                let messages = if region_num >= FIRST_INDOOR_REGION {
+                let messages = if the_world.region >= FIRST_INDOOR_REGION {
                     inside_msg.as_ptr()
                 } else {
                     place_msg.as_ptr()
@@ -201,13 +198,13 @@ unsafe fn announce_place(flag: i16) {
 /// Finds the first extent (special rectangle of the world) the hero is in.
 unsafe fn locate_extent() {
     unsafe {
-        current_extent = (&raw mut extent_list).cast::<Extent>();
+        the_world.extent = (&raw mut extent_list).cast::<Extent>();
         for _ in 0..EXTENT_COUNT {
-            let e = &*current_extent;
-            if hero_x > e.x1 && hero_x < e.x2 && hero_y > e.y1 && hero_y < e.y2 {
+            let e = &*the_world.extent;
+            if the_hero.x > e.x1 && the_hero.x < e.x2 && the_hero.y > e.y1 && the_hero.y < e.y2 {
                 break;
             }
-            current_extent = current_extent.add(1);
+            the_world.extent = the_world.extent.add(1);
         }
     }
 }
@@ -217,35 +214,35 @@ unsafe fn locate_extent() {
 /// zones may send a fight. Returns false if the princess was rescued (the caller starts over).
 unsafe fn enter_extent(flag: i16) -> bool {
     unsafe {
-        if extent_type == (*current_extent).etype as u16 {
+        if the_world.extent_type == (*the_world.extent).etype as u16 {
             return true;
         }
-        extent_type = (*current_extent).etype as u16;
+        the_world.extent_type = (*the_world.extent).etype as u16;
         let mut force = false;
-        if extent_type == XT_PRINCESS && ob_list8[PRINCESS_OBJECT].ob_stat != 0 {
+        if the_world.extent_type == XT_PRINCESS && ob_list8[PRINCESS_OBJECT].ob_stat != 0 {
             rescue_princess();
             return false;
-        } else if extent_type >= XT_SPECIAL_MIN {
+        } else if the_world.extent_type >= XT_SPECIAL_MIN {
             // birds, turtles, special
-            if (extent_type == XT_NECROMANCER || extent_type == XT_TURTLE_EGGS)
-                && (actor_list[FIRST_MONSTER as usize].race != (*current_extent).v3
-                    || active_actor_count < 4)
+            if (the_world.extent_type == XT_NECROMANCER || the_world.extent_type == XT_TURTLE_EGGS)
+                && (the_actors.list[FIRST_MONSTER as usize].race != (*the_world.extent).v3
+                    || the_actors.active < 4)
             {
-                encounter_x =
-                    (((*current_extent).x1 as u32 + (*current_extent).x2 as u32) / 2) as u16;
-                encounter_y =
-                    (((*current_extent).y1 as u32 + (*current_extent).y2 as u32) / 2) as u16;
+                the_encounter.x =
+                    (((*the_world.extent).x1 as u32 + (*the_world.extent).x2 as u32) / 2) as u16;
+                the_encounter.y =
+                    (((*the_world.extent).y1 as u32 + (*the_world.extent).y2 as u32) / 2) as u16;
                 force = true;
             }
-        } else if extent_type == XT_SPIDER_PIT {
-            encounter_type = SPIDER_ENCOUNTER;
+        } else if the_world.extent_type == XT_SPIDER_PIT {
+            the_encounter.kind = SPIDER_ENCOUNTER;
             load_enemy_sprites();
             finish_sprite_load(ENEMY_SLOT);
             motor_off();
             actors_loading = 0;
-        } else if extent_type >= XT_MONSTER_ZONE_MIN && flag == 1 {
-            encounter_x = hero_x;
-            encounter_y = hero_y;
+        } else if the_world.extent_type >= XT_MONSTER_ZONE_MIN && flag == 1 {
+            the_encounter.x = the_hero.x;
+            the_encounter.y = the_hero.y;
             force = true;
         }
         if force {
@@ -259,13 +256,13 @@ unsafe fn enter_extent(flag: i16) -> bool {
 /// dragon inside them.
 unsafe fn update_carrier() {
     unsafe {
-        if extent_type < XT_CARRIER_MIN {
+        if the_world.extent_type < XT_CARRIER_MIN {
             active_carrier = 0;
-        } else if extent_type == XT_CARRIER
+        } else if the_world.extent_type == XT_CARRIER
             && (active_carrier == 0
-                || (riding == 0 && loaded_actor_file != (*current_extent).v3 as i16))
+                || (the_hero.riding == 0 && loaded_actor_file != (*the_world.extent).v3 as i16))
         {
-            load_carrier((*current_extent).v3 as i16);
+            load_carrier((*the_world.extent).v3 as i16);
         }
     }
 }

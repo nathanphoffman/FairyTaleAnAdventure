@@ -11,10 +11,10 @@
 
 use super::asm_blit::make_sprite_masks;
 use super::display::flip_pages;
-use super::game_tables::{menus, region_num};
+use super::game_tables::menus;
 use super::globals::{
-    brother, drawing_page, loaded_actor_file, loaded_setfig_file, new_region, nextshape, pagea,
-    pageb, sample, sample_mem, sample_size, scoremem, seq_list, shape_mem, track,
+    drawing_page, loaded_actor_file, loaded_setfig_file, nextshape, pagea, pageb, sample,
+    sample_mem, sample_size, scoremem, seq_list, shape_mem, track,
 };
 use super::hdrive::{
     is_last_read_pending, last_read_finished, load_track_range, mark_read_unused, motor_off,
@@ -23,6 +23,7 @@ use super::hdrive::{
 use super::iffsubs::load_picture;
 use super::input::next_key;
 use super::regions::{load_region_now, load_region_piece};
+use super::state::{the_hero, the_world};
 use super::types::SeqInfo;
 use crate::amiga::{BPTR, BitMap};
 use std::ffi::c_char;
@@ -142,7 +143,7 @@ pub fn load_start_sprites() {
         nextshape = shape_mem;
         load_sprite_file(OBJECTS_FILE);
         finish_sprite_load(OBJECTS as i16);
-        load_sprite_file(brother as i32 - 1);
+        load_sprite_file(the_hero.brother as i32 - 1);
         finish_sprite_load(PHIL as i16);
         load_sprite_file(RAFT_FILE);
         finish_sprite_load(RAFT as i16);
@@ -151,7 +152,7 @@ pub fn load_start_sprites() {
         finish_sprite_load(sprite_files[loaded_actor_file as usize].seq_num as i16);
         load_sprite_file(loaded_setfig_file as i32);
         finish_sprite_load(SETFIG as i16);
-        new_region = region_num;
+        the_world.new_region = the_world.region;
         load_region_now();
         motor_off();
     }

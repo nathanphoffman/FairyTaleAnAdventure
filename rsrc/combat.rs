@@ -3,12 +3,9 @@
 
 use super::actors::hit_actor;
 use super::asm_map::{step_x, step_y, terrain_at};
-use super::globals::{
-    active_actor_count, actor_list, brave, drawn_actor_count, freeze_timer, map_x, map_y,
-    missile_slots,
-};
 use super::loading::play_effect;
 use super::random::{bitrand, rand4, rand8, rand256};
+use super::state::{the_actors, the_hero, the_world};
 use super::types::Missile;
 
 // Actor kinds and states (csrc/ftale.h).
@@ -48,11 +45,11 @@ fn chebyshev(dx: i16, dy: i16) -> i16 {
 pub fn resolve_melee() {
     unsafe {
         let mut i = 0;
-        while i < active_actor_count as usize {
-            if i > 0 && freeze_timer != 0 {
+        while i < the_actors.active as usize {
+            if i > 0 && the_world.freeze_timer != 0 {
                 break;
             }
-            let attacker = &raw const actor_list[i];
+            let attacker = &raw const the_actors.list[i];
             if i != RAFT && (*attacker).state < WALKING {
                 swing(i);
             }
@@ -64,7 +61,7 @@ pub fn resolve_melee() {
 /// One actor's swing.
 unsafe fn swing(i: usize) {
     unsafe {
-        let attacker = &raw const actor_list[i];
+        let attacker = &raw const the_actors.list[i];
         let mut wt = (*attacker).weapon as i16;
         let fc = (*attacker).facing as i32;
         if wt & BOW_BIT != 0 {
@@ -78,7 +75,7 @@ unsafe fn swing(i: usize) {
         let xs = (step_x((*attacker).abs_x as i32, fc, reach) + rand8() - TIP_NOISE) as i16;
         let ys = (step_y((*attacker).abs_y as i32, fc, reach) + rand8() - TIP_NOISE) as i16;
         let mut bv = if i == 0 {
-            brave / BRAVE_PER_REACH + HERO_BASE_REACH
+            the_hero.brave / BRAVE_PER_REACH + HERO_BASE_REACH
         } else {
             ENEMY_BASE_REACH + rand4() as i16
         };
@@ -86,8 +83,8 @@ unsafe fn swing(i: usize) {
             bv = REACH_LIMIT;
         }
         let mut j = 0;
-        while j < active_actor_count as usize {
-            let target = &raw const actor_list[j];
+        while j < the_actors.active as usize {
+            let target = &raw const the_actors.list[j];
             if j == RAFT || j == i || (*target).state == DEAD || (*attacker).kind == CARRIER {
                 j += 1;
                 continue;
@@ -95,7 +92,10 @@ unsafe fn swing(i: usize) {
             let xd = ((*target).abs_x as i32 - xs as i32) as i16;
             let yd = ((*target).abs_y as i32 - ys as i32) as i16;
             let dist = chebyshev(xd, yd);
-            if (i == 0 || rand256() > brave as i32) && dist < bv && freeze_timer == 0 {
+            if (i == 0 || rand256() > the_hero.brave as i32)
+                && dist < bv
+                && the_world.freeze_timer == 0
+            {
                 hit_actor(i as i32, j as i32, fc, wt);
                 break;
             } else if dist < bv + WHOOSH_MARGIN && wt != TOUCH_WEAPON {
@@ -129,11 +129,11 @@ const BY_FIREBALL: i32 = -2;
 /// moves while time is frozen.
 pub fn advance_missiles() {
     unsafe {
-        if freeze_timer != 0 {
+        if the_world.freeze_timer != 0 {
             return;
         }
         for i in 0..MISSILES {
-            let ms = &raw mut missile_slots[i];
+            let ms = &raw mut the_actors.missiles[i];
             fly(i, ms);
         }
     }
@@ -188,8 +188,8 @@ unsafe fn hit_first_actor_in_path(i: usize, ms: *mut Missile, xs: i16, ys: i16) 
         };
         let mut j = 0;
         while j < actor_count() {
-            let dodge = if j == 0 { brave } else { OTHER_DODGE };
-            let target = &raw const actor_list[j];
+            let dodge = if j == 0 { the_hero.brave } else { OTHER_DODGE };
+            let target = &raw const the_actors.list[j];
             let untouchable = j == RAFT
                 || (*ms).archer as i16 == j as i16
                 || (*target).state == DEAD
@@ -221,7 +221,7 @@ unsafe fn hit_first_actor_in_path(i: usize, ms: *mut Missile, xs: i16, ys: i16) 
 
 /// The current number of actors (the loop bound is read again each time, as in the original).
 pub fn actor_count() -> usize {
-    unsafe { active_actor_count as usize }
+    unsafe { the_actors.active as usize }
 }
 
 // ---- queue_missiles ----
@@ -241,19 +241,19 @@ const NO_RACE: u8 = 0xff;
 pub fn queue_missile_sprites() {
     unsafe {
         for i in 0..MISSILES {
-            let ms = &raw const missile_slots[i];
+            let ms = &raw const the_actors.missiles[i];
             let t = (*ms).missile_type;
             if t == MISSILE_NONE {
                 continue;
             }
-            let xstart = ((*ms).abs_x as i32 - map_x as i32 - SPRITE_OFFSET.0) as i16;
-            let ystart = ((*ms).abs_y as i32 - map_y as i32 - SPRITE_OFFSET.1) as i16;
+            let xstart = ((*ms).abs_x as i32 - the_world.map_x as i32 - SPRITE_OFFSET.0) as i16;
+            let ystart = ((*ms).abs_y as i32 - the_world.map_y as i32 - SPRITE_OFFSET.1) as i16;
             if xstart > SCREEN_LEFT
                 && xstart < SCREEN_RIGHT
                 && ystart > SCREEN_TOP
                 && ystart < SCREEN_BOTTOM
             {
-                let an = &raw mut actor_list[drawn_actor_count as usize];
+                let an = &raw mut the_actors.list[the_actors.drawn as usize];
                 (*an).abs_x = (*ms).abs_x;
                 (*an).abs_y = (*ms).abs_y;
                 (*an).rel_x = xstart as u16;
@@ -267,8 +267,8 @@ pub fn queue_missile_sprites() {
                 } else if t == MISSILE_ROCK {
                     (*an).index = (*an).index.wrapping_add(MISSILE_ROCK_IMAGE);
                 }
-                drawn_actor_count += 1;
-                if drawn_actor_count >= ACTOR_SLOTS {
+                the_actors.drawn += 1;
+                if the_actors.drawn >= ACTOR_SLOTS {
                     return;
                 }
             }

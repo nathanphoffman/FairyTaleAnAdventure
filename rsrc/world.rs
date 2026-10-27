@@ -8,14 +8,11 @@ use super::asm_map::{terrain_at, tile_address};
 use super::asm_text::{queue_print, show_event, speak};
 use super::encounters::load_enemy_sprites;
 use super::encounters::place_encounter;
-use super::game_tables::{door_list, region_num};
+use super::game_tables::door_list;
 use super::globals::{
-    active_actor_count, active_carrier, actor_list, actors_loading, actors_on_screen, battle_flag,
-    bm_draw, brave, carrier_slot, danger_level, day_clock, day_period, draw_order, drawing_page,
-    drawn_actor_count, encounter_number, encounter_type, encounter_x, encounter_y, extent_type,
-    fatigue, freeze_timer, hero_x, hero_y, hunger, last_person, light_level, mixflag,
-    nearest_person, nearest_person_distance, new_region, planes, raft_nearness, riding, rp_map,
-    safe_flag, safe_r, safe_x, safe_y, shp, sleepwait, stuff, turtle_nearness, witch_on_screen, wt,
+    active_carrier, actors_loading, actors_on_screen, battle_flag, bm_draw, carrier_slot,
+    draw_order, drawing_page, nearest_person_distance, planes, raft_nearness, rp_map, safe_flag,
+    safe_r, safe_x, safe_y, shp, sleepwait, turtle_nearness, witch_on_screen,
 };
 use super::hdrive::{motor_off, read_finished};
 use super::loading::finish_sprite_load;
@@ -23,6 +20,7 @@ use super::mood::set_mood;
 use super::places::{find_place, transfer_hero};
 use super::random::{fta_rand, rand4, rand64};
 use super::screen_fx::{day_fade, fade_page};
+use super::state::{the_actors, the_encounter, the_hero, the_world};
 use super::tables::{ob_list8, ob_listg, page_colors};
 use super::types::{Door, Shape};
 use super::witch::witch_fx;
@@ -65,8 +63,8 @@ pub fn raft_proximity() {
         } else {
             RAFT_SLOT
         };
-        let carrier = &raw const actor_list[carrier_slot as usize];
-        let hero = &raw mut actor_list[0];
+        let carrier = &raw const the_actors.list[carrier_slot as usize];
+        let hero = &raw mut the_actors.list[0];
         let dx = ((*hero).abs_x as i32 - (*carrier).abs_x as i32 - CARRIER_OFFSET) as i16;
         let dy = ((*hero).abs_y as i32 - (*carrier).abs_y as i32 - CARRIER_OFFSET) as i16;
         if dx < NEAR && dx > -NEAR && dy < NEAR && dy > -NEAR {
@@ -75,7 +73,7 @@ pub fn raft_proximity() {
         if dx < VERY_NEAR && dx > -VERY_NEAR && dy < VERY_NEAR && dy > -VERY_NEAR {
             raft_nearness = 2;
         }
-        if riding == BIRD {
+        if the_hero.riding == BIRD {
             (*hero).environ = TURTLE_ENVIRON;
         }
     }
@@ -95,24 +93,24 @@ const BED_Y_MASK: u16 = 0x1f;
 /// Copies the hero's position, and puts the hero to bed after standing on a bed for 30 ticks.
 pub fn check_bed() {
     unsafe {
-        let hero = &raw mut actor_list[0];
+        let hero = &raw mut the_actors.list[0];
         if (*hero).state != STILL {
             sleepwait = 0;
         }
-        hero_x = (*hero).abs_x;
-        hero_y = (*hero).abs_y;
+        the_hero.x = (*hero).abs_x;
+        the_hero.y = (*hero).abs_y;
 
-        if region_num == INSIDE_REGION {
-            let tile = *tile_address((hero_x >> 4) as i32, (hero_y >> 5) as i32);
+        if the_world.region == INSIDE_REGION {
+            let tile = *tile_address((the_hero.x >> 4) as i32, (the_hero.y >> 5) as i32);
             if BED_TILES.contains(&tile) {
                 sleepwait += 1;
                 if sleepwait == BED_WAIT {
-                    if fatigue < TOO_RESTED {
+                    if the_hero.fatigue < TOO_RESTED {
                         show_event(EVENT_NOT_TIRED);
                     } else {
                         show_event(EVENT_SLEEPING);
                         (*hero).abs_y |= BED_Y_MASK;
-                        hero_y = (*hero).abs_y;
+                        the_hero.y = (*hero).abs_y;
                         (*hero).state = SLEEP;
                     }
                 }
@@ -166,12 +164,12 @@ unsafe fn door_at(j: i32) -> &'static Door {
 /// Riding disables doors.
 pub fn check_door() {
     unsafe {
-        if riding != 0 {
+        if the_hero.riding != 0 {
             return;
         }
-        let xtest = hero_x & 0xfff0;
-        let ytest = hero_y & 0xffe0;
-        if region_num < FIRST_INSIDE_REGION {
+        let xtest = the_hero.x & 0xfff0;
+        let ytest = the_hero.y & 0xffe0;
+        if the_world.region < FIRST_INSIDE_REGION {
             enter_door(xtest, ytest);
         } else {
             leave_door(xtest, ytest);
@@ -187,14 +185,14 @@ unsafe fn enter_door(xtest: u16, ytest: u16) {
         let d = door_at(index);
         let horizontal = d.kind & 1 != 0;
         let lined_up = if horizontal {
-            hero_y & 0x10 == 0
+            the_hero.y & 0x10 == 0
         } else {
-            hero_x & 15 <= 6
+            the_hero.x & 15 <= 6
         };
-        let allowed = d.kind != DESERT || *stuff.add(STATBASE) >= STATUES_NEEDED;
+        let allowed = d.kind != DESERT || *the_hero.stuff.add(STATBASE) >= STATUES_NEEDED;
         if lined_up && allowed {
             let (x, y) = inside_spot(d);
-            new_region = if d.secs == 1 {
+            the_world.new_region = if d.secs == 1 {
                 REGION_INSIDE
             } else {
                 REGION_INSIDE_OTHER
@@ -251,9 +249,9 @@ unsafe fn leave_door(xtest: u16, ytest: u16) {
                 && (d.xc2 == xtest || (d.xc2 as i32 == xtest as i32 - 16 && horizontal))
             {
                 let lined_up = if horizontal {
-                    hero_y & 0x10 != 0
+                    the_hero.y & 0x10 != 0
                 } else {
-                    hero_x & 15 >= 2
+                    the_hero.x & 15 >= 2
                 };
                 if lined_up {
                     let (x, y) = outside_spot(d);
@@ -312,29 +310,29 @@ const WAKE_Y_MASK: u16 = 0xffe0;
 /// Sleeping, the day clock, the light level, the messages for the time of day and slow healing.
 pub fn day_night_tick() {
     unsafe {
-        let hero = &raw mut actor_list[0];
+        let hero = &raw mut the_actors.list[0];
         if (*hero).state == SLEEP {
             sleep_tick(hero);
         }
-        if freeze_timer == 0 {
-            let old = day_clock;
-            day_clock = old.wrapping_add(1);
+        if the_world.freeze_timer == 0 {
+            let old = the_world.day_clock;
+            the_world.day_clock = old.wrapping_add(1);
             if old >= DAY_LENGTH {
-                day_clock = 0;
+                the_world.day_clock = 0;
             }
         }
-        light_level = day_clock / DARK;
-        if light_level >= LIGHT_PEAK {
-            light_level = 2 * LIGHT_PEAK - light_level;
+        the_world.light_level = the_world.day_clock / DARK;
+        if the_world.light_level >= LIGHT_PEAK {
+            the_world.light_level = 2 * LIGHT_PEAK - the_world.light_level;
         }
-        ob_listg[LAMP_SLOT].ob_stat = if light_level < DARK {
+        ob_listg[LAMP_SLOT].ob_stat = if the_world.light_level < DARK {
             LAMP_ON
         } else {
             LAMP_OFF
         };
-        let period = (day_clock / PERIOD_LENGTH) as i16;
-        if period != day_period {
-            day_period = period;
+        let period = (the_world.day_clock / PERIOD_LENGTH) as i16;
+        if period != the_world.day_period {
+            the_world.day_period = period;
             if let Some((_, e)) = PERIOD_EVENTS.iter().find(|(p, _)| *p == period) {
                 show_event(*e);
             }
@@ -342,8 +340,8 @@ pub fn day_night_tick() {
 
         day_fade();
 
-        if day_clock & HEAL_MASK == 0
-            && (*hero).vitality < HEAL_BASE + brave / 4
+        if the_world.day_clock & HEAL_MASK == 0
+            && (*hero).vitality < HEAL_BASE + the_hero.brave / 4
             && (*hero).state != DEAD
         {
             (*hero).vitality += 1;
@@ -355,17 +353,19 @@ pub fn day_night_tick() {
 /// While asleep time runs fast; the hero wakes when rested, at dawn, or when a fight starts.
 unsafe fn sleep_tick(hero: *mut Shape) {
     unsafe {
-        day_clock = day_clock.wrapping_add(SLEEP_TIME_STEP);
-        if fatigue != 0 {
-            fatigue -= 1;
+        the_world.day_clock = the_world.day_clock.wrapping_add(SLEEP_TIME_STEP);
+        if the_hero.fatigue != 0 {
+            the_hero.fatigue -= 1;
         }
-        if fatigue == 0
-            || (fatigue < LITTLE_TIRED && day_clock > DAWN.0 && day_clock < DAWN.1)
+        if the_hero.fatigue == 0
+            || (the_hero.fatigue < LITTLE_TIRED
+                && the_world.day_clock > DAWN.0
+                && the_world.day_clock < DAWN.1)
             || (battle_flag != 0 && rand64() == 0)
         {
             (*hero).state = STILL;
             (*hero).abs_y &= WAKE_Y_MASK;
-            hero_y = (*hero).abs_y;
+            the_hero.y = (*hero).abs_y;
         }
     }
 }
@@ -397,34 +397,34 @@ pub fn spawn_encounters() {
             finish_sprite_load(ENEMY_SLOT);
             motor_off();
             actors_loading = 0;
-            active_actor_count = FIRST_ENEMY_ACTOR;
+            the_actors.active = FIRST_ENEMY_ACTOR;
         }
-        if day_clock & 15 == 0 && encounter_number != 0 && actors_loading == 0 {
+        if the_world.day_clock & 15 == 0 && the_encounter.number != 0 && actors_loading == 0 {
             place_waiting_encounters();
         }
-        if day_clock & 31 == 0
+        if the_world.day_clock & 31 == 0
             && actors_on_screen == 0
             && actors_loading == 0
             && active_carrier == 0
-            && extent_type < NO_RANDOM_XTYPE
+            && the_world.extent_type < NO_RANDOM_XTYPE
         {
-            danger_level = (if region_num > INDOOR_REGION {
-                5 + extent_type
+            the_encounter.danger_level = (if the_world.region > INDOOR_REGION {
+                5 + the_world.extent_type
             } else {
-                2 + extent_type
+                2 + the_world.extent_type
             }) as u8;
-            if rand64() <= danger_level as i32 {
-                encounter_type = rand4() as u16;
-                if extent_type == DKNIGHT_XTYPE && encounter_type == 2 {
-                    encounter_type = 4;
+            if rand64() <= the_encounter.danger_level as i32 {
+                the_encounter.kind = rand4() as u16;
+                if the_world.extent_type == DKNIGHT_XTYPE && the_encounter.kind == 2 {
+                    the_encounter.kind = 4;
                 }
-                if extent_type == SPIDER_PIT_XTYPE {
-                    encounter_type = 6;
-                    mixflag = 0;
+                if the_world.extent_type == SPIDER_PIT_XTYPE {
+                    the_encounter.kind = 6;
+                    the_encounter.mix_flag = 0;
                 }
-                if extent_type == FINAL_XTYPE {
-                    encounter_type = 2;
-                    mixflag = 0;
+                if the_world.extent_type == FINAL_XTYPE {
+                    the_encounter.kind = 2;
+                    the_encounter.mix_flag = 0;
                 }
                 load_enemy_sprites();
             }
@@ -436,31 +436,31 @@ pub fn spawn_encounters() {
 /// actor slots first and then into dead ones.
 unsafe fn place_waiting_encounters() {
     unsafe {
-        mixflag = fta_rand() as i16;
-        if extent_type > NO_MIX_XTYPE {
-            mixflag = 0;
+        the_encounter.mix_flag = fta_rand() as i16;
+        if the_world.extent_type > NO_MIX_XTYPE {
+            the_encounter.mix_flag = 0;
         }
-        wt = rand4() as i16;
-        if extent_type & 3 == 0 {
-            mixflag = 0;
+        the_encounter.weapon_type = rand4() as i16;
+        if the_world.extent_type & 3 == 0 {
+            the_encounter.mix_flag = 0;
         }
         for _ in 1..PLACE_TRIES {
             pick_encounter_spot();
-            if terrain_at(encounter_x as i32, encounter_y as i32) != PLAIN_TERRAIN {
+            if terrain_at(the_encounter.x as i32, the_encounter.y as i32) != PLAIN_TERRAIN {
                 continue;
             }
-            while encounter_number != 0 && active_actor_count < LAST_ENEMY_ACTOR {
-                if place_encounter(active_actor_count as u16, SPREAD) != 0 {
-                    active_actor_count += 1;
+            while the_encounter.number != 0 && the_actors.active < LAST_ENEMY_ACTOR {
+                if place_encounter(the_actors.active as u16, SPREAD) != 0 {
+                    the_actors.active += 1;
                 }
-                encounter_number -= 1;
+                the_encounter.number -= 1;
             }
             let mut i = FIRST_ENEMY_ACTOR as usize;
-            while i < LAST_ENEMY_ACTOR as usize && encounter_number != 0 {
-                let an = &raw const actor_list[i];
+            while i < LAST_ENEMY_ACTOR as usize && the_encounter.number != 0 {
+                let an = &raw const the_actors.list[i];
                 if (*an).state == DEAD && ((*an).visible == 0 || (*an).race == WRAITH) {
                     place_encounter(i as u16, SPREAD);
-                    encounter_number -= 1;
+                    the_encounter.number -= 1;
                 }
                 i += 1;
             }
@@ -480,8 +480,8 @@ const PRINCESS_FREED_SLOT: usize = 9;
 /// The nearest person says something when they come near (once per person).
 pub fn speak_nearby() {
     unsafe {
-        let race = actor_list[nearest_person as usize].race as i16;
-        if nearest_person != 0 && race != last_person {
+        let race = the_actors.list[the_actors.nearest_person as usize].race as i16;
+        if the_actors.nearest_person != 0 && race != the_actors.last_person {
             match race {
                 BEGGAR => speak(23),
                 WITCH => speak(46),
@@ -494,7 +494,7 @@ pub fn speak_nearby() {
                 DKNIGHT => speak(41),
                 _ => {}
             }
-            last_person = race;
+            the_actors.last_person = race;
         }
     }
 }
@@ -518,8 +518,8 @@ const TIRED_AT: i16 = 70;
 /// Notes a safe spot, picks the music, and makes the hero hungrier and more tired.
 pub fn survival_tick() {
     unsafe {
-        let hero = &raw mut actor_list[0];
-        if day_clock & SAFE_CHECK_MASK == 0
+        let hero = &raw mut the_actors.list[0];
+        if the_world.day_clock & SAFE_CHECK_MASK == 0
             && actors_on_screen == 0
             && actors_loading == 0
             && witch_on_screen == 0
@@ -527,25 +527,28 @@ pub fn survival_tick() {
             && safe_flag == 0
             && (*hero).state != DEAD
         {
-            safe_r = region_num;
-            safe_x = hero_x;
-            safe_y = hero_y;
-            if hunger > 30 && *stuff.add(FRUIT_SLOT) != 0 {
-                *stuff.add(FRUIT_SLOT) -= 1;
-                hunger -= FRUIT_FOOD;
+            safe_r = the_world.region;
+            safe_x = the_hero.x;
+            safe_y = the_hero.y;
+            if the_hero.hunger > 30 && *the_hero.stuff.add(FRUIT_SLOT) != 0 {
+                *the_hero.stuff.add(FRUIT_SLOT) -= 1;
+                the_hero.hunger -= FRUIT_FOOD;
                 show_event(EVENT_ATE_FRUIT);
             }
         }
-        if day_clock & 7 == 0 && battle_flag == 0 {
+        if the_world.day_clock & 7 == 0 && battle_flag == 0 {
             set_mood(0);
         }
-        if day_clock & SAFE_CHECK_MASK == 0 && (*hero).vitality != 0 && (*hero).state != SLEEP {
-            hunger += 1;
-            fatigue += 1;
+        if the_world.day_clock & SAFE_CHECK_MASK == 0
+            && (*hero).vitality != 0
+            && (*hero).state != SLEEP
+        {
+            the_hero.hunger += 1;
+            the_hero.fatigue += 1;
             hunger_effects(hero);
-            if fatigue == TIRED_AT {
+            if the_hero.fatigue == TIRED_AT {
                 show_event(3);
-            } else if hunger == STARVING_AT {
+            } else if the_hero.hunger == STARVING_AT {
                 show_event(4);
             }
         }
@@ -555,25 +558,25 @@ pub fn survival_tick() {
 /// The messages and damage that come with hunger and fatigue.
 unsafe fn hunger_effects(hero: *mut Shape) {
     unsafe {
-        if hunger == HUNGRY {
+        if the_hero.hunger == HUNGRY {
             show_event(0);
-        } else if hunger == VERY_HUNGRY {
+        } else if the_hero.hunger == VERY_HUNGRY {
             show_event(1);
-        } else if hunger & 7 == 0 {
+        } else if the_hero.hunger & 7 == 0 {
             if (*hero).vitality > WEAK_VITALITY {
-                if hunger > MUCH_HUNGER || fatigue > MUCH_FATIGUE {
+                if the_hero.hunger > MUCH_HUNGER || the_hero.fatigue > MUCH_FATIGUE {
                     (*hero).vitality -= 2;
                     queue_print(PRQ_STATS);
                 }
-                if hunger > STARVING_AT {
+                if the_hero.hunger > STARVING_AT {
                     show_event(2);
                 }
-            } else if fatigue > COLLAPSE_FATIGUE {
+            } else if the_hero.fatigue > COLLAPSE_FATIGUE {
                 show_event(12);
                 (*hero).state = SLEEP;
-            } else if hunger > FAINT_HUNGER {
+            } else if the_hero.hunger > FAINT_HUNGER {
                 show_event(24);
-                hunger = FAINT_RESET;
+                the_hero.hunger = FAINT_RESET;
                 (*hero).state = SLEEP;
             }
         }
@@ -592,21 +595,21 @@ const RAFT_ACTOR: u8 = 1;
 /// drawn later.
 pub fn sort_actors() {
     unsafe {
-        nearest_person = 0;
+        the_actors.nearest_person = 0;
         nearest_person_distance = PERSON_RANGE;
-        for i in 0..drawn_actor_count as usize {
+        for i in 0..the_actors.drawn as usize {
             draw_order[i] = i as u8;
         }
-        for i in 0..drawn_actor_count as usize {
-            let an = &raw const actor_list[i];
-            if i != 0 && (*an).kind != OBJECTS && (*an).state != DEAD && riding != BIRD {
+        for i in 0..the_actors.drawn as usize {
+            let an = &raw const the_actors.list[i];
+            if i != 0 && (*an).kind != OBJECTS && (*an).state != DEAD && the_hero.riding != BIRD {
                 let dist = actor_distance(i as i32, 0) as i16;
                 if dist < nearest_person_distance {
                     nearest_person_distance = dist;
-                    nearest_person = i as i16;
+                    the_actors.nearest_person = i as i16;
                 }
             }
-            for j in 1..drawn_actor_count as usize {
+            for j in 1..the_actors.drawn as usize {
                 bubble_step(j);
             }
         }
@@ -618,14 +621,14 @@ unsafe fn bubble_step(j: usize) {
     unsafe {
         let k1 = draw_order[j - 1];
         let k2 = draw_order[j];
-        let a = &raw const actor_list[k1 as usize];
-        let b = &raw const actor_list[k2 as usize];
+        let a = &raw const the_actors.list[k1 as usize];
+        let b = &raw const the_actors.list[k2 as usize];
         let mut y1 = (*a).abs_y as i16;
         let mut y2 = (*b).abs_y as i16;
-        if (*a).state == DEAD || (k2 == 0 && riding != 0) || k1 == RAFT_ACTOR {
+        if (*a).state == DEAD || (k2 == 0 && the_hero.riding != 0) || k1 == RAFT_ACTOR {
             y1 = y1.wrapping_sub(DRAW_LOWER);
         }
-        if (*b).state == DEAD || (k1 == 0 && riding != 0) || k2 == RAFT_ACTOR {
+        if (*b).state == DEAD || (k1 == 0 && the_hero.riding != 0) || k2 == RAFT_ACTOR {
             y2 = y2.wrapping_sub(DRAW_LOWER);
         }
         if (*a).environ > WADING {

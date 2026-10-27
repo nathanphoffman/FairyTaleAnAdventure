@@ -3,8 +3,9 @@
 //! The music depends on what the hero is doing: dying, in the astral plane, fighting, indoors,
 //! or just walking by day or night. `track` holds the four voices of each tune in order.
 
-use super::game_tables::{instrument_waves, menus, region_num};
-use super::globals::{actor_list, battle_flag, hero_x, hero_y, light_level, track};
+use super::game_tables::{instrument_waves, menus};
+use super::globals::{battle_flag, track};
+use super::state::{the_actors, the_hero, the_world};
 
 unsafe extern "C" {
     fn playscore(t1: *const u8, t2: *const u8, t3: *const u8, t4: *const u8);
@@ -40,25 +41,25 @@ const MUSIC_ENTRY: usize = 6;
 /// to it at the end of the current one. If music is switched off, stops the music.
 pub fn set_mood(now: i8) {
     unsafe {
-        let tune = if actor_list[0].vitality == 0 {
+        let tune = if the_actors.list[0].vitality == 0 {
             TUNE_DEATH
-        } else if hero_x > ASTRAL_X.0
-            && hero_x < ASTRAL_X.1
-            && hero_y > ASTRAL_Y.0
-            && hero_y < ASTRAL_Y.1
+        } else if the_hero.x > ASTRAL_X.0
+            && the_hero.x < ASTRAL_X.1
+            && the_hero.y > ASTRAL_Y.0
+            && the_hero.y < ASTRAL_Y.1
         {
             TUNE_ASTRAL
         } else if battle_flag != 0 {
             TUNE_BATTLE
-        } else if region_num > INDOOR_REGION {
+        } else if the_world.region > INDOOR_REGION {
             let wave = (&raw mut instrument_waves).cast::<i16>().add(WAVE_SLOT);
-            *wave = if region_num == CAVE_REGION {
+            *wave = if the_world.region == CAVE_REGION {
                 WAVE_CAVE
             } else {
                 WAVE_INDOORS
             };
             TUNE_INDOORS
-        } else if light_level > NIGHT_LIGHT {
+        } else if the_world.light_level > NIGHT_LIGHT {
             TUNE_DAY
         } else {
             TUNE_NIGHT

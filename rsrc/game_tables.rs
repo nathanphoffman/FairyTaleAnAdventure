@@ -419,8 +419,6 @@ pub static mut region_disk_blocks: [Need; 10] = [
 pub static mut loaded_blocks: Need = Need { image: [0, 0, 0, 0], terra1: 1, terra2: 2, sector: 0, region: 0, setchar: 0 };
 
 /// The region the hero is in (the start is region 3).
-#[unsafe(no_mangle)]
-pub static mut region_num: u16 = 3;
 
 /// The font the text panel asks for.
 pub static mut topaz_attr: TextAttr = TextAttr { ta_Name: b"topaz.font\0".as_ptr(), ta_YSize: 8, ta_Style: 0, ta_Flags: 1 };
@@ -429,9 +427,7 @@ pub static mut topaz_attr: TextAttr = TextAttr { ta_Name: b"topaz.font\0".as_ptr
 pub static mut instrument_waves: [i16; 12] = [0x0000, 0x0000, 0x0000, 0x0000, 0x0005, 0x0202, 0x0101, 0x0103, 0x0004, 0x0504, 0x0100, 0x0500];
 
 /// The random number seeds the game starts with.
-#[unsafe(no_mangle)]
 pub static mut seed1: i32 = 19837325;
-#[unsafe(no_mangle)]
 pub static mut seed2: i32 = 23098324;
 
 /// The direction the compass shows (9 = none).

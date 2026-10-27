@@ -6,7 +6,8 @@
 //! second time erases it. It also records, in `s1` and `s2`, on which side of each edge the hero
 //! stands, which csrc/fmain.c uses to decide whether the beam hits the hero.
 
-use super::globals::{hero_x, hero_y, li, map_x, map_y, rp_map};
+use super::globals::{li, rp_map};
+use super::state::{the_hero, the_world};
 use super::tables::witchpoints;
 use super::types::FPage;
 use crate::amiga::{AreaInfo, BitMap, Layer, RastPort, TmpRas};
@@ -105,8 +106,8 @@ fn side(p1: (i16, i16), p2: (i16, i16), xh: i16, yh: i16) -> (i16, i16) {
 pub fn witch_fx(fp: *mut FPage) {
     unsafe {
         let fp = &*fp;
-        let xh = hero_x.wrapping_sub(map_x & TILE_X_MASK) as i16;
-        let yh = hero_y.wrapping_sub(map_y & TILE_Y_MASK) as i16;
+        let xh = the_hero.x.wrapping_sub(the_world.map_x & TILE_X_MASK) as i16;
+        let yh = the_hero.y.wrapping_sub(the_world.map_y & TILE_Y_MASK) as i16;
 
         LAYER = CreateUpfrontLayer(
             li,

@@ -6,8 +6,9 @@
 
 use super::asm_text::item_menu_state;
 use super::game_tables::{key_colors, label1, menus};
-use super::globals::{current_menu, rp_text2, slot_entries, wealth};
+use super::globals::{current_menu, rp_text2, slot_entries};
 use super::input::forget_last_menu;
+use super::state::the_hero;
 use crate::amiga::RastPort;
 use std::ffi::c_char;
 
@@ -60,7 +61,7 @@ pub fn update_menu_availability() {
         }
         menus[USE].enabled[7] = keys;
         menus[USE].enabled[8] = item_menu_state(SUNSTONE) as i8;
-        menus[GIVE].enabled[5] = if wealth > GIVE_GOLD_MIN {
+        menus[GIVE].enabled[5] = if the_hero.wealth > GIVE_GOLD_MIN {
             AVAILABLE
         } else {
             GREYED

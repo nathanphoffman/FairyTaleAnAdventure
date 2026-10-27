@@ -7,14 +7,11 @@
 use super::asm_map::move_camera_to;
 use super::asm_text::{draw_placard_border, placard_text, queue_print, show_event};
 use super::display::reset_input;
-use super::game_tables::{brother_stats, region_num};
+use super::game_tables::brother_stats;
 use super::globals::{
-    active_actor_count, actor_list, actors_loading, actors_on_screen, battle_flag, brave, brother,
-    current_rastport, day_clock, drawing_page, extent_type, fatigue, fiery_death, freeze_timer,
-    good_fairy_timer, hero_place, hero_x, hero_y, hunger, kind as hero_kind, light_level,
-    light_timer, loaded_actor_file, loaded_setfig_file, luck, map_x, map_y, new_region,
-    next_missile, panel_font, quit_requested, rp_map, rp_text, safe_r, safe_x, safe_y,
-    secret_timer, story_font, stuff, view_status, viewing_page, wealth,
+    actors_loading, actors_on_screen, battle_flag, current_rastport, drawing_page, fiery_death,
+    good_fairy_timer, loaded_actor_file, loaded_setfig_file, panel_font, quit_requested, rp_map,
+    rp_text, safe_r, safe_x, safe_y, story_font, view_status, viewing_page,
 };
 use super::loading::load_start_sprites;
 use super::menus::update_menu_availability;
@@ -22,6 +19,7 @@ use super::messages::print_cont;
 use super::mood::set_mood;
 use super::regions::load_region_now;
 use super::screen_fx::{fade_down, map_message, message_off};
+use super::state::{the_actors, the_hero, the_world};
 use super::tables::{ob_list8, ob_listg};
 use super::types::Shape;
 use crate::amiga::{RastPort, TextFont};
@@ -93,7 +91,7 @@ const HERO_SET_FILE: i16 = 13;
 /// (8000), and hunger and fatigue are cleared.
 pub fn revive(new: i16) {
     unsafe {
-        let list = (&raw mut actor_list).cast::<Shape>();
+        let list = (&raw mut the_actors.list).cast::<Shape>();
         place_raft_and_setfig(list);
 
         let hero = list;
@@ -103,7 +101,7 @@ pub fn revive(new: i16) {
         reset_input();
         battle_flag = 0;
         good_fairy_timer = 0;
-        next_missile = 0;
+        the_actors.next_missile = 0;
         if new != 0 {
             stopscore();
             leave_fallen_brother();
@@ -116,13 +114,13 @@ pub fn revive(new: i16) {
 
         put_hero_at_safe_spot(hero);
         restore_hero(hero);
-        if brother > 3 {
+        if the_hero.brother > 3 {
             view_status = VIEW_GAME_OVER;
         } else {
             view_status = VIEW_FADE_IN;
             set_mood(1);
         }
-        extent_type = 0;
+        the_world.extent_type = 0;
         fiery_death = 0;
     }
 }
@@ -150,11 +148,11 @@ unsafe fn place_raft_and_setfig(list: *mut Shape) {
 /// The fallen brother's body is left where he died, and his ghost appears.
 unsafe fn leave_fallen_brother() {
     unsafe {
-        if brother > 0 && brother < 3 {
-            ob_listg[brother as usize].xc = hero_x;
-            ob_listg[brother as usize].yc = hero_y;
-            ob_listg[brother as usize].ob_stat = ON_GROUND;
-            ob_listg[brother as usize + DEAD_BROTHER_PERSON].ob_stat = PERSON;
+        if the_hero.brother > 0 && the_hero.brother < 3 {
+            ob_listg[the_hero.brother as usize].xc = the_hero.x;
+            ob_listg[the_hero.brother as usize].yc = the_hero.y;
+            ob_listg[the_hero.brother as usize].ob_stat = ON_GROUND;
+            ob_listg[the_hero.brother as usize + DEAD_BROTHER_PERSON].ob_stat = PERSON;
         }
         ob_list8[SPECTRE_SLOT].ob_stat = PERSON;
     }
@@ -164,27 +162,27 @@ unsafe fn leave_fallen_brother() {
 /// safe spot.
 unsafe fn take_over_next_brother(hero: *mut Shape) {
     unsafe {
-        let next = &brother_stats[brother as usize];
-        brave = next.brave as i16;
-        luck = next.luck as i16;
-        hero_kind = next.kind as i16;
-        wealth = next.wealth as i16;
-        stuff = next.stuff;
-        brother += 1;
+        let next = &brother_stats[the_hero.brother as usize];
+        the_hero.brave = next.brave as i16;
+        the_hero.luck = next.luck as i16;
+        the_hero.kindness = next.kind as i16;
+        the_hero.wealth = next.wealth as i16;
+        the_hero.stuff = next.stuff;
+        the_hero.brother += 1;
 
         for slot in 0..GOLDBASE {
-            *stuff.add(slot) = 0; // has no stuff
+            *the_hero.stuff.add(slot) = 0; // has no stuff
         }
-        *stuff = 1; // okay, a dirk, then
+        *the_hero.stuff = 1; // okay, a dirk, then
         (*hero).weapon = 1;
 
-        secret_timer = 0;
-        light_timer = 0;
-        freeze_timer = 0;
+        the_world.secret_timer = 0;
+        the_world.light_timer = 0;
+        the_world.freeze_timer = 0;
         safe_x = FIRST_SAFE_SPOT.0;
         safe_y = FIRST_SAFE_SPOT.1;
         safe_r = FIRST_REGION;
-        region_num = FIRST_REGION;
+        the_world.region = FIRST_REGION;
         move_camera_to(safe_x as i32, safe_y as i32);
         view_status = VIEW_REDRAW;
         actors_on_screen = 1;
@@ -197,14 +195,14 @@ unsafe fn show_brother_placards() {
     unsafe {
         map_message();
         SetFont(current_rastport, story_font);
-        if brother == 1 {
+        if the_hero.brother == 1 {
             placard_text(0);
             rp_map.BitMap = (*(*drawing_page).ri_page).BitMap;
             SetRast(&raw mut rp_map, PEN_BLACK);
             rp_map.BitMap = (*(*viewing_page).ri_page).BitMap;
-        } else if brother == 2 {
+        } else if the_hero.brother == 2 {
             placard_text(1);
-        } else if brother == 3 {
+        } else if the_hero.brother == 3 {
             placard_text(3);
         } else {
             placard_text(5);
@@ -213,16 +211,16 @@ unsafe fn show_brother_placards() {
         draw_placard_border();
         Delay(SHOW_PLACARD);
 
-        if brother > LAST_BROTHER {
+        if the_hero.brother > LAST_BROTHER {
             quit_requested = 1;
             Delay(GAME_OVER_PAUSE);
-        } else if brother > 1 {
+        } else if the_hero.brother > 1 {
             Delay(SHORT_PAUSE);
             SetAPen(current_rastport, PEN_BLACK);
             RectFill(current_rastport, PANEL.0, PANEL.1, PANEL.2, PANEL.3);
             Delay(TINY_PAUSE);
             SetAPen(current_rastport, PEN_TEXT);
-            placard_text(if brother == 2 { 2 } else { 4 });
+            placard_text(if the_hero.brother == 2 { 2 } else { 4 });
             Delay(SHOW_PLACARD);
         }
     }
@@ -238,15 +236,15 @@ unsafe fn announce_brother() {
         loaded_setfig_file = HERO_SET_FILE;
         load_start_sprites();
 
-        if brother < 4 {
+        if the_hero.brother < 4 {
             message_off();
-            hero_place = START_PLACE;
+            the_hero.place = START_PLACE;
             show_event(9);
-            if brother == 1 {
+            if the_hero.brother == 1 {
                 print_cont(c".".as_ptr());
-            } else if brother == 2 {
+            } else if the_hero.brother == 2 {
                 show_event(10);
-            } else if brother == 3 {
+            } else if the_hero.brother == 3 {
                 show_event(11);
             }
         }
@@ -256,13 +254,13 @@ unsafe fn announce_brother() {
 /// The hero (re)appears at the last safe spot, and the region there is loaded.
 unsafe fn put_hero_at_safe_spot(hero: *mut Shape) {
     unsafe {
-        hero_x = safe_x;
+        the_hero.x = safe_x;
         (*hero).abs_x = safe_x;
-        hero_y = safe_y;
+        the_hero.y = safe_y;
         (*hero).abs_y = safe_y;
-        map_x = hero_x.wrapping_sub(CAMERA_OFFSET.0);
-        map_y = hero_y.wrapping_sub(CAMERA_OFFSET.1);
-        new_region = safe_r;
+        the_world.map_x = the_hero.x.wrapping_sub(CAMERA_OFFSET.0);
+        the_world.map_y = the_hero.y.wrapping_sub(CAMERA_OFFSET.1);
+        the_world.new_region = safe_r;
         load_region_now();
     }
 }
@@ -270,15 +268,15 @@ unsafe fn put_hero_at_safe_spot(hero: *mut Shape) {
 /// Fresh health, a new day, and no hunger or tiredness.
 unsafe fn restore_hero(hero: *mut Shape) {
     unsafe {
-        (*hero).vitality = 15 + brave / 4;
+        (*hero).vitality = 15 + the_hero.brave / 4;
         (*hero).environ = 0;
         (*hero).state = STILL;
         (*hero).race = 255; // -1
-        day_clock = START_DAYNIGHT;
-        light_level = START_LIGHT;
-        hunger = 0;
-        fatigue = 0;
-        active_actor_count = 3;
+        the_world.day_clock = START_DAYNIGHT;
+        the_world.light_level = START_LIGHT;
+        the_hero.hunger = 0;
+        the_hero.fatigue = 0;
+        the_actors.active = 3;
         update_menu_availability();
         queue_print(PRQ_VITALITY);
         queue_print(PRQ_STATS);

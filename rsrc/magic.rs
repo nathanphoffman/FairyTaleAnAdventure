@@ -4,18 +4,17 @@
 use super::asm_map::draw_overview_map;
 use super::asm_text::{queue_print, show_event, speak};
 use super::encounters::check_death;
-use super::game_tables::{region_num, stone_ring_sectors};
+use super::game_tables::stone_ring_sectors;
 use super::globals::{
-    active_actor_count, actor_list, battle_flag, bm_draw, brave, carrier_slot, cheat_enabled,
-    current_extent, drawing_page, freeze_timer, hero_sector, hero_x, hero_y, light_timer, map_x,
-    map_y, planes, region_origin_x, region_origin_y, riding, rp_map, secret_timer, secx, secy,
-    stuff, view_status,
+    battle_flag, bm_draw, carrier_slot, cheat_enabled, drawing_page, planes, rp_map, secx, secy,
+    view_status,
 };
 use super::menus::update_menu_availability;
 use super::messages::print;
 use super::places::transfer_hero;
 use super::random::rand8;
 use super::screen_fx::{flicker_colors, show_still_screen};
+use super::state::{the_actors, the_hero, the_world};
 use crate::amiga::RastPort;
 use std::ffi::c_char;
 
@@ -77,25 +76,27 @@ const ENEMY: i8 = 2;
 /// (the spell did not work, so the stone is not used up).
 pub unsafe fn magic_option(chosen_entry: i16) -> bool {
     unsafe {
-        if chosen_entry < FIRST_SPELL || *stuff.add(SPELL_SLOT_BASE + chosen_entry as usize) == 0 {
+        if chosen_entry < FIRST_SPELL
+            || *the_hero.stuff.add(SPELL_SLOT_BASE + chosen_entry as usize) == 0
+        {
             show_event(NO_SPELL_EVENT);
             return true;
         }
-        if (*current_extent).v3 == NO_MAGIC_ZONE {
+        if (*the_world.extent).v3 == NO_MAGIC_ZONE {
             speak(NO_MAGIC_SPEECH);
             return true;
         }
         match chosen_entry {
-            SPELL_LIGHT => light_timer += LIGHT_TIME,
-            SPELL_SECRET => secret_timer += SECRET_TIME,
+            SPELL_LIGHT => the_world.light_timer += LIGHT_TIME,
+            SPELL_SECRET => the_world.secret_timer += SECRET_TIME,
             SPELL_FREEZE => {
-                if riding > RIDING_BIG {
+                if the_hero.riding > RIDING_BIG {
                     return false;
                 }
-                freeze_timer += FREEZE_TIME;
+                the_world.freeze_timer += FREEZE_TIME;
             }
             SPELL_MAP => {
-                if cheat_enabled == 0 && region_num > LAST_OUTDOOR_REGION {
+                if cheat_enabled == 0 && the_world.region > LAST_OUTDOOR_REGION {
                     return false;
                 }
                 show_map();
@@ -111,8 +112,8 @@ pub unsafe fn magic_option(chosen_entry: i16) -> bool {
             _ => {}
         }
         let slot = SPELL_SLOT_BASE + chosen_entry as usize;
-        *stuff.add(slot) = (*stuff.add(slot)).wrapping_sub(1);
-        if *stuff.add(slot) == 0 {
+        *the_hero.stuff.add(slot) = (*the_hero.stuff.add(slot)).wrapping_sub(1);
+        if *the_hero.stuff.add(slot) == 0 {
             update_menu_availability();
         }
         true
@@ -124,12 +125,12 @@ unsafe fn show_map() {
     unsafe {
         bm_draw = (*(*drawing_page).ri_page).BitMap;
         planes = (*bm_draw).Planes.as_mut_ptr();
-        draw_overview_map(map_x as i32, map_y as i32);
+        draw_overview_map(the_world.map_x as i32, the_world.map_y as i32);
 
-        let x = ((hero_x >> 4) as i64
-            - ((secx as i64 + region_origin_x as i64) << 4)
+        let x = ((the_hero.x >> 4) as i64
+            - ((secx as i64 + the_world.origin_x as i64) << 4)
             - MARK_X_OFFSET) as u32;
-        let y = ((hero_y >> 4) as i64 - ((secy as i64 + region_origin_y as i64) << 4)
+        let y = ((the_hero.y >> 4) as i64 - ((secy as i64 + the_world.origin_y as i64) << 4)
             + MARK_Y_OFFSET) as u32;
         rp_map.BitMap = bm_draw;
         SetDrMd(&raw mut rp_map, JAM1);
@@ -148,28 +149,30 @@ unsafe fn show_map() {
 /// the next circle in the direction faced. Returns false if the spell did not work.
 unsafe fn stone_jump() -> bool {
     unsafe {
-        if hero_sector != STONE_SECTOR {
+        if the_hero.sector != STONE_SECTOR {
             return false;
         }
-        if (hero_x & 255) / STONE_COLUMN_WIDTH != 1 || (hero_y & 255) / STONE_ROW_HEIGHT != 1 {
+        if (the_hero.x & 255) / STONE_COLUMN_WIDTH != 1
+            || (the_hero.y & 255) / STONE_ROW_HEIGHT != 1
+        {
             return false;
         }
-        let (sector_x, sector_y) = (hero_x >> 8, hero_y >> 8);
+        let (sector_x, sector_y) = (the_hero.x >> 8, the_hero.y >> 8);
         for ring in 0..STONE_CIRCLES {
             if stone_ring_sectors[ring * 2] as u16 == sector_x
                 && stone_ring_sectors[ring * 2 + 1] as u16 == sector_y
             {
-                let mut target = ring + (actor_list[0].facing + 1) as usize;
+                let mut target = ring + (the_actors.list[0].facing + 1) as usize;
                 if target > STONE_CIRCLES - 1 {
                     target -= STONE_CIRCLES;
                 }
-                let x = ((stone_ring_sectors[target * 2] as u16) << 8) + (hero_x & 255);
-                let y = ((stone_ring_sectors[target * 2 + 1] as u16) << 8) + (hero_y & 255);
+                let x = ((stone_ring_sectors[target * 2] as u16) << 8) + (the_hero.x & 255);
+                let y = ((stone_ring_sectors[target * 2 + 1] as u16) << 8) + (the_hero.y & 255);
                 flicker_colors();
                 transfer_hero(x, y, 1);
-                if riding != 0 {
-                    actor_list[carrier_slot as usize].abs_x = actor_list[0].abs_x;
-                    actor_list[carrier_slot as usize].abs_y = actor_list[0].abs_y;
+                if the_hero.riding != 0 {
+                    the_actors.list[carrier_slot as usize].abs_x = the_actors.list[0].abs_x;
+                    the_actors.list[carrier_slot as usize].abs_y = the_actors.list[0].abs_y;
                 }
                 break;
             }
@@ -181,8 +184,8 @@ unsafe fn stone_jump() -> bool {
 /// Heals the hero a little, up to a limit set by bravery.
 unsafe fn heal() {
     unsafe {
-        let cap = HEAL_CAP_BASE + brave / 4;
-        let hero = &raw mut actor_list[0];
+        let cap = HEAL_CAP_BASE + the_hero.brave / 4;
+        let hero = &raw mut the_actors.list[0];
         (*hero).vitality = (*hero).vitality.wrapping_add((rand8() + HEAL_MIN) as i16);
         if (*hero).vitality > cap {
             (*hero).vitality = cap;
@@ -197,12 +200,12 @@ unsafe fn heal() {
 unsafe fn scare_enemies() {
     unsafe {
         let mut i = 1;
-        while i < active_actor_count as usize {
-            let an = &raw mut actor_list[i];
+        while i < the_actors.active as usize {
+            let an = &raw mut the_actors.list[i];
             if (*an).vitality != 0 && (*an).kind == ENEMY && (*an).race < FEAR_RACE_LIMIT {
                 (*an).vitality = 0;
                 check_death(i as i32, 0);
-                brave -= 1;
+                the_hero.brave -= 1;
             }
             i += 1;
         }

@@ -2,11 +2,7 @@
 // The Amiga library calls and the assembly routines are provided by Rust (src/platform/*),
 // except the ones still listed in csrc/asm_stubs.c.
 fn main() {
-    let files = [
-        "layout.c",
-        "narr_data.c",
-        "statedump.c",
-    ];
+    let files = ["layout.c", "narr_data.c"];
     let mut b = cc::Build::new();
     for f in files {
         b.file(format!("csrc/{f}"));

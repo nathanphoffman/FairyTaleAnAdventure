@@ -4,15 +4,12 @@ use super::actors::blocked_at;
 use super::asm_map::terrain_at;
 use super::asm_text::{queue_print, show_event, speak};
 use super::game_tables::{encounter_chart, extent_list};
-use super::globals::{
-    active_actor_count, active_carrier, actor_list, actors_loading, brave, current_extent,
-    encounter_number, encounter_type, encounter_x, encounter_y, extent_type, kind as hero_kind,
-    loaded_actor_file, luck, map_x, map_y, mixflag, nextshape, seq_list, wt,
-};
+use super::globals::{active_carrier, actors_loading, loaded_actor_file, nextshape, seq_list};
 use super::hdrive::motor_off;
 use super::loading::{finish_sprite_load, load_sprite_file};
 use super::mood::set_mood;
 use super::random::{bitrand, rand2, rand4, rnd};
+use super::state::{the_actors, the_encounter, the_hero, the_world};
 use super::tables::weapon_probs;
 use super::types::{Extent, SeqInfo, Shape};
 
@@ -74,7 +71,7 @@ const FIRST_CARRIER_SLOT: usize = 3;
 /// 0 if no free spot was found in 15 tries.
 pub fn place_encounter(i: u16, spread: u16) -> i32 {
     unsafe {
-        let an = (&raw mut actor_list).cast::<Shape>().add(i as usize);
+        let an = (&raw mut the_actors.list).cast::<Shape>().add(i as usize);
         let Some((xtest, ytest)) = find_open_spot(i, spread) else {
             return 0;
         };
@@ -83,11 +80,11 @@ pub fn place_encounter(i: u16, spread: u16) -> i32 {
         (*an).kind = ENEMY;
         let race = encounter_race();
         (*an).race = race as u8;
-        if mixflag & 4 != 0 {
-            wt = rand4() as i16;
+        if the_encounter.mix_flag & 4 != 0 {
+            the_encounter.weapon_type = rand4() as i16;
         }
         let chart = &encounter_chart[race as usize];
-        let w = (chart.arms as i32 * 4) + wt as i32;
+        let w = (chart.arms as i32 * 4) + the_encounter.weapon_type as i32;
         (*an).weapon = weapon_probs[w as usize];
         (*an).state = STILL;
         (*an).environ = 0;
@@ -98,8 +95,8 @@ pub fn place_encounter(i: u16, spread: u16) -> i32 {
             (*an).goal = ATTACK1 + chart.cleverness;
         }
         (*an).vitality = chart.hitpoints as i16;
-        (*an).rel_x = (*an).abs_x.wrapping_sub(map_x).wrapping_sub(8);
-        (*an).rel_y = (*an).abs_y.wrapping_sub(map_y).wrapping_sub(26);
+        (*an).rel_x = (*an).abs_x.wrapping_sub(the_world.map_x).wrapping_sub(8);
+        (*an).rel_y = (*an).abs_y.wrapping_sub(the_world.map_y).wrapping_sub(26);
         1
     }
 }
@@ -109,16 +106,19 @@ pub fn place_encounter(i: u16, spread: u16) -> i32 {
 /// spot was blocked.
 unsafe fn find_open_spot(i: u16, spread: u16) -> Option<(u16, u16)> {
     unsafe {
-        if (*current_extent).v3 == FIXED_PLACE_ENCOUNTER {
+        if (*the_world.extent).v3 == FIXED_PLACE_ENCOUNTER {
             return Some(FIXED_PLACE);
         }
         for _ in 0..MAX_TRY {
-            let xtest = (encounter_x as i32 + bitrand(spread as i32) - (spread as i32 / 2)) as u16;
-            let ytest = (encounter_y as i32 + bitrand(spread as i32) - (spread as i32 / 2)) as u16;
+            let xtest =
+                (the_encounter.x as i32 + bitrand(spread as i32) - (spread as i32 / 2)) as u16;
+            let ytest =
+                (the_encounter.y as i32 + bitrand(spread as i32) - (spread as i32 / 2)) as u16;
             if blocked_at(xtest as i16, ytest as i16, i as i16) == 0 {
                 return Some((xtest, ytest));
             }
-            if extent_type == SPIDER_PIT && terrain_at(xtest as i32, ytest as i32) == TERRAIN_SWAMP
+            if the_world.extent_type == SPIDER_PIT
+                && terrain_at(xtest as i32, ytest as i32) == TERRAIN_SWAMP
             {
                 return Some((xtest, ytest));
             }
@@ -131,10 +131,10 @@ unsafe fn find_open_spot(i: u16, spread: u16) -> Option<(u16, u16)> {
 /// (except encounter type 4).
 unsafe fn encounter_race() -> i32 {
     unsafe {
-        if (mixflag & 2) != 0 && encounter_type != 4 {
-            (encounter_type & 0xfffe) as i32 + rand2()
+        if (the_encounter.mix_flag & 2) != 0 && the_encounter.kind != 4 {
+            (the_encounter.kind & 0xfffe) as i32 + rand2()
         } else {
-            encounter_type as i32
+            the_encounter.kind as i32
         }
     }
 }
@@ -143,10 +143,9 @@ unsafe fn encounter_race() -> i32 {
 /// DYING, the hero gains bravery for a kill, and killing a person (not the lasso keeper) costs
 /// 3 kindness. If it is the hero, `dtype` is the death message, luck drops by 5 and the music
 /// changes. The hero's stats are always refreshed on screen.
-#[unsafe(export_name = "checkdead")]
 pub extern "C" fn check_death(i: i32, dtype: i32) {
     unsafe {
-        let an = (&raw mut actor_list).cast::<Shape>().add(i as usize);
+        let an = (&raw mut the_actors.list).cast::<Shape>().add(i as usize);
         if (*an).vitality < 1 && (*an).state != DYING && (*an).state != DEAD {
             (*an).vitality = 0;
             (*an).tactic = DYING_COUNTDOWN;
@@ -155,17 +154,17 @@ pub extern "C" fn check_death(i: i32, dtype: i32) {
             if (*an).race == RACE_DARK_KNIGHT {
                 speak(SPEAK_DARK_KNIGHT_DIES);
             } else if (*an).kind == SETFIG && (*an).race != RACE_LASSO_KEEPER {
-                hero_kind -= KINDNESS_LOSS;
+                the_hero.kindness -= KINDNESS_LOSS;
             }
             if i != 0 {
-                brave += 1;
+                the_hero.brave += 1;
             } else {
                 show_event(dtype);
-                luck -= LUCK_LOSS;
+                the_hero.luck -= LUCK_LOSS;
                 set_mood(1);
             }
-            if hero_kind < 0 {
-                hero_kind = 0;
+            if the_hero.kindness < 0 {
+                the_hero.kindness = 0;
             }
             queue_print(PRQ_VITALITY);
         }
@@ -179,7 +178,7 @@ pub extern "C" fn check_death(i: i32, dtype: i32) {
 /// if they are not the ones already loaded, in the middle of its extent.
 pub fn load_carrier(n: i16) {
     unsafe {
-        let an = (&raw mut actor_list)
+        let an = (&raw mut the_actors.list)
             .cast::<Shape>()
             .add(FIRST_CARRIER_SLOT);
         (*an).kind = if n == CARRIER_DRAGON { DRAGON } else { CARRIER };
@@ -204,7 +203,7 @@ pub fn load_carrier(n: i16) {
         (*an).environ = 0;
         (*an).state = STILL;
         (*an).vitality = VITALITY_CARRIER;
-        active_actor_count = 4;
+        the_actors.active = 4;
         active_carrier = n;
         loaded_actor_file = n;
         (*an).race = n as u8;
@@ -216,11 +215,12 @@ pub fn load_carrier(n: i16) {
 pub fn load_enemy_sprites() {
     const FIRST_ENEMY_SLOT: i16 = 3;
     unsafe {
-        encounter_number = ((*current_extent).v1 as i32 + rnd((*current_extent).v2 as i32)) as u8;
-        let file = encounter_chart[encounter_type as usize].file_id as i16;
+        the_encounter.number =
+            ((*the_world.extent).v1 as i32 + rnd((*the_world.extent).v2 as i32)) as u8;
+        let file = encounter_chart[the_encounter.kind as usize].file_id as i16;
         if loaded_actor_file != file {
             loaded_actor_file = file;
-            active_actor_count = FIRST_ENEMY_SLOT;
+            the_actors.active = FIRST_ENEMY_SLOT;
             nextshape = (*(&raw const seq_list).cast::<SeqInfo>().add(ENEMY as usize)).location;
             load_sprite_file(loaded_actor_file as i32);
             actors_loading = 1;

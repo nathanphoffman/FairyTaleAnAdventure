@@ -13,11 +13,8 @@
 //! visible area, and `draw_map`, `draw_map_column`, `draw_map_row` copy the tile graphics to the screen.
 //! `scroll_map` shifts the picture by one tile so only a new edge has to be drawn.
 
-use super::game_tables::region_num;
-use super::globals::{
-    hero_sector, hero_x, hero_y, image_mem, map_mem, map_x, map_y, planes, region_origin_x,
-    region_origin_y, sector_mem, secx, secy, terrain_mem,
-};
+use super::globals::{image_mem, map_mem, planes, sector_mem, secx, secy, terrain_mem};
+use super::state::{the_hero, the_world};
 use super::tables::minimap;
 
 /// One bitplane of 256 tiles, 64 bytes per tile.
@@ -56,7 +53,7 @@ fn clamp_secy(v: i16) -> u16 {
 unsafe fn sector_at(col: u16, row: u16) -> u8 {
     unsafe {
         *map_mem.add(
-            (row as usize * MAP_ROW_BYTES + col as usize + region_origin_x as usize) as u16
+            (row as usize * MAP_ROW_BYTES + col as usize + the_world.origin_x as usize) as u16
                 as usize,
         )
     }
@@ -81,8 +78,8 @@ pub fn terrain_at(x: i32, y: i32) -> i32 {
     }
     let (imx, imy) = (ux >> 4, uy >> 5);
     unsafe {
-        let col = wrap_secx((imx >> 4).wrapping_sub(region_origin_x));
-        let row = clamp_secy((imy >> 3).wrapping_sub(region_origin_y) as i16);
+        let col = wrap_secx((imx >> 4).wrapping_sub(the_world.origin_x));
+        let row = clamp_secy((imy >> 3).wrapping_sub(the_world.origin_y) as i16);
         let sec = sector_at(col, row) as usize;
         let tile = *sector_mem.add(
             (sec * SECTOR_BYTES + (imy as usize & 7) * 16 + (imx as usize & 15)) as u16 as usize,
@@ -113,8 +110,8 @@ pub fn probe_collision(x: i32, y: i32) -> i32 {
 pub fn tile_address(imx: i32, imy: i32) -> *const u8 {
     let (ux, uy) = (imx as u16, imy as u16);
     unsafe {
-        let col = wrap_secx((ux >> 4).wrapping_sub(region_origin_x));
-        let mut row = (uy >> 3).wrapping_sub(region_origin_y);
+        let col = wrap_secx((ux >> 4).wrapping_sub(the_world.origin_x));
+        let mut row = (uy >> 3).wrapping_sub(the_world.origin_y);
         if row & 32 != 0 {
             row = if row & 16 != 0 { 0 } else { 31 };
         }
@@ -132,11 +129,11 @@ pub fn fill_minimap(tile_x: i32, tile_y: i32) {
         let mut next = 0;
         for _ in 0..SCREEN_COLUMNS {
             x &= 0x07ff;
-            let col =
-                wrap_secx((x >> 4).wrapping_sub(region_origin_x)).wrapping_add(region_origin_x);
+            let col = wrap_secx((x >> 4).wrapping_sub(the_world.origin_x))
+                .wrapping_add(the_world.origin_x);
             for j in 0..SCREEN_ROWS as i32 {
                 let y = (tile_y + j) as u16 & 0x7fff;
-                let row = clamp_secy((y >> 3).wrapping_sub(region_origin_y) as i16);
+                let row = clamp_secy((y >> 3).wrapping_sub(the_world.origin_y) as i16);
                 let sec = *map_mem
                     .add(((row as usize) << 7).wrapping_add(col as usize) as u16 as usize)
                     as usize;
@@ -150,13 +147,13 @@ pub fn fill_minimap(tile_x: i32, tile_y: i32) {
             x += 1;
         }
         // the assembly read the high byte of hero_x and hero_y (68000 is big-endian)
-        let hx = (hero_x >> 8) as i32;
-        let hy = ((hero_y >> 8).wrapping_sub(region_origin_y)) as i16 as i32;
+        let hx = (the_hero.x >> 8) as i32;
+        let hy = ((the_hero.y >> 8).wrapping_sub(the_world.origin_y)) as i16 as i32;
         let mut sec = *map_mem.add(((hy << 7).wrapping_add(hx)) as u16 as usize) as i32;
-        if region_num & 0xff > 7 {
+        if the_world.region & 0xff > 7 {
             sec += 256;
         }
-        hero_sector = sec as i16;
+        the_hero.sector = sec as i16;
     }
 }
 
@@ -252,7 +249,9 @@ fn camera_after(cam_x: u16, cam_y: u16, x: i32, y: i32) -> (u16, u16) {
 
 /// Moves the camera (`map_x`, `map_y`) after the hero.
 pub fn move_camera_to(x: i32, y: i32) {
-    unsafe { (map_x, map_y) = camera_after(map_x, map_y, x, y) };
+    unsafe {
+        (the_world.map_x, the_world.map_y) = camera_after(the_world.map_x, the_world.map_y, x, y)
+    };
 }
 
 /// Small lookup used by the page-turn animation: how far in from the top and bottom a strip of
@@ -429,13 +428,14 @@ fn overview_origin(mx: i32, my: i32, region_x: u16, region_y: u16) -> (i16, i16)
 /// colour (terrain table byte 3). `secx` / `secy` tell the caller which sector is at the top left.
 pub fn draw_overview_map(mx: i32, my: i32) {
     unsafe {
-        let (x, y) = overview_origin(mx, my, region_origin_x, region_origin_y);
+        let (x, y) = overview_origin(mx, my, the_world.origin_x, the_world.origin_y);
         secx = x as i32;
         secy = y as i32;
         let mut offset = 0usize;
         for j in 0..OVERVIEW_ROWS {
             for i in 0..OVERVIEW_COLUMNS {
-                let index = region_origin_x as i32 + x as i32 + i as i32 + (((y + j) as i32) << 7);
+                let index =
+                    the_world.origin_x as i32 + x as i32 + i as i32 + (((y + j) as i32) << 7);
                 let sec = *map_mem.add(index as u16 as usize) as usize;
                 let tiles = sector_mem.add(sec * SECTOR_BYTES);
                 for line in 0..SECTOR_TILE_ROWS {

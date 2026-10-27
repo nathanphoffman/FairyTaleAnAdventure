@@ -12,15 +12,13 @@
 
 use super::actors::turtle_eggs;
 use super::asm_map::terrain_at;
-use super::game_tables::{region_num, setfig_table};
-use super::globals::{
-    active_actor_count, actor_list, drawn_actor_count, loaded_setfig_file, map_x, map_y,
-    new_region, nextshape, seq_list, witch_on_screen,
-};
+use super::game_tables::setfig_table;
+use super::globals::{loaded_setfig_file, nextshape, seq_list, witch_on_screen};
 use super::hdrive::motor_off;
 use super::loading::sprite_files;
 use super::loading::{finish_sprite_load, load_sprite_file};
 use super::random::bitrand;
+use super::state::{the_actors, the_world};
 use super::tables::{CHEST, TURTLE, dstobs, glbobs, mapobs, ob_listg, ob_table, rand_treasure};
 use super::types::{SeqInfo, Shape, WorldObject};
 /// Mirror of the `setfig_table` entries in csrc/fmain.c: for each kind of person (wizard, priest,
@@ -91,12 +89,12 @@ pub fn spawn_object_actors() {
         J1 = FIRST_OBJECT_ACTOR;
         add_objects_near((&raw mut ob_listg).cast(), glbobs, GLOBAL_LIST_BIT as i32);
         add_objects_near(
-            ob_table[region_num as usize],
-            mapobs[region_num as usize],
+            ob_table[the_world.region as usize],
+            mapobs[the_world.region as usize],
             0,
         );
         if J1 > 3 {
-            active_actor_count = J1;
+            the_actors.active = J1;
         }
     }
 }
@@ -106,7 +104,7 @@ pub fn spawn_object_actors() {
 pub fn leave_item(i: i16, object: i16) {
     unsafe {
         let drop = &mut *(&raw mut ob_listg).cast::<WorldObject>();
-        let actor = &(*(&raw const actor_list))[i as usize];
+        let actor = &(*(&raw const the_actors.list))[i as usize];
         drop.xc = actor.abs_x;
         drop.yc = actor.abs_y.wrapping_add(10);
         drop.ob_id = object as i8;
@@ -118,12 +116,12 @@ pub fn leave_item(i: i16, object: i16) {
 /// instead (its id changes to the opened chest, rather than its state).
 pub fn change_object(id: i32, flag: i32) {
     unsafe {
-        let vitality = (*(&raw const actor_list))[id as usize].vitality;
+        let vitality = (*(&raw const the_actors.list))[id as usize].vitality;
         let index = (vitality & OBJECT_INDEX_MASK) as usize;
         let object = if vitality & GLOBAL_LIST_BIT != 0 {
             (&raw mut ob_listg).cast::<WorldObject>().add(index)
         } else {
-            ob_table[region_num as usize].add(index)
+            ob_table[the_world.region as usize].add(index)
         };
         if (*object).ob_id == CHEST as i8 {
             (*object).ob_id = OPENED_CHEST;
@@ -138,13 +136,13 @@ pub fn change_object(id: i32, flag: i32) {
 /// from `rand_treasure`. `dstobs` remembers that it has been done.
 unsafe fn distribute_treasure() {
     unsafe {
-        let region = region_num as usize;
+        let region = the_world.region as usize;
         let objects = ob_table[region];
         for _ in 0..RANDOM_TREASURES {
             let (mut x, mut y);
             loop {
-                x = (bitrand(0x3fff) + ((region_num & 1) as i32 * 0x4000)) as i16;
-                y = (bitrand(0x1fff) + ((region_num & 6) as i32 * 0x1000)) as i16;
+                x = (bitrand(0x3fff) + ((the_world.region & 1) as i32 * 0x4000)) as i16;
+                y = (bitrand(0x1fff) + ((the_world.region & 6) as i32 * 0x1000)) as i16;
                 if terrain_at(x as i32, y as i32) == 0 {
                     break;
                 }
@@ -191,13 +189,13 @@ pub fn add_objects_near(mut list: *mut WorldObject, mut length: i16, f: i32) {
     unsafe {
         turtle_eggs = 0;
         witch_on_screen = 0;
-        if dstobs[region_num as usize] == 0 && new_region >= NO_REGION {
+        if dstobs[the_world.region as usize] == 0 && the_world.new_region >= NO_REGION {
             distribute_treasure();
         }
         let mut index: i16 = 0;
         while length > 0 {
             length -= 1;
-            if drawn_actor_count >= MAX_ACTORS {
+            if the_actors.drawn >= MAX_ACTORS {
                 return;
             }
             add_object(&mut *list, index, f);
@@ -210,8 +208,10 @@ pub fn add_objects_near(mut list: *mut WorldObject, mut length: i16, f: i32) {
 /// Adds one object of a list as an actor, if it is near enough and not hidden or taken.
 unsafe fn add_object(object: &mut WorldObject, index: i16, f: i32) {
     unsafe {
-        let xstart = (object.xc as i32 - map_x as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
-        let ystart = (object.yc as i32 - map_y as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
+        let xstart =
+            (object.xc as i32 - the_world.map_x as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
+        let ystart =
+            (object.yc as i32 - the_world.map_y as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
         // States 3 and 4 are people; everything else is an item.
         let is_person = object.ob_stat == STAT_PERSON || object.ob_stat == STAT_DEAD_PERSON;
         let id = object.ob_id;
@@ -255,7 +255,7 @@ unsafe fn add_person_actor(
 ) -> Option<(&'static mut Shape, i16)> {
     unsafe {
         let id = object.ob_id;
-        let actor = &mut (*(&raw mut actor_list))[J1 as usize];
+        let actor = &mut (*(&raw mut the_actors.list))[J1 as usize];
         J1 += 1;
         if actor.abs_x == object.xc && actor.abs_y == object.yc {
             if actor.state == DEAD {
@@ -279,8 +279,8 @@ unsafe fn add_person_actor(
         };
         // A person's race is 0x80 plus their kind, so they can be told from monsters.
         actor.race = (id as i32 + PERSON_RACE_BASE) as u8;
-        if J1 > drawn_actor_count {
-            drawn_actor_count = J1;
+        if J1 > the_actors.drawn {
+            the_actors.drawn = J1;
         }
         Some((actor, ystart - PERSON_RAISE))
     }
@@ -290,10 +290,10 @@ unsafe fn add_person_actor(
 unsafe fn add_item_actor(object: &WorldObject, index: i16, f: i32) -> &'static mut Shape {
     unsafe {
         if object.ob_id == TURTLE as i8 {
-            turtle_eggs = drawn_actor_count as i8;
+            turtle_eggs = the_actors.drawn as i8;
         }
-        let actor = &mut (*(&raw mut actor_list))[drawn_actor_count as usize];
-        drawn_actor_count += 1;
+        let actor = &mut (*(&raw mut the_actors.list))[the_actors.drawn as usize];
+        the_actors.drawn += 1;
         actor.kind = OBJECTS;
         actor.index = object.ob_id;
         actor.weapon = 0;

@@ -11,9 +11,10 @@
 //! skipping `n` zero bytes.
 
 use super::game_tables::number_buffer;
-use super::globals::{actor_list, current_rastport, rp_map, stuff};
+use super::globals::{current_rastport, rp_map};
 use super::messages::print_wrapped;
 use super::random::fta_rand;
+use super::state::{the_actors, the_hero};
 use super::tables::{pplay, prec, print_que};
 use crate::amiga::RastPort;
 use std::ffi::c_char;
@@ -76,7 +77,6 @@ pub fn print_number(value: i32, len: i32) {
 
 // `move` is a Rust keyword, so this one is exported under the C name.
 /// Moves the text position (the C name is `move`, a keyword in Rust).
-#[unsafe(export_name = "move")]
 pub extern "C" fn move_to(x: i32, y: i32) {
     unsafe { Move(current_rastport, x, y) };
 }
@@ -220,7 +220,7 @@ pub fn draw_placard_border() {
 
 /// Menu state for an item: 10 if the player has item `n`, otherwise 8 (a menu item state).
 pub fn item_menu_state(n: i32) -> i32 {
-    if unsafe { *stuff.offset(n as isize) } != 0 {
+    if unsafe { *the_hero.stuff.offset(n as isize) } != 0 {
         10
     } else {
         8
@@ -292,7 +292,7 @@ fn steer(xdif: i16, ydif: i16, mode: i32, random_bit: impl FnOnce() -> bool) -> 
 pub fn steer_actor(object: i32, target_x: i32, target_y: i32, mode: i32) {
     let mode = mode & 0xff;
     unsafe {
-        let actor = &mut (*(&raw mut actor_list))[object as usize];
+        let actor = &mut (*(&raw mut the_actors.list))[object as usize];
         let (xdif, ydif) = if mode == 6 {
             (target_x as i16, target_y as i16)
         } else {

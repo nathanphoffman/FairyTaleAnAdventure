@@ -7,10 +7,9 @@ use super::asm_text::{queue_print, show_event};
 use super::encounters::load_carrier;
 use super::game_tables::{compass_lit_direction, menu_shortcuts, menus};
 use super::globals::{
-    active_actor_count, active_carrier, actor_list, actors_on_screen, battle_flag, cheat_enabled,
-    chosen_entry as menu_hit, current_menu, day_clock, extent_type, fiery_death, fight_key_held,
-    freeze_timer, good_fairy_timer, held_direction, hero_x, hero_y, hunger, light_timer, luck,
-    map_x, map_y, menu_hit_enabled, riding, secret_timer, slot_entries, stuff, view_status,
+    active_carrier, actors_on_screen, battle_flag, cheat_enabled, chosen_entry as menu_hit,
+    current_menu, fiery_death, fight_key_held, good_fairy_timer, held_direction, menu_hit_enabled,
+    slot_entries, view_status,
 };
 use super::input::{forget_last_menu, fta_pia, mouse_buttons};
 use super::menus::print_options;
@@ -18,6 +17,7 @@ use super::menus::{go_to_menu, print_menu_entry, update_menu_availability};
 use super::options::choose_menu_entry;
 use super::random::{fta_rand, rand4, rnd};
 use super::revive::revive;
+use super::state::{the_actors, the_hero, the_world};
 use super::types::Letter;
 
 // Menu numbers (`enum cmodes`).
@@ -96,7 +96,7 @@ pub fn handle_key(key: i32, notpause: i32) {
             if key & RELEASED == 0 {
                 view_status = VIEW_REDRAW;
             }
-        } else if actor_list[0].state == DEAD {
+        } else if the_actors.list[0].state == DEAD {
             // ignored while dead
         } else if (FIRST_DIRECTION_KEY..=LAST_DIRECTION_KEY).contains(&key) {
             held_direction = key as i16;
@@ -132,20 +132,20 @@ unsafe fn cheat_items(key: i8) -> bool {
         }
         if key == CHEAT_CARRIER {
             if active_carrier == CARRIER_BIRD {
-                *stuff.add(RAFT_STONE_SLOT) = 1;
+                *the_hero.stuff.add(RAFT_STONE_SLOT) = 1;
             }
             center_extent_on(
                 0,
-                (hero_x as i16).wrapping_add(CARRIER_OFFSET),
-                (hero_y as i16).wrapping_add(CARRIER_OFFSET),
+                (the_hero.x as i16).wrapping_add(CARRIER_OFFSET),
+                (the_hero.y as i16).wrapping_add(CARRIER_OFFSET),
             );
             load_carrier(CARRIER_BIRD);
             true
         } else if key == CHEAT_STUFF {
             let slot = rnd(GOLDBASE) as usize;
-            *stuff.add(slot) = (*stuff.add(slot)).wrapping_add(3);
+            *the_hero.stuff.add(slot) = (*the_hero.stuff.add(slot)).wrapping_add(3);
             update_menu_availability();
-            *stuff.add(VIAL_SLOT) = 0;
+            *the_hero.stuff.add(VIAL_SLOT) = 0;
             true
         } else {
             false
@@ -159,27 +159,27 @@ unsafe fn cheat_move(key: i8) -> bool {
         if cheat_enabled == 0 {
             return false;
         }
-        let hero = &raw mut actor_list[0];
+        let hero = &raw mut the_actors.list[0];
         match key {
             CHEAT_RESCUE => rescue_princess(),
             CHEAT_PRQ_2 => queue_print(2),
             CHEAT_PRQ_3 => queue_print(3),
-            CHEAT_TIME => day_clock = day_clock.wrapping_add(CHEAT_TIME_STEP),
+            CHEAT_TIME => the_world.day_clock = the_world.day_clock.wrapping_add(CHEAT_TIME_STEP),
             CHEAT_NORTH => {
                 (*hero).abs_y = (*hero).abs_y.wrapping_sub(CHEAT_STEP_Y);
-                map_y = map_y.wrapping_sub(CHEAT_STEP_Y);
+                the_world.map_y = the_world.map_y.wrapping_sub(CHEAT_STEP_Y);
             }
             CHEAT_SOUTH => {
                 (*hero).abs_y = (*hero).abs_y.wrapping_add(CHEAT_STEP_Y);
-                map_y = map_y.wrapping_add(CHEAT_STEP_Y);
+                the_world.map_y = the_world.map_y.wrapping_add(CHEAT_STEP_Y);
             }
             CHEAT_EAST => {
                 (*hero).abs_x = (*hero).abs_x.wrapping_add(CHEAT_STEP_X);
-                map_x = map_x.wrapping_add(CHEAT_STEP_X);
+                the_world.map_x = the_world.map_x.wrapping_add(CHEAT_STEP_X);
             }
             CHEAT_WEST => {
                 (*hero).abs_x = (*hero).abs_x.wrapping_sub(CHEAT_STEP_X);
-                map_x = map_x.wrapping_sub(CHEAT_STEP_X);
+                the_world.map_x = the_world.map_x.wrapping_sub(CHEAT_STEP_X);
             }
             _ => return false,
         }
@@ -295,14 +295,16 @@ const NOT_WALKING: i16 = 9;
 /// or falling, shooting, riding, fighting or walking. `cycle` is the main loop's frame counter.
 pub fn update_hero(cycle: i16) {
     unsafe {
-        count_down(&raw mut light_timer);
-        count_down(&raw mut secret_timer);
-        count_down(&raw mut freeze_timer);
+        count_down(&raw mut the_world.light_timer);
+        count_down(&raw mut the_world.secret_timer);
+        count_down(&raw mut the_world.freeze_timer);
 
-        fiery_death =
-            (map_x > LAVA_X.0 && map_x < LAVA_X.1 && map_y > LAVA_Y.0 && map_y < LAVA_Y.1) as i8;
+        fiery_death = (the_world.map_x > LAVA_X.0
+            && the_world.map_x < LAVA_X.1
+            && the_world.map_y > LAVA_Y.0
+            && the_world.map_y < LAVA_Y.1) as i8;
 
-        let mut state = actor_list[0].state;
+        let mut state = the_actors.list[0].state;
         if state == DEAD || state == FALL {
             state = fairy_or_revive(state, cycle);
         } else if state == DYING || state == SINK || state == SLEEP {
@@ -317,7 +319,7 @@ pub fn update_hero(cycle: i16) {
         } else {
             state = walking_state(state);
         }
-        actor_list[0].state = state;
+        the_actors.list[0].state = state;
     }
 }
 
@@ -340,19 +342,20 @@ unsafe fn fairy_or_revive(state: i8, cycle: i16) -> i8 {
         good_fairy_timer = good_fairy_timer.wrapping_sub(1);
         if good_fairy_timer < FAIRY_RESURRECT {
             // the resurrection glow
-        } else if luck < 1 && good_fairy_timer < FAIRY_GIVES_UP {
+        } else if the_hero.luck < 1 && good_fairy_timer < FAIRY_GIVES_UP {
             revive(1);
             return STILL;
-        } else if actor_list[0].state == FALL && good_fairy_timer < FAIRY_GIVES_UP {
+        } else if the_actors.list[0].state == FALL && good_fairy_timer < FAIRY_GIVES_UP {
             revive(0);
             return STILL;
         } else if good_fairy_timer < FAIRY_ARRIVES {
-            let fairy = &raw mut actor_list[FAIRY_SLOT];
-            active_actor_count = NO_ACTORS_LOADED;
-            (*fairy).abs_x = hero_x
+            let fairy = &raw mut the_actors.list[FAIRY_SLOT];
+            the_actors.active = NO_ACTORS_LOADED;
+            (*fairy).abs_x = the_hero
+                .x
                 .wrapping_add(good_fairy_timer as u16 * FAIRY_SPEED)
                 .wrapping_sub(FAIRY_X_OFFSET);
-            (*fairy).abs_y = hero_y;
+            (*fairy).abs_y = the_hero.y;
             (*fairy).kind = OBJECTS;
             (*fairy).index = FAIRY_IMAGE + (cycle & 1) as i8;
             (*fairy).state = STILL;
@@ -369,18 +372,18 @@ unsafe fn fairy_or_revive(state: i8, cycle: i16) -> i8 {
 /// The fight button is down: shoot in a shooting zone, dismount, or fight with the weapon held.
 unsafe fn fighting_state(state: i8) -> i8 {
     unsafe {
-        let hero = &raw mut actor_list[0];
+        let hero = &raw mut the_actors.list[0];
         let (dif_x, dif_y) = ((*hero).vel_x, (*hero).vel_y);
-        if extent_type > SHOOTING_ZONE {
-            if state != SHOOT1 && extent_type == ZONE_ARROW_SLOW {
+        if the_world.extent_type > SHOOTING_ZONE {
+            if state != SHOOT1 && the_world.extent_type == ZONE_ARROW_SLOW {
                 show_event(EVENT_ZONE_81);
             }
-            if state != SHOOT1 && extent_type == ZONE_ARROW_FAST {
+            if state != SHOOT1 && the_world.extent_type == ZONE_ARROW_FAST {
                 show_event(EVENT_ZONE_82);
             }
             return SHOOT1;
         }
-        if riding == BIRD {
+        if the_hero.riding == BIRD {
             if fiery_death != 0 {
                 show_event(EVENT_LAVA);
             } else if dif_x > -DISMOUNT_SPEED
@@ -396,7 +399,7 @@ unsafe fn fighting_state(state: i8) -> i8 {
                         0,
                     ) == 0
                 {
-                    riding = 0;
+                    the_hero.riding = 0;
                     (*hero).abs_y = ytest;
                 }
             } else {
@@ -424,14 +427,14 @@ unsafe fn walking_state(state: i8) -> i8 {
         if compass_lit_direction >= NOT_WALKING {
             return STILL;
         }
-        if hunger > STUMBLE_HUNGER && rand4() == 0 {
+        if the_hero.hunger > STUMBLE_HUNGER && rand4() == 0 {
             compass_lit_direction = if fta_rand() & 1 != 0 {
                 (compass_lit_direction + 1) & 7
             } else {
                 (compass_lit_direction - 1) & 7
             };
         }
-        actor_list[0].facing = compass_lit_direction as i8;
+        the_actors.list[0].facing = compass_lit_direction as i8;
         if mouse_buttons() & LEFT_BUTTON != 0 || held_direction != 0 {
             return WALKING;
         }

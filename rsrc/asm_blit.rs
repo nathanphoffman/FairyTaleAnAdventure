@@ -149,52 +149,67 @@ fn minterm_word(minterm: u32, a: u32, b: u32, c: u32) -> u32 {
 unsafe fn blit(t: &mut Blit) {
     unsafe {
         for _ in 0..t.height {
-            let (mut a_prev, mut b_prev) = (0u32, 0u32);
-            for x in 0..t.width {
-                let (mut aw, mut bw, mut cw) = (ALL_BITS, 0, 0);
-                if t.uses & USE_A != 0 {
-                    aw = read_word(t.a);
-                    t.a = t.a.add(2);
-                    if x == 0 {
-                        aw &= t.afwm;
-                    }
-                    if x == t.width - 1 {
-                        aw &= t.alwm;
-                    }
-                }
-                if t.uses & USE_B != 0 {
-                    bw = read_word(t.b);
-                    t.b = t.b.add(2);
-                }
-                if t.uses & USE_C != 0 {
-                    cw = read_word(t.c);
-                }
-                let shifted_a = ((a_prev << 16 | aw) >> t.ashift) & ALL_BITS;
-                let shifted_b = ((b_prev << 16 | bw) >> t.bshift) & ALL_BITS;
-                a_prev = aw;
-                b_prev = bw;
+            blit_row(t);
+            skip_row_modulos(t);
+        }
+    }
+}
 
-                let dw = minterm_word(t.minterm, shifted_a, shifted_b, cw);
-                if t.uses & USE_D != 0 {
-                    write_word(t.d, dw);
-                    t.d = t.d.add(2);
-                }
-                if t.uses & USE_C != 0 {
-                    t.c = t.c.add(2);
-                }
-            }
+/// Blits one row of `t.width` words, working through the A, B and C sources and the D destination
+/// that are in use. A and B can be shifted, and carry bits over from the previous word.
+unsafe fn blit_row(t: &mut Blit) {
+    unsafe {
+        let (mut a_prev, mut b_prev) = (0u32, 0u32);
+        for x in 0..t.width {
+            let (mut aw, mut bw, mut cw) = (ALL_BITS, 0, 0);
             if t.uses & USE_A != 0 {
-                t.a = t.a.offset(t.amod as isize);
+                aw = read_word(t.a);
+                t.a = t.a.add(2);
+                if x == 0 {
+                    aw &= t.afwm;
+                }
+                if x == t.width - 1 {
+                    aw &= t.alwm;
+                }
             }
             if t.uses & USE_B != 0 {
-                t.b = t.b.offset(t.bmod as isize);
+                bw = read_word(t.b);
+                t.b = t.b.add(2);
             }
             if t.uses & USE_C != 0 {
-                t.c = t.c.offset(t.cmod as isize);
+                cw = read_word(t.c);
             }
+            let shifted_a = ((a_prev << 16 | aw) >> t.ashift) & ALL_BITS;
+            let shifted_b = ((b_prev << 16 | bw) >> t.bshift) & ALL_BITS;
+            a_prev = aw;
+            b_prev = bw;
+
+            let dw = minterm_word(t.minterm, shifted_a, shifted_b, cw);
             if t.uses & USE_D != 0 {
-                t.d = t.d.offset(t.dmod as isize);
+                write_word(t.d, dw);
+                t.d = t.d.add(2);
             }
+            if t.uses & USE_C != 0 {
+                t.c = t.c.add(2);
+            }
+        }
+    }
+}
+
+/// After a row, moves each pointer in use on by its modulo (bytes to skip to reach the next row).
+unsafe fn skip_row_modulos(t: &mut Blit) {
+    unsafe {
+        if t.uses & USE_A != 0 {
+            t.a = t.a.offset(t.amod as isize);
+        }
+        if t.uses & USE_B != 0 {
+            t.b = t.b.offset(t.bmod as isize);
+        }
+        if t.uses & USE_C != 0 {
+            t.c = t.c.offset(t.cmod as isize);
+        }
+        if t.uses & USE_D != 0 {
+            t.d = t.d.offset(t.dmod as isize);
         }
     }
 }

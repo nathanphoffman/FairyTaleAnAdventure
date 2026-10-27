@@ -6,11 +6,9 @@ use super::actors::{eat_food, find_nearest_figure, summon_turtle};
 use super::asm_map::{step_x, step_y};
 use super::asm_text::{queue_print, show_event, speak};
 use super::doors::{bumped_locked_door, open_door_near};
-use super::game_tables::{item_list, region_num, setfig_table};
+use super::game_tables::{item_list, setfig_table};
 use super::globals::{
-    active_carrier, actor_list, brave, current_menu, day_clock, day_period, fatigue, hero_x,
-    hero_y, kind as hero_kind, luck, menu_hit_enabled, nearest_object, nearest_person,
-    quit_requested, stuff, wealth, witch_on_screen,
+    active_carrier, current_menu, menu_hit_enabled, quit_requested, witch_on_screen,
 };
 use super::items_menu::items_option;
 use super::magic::magic_option;
@@ -21,6 +19,7 @@ use super::mood::set_mood;
 use super::objects::{SetFigEntry, leave_item};
 use super::random::rand64;
 use super::savegame::{is_saving, savegame};
+use super::state::{the_actors, the_hero, the_world};
 use super::tables::{jtrans, ob_list8, ob_listg};
 use super::types::{InvItem, Shape};
 
@@ -163,7 +162,7 @@ pub fn choose_menu_entry(chosen_entry: i16) {
 }
 
 unsafe fn add_stuff(slot: usize, amount: u8) {
-    unsafe { *stuff.add(slot) = (*stuff.add(slot)).wrapping_add(amount) };
+    unsafe { *the_hero.stuff.add(slot) = (*the_hero.stuff.add(slot)).wrapping_add(amount) };
 }
 
 unsafe fn item_name(i: usize) -> *const std::ffi::c_char {
@@ -181,10 +180,10 @@ unsafe fn talk_option(chosen_entry: i16) -> bool {
                 TALK_RANGE
             },
         );
-        if nearest_object == 0 {
+        if the_actors.nearest_object == 0 {
             return true;
         }
-        let an = &raw mut actor_list[nearest_object as usize];
+        let an = &raw mut the_actors.list[the_actors.nearest_object as usize];
         if (*an).state == DEAD {
             return true;
         }
@@ -205,10 +204,10 @@ unsafe fn talk_option(chosen_entry: i16) -> bool {
             }
             person_speaks(person, an);
         } else if (*an).kind == CARRIER && active_carrier == CARRIER_TURTLE {
-            if *stuff.add(SHELL) != 0 {
+            if *the_hero.stuff.add(SHELL) != 0 {
                 speak(57);
             } else {
-                *stuff.add(SHELL) = 1;
+                *the_hero.stuff.add(SHELL) = 1;
                 speak(56);
             }
         } else if (*an).kind == ENEMY {
@@ -224,7 +223,7 @@ unsafe fn person_speaks(person: u8, an: *mut Shape) {
     unsafe {
         let goal = (*an).goal as i32;
         match person {
-            WIZARD => speak(if hero_kind < KIND_ENOUGH {
+            WIZARD => speak(if the_hero.kindness < KIND_ENOUGH {
                 35
             } else {
                 27 + goal
@@ -244,9 +243,9 @@ unsafe fn person_speaks(person: u8, an: *mut Shape) {
             NOBLE => speak(20),
             SORCERESS => sorceress_speaks(),
             BARTENDER => {
-                if fatigue < TIRED {
+                if the_hero.fatigue < TIRED {
                     speak(13);
-                } else if day_period > NIGHT_PERIOD {
+                } else if the_world.day_period > NIGHT_PERIOD {
                     speak(12);
                 } else {
                     speak(14);
@@ -255,7 +254,7 @@ unsafe fn person_speaks(person: u8, an: *mut Shape) {
             WITCH => speak(46),
             SPECTRE => speak(47),
             GHOST => speak(49),
-            RANGER => speak(if region_num == RANGER_SWAMP_REGION {
+            RANGER => speak(if the_world.region == RANGER_SWAMP_REGION {
                 22
             } else {
                 53 + goal
@@ -270,8 +269,8 @@ unsafe fn person_speaks(person: u8, an: *mut Shape) {
 unsafe fn sorceress_speaks() {
     unsafe {
         if ob_listg[SORCERESS_SLOT].ob_stat != 0 {
-            if luck < rand64() as i16 {
-                luck += SORCERESS_LUCK;
+            if the_hero.luck < rand64() as i16 {
+                the_hero.luck += SORCERESS_LUCK;
             }
         } else {
             speak(45);
@@ -284,18 +283,18 @@ unsafe fn sorceress_speaks() {
 /// The priest gives the writ's reward, scolds the unkind, or heals.
 unsafe fn priest_speaks() {
     unsafe {
-        if *stuff.add(WRIT) != 0 {
+        if *the_hero.stuff.add(WRIT) != 0 {
             if ob_listg[PRIEST_WRIT_SLOT].ob_stat == 0 {
                 speak(39);
                 ob_listg[PRIEST_WRIT_SLOT].ob_stat = 1;
             } else {
                 speak(19);
             }
-        } else if hero_kind < KIND_ENOUGH {
+        } else if the_hero.kindness < KIND_ENOUGH {
             speak(40);
         } else {
-            speak(36 + (day_clock % PRIEST_BLESSINGS) as i32);
-            actor_list[0].vitality = FULL_VITALITY_BASE + brave / 4;
+            speak(36 + (the_world.day_clock % PRIEST_BLESSINGS) as i32);
+            the_actors.list[0].vitality = FULL_VITALITY_BASE + the_hero.brave / 4;
             queue_print(PRQ_STATS);
         }
     }
@@ -304,11 +303,11 @@ unsafe fn priest_speaks() {
 /// Buys what the bartender sells, if the hero can pay.
 unsafe fn buy_option(chosen_entry: i16) -> bool {
     unsafe {
-        nearest_object = nearest_person;
-        if nearest_object == 0 {
+        the_actors.nearest_object = the_actors.nearest_person;
+        if the_actors.nearest_object == 0 {
             return true;
         }
-        if actor_list[nearest_object as usize].race != BARTENDER_RACE {
+        if the_actors.list[the_actors.nearest_object as usize].race != BARTENDER_RACE {
             return true;
         }
         if chosen_entry > LAST_BUY_ENTRY {
@@ -317,8 +316,8 @@ unsafe fn buy_option(chosen_entry: i16) -> bool {
         let pair = ((chosen_entry - FIRST_MENU_ENTRY) * 2) as isize;
         let item = *jtrans.as_ptr().offset(pair) as u8 as usize;
         let price = *jtrans.as_ptr().offset(pair + 1) as i16;
-        if wealth > price {
-            wealth -= price;
+        if the_hero.wealth > price {
+            the_hero.wealth -= price;
             queue_print(PRQ_VITALITY);
             if item == FOOD {
                 show_event(BOUGHT_FOOD_EVENT);
@@ -369,14 +368,18 @@ unsafe fn use_option(chosen_entry: i16) -> bool {
         }
         if chosen_entry < WEAPONS {
             if menu_hit_enabled != 0 {
-                actor_list[0].weapon = (chosen_entry + 1) as i8;
+                the_actors.list[0].weapon = (chosen_entry + 1) as i8;
             } else {
                 print_wrapped(c"% doesn't have one.".as_ptr());
             }
         }
         if chosen_entry == SHELL_ENTRY && menu_hit_enabled != 0 {
             let (x_low, x_high, y_low, y_high) = NO_TURTLE_AREA;
-            if hero_x < x_high && hero_x > x_low && hero_y < y_high && hero_y > y_low {
+            if the_hero.x < x_high
+                && the_hero.x > x_low
+                && the_hero.y < y_high
+                && the_hero.y > y_low
+            {
                 return true;
             }
             summon_turtle();
@@ -415,13 +418,13 @@ unsafe fn keys_option(chosen_entry: i16) -> bool {
     unsafe {
         let key = (chosen_entry - FIRST_MENU_ENTRY) as usize;
         bumped_locked_door = 0;
-        if *stuff.add(key + KEYBASE) != 0 {
+        if *the_hero.stuff.add(key + KEYBASE) != 0 {
             let mut direction = 0;
             while direction < DIRECTIONS {
-                let x = step_x(hero_x as i32, direction, DOOR_REACH) as u16;
-                let y = step_y(hero_y as i32, direction, DOOR_REACH) as u16;
+                let x = step_x(the_hero.x as i32, direction, DOOR_REACH) as u16;
+                let y = step_y(the_hero.y as i32, direction, DOOR_REACH) as u16;
                 if open_door_near(x, y, key as u32 + 1) != 0 {
-                    *stuff.add(key + KEYBASE) -= 1;
+                    *the_hero.stuff.add(key + KEYBASE) -= 1;
                     break;
                 }
                 direction += 1;
@@ -441,15 +444,15 @@ unsafe fn keys_option(chosen_entry: i16) -> bool {
 /// Gives gold to a beggar, or the bone to the spectre.
 unsafe fn give_option(chosen_entry: i16) -> bool {
     unsafe {
-        if nearest_person == 0 {
+        if the_actors.nearest_person == 0 {
             return true;
         }
-        let person = &raw mut actor_list[nearest_person as usize];
+        let person = &raw mut the_actors.list[the_actors.nearest_person as usize];
         let race = (*person).race;
-        if chosen_entry == GIVE_GOLD && wealth > GOLD_GIVEN {
-            wealth -= GOLD_GIVEN;
-            if rand64() > hero_kind as i32 {
-                hero_kind += 1;
+        if chosen_entry == GIVE_GOLD && the_hero.wealth > GOLD_GIVEN {
+            the_hero.wealth -= GOLD_GIVEN;
+            if rand64() > the_hero.kindness as i32 {
+                the_hero.kindness += 1;
             }
             queue_print(PRQ_STATS);
             queue_print(PRQ_VITALITY);
@@ -458,13 +461,13 @@ unsafe fn give_option(chosen_entry: i16) -> bool {
             } else {
                 speak(BEGGAR_THANKS);
             }
-        } else if chosen_entry == GIVE_BONE && *stuff.add(BONE) != 0 {
+        } else if chosen_entry == GIVE_BONE && *the_hero.stuff.add(BONE) != 0 {
             if race != SPECTRE_RACE {
                 speak(SPECTRE_NOT_HERE);
             } else {
                 speak(SPECTRE_THANKS);
-                *stuff.add(BONE) = 0;
-                leave_item(nearest_person, SPECTRE_BONE_DROP);
+                *the_hero.stuff.add(BONE) = 0;
+                leave_item(the_actors.nearest_person, SPECTRE_BONE_DROP);
             }
         }
         go_to_menu(ITEMS as i16);

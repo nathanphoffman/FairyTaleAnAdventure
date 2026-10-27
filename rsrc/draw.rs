@@ -10,12 +10,12 @@ use super::asm_blit::{
 use super::asm_map::{draw_map_column, draw_map_row};
 use super::game_tables::animation_frames;
 use super::globals::{
-    actor_list, aoff, bmask_mem, bmod, boff, draw_order, drawing_page, drawn_actor_count,
-    extent_type, fiery_death, hero_sector, hero_x, hero_y, loaded_actor_file, map_x, map_y,
-    mask_buffer, planes, planesize, riding, seq_list, shapedata, shift, shp, terrain_mem,
-    witch_angle, witch_direction, witch_on_screen, wmask,
+    aoff, bmask_mem, bmod, boff, draw_order, drawing_page, fiery_death, loaded_actor_file,
+    mask_buffer, planes, planesize, seq_list, shapedata, shift, shp, terrain_mem, witch_angle,
+    witch_direction, witch_on_screen, wmask,
 };
 use super::random::{rand2, rand4};
+use super::state::{the_actors, the_hero, the_world};
 use super::tables::{bow_x, bow_y, minimap};
 use super::types::{SeqInfo, Shape, StateEntry};
 use super::witch::witch_fx;
@@ -64,10 +64,10 @@ pub fn repair_map_and_witch(dif_x: i16, dif_y: i16) {
             draw_map_row(ROW_TOP);
         }
 
-        let witch = &raw const actor_list[WITCH_SLOT];
+        let witch = &raw const the_actors.list[WITCH_SLOT];
         let page = drawing_page;
-        (*page).witchx = ((*witch).abs_x as i32 - (map_x & 0xfff0) as i32) as i16;
-        (*page).witchy = (((*witch).abs_y as i32 - 15) - (map_y & 0xffe0) as i32) as i16;
+        (*page).witchx = ((*witch).abs_x as i32 - (the_world.map_x & 0xfff0) as i32) as i16;
+        (*page).witchy = (((*witch).abs_y as i32 - 15) - (the_world.map_y & 0xffe0) as i32) as i16;
         if rand4() == 0 {
             witch_direction = if s1 > 0 { 1 } else { -1 };
         }
@@ -166,9 +166,9 @@ pub fn draw_sprites(cycle: i16) {
             crack: 0,
             backalloc: (*page).backsave,
         };
-        for j in 0..drawn_actor_count {
+        for j in 0..the_actors.drawn {
             let i = draw_order[j as usize] as i32;
-            let an = &raw mut actor_list[i as usize];
+            let an = &raw mut the_actors.list[i as usize];
             (*an).visible = 0;
             let mut pass: u8 = 0;
             loop {
@@ -192,7 +192,7 @@ unsafe fn weapon_passmode(an: *const Shape, pass: &mut u8) -> bool {
         let state = (*an).state;
         if (*an).weapon > 0
             && (*an).weapon < 8
-            && (state < DEAD || state >= SHOOT1 || extent_type > 80)
+            && (state < DEAD || state >= SHOOT1 || the_world.extent_type > 80)
         {
             let facing = (*an).facing as i32;
             let flipped = *pass ^ 1;
@@ -244,9 +244,9 @@ unsafe fn draw_one(frame: &mut Frame, an: *mut Shape, i: i32, cycle: i16, passmo
         let Some(mut sprite) = choose_image(an, i, passmode) else {
             return Drawn::Done;
         };
-        sprite.xstart += (map_x & 15) as i16;
-        sprite.ystart += (map_y & 31) as i16;
-        sprite.ground += (map_y & 31) as i16;
+        sprite.xstart += (the_world.map_x & 15) as i16;
+        sprite.ystart += (the_world.map_y & 31) as i16;
+        sprite.ground += (the_world.map_y & 31) as i16;
 
         let seq = sprite_sheet(sprite.atype);
         let xsize = (seq.width << 4) as i8;
@@ -487,7 +487,7 @@ unsafe fn body_image(an: *const Shape, i: i32, mut inum: i16) -> Option<(i16, i1
         if atype == OBJECTS && (*an).race == 0 {
             return None;
         }
-        if atype == CARRIER && riding == 0 && loaded_actor_file == 11 {
+        if atype == CARRIER && the_hero.riding == 0 && loaded_actor_file == 11 {
             atype = RAFT;
             inum = 1;
         }
@@ -522,7 +522,7 @@ unsafe fn adjust_for_depth(
     unsafe {
         let depth = (*an).environ as i16;
         if !passmode && sprite.atype != OBJECTS {
-            if i == 0 && riding == 11 {
+            if i == 0 && the_hero.riding == 11 {
                 sprite.ystop -= 16;
             } else if depth == 2 {
                 sprite.ystop -= 10;
@@ -582,9 +582,12 @@ unsafe fn drawn_in_front(an: *const Shape, i: i32, atype: i16, inum: i16) -> boo
     unsafe {
         if atype == CARRIER
             || (i == 0
-                && (riding == 11
-                    || extent_type == NO_MASK_XTYPE
-                    || (hero_x > 22833 && hero_x < 26428 && hero_y > 26425 && hero_y < 26527)))
+                && (the_hero.riding == 11
+                    || the_world.extent_type == NO_MASK_XTYPE
+                    || (the_hero.x > 22833
+                        && the_hero.x < 26428
+                        && the_hero.y > 26425
+                        && the_hero.y < 26527)))
         {
             return true;
         }
@@ -592,6 +595,40 @@ unsafe fn drawn_in_front(an: *const Shape, i: i32, atype: i16, inum: i16) -> boo
             return true;
         }
         (*an).race == RACE_NO_MASK_A || (*an).race == RACE_NO_MASK_B
+    }
+}
+
+/// What a terrain tile does to a sprite drawn behind it.
+#[derive(Debug, PartialEq)]
+enum SceneryRule {
+    /// The sprite is drawn over the tile.
+    Skip,
+    /// The tile's own mask hides part of the sprite.
+    UseTileMask,
+    /// The whole tile hides the sprite.
+    UseFullMask,
+}
+
+/// How the tile of masking type `k` (from the terrain table) treats a sprite. `xm` and `ym` are
+/// the tile's column and row within the sprite, `ystop` is the sprite's feet height above the
+/// tile bottom, and `on_bridge` is true when the sprite is on the bridge.
+fn scenery_rule(k: i16, xm: i32, ym: i32, ystop: i16, on_bridge: bool) -> SceneryRule {
+    let skip = match k {
+        0 => true,
+        1 => xm == 0,
+        2 => ystop > 35,
+        3 => on_bridge,
+        4 => xm == 0 || ystop > 35,
+        5 => xm == 0 && ystop > 35,
+        7 => ystop > 20,
+        _ => false,
+    };
+    if skip {
+        SceneryRule::Skip
+    } else if k == 6 && ym != 0 {
+        SceneryRule::UseFullMask // full if above
+    } else {
+        SceneryRule::UseTileMask
     }
 }
 
@@ -621,44 +658,11 @@ unsafe fn mask_against_scenery(
                     }
                     k = 3;
                 }
-                match k {
-                    0 => continue,
-                    1 => {
-                        if xm == 0 {
-                            continue;
-                        }
-                    }
-                    2 => {
-                        if ystop > 35 {
-                            continue;
-                        }
-                    }
-                    3 => {
-                        if hero_sector == BRIDGE_SECTOR && i != RAFT_SLOT {
-                            continue;
-                        }
-                    }
-                    4 => {
-                        if xm == 0 || ystop > 35 {
-                            continue;
-                        }
-                    }
-                    5 => {
-                        if xm == 0 && ystop > 35 {
-                            continue;
-                        }
-                    }
-                    6 => {
-                        if ym != 0 {
-                            cm = TILE_FULL_MASK; // full if above
-                        }
-                    }
-                    7 => {
-                        if ystop > 20 {
-                            continue;
-                        }
-                    }
-                    _ => {}
+                let on_bridge = the_hero.sector == BRIDGE_SECTOR && i != RAFT_SLOT;
+                match scenery_rule(k, xm, ym, ystop, on_bridge) {
+                    SceneryRule::Skip => continue,
+                    SceneryRule::UseFullMask => cm = TILE_FULL_MASK,
+                    SceneryRule::UseTileMask => {}
                 }
                 add_scenery_mask(
                     xm,
@@ -674,6 +678,25 @@ unsafe fn mask_against_scenery(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn scenery_rules_by_tile_type() {
+        use SceneryRule::*;
+        assert_eq!(scenery_rule(0, 1, 0, 0, false), Skip);
+        assert_eq!(scenery_rule(1, 0, 0, 0, false), Skip);
+        assert_eq!(scenery_rule(1, 1, 0, 0, false), UseTileMask);
+        assert_eq!(scenery_rule(2, 0, 0, 36, false), Skip);
+        assert_eq!(scenery_rule(2, 0, 0, 35, false), UseTileMask);
+        assert_eq!(scenery_rule(3, 0, 0, 0, true), Skip);
+        assert_eq!(scenery_rule(3, 0, 0, 0, false), UseTileMask);
+        assert_eq!(scenery_rule(4, 0, 0, 0, false), Skip);
+        assert_eq!(scenery_rule(5, 0, 0, 36, false), Skip);
+        assert_eq!(scenery_rule(5, 0, 0, 10, false), UseTileMask);
+        assert_eq!(scenery_rule(6, 0, 0, 0, false), UseTileMask);
+        assert_eq!(scenery_rule(6, 0, 1, 0, false), UseFullMask);
+        assert_eq!(scenery_rule(7, 0, 0, 21, false), Skip);
+        assert_eq!(scenery_rule(8, 0, 0, 99, false), UseTileMask);
+    }
 
     fn sprite_at(
         atype: i16,

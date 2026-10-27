@@ -4,17 +4,17 @@
 use super::actors::{actor_distance, eat_food, find_nearest_figure};
 use super::asm_text::{print_number, queue_print, show_event};
 use super::encounters::Encounter;
-use super::game_tables::{encounter_chart, item_list, region_num};
+use super::game_tables::{encounter_chart, item_list};
 use super::globals::{
-    actor_list, current_rastport, drawing_page, drawn_actor_count, freeze_timer, hunger, julstuff,
-    nearest_object, pagea, philstuff, quit_requested, rp_map, seq_list, story_font, stuff,
-    view_status, vp_page, wealth,
+    current_rastport, drawing_page, julstuff, pagea, philstuff, quit_requested, rp_map, seq_list,
+    story_font, view_status, vp_page,
 };
 use super::menus::go_to_menu;
 use super::messages::{announce_container, announce_treasure, print, print_cont, print_wrapped};
 use super::objects::change_object;
 use super::random::{rand4, rand8};
 use super::screen_fx::{map_message, show_still_screen, win_colors};
+use super::state::{the_actors, the_hero, the_world};
 use super::tables::{itrans, ob_listg, page_colors, treasure_probs};
 use super::types::{InvItem, SeqInfo, Shape};
 use crate::amiga::{BitMap, RastPort, TextFont, ViewPort};
@@ -126,7 +126,7 @@ unsafe fn item(i: usize) -> &'static InvItem {
 }
 
 unsafe fn add_stuff(slot: usize, amount: u8) {
-    unsafe { *stuff.add(slot) = (*stuff.add(slot)).wrapping_add(amount) };
+    unsafe { *the_hero.stuff.add(slot) = (*the_hero.stuff.add(slot)).wrapping_add(amount) };
 }
 
 /// Handles an entry of the Items menu.
@@ -181,7 +181,7 @@ unsafe fn draw_item_icons(bm: *mut BitMap) {
     unsafe {
         for slot in 0..GOLDBASE {
             let it = item(slot);
-            let shown = (*stuff.add(slot)).min(it.maxshown);
+            let shown = (*the_hero.stuff.add(slot)).min(it.maxshown);
             let x = it.xoff as i32 + ITEM_X_MARGIN;
             let mut y = it.yoff as u16;
             let source_row = it.image_number as i32 * ITEM_ROW_HEIGHT + it.img_off as i32;
@@ -210,19 +210,19 @@ unsafe fn take_nearest() {
     unsafe {
         queue_print(PRQ_VITALITY);
         find_nearest_figure(0, TAKE_RANGE);
-        *stuff.add(ARROWBASE) = 0;
-        if nearest_object == 0 {
+        *the_hero.stuff.add(ARROWBASE) = 0;
+        if the_actors.nearest_object == 0 {
             queue_print(PRQ_NOTHING_NEAR);
             return;
         }
-        let an = &raw mut actor_list[nearest_object as usize];
+        let an = &raw mut the_actors.list[the_actors.nearest_object as usize];
         if (*an).kind == OBJECTS {
             if take_object() {
                 finish_pickup();
             }
         } else if (*an).weapon < 0 {
             // already searched
-        } else if (*an).vitality == 0 || freeze_timer != 0 {
+        } else if (*an).vitality == 0 || the_world.freeze_timer != 0 {
             search_body();
         } else {
             show_event(EVENT_ALIVE);
@@ -234,9 +234,9 @@ unsafe fn take_nearest() {
 /// count, and ends the game if the talisman was found.
 unsafe fn finish_pickup() {
     unsafe {
-        change_object(nearest_object as i32, 2);
-        add_stuff(ARROWS, (*stuff.add(ARROWBASE) as u32 * 10) as u8);
-        if *stuff.add(TALISMAN) != 0 {
+        change_object(the_actors.nearest_object as i32, 2);
+        add_stuff(ARROWS, (*the_hero.stuff.add(ARROWBASE) as u32 * 10) as u8);
+        if *the_hero.stuff.add(TALISMAN) != 0 {
             quit_requested = 1;
             view_status = VIEW_GAME_OVER;
             map_message();
@@ -249,18 +249,18 @@ unsafe fn finish_pickup() {
 /// Handles taking the object `nearest_object`. Returns true if it was taken (so it must be removed).
 unsafe fn take_object() -> bool {
     unsafe {
-        let an = &raw mut actor_list[nearest_object as usize];
+        let an = &raw mut the_actors.list[the_actors.nearest_object as usize];
         let id = (*an).index as u8 as u32;
         let owner = (*an).vitality as u32 & 0x7f;
         match id {
             GOLD_PILE => {
                 announce_treasure(c"50 gold pieces".as_ptr());
-                wealth += GOLD_FOUND;
+                the_hero.wealth += GOLD_FOUND;
                 true
             }
             SCRAP_OF_PAPER => {
                 show_event(EVENT_PAPER);
-                show_event(if region_num > FIRST_INDOOR_REGION {
+                show_event(if the_world.region > FIRST_INDOOR_REGION {
                     EVENT_PAPER_INDOORS
                 } else {
                     EVENT_PAPER_OUTDOORS
@@ -268,7 +268,7 @@ unsafe fn take_object() -> bool {
                 true
             }
             FRUIT => {
-                if hunger < NOT_HUNGRY {
+                if the_hero.hunger < NOT_HUNGRY {
                     add_stuff(FRUIT_SLOT, 1);
                     show_event(EVENT_FRUIT_KEPT);
                 } else {
@@ -358,7 +358,7 @@ unsafe fn two_things() {
         let mut i = rand8() + 8;
         if i == 8 {
             i = HUNDRED_GOLD;
-            wealth += CONTAINER_GOLD;
+            the_hero.wealth += CONTAINER_GOLD;
         } else {
             print_cont(c" a".as_ptr());
         }
@@ -413,7 +413,7 @@ unsafe fn search_body() {
         const ARCHER_WEAPON: u32 = 4;
         const MAX_WEAPON: u32 = 5;
         const EXTRA_ARROWS_MIN: i32 = 2;
-        let an = &raw mut actor_list[nearest_object as usize];
+        let an = &raw mut the_actors.list[the_actors.nearest_object as usize];
         print_wrapped(c"% searched the body and found".as_ptr());
         print(c"".as_ptr());
         let mut weapon = (*an).weapon as u32;
@@ -424,8 +424,8 @@ unsafe fn search_body() {
             print_cont(c"a ".as_ptr());
             print_cont(item_name(weapon as usize - 1));
             add_stuff(weapon as usize - 1, 1);
-            if weapon as i8 > actor_list[0].weapon {
-                actor_list[0].weapon = weapon as i8;
+            if weapon as i8 > the_actors.list[0].weapon {
+                the_actors.list[0].weapon = weapon as i8;
             }
             if weapon == ARCHER_WEAPON {
                 print_cont(c" and ".as_ptr());
@@ -448,7 +448,7 @@ unsafe fn search_body() {
             }
             print_cont(item_name(found as usize));
             if found >= GOLDBASE as u32 {
-                wealth += item(found as usize).maxshown as i16;
+                the_hero.wealth += item(found as usize).maxshown as i16;
             } else {
                 add_stuff(found as usize, 1);
             }
@@ -480,8 +480,8 @@ unsafe fn roll_body_treasure(an: *mut Shape) -> u32 {
 unsafe fn look_around() {
     unsafe {
         let mut found = false;
-        for i in 0..drawn_actor_count as i32 {
-            let an = &raw const actor_list[i as usize];
+        for i in 0..the_actors.drawn as i32 {
+            let an = &raw const the_actors.list[i as usize];
             if (*an).kind == OBJECTS && (*an).race == 0 && actor_distance(i, 0) < LOOK_RANGE {
                 found = true;
                 change_object(i, 1);

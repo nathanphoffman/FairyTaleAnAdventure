@@ -6,20 +6,12 @@ use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
 use std::cell::RefCell;
 
-unsafe extern "C" {
-    fn fta_queue_cmd(kind: i32, a: i32, b: i32);
-}
+use crate::rsrc::statedump::{Command, queue_command};
 
 /// A key press stays down this many ticks unless the script says otherwise.
 const DEFAULT_HOLD_TICKS: u32 = 4;
 /// A scripted click releases the button this many ticks after pressing it.
 const CLICK_HOLD_TICKS: u32 = 3;
-/// `fta_queue_cmd` kinds.
-const CMD_TELEPORT: i32 = 1;
-const CMD_KILL: i32 = 2;
-const CMD_GIVE: i32 = 3;
-const CMD_SET_STAT: i32 = 4;
-const CMD_SLAY: i32 = 5;
 /// A test command has at least tick, name and one number.
 const MIN_CMD_FIELDS: usize = 3;
 const LORES_TO_FRAME: i32 = 2;
@@ -139,11 +131,11 @@ fn run_cmds(tick: u32) {
         let a: i32 = p[2].parse().unwrap_or(0);
         let b: i32 = p.get(3).and_then(|v| v.parse().ok()).unwrap_or(0);
         match p[1] {
-            "tp" => unsafe { fta_queue_cmd(CMD_TELEPORT, a, b) },
-            "kill" => unsafe { fta_queue_cmd(CMD_KILL, a, b) },
-            "give" => unsafe { fta_queue_cmd(CMD_GIVE, a, b) },
-            "slay" => unsafe { fta_queue_cmd(CMD_SLAY, a, b) },
-            "stat" => unsafe { fta_queue_cmd(CMD_SET_STAT, a, b) },
+            "tp" => queue_command(Command::Teleport { x: a, y: b }),
+            "kill" => queue_command(Command::KillHero { luck: a }),
+            "give" => queue_command(Command::Give { slot: a, count: b }),
+            "slay" => queue_command(Command::SlayEnemies),
+            "stat" => queue_command(Command::SetStat { stat: a, value: b }),
             _ => {}
         }
     }

@@ -5,12 +5,10 @@
 use super::actors::turtle_eggs;
 use super::actors::{report_battle_result, run_tactic};
 use super::asm_text::{queue_print, steer_actor};
-use super::globals::{
-    active_actor_count, actor_list, actors_on_screen, battle_flag, current_extent, day_clock,
-    extent_type, good_fairy_timer, hero_x, hero_y, leader,
-};
+use super::globals::{actors_on_screen, battle_flag, good_fairy_timer};
 use super::mood::set_mood;
 use super::random::{bitrand, rand2, rand4};
+use super::state::{the_actors, the_hero, the_world};
 use super::types::Shape;
 
 // Actor kinds and states (csrc/ftale.h).
@@ -75,11 +73,11 @@ const PRQ_VITALITY: i32 = 7;
 pub fn update_enemy_goals() {
     unsafe {
         actors_on_screen = 0;
-        leader = 0;
+        the_actors.leader = 0;
         let battle2 = battle_flag;
         battle_flag = 0;
         let mut i = FIRST_AI_ACTOR;
-        while i < active_actor_count as usize {
+        while i < the_actors.active as usize {
             if good_fairy_timer != 0 && good_fairy_timer < FAIRY_ARRIVES {
                 break;
             }
@@ -101,10 +99,15 @@ pub fn update_enemy_goals() {
 /// anyone out of hit points who is on screen.
 unsafe fn think(i: usize, battle2: i8) {
     unsafe {
-        let an = &raw mut actor_list[i];
+        let an = &raw mut the_actors.list[i];
         if (*an).kind == CARRIER {
-            if day_clock & CARRIER_AIM_MASK == 0 {
-                steer_actor(i as i32, hero_x as i32, hero_y as i32, CARRIER_AIM_MODE);
+            if the_world.day_clock & CARRIER_AIM_MASK == 0 {
+                steer_actor(
+                    i as i32,
+                    the_hero.x as i32,
+                    the_hero.y as i32,
+                    CARRIER_AIM_MODE,
+                );
             }
             return;
         } else if (*an).kind == SETFIG {
@@ -113,8 +116,8 @@ unsafe fn think(i: usize, battle2: i8) {
         let mut mode = (*an).goal as i16;
         let mut tactic = (*an).tactic as i16;
 
-        let xd = ((*an).abs_x as i32 - hero_x as i32) as i16;
-        let yd = ((*an).abs_y as i32 - hero_y as i32) as i16;
+        let xd = ((*an).abs_x as i32 - the_hero.x as i32) as i16;
+        let yd = ((*an).abs_y as i32 - the_hero.y as i32) as i16;
         let (xd, yd) = (xd.wrapping_abs(), yd.wrapping_abs());
         if xd < SCREEN_RANGE && yd < SCREEN_RANGE {
             actors_on_screen = 1;
@@ -149,15 +152,15 @@ unsafe fn think(i: usize, battle2: i8) {
         } else if mode == FOLLOWER {
             run_tactic(i as i32, FOLLOW);
         } else if mode == STAND {
-            steer_actor(i as i32, hero_x as i32, hero_y as i32, 0);
+            steer_actor(i as i32, the_hero.x as i32, the_hero.y as i32, 0);
             (*an).state = STILL;
         } else if mode == WAIT {
             (*an).state = STILL;
         }
 
         (*an).goal = mode as i8;
-        if leader == 0 {
-            leader = i as i16;
+        if the_actors.leader == 0 {
+            the_actors.leader = i as i16;
         }
     }
 }
@@ -166,11 +169,15 @@ unsafe fn think(i: usize, battle2: i8) {
 /// flee when nearly dead.
 unsafe fn adjust_mode_for_situation(an: *mut Shape, mode: i16) -> i16 {
     unsafe {
-        let hero_state = actor_list[0].state;
+        let hero_state = the_actors.list[0].state;
         if hero_state == DEAD || hero_state == FALL {
-            if leader == 0 { FLEE } else { FOLLOWER }
+            if the_actors.leader == 0 {
+                FLEE
+            } else {
+                FOLLOWER
+            }
         } else if (*an).vitality < NEARLY_DEAD
-            || (extent_type > SPECIAL_XTYPE && (*an).race != (*current_extent).v3)
+            || (the_world.extent_type > SPECIAL_XTYPE && (*an).race != (*the_world.extent).v3)
         {
             FLEE // special encounters don't flee in the 60+ zones
         } else {
@@ -213,7 +220,7 @@ unsafe fn hostile_action(i: usize, an: *mut Shape, mode: i16, tactic: i16, xd: i
             thresh = DKNIGHT_STRIKE;
         }
         if (*an).weapon & BOW_BIT == 0 && xd < thresh && yd < thresh {
-            steer_actor(i as i32, hero_x as i32, hero_y as i32, 0);
+            steer_actor(i as i32, the_hero.x as i32, the_hero.y as i32, 0);
             if (*an).state >= WALKING {
                 (*an).state = FIGHTING;
             }

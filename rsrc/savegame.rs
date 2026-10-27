@@ -11,20 +11,18 @@
 //! choice) and the platform layer puts the files in the `saves/` folder.
 
 use super::asm_text::queue_print;
-use super::game_tables::{brother_stats, extent_list, region_num};
+use super::game_tables::{brother_stats, extent_list};
 use super::globals::{
-    active_actor_count, active_carrier, actor_list, actors_loading, brave, brother, carrier_slot,
-    cheat_enabled, current_menu, current_rastport, day_clock, drawn_actor_count, encounter_number,
-    encounter_type, extent_type, fatigue, flying, freeze_timer, hero_place, hero_sector, hero_x,
-    hero_y, hunger, julstuff, kevstuff, kind, leader, light_level, light_timer, loaded_actor_file,
-    loaded_setfig_file, luck, map_x, map_y, missile_slots, next_missile, pad1, pad2, pad3,
-    panel_font, philstuff, princess, raft_nearness, riding, safe_r, safe_x, safe_y, secret_timer,
-    story_font, stuff, tile_x, tile_y, turtle_nearness, view_status, wealth, wt,
+    active_carrier, actors_loading, carrier_slot, cheat_enabled, current_menu, current_rastport,
+    julstuff, kevstuff, loaded_actor_file, loaded_setfig_file, pad1, pad2, pad3, panel_font,
+    philstuff, princess, raft_nearness, safe_r, safe_x, safe_y, story_font, turtle_nearness,
+    view_status,
 };
 use super::input::take_new_disk;
 use super::loading::load_start_sprites;
 use super::menus::update_menu_availability;
 use super::messages::print;
+use super::state::{the_actors, the_encounter, the_hero, the_world};
 use super::tables::{dstobs, glbobs, mapobs, ob_listg, ob_table};
 use super::types::{Extent, Missile, Shape, WorldObject};
 use crate::amiga::{BPTR, RastPort, TextFont};
@@ -124,13 +122,13 @@ unsafe fn find_target() -> Target {
 unsafe fn save_all() {
     unsafe {
         save_variables();
-        transfer_u16(&raw mut region_num);
+        transfer_u16(&raw mut the_world.region);
 
-        transfer_u16((&raw mut active_actor_count).cast());
-        transfer_u16((&raw mut drawn_actor_count).cast());
-        transfer_u16((&raw mut next_missile).cast());
-        for i in 0..active_actor_count as usize {
-            transfer_actor(&raw mut actor_list[i]);
+        transfer_u16((&raw mut the_actors.active).cast());
+        transfer_u16((&raw mut the_actors.drawn).cast());
+        transfer_u16((&raw mut the_actors.next_missile).cast());
+        for i in 0..the_actors.active as usize {
+            transfer_actor(&raw mut the_actors.list[i]);
         }
 
         transfer_brothers_and_missiles();
@@ -234,8 +232,8 @@ unsafe fn wait_for_game_disk() {
 /// After loading a game: clears the encounter state and redraws the status panel for the new hero.
 unsafe fn reset_after_load() {
     unsafe {
-        wt = 0;
-        encounter_number = 0;
+        the_encounter.weapon_type = 0;
+        the_encounter.number = 0;
         load_start_sprites();
         update_menu_availability();
         view_status = VIEW_CORRUPT;
@@ -244,7 +242,7 @@ unsafe fn reset_after_load() {
         print(c"".as_ptr());
         print(c"".as_ptr());
         print(c"".as_ptr());
-        encounter_type = 0;
+        the_encounter.kind = 0;
         actors_loading = 0;
     }
 }
@@ -287,48 +285,50 @@ pub fn transfer_u16(v: *mut u16) {
 /// positions, the stats (bravery, luck, kindness, wealth, hunger, fatigue), which brother is
 /// playing, the day/night clock, the magic timers and so on. The order is the file format.
 fn save_variables() {
-    let variables: [*mut u16; MISC_VARIABLES] = [
-        &raw mut map_x,
-        &raw mut map_y,
-        &raw mut hero_x,
-        &raw mut hero_y,
-        &raw mut safe_x,
-        &raw mut safe_y,
-        &raw mut safe_r,
-        &raw mut tile_x,
-        &raw mut tile_y,
-        (&raw mut cheat_enabled).cast(),
-        (&raw mut riding).cast(),
-        (&raw mut flying).cast(),
-        (&raw mut carrier_slot).cast(),
-        (&raw mut turtle_nearness).cast(),
-        (&raw mut raft_nearness).cast(),
-        (&raw mut brave).cast(),
-        (&raw mut luck).cast(),
-        (&raw mut kind).cast(),
-        (&raw mut wealth).cast(),
-        (&raw mut hunger).cast(),
-        (&raw mut fatigue).cast(),
-        (&raw mut brother).cast(),
-        (&raw mut princess).cast(),
-        (&raw mut hero_sector).cast(),
-        &raw mut hero_place,
-        &raw mut day_clock,
-        &raw mut light_level,
-        (&raw mut loaded_actor_file).cast(),
-        (&raw mut loaded_setfig_file).cast(),
-        (&raw mut active_carrier).cast(),
-        &raw mut extent_type,
-        (&raw mut leader).cast(),
-        (&raw mut secret_timer).cast(),
-        (&raw mut light_timer).cast(),
-        (&raw mut freeze_timer).cast(),
-        (&raw mut current_menu).cast(),
-        (&raw mut encounter_type).cast(),
-        &raw mut pad1,
-        &raw mut pad2,
-        &raw mut pad3,
-    ];
+    let variables: [*mut u16; MISC_VARIABLES] = unsafe {
+        [
+            &raw mut the_world.map_x,
+            &raw mut the_world.map_y,
+            &raw mut the_hero.x,
+            &raw mut the_hero.y,
+            &raw mut safe_x,
+            &raw mut safe_y,
+            &raw mut safe_r,
+            &raw mut the_world.tile_x,
+            &raw mut the_world.tile_y,
+            (&raw mut cheat_enabled).cast(),
+            (&raw mut the_hero.riding).cast(),
+            (&raw mut the_hero.flying).cast(),
+            (&raw mut carrier_slot).cast(),
+            (&raw mut turtle_nearness).cast(),
+            (&raw mut raft_nearness).cast(),
+            (&raw mut the_hero.brave).cast(),
+            (&raw mut the_hero.luck).cast(),
+            (&raw mut the_hero.kindness).cast(),
+            (&raw mut the_hero.wealth).cast(),
+            (&raw mut the_hero.hunger).cast(),
+            (&raw mut the_hero.fatigue).cast(),
+            (&raw mut the_hero.brother).cast(),
+            (&raw mut princess).cast(),
+            (&raw mut the_hero.sector).cast(),
+            &raw mut the_hero.place,
+            &raw mut the_world.day_clock,
+            &raw mut the_world.light_level,
+            (&raw mut loaded_actor_file).cast(),
+            (&raw mut loaded_setfig_file).cast(),
+            (&raw mut active_carrier).cast(),
+            &raw mut the_world.extent_type,
+            (&raw mut the_actors.leader).cast(),
+            (&raw mut the_world.secret_timer).cast(),
+            (&raw mut the_world.light_timer).cast(),
+            (&raw mut the_world.freeze_timer).cast(),
+            (&raw mut current_menu).cast(),
+            (&raw mut the_encounter.kind).cast(),
+            &raw mut pad1,
+            &raw mut pad2,
+            &raw mut pad3,
+        ]
+    };
     for v in variables {
         transfer_u16(v);
     }
@@ -416,9 +416,9 @@ pub fn transfer_brothers_and_missiles() {
         transfer_bytes((&raw mut julstuff).cast(), STUFF_SIZE);
         transfer_bytes((&raw mut philstuff).cast(), STUFF_SIZE);
         transfer_bytes((&raw mut kevstuff).cast(), STUFF_SIZE);
-        stuff = brother_stats[brother as usize - 1].stuff;
+        the_hero.stuff = brother_stats[the_hero.brother as usize - 1].stuff;
         for i in 0..6 {
-            transfer_missile((&raw mut missile_slots).cast::<Missile>().add(i));
+            transfer_missile((&raw mut the_actors.missiles).cast::<Missile>().add(i));
         }
     }
 }

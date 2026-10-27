@@ -4,10 +4,6 @@ use super::{BEAT, Display, HEIGHT, WIDTH};
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
-unsafe extern "C" {
-    fn fta_dump_state(path: *const std::ffi::c_char);
-}
-
 const WATCHDOG_CHECK: Duration = Duration::from_secs(1);
 /// Used when FTA_STATE_AFTER / FTA_SHOT_AFTER are not set.
 const DEFAULT_AFTER_TICKS: u32 = 1;
@@ -53,9 +49,7 @@ fn dump_state_hook(d: &Display) {
     if d.ticks < ticks_from_env("FTA_STATE_AFTER") {
         return;
     }
-    if let Ok(c) = std::ffi::CString::new(path.as_encoded_bytes()) {
-        unsafe { fta_dump_state(c.as_ptr()) };
-    }
+    crate::rsrc::statedump::dump_state(std::path::Path::new(&path));
     std::process::exit(0);
 }
 
