@@ -144,8 +144,8 @@ the game. Routines still stubbed are in `csrc/asm_stubs.c` and print "STUB calle
 ### Phase 7 - Port C to Rust
 Superseded by `modern_engine_plan.md` (steps 2-4), which first cuts `main()` into functions and
 gathers the state into structs, then ports the rules to Rust. Keep this list as a rough guide.
-The current approach is `rsrc/` (see section 4a of `modern_engine_plan.md`): `csrc/` stays untouched
-and each file is ported into `rsrc/`. Move modules one at a time, with the game runnable after each one. Rough order, easiest first:
+The current approach is `src/game/` (see section 4a of `modern_engine_plan.md`): `csrc/` stays untouched
+and each file is ported into `src/game/`. Move modules one at a time, with the game runnable after each one. Rough order, easiest first:
 - [x] `asm_port.c`, `input.c`, `iffsubs.c`, `hdrive.c`
 - [x] `asm_blit.c`, `asm_text.c`, `asm_map.c`, `asm_stubs.c`
 - [x] `fmain2.c` (functions and data tables)

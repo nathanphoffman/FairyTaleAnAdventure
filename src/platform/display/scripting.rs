@@ -6,7 +6,7 @@ use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
 use std::cell::RefCell;
 
-use crate::rsrc::statedump::{Command, queue_command};
+use crate::game::statedump::{Command, queue_command};
 
 /// A key press stays down this many ticks unless the script says otherwise.
 const DEFAULT_HOLD_TICKS: u32 = 4;

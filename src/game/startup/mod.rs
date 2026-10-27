@@ -1,0 +1,91 @@
+//! Starting and stopping the game (from csrc/fmain.c): `open_all` sets up the screen, memory, fonts,
+//! sound and input; `close_all` gives it all back; and `fta_main` (the original `main`) shows the
+//! title and intro, starts the game and runs the main loop, one pass per frame.
+
+pub mod amiga_leftovers;
+pub mod game_loop;
+pub mod intro;
+pub mod open_close;
+
+use game_loop::main_loop;
+use intro::start_up;
+use open_close::{close_all, open_all};
+
+use crate::amiga::RastPort;
+use std::ffi::c_char;
+
+use crate::game::data::globals::original_dir;
+use crate::game::data::state::{the_screen, the_world};
+use crate::game::startup::amiga_leftovers::WBenchMsg;
+use crate::game::ui::text::show_error;
+
+unsafe extern "C" {
+
+    // AmigaOS calls the platform layer provides.
+    fn SetRast(current_rastport: *mut RastPort, pen: u32);
+    fn CurrentDir(lock: isize) -> isize;
+    // The game's own code that is still C, or lives in other files.
+    fn stopscore();
+}
+
+// Memory the game allocates (csrc/fmain.c).
+
+// What `open_all` has set up, so `close_all` knows what to undo (`openflags` bits).
+
+// ---- fta_main ----
+unsafe extern "C" {}
+
+// Screen modes (`view_status`).
+/// The game menu entry that pauses the game; bit 0 set means paused.
+/// Intro: how big the picture zooms (half the width in pixels), and the step.
+/// A region number below this means the next region is still being loaded.
+/// Colours `LoadRGB4` sets for the page and the text.
+/// Pens: the title text, and the colour of the flashing pointer.
+/// Waits, in fiftieths of a second.
+/// The placard shown while the copy protection question is asked.
+/// Where the picture planes in `image_mem` start: five planes, 8000 bytes apart.
+/// Disk track range holding the shadow masks.
+/// How `dif_x` wraps: a 10 bit signed value.
+#[repr(C)]
+struct WBArg {
+    wa_lock: isize,
+}
+
+#[repr(C)]
+struct WBStartup {
+    sm_arglist: *const WBArg,
+}
+
+/// The game: the original `main`. Called once from `src/main.rs` (`argc` 0 would mean "started from
+/// Workbench").
+#[unsafe(no_mangle)]
+pub extern "C" fn fta_main(argc: i32, _argv: *mut c_char) {
+    unsafe {
+        if argc == 0 {
+            original_dir = CurrentDir((*(*WBenchMsg.cast::<WBStartup>()).sm_arglist).wa_lock);
+        }
+
+        the_world.light_timer = 0;
+        let err = open_all();
+        if err != 0 {
+            show_error(err);
+            quit_all();
+            return;
+        }
+
+        if start_up() {
+            main_loop();
+            stopscore();
+        }
+        quit_all();
+    }
+}
+
+/// The end of the program (the `quit_all` label): back to the plain text screen, then `close_all`.
+unsafe fn quit_all() {
+    unsafe {
+        the_screen.rp_text.BitMap = the_screen.wb_bmap;
+        SetRast(&raw mut the_screen.rp_text, 0);
+        close_all();
+    }
+}

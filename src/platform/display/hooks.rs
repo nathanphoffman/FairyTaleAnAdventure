@@ -49,7 +49,7 @@ fn dump_state_hook(d: &Display) {
     if d.ticks < ticks_from_env("FTA_STATE_AFTER") {
         return;
     }
-    crate::rsrc::statedump::dump_state(std::path::Path::new(&path));
+    crate::game::statedump::dump_state(std::path::Path::new(&path));
     std::process::exit(0);
 }
 

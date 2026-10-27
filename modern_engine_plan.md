@@ -96,11 +96,11 @@ Give C a small API: `tick(input)` and `get_state()`.
 Small leaves first: RNG, collision, text, save/load. Then AI, combat, inventory, shops. The old
 `main()` loop goes last. Compare against the C using the state tests.
 
-### 4a. `rsrc/`: clean Rust copy of `csrc/` (decided, in progress)
+### 4a. `src/game/`: clean Rust copy of `csrc/` (decided, in progress)
 Decision: `csrc/` is the reference and is not edited, except `#ifndef RSRC_*` guards (preprocessor
-only) and the step-2 `main()` cuts. Each C file is ported 1:1 into `rsrc/` (same behaviour, same
+only) and the step-2 `main()` cuts. Each C file is ported 1:1 into `src/game/` (same behaviour, same
 function names, bugs included), written to the cleanup rules (short functions, named constants,
-small files, tests). `rsrc/` is a module of the main crate (`#[path = "../rsrc/mod.rs"]` in
+small files, tests). `src/game/` is a module of the main crate (`#[path = "../src/game/mod.rs"]` in
 `src/main.rs`), not a separate crate.
 
 **Status.** Every C file is ported except `fmain.c` (about 85% of its functions are done; groups C to F
@@ -116,9 +116,9 @@ Done files: `random`, `iff_helpers`, `input`, `iffsubs`, `hdrive`, `asm_blit`, `
 #### HANDOFF: how to port the next group (read this first)
 **Method (what every group so far followed).**
 1. Pick a group of related functions in `csrc/fmain.c`. Read the C carefully, including the globals it
-   touches. Write the Rust in `rsrc/<name>.rs` (add `pub mod` to `rsrc/mod.rs` with a one-line comment),
+   touches. Write the Rust in `src/game/<name>.rs` (add `pub mod` to `src/game/mod.rs` with a one-line comment),
    with `#[unsafe(no_mangle)] pub extern "C" fn <same C name>`. Doc comments say what the rules are.
-2. In `csrc/fmain.c` wrap the old C in `#ifndef RSRC_<GROUP> /* PORT: ported to rsrc/<name>.rs */ ...
+2. In `csrc/fmain.c` wrap the old C in `#ifndef RSRC_<GROUP> /* PORT: ported to src/game/<name>.rs */ ...
    #endif /* RSRC_<GROUP> */` and add `.define("RSRC_<GROUP>", None)` in `build.rs`. The C stays as the
    reference. If other C still uses a variable that was defined inside the guard (like `bumped`), add
    `#else extern ...;` inside the guard. If the function was `static` in C and `main()` calls it, add a
@@ -140,10 +140,10 @@ Done files: `random`, `iff_helpers`, `input`, `iffsubs`, `hdrive`, `asm_blit`, `
 - C has file-level globals `LONG i; SHORT j,k,n;`. Functions that use `i`/`j` without declaring them write
   these globals. In Rust import them with `#[link_name = "i"] static mut c_i: i32;` (a plain `i` would
   clash with local variables). Only mirror the write if something could read it.
-- Globals defined in C are read in Rust through `unsafe extern "C" { static ...; }`. Several `rsrc` files
+- Globals defined in C are read in Rust through `unsafe extern "C" { static ...; }`. Several `src/game` files
   declare the same C global; that is fine. Keep the C name for any global that moves. Use `#[link_name]`
   when the C name collides with a Rust local (for example `kind`).
-- Struct mirrors go in `rsrc/types.rs` with a size check in its test (`Need`, `Menu`, `Bro` were added).
+- Struct mirrors go in `src/game/data/types.rs` with a size check in its test (`Need`, `Menu`, `Bro` were added).
 - Uninitialised C variables: treat as 0 only if the value is never really used; otherwise note it in a
   comment (see step 2 for the ones already found).
 - A state test that differs between two runs of the same binary means an uninitialised variable.
@@ -212,17 +212,38 @@ The port is finished. What remains afterwards (optional, no firm end) is the cle
 - Give the Rust functions readable names with thin wrappers that keep the C names for any C still
   left (`layout.c`, `statedump.c`), then delete the wrappers.
 - Replace the `static mut` globals with structs (this is step 3). Done for the game state:
-  `rsrc/state.rs` has `Hero`, `World`, `Encounters`, `Actors`, `Screen`, `Memory`, `Ui` and `Witch`
+  `src/game/data/state.rs` has `Hero`, `World`, `Encounters`, `Actors`, `Screen`, `Memory`, `Ui` and `Witch`
   (statics `the_hero`, `the_world`, ...). `globals.rs` keeps only the Amiga base pointers, fonts,
-  scratch variables and the audio ones. `statedump.c` is now `rsrc/statedump.rs`, so no C reads Rust
+  scratch variables and the audio ones. `statedump.c` is now `src/game/statedump.rs`, so no C reads Rust
   variables any more. All long functions are split (done).
 - Unit tests instead of playtests (done): the rules are plain functions that take values or the state
   structs and return what should happen (hunger, tactics, melee and missile hits, death, revive,
   talking, shops, loot, doors, spells, riding, water, beds, the day clock). The callers do the sounds,
   text and drawing. 192 unit tests. The playtests went from 49 to 21 (13 pixel, 8 state); the ones
   left check drawing, save/load and that the game reaches the rules. `cargo clippy` is clean.
-- `FTA_MUSIC_EXPORT=dir` writes every tune as a WAV file and quits (`rsrc/mood.rs`).
+- `FTA_MUSIC_EXPORT=dir` writes every tune as a WAV file and quits (`src/game/ui/music.rs`).
 - See the note below on keeping an all-C "original" build possible while doing this.
+
+### Where the Rust files are (after the folder clean-up)
+The Rust game lives in `src/game/`, grouped by purpose (it used to be a flat `rsrc/` folder named
+after the C files). `csrc/` comments still use the old names; this table maps them.
+
+| Old (`rsrc/`) | Now (`src/game/`) |
+|---|---|
+| `actors.rs` | `actors/interaction.rs` (hits, blocking, nearest figure, rescue) |
+| `ai.rs`, `combat.rs`, `encounters.rs`, `revive.rs` | `actors/ai.rs`, `actors/combat.rs`, `actors/encounters.rs`, `actors/revive.rs` |
+| `move_actor.rs` | `actors/movement.rs` |
+| `world.rs` | split: `actors/carriers.rs`, `actors/spawning.rs`, `actors/nearby_speech.rs`, `world/bed.rs`, `world/travel_doors.rs`, `world/clock.rs`, `world/survival.rs`, `render/restore.rs`, `render/sprite_order.rs` |
+| `asm_text.rs` | `ui/text.rs` (printing) and `actors/steering.rs` |
+| `asm_map.rs`, `regions.rs`, `places.rs`, `objects.rs`, `doors.rs` | `world/map.rs`, `world/regions.rs`, `world/places.rs`, `world/objects.rs`, `world/key_doors.rs` |
+| `asm_blit.rs`, `draw.rs`, `display.rs`, `screen_fx.rs`, `witch.rs` | `render/blit.rs`, `render/draw.rs`, `render/display.rs`, `render/screen_fx.rs`, `render/witch.rs` |
+| `menus.rs`, `options.rs`, `items_menu.rs`, `magic.rs`, `messages.rs`, `mood.rs` | `ui/menus.rs`, `ui/options.rs`, `ui/items_menu.rs`, `ui/magic.rs`, `ui/messages.rs`, `ui/music.rs` |
+| `keys.rs`, `input.rs` | `input/keys.rs`, `input/handler.rs` |
+| `hdrive.rs`, `iffsubs.rs`, `iff_helpers.rs`, `loading.rs`, `savegame.rs` | `files/disk.rs`, `files/iff_picture.rs`, `files/iff_chunks.rs`, `files/loading.rs`, `files/savegame.rs` |
+| `types.rs`, `state.rs`, `globals.rs`, `random.rs` | `data/types.rs`, `data/state.rs`, `data/globals.rs`, `data/random.rs` |
+| `game_tables.rs`, `tables.rs` | `data/tables.rs` (people, monsters, doors, items, menus, regions), `data/object_tables.rs` (item ids, object lists, colours) |
+| `startup.rs`, `asm_stubs.rs` | `startup/` (`open_close.rs`, `intro.rs`, `game_loop.rs`, `mod.rs` with `fta_main`), `startup/amiga_leftovers.rs` |
+| `statedump.rs` | `statedump.rs` |
 
 ### Keeping an all-C "original" build possible
 Idea, not scheduled: a launcher that offers "Original" (the C game logic) next to the Rust-ported game.
