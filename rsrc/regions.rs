@@ -14,6 +14,7 @@ use super::globals::{
 use super::hdrive::{
     is_read_pending, load_track_range, mark_read_unused, motor_off, read_finished, wait_for_read,
 };
+use super::types::Need;
 use std::ffi::c_void;
 
 /// `new_region` value meaning no region is waiting to be loaded.
@@ -140,6 +141,21 @@ pub fn load_region_piece() {
             load_track_range(TERRA_BLOCK + need.terra2 as i16, 1, dest, REQ_TERRA2);
             loaded_blocks.terra2 = need.terra2;
         }
+        if load_next_image_bank(need) {
+            return;
+        }
+        block_desert_door_without_statues();
+        wait_for_all_reads();
+        motor_off();
+        region_num = new_region;
+        new_region = NO_REGION;
+    }
+}
+
+/// Loads the first of the four image banks that differs from the loaded one. Returns true if it
+/// loaded one (only one bank per call, so the game keeps running), false if all are up to date.
+unsafe fn load_next_image_bank(need: &Need) -> bool {
+    unsafe {
         let mut bank_mem = image_mem;
         for bank in 0..4 {
             if need.image[bank] != loaded_blocks.image[bank] {
@@ -155,26 +171,31 @@ pub fn load_region_piece() {
                     );
                 }
                 loaded_blocks.image[bank] = need.image[bank];
-                return;
+                return true;
             }
             bank_mem = bank_mem.add(QUARTER_PLANE_SIZE);
         }
+        false
+    }
+}
 
+/// Until the hero has enough statues, the desert fort door is covered with blocked tiles.
+unsafe fn block_desert_door_without_statues() {
+    unsafe {
         if new_region == DESERT_REGION && *stuff.add(STATUE_SLOT) < STATUES_NEEDED {
             for offset in [0, 1, 128, 129] {
                 *map_mem.add(DESERT_DOOR_TILE + offset) = BLOCKED_TILE;
             }
         }
+    }
+}
 
-        for request in 0..7 {
-            if is_read_pending(request) != 0 {
-                wait_for_read(request);
-            }
-            mark_read_unused(request);
+/// Waits for every loading request still running and marks them all unused.
+fn wait_for_all_reads() {
+    for request in 0..7 {
+        if is_read_pending(request) != 0 {
+            wait_for_read(request);
         }
-
-        motor_off();
-        region_num = new_region;
-        new_region = NO_REGION;
+        mark_read_unused(request);
     }
 }

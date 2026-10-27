@@ -85,33 +85,9 @@ fn tile(x: i32, y: i32) -> *mut u8 {
 /// first time).
 pub fn open_door_near(x: u16, y: u16, keytype: u32) -> i32 {
     unsafe {
-        let mut x = x;
-        let mut y = y;
-        let mut found = terrain_at(x as i32, y as i32) == DOOR_TERRAIN;
-        if !found {
-            x = x.wrapping_add(4);
-            found = terrain_at(x as i32, y as i32) == DOOR_TERRAIN;
-        }
-        if !found {
-            x = x.wrapping_sub(8);
-            found = terrain_at(x as i32, y as i32) == DOOR_TERRAIN;
-        }
-        if !found {
+        let Some((x, y)) = find_door_corner(x, y) else {
             return 0;
-        }
-
-        if terrain_at(x as i32 - 16, y as i32) == DOOR_TERRAIN {
-            x = x.wrapping_sub(16);
-        }
-        if terrain_at(x as i32 - 16, y as i32) == DOOR_TERRAIN {
-            x = x.wrapping_sub(16);
-        }
-        if terrain_at(x as i32, y as i32 + 32) == DOOR_TERRAIN {
-            y = y.wrapping_add(32);
-        }
-        let x = (x >> 4) as i32;
-        let y = (y >> 5) as i32;
-
+        };
         // we know where the door starts; now which type is it?
         let sector_id = *tile(x, y);
         let map_id = loaded_blocks.image[(sector_id >> 6) as usize];
@@ -120,25 +96,7 @@ pub fn open_door_near(x: u16, y: u16, keytype: u32) -> i32 {
                 continue;
             }
             if open.keytype == NOKEY || open.keytype as u32 == keytype {
-                *tile(x, y) = open.new1;
-                let second = open.new2;
-                if second != 0 {
-                    match open.above {
-                        ABOVE => *tile(x, y - 1) = second,
-                        BACK => *tile(x - 1, y) = second,
-                        CABINET_LAYOUT => {
-                            *tile(x, y - 1) = 87;
-                            *tile(x + 1, y) = 86;
-                            *tile(x + 1, y - 1) = 88;
-                        }
-                        layout => {
-                            *tile(x + 1, y) = second;
-                            if layout != SIDE {
-                                *tile(x + 2, y) = layout;
-                            }
-                        }
-                    }
-                }
+                swap_in_open_door_tiles(open, x, y);
                 view_status = REDRAW_MAP;
                 held_direction = 0;
                 print(c"It opened.".as_ptr());
@@ -150,5 +108,61 @@ pub fn open_door_near(x: u16, y: u16, keytype: u32) -> i32 {
         }
         bumped_locked_door = 1;
         0
+    }
+}
+
+/// Looks for a door tile at the point, 4 pixels right of it, or 4 pixels left of it, then moves to
+/// the door's top-left tile. Returns that tile's column and row, or `None` if there is no door.
+fn find_door_corner(x: u16, y: u16) -> Option<(i32, i32)> {
+    let mut x = x;
+    let mut y = y;
+    let mut found = terrain_at(x as i32, y as i32) == DOOR_TERRAIN;
+    if !found {
+        x = x.wrapping_add(4);
+        found = terrain_at(x as i32, y as i32) == DOOR_TERRAIN;
+    }
+    if !found {
+        x = x.wrapping_sub(8);
+        found = terrain_at(x as i32, y as i32) == DOOR_TERRAIN;
+    }
+    if !found {
+        return None;
+    }
+    // A door can be up to three tiles wide; step to its left edge.
+    for _ in 0..2 {
+        if terrain_at(x as i32 - 16, y as i32) == DOOR_TERRAIN {
+            x = x.wrapping_sub(16);
+        }
+    }
+    if terrain_at(x as i32, y as i32 + 32) == DOOR_TERRAIN {
+        y = y.wrapping_add(32);
+    }
+    Some(((x >> 4) as i32, (y >> 5) as i32))
+}
+
+/// Replaces the closed door tile at (`x`, `y`) with its open version, and the neighbouring tiles
+/// the door covers (which ones depends on the door's layout).
+unsafe fn swap_in_open_door_tiles(open: &DoorOpen, x: i32, y: i32) {
+    unsafe {
+        *tile(x, y) = open.new1;
+        let second = open.new2;
+        if second == 0 {
+            return;
+        }
+        match open.above {
+            ABOVE => *tile(x, y - 1) = second,
+            BACK => *tile(x - 1, y) = second,
+            CABINET_LAYOUT => {
+                *tile(x, y - 1) = 87;
+                *tile(x + 1, y) = 86;
+                *tile(x + 1, y - 1) = 88;
+            }
+            layout => {
+                *tile(x + 1, y) = second;
+                if layout != SIDE {
+                    *tile(x + 2, y) = layout;
+                }
+            }
+        }
     }
 }

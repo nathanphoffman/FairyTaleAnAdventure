@@ -370,26 +370,7 @@ pub fn win_colors() {
         vp_text.Modes = HIRES | SPRITES | VP_HIDE;
         set_intro_zoom(WIN_SCREEN_SIZE);
         for i in (SUNRISE_END + 1..=SUNRISE_START).rev() {
-            fader[0] = 0;
-            fader[31] = 0;
-            fader[1] = 0xfff;
-            fader[28] = 0xfff;
-            for j in SUNRISE_COLORS {
-                let index = i + j as i32;
-                fader[j] = if index > 0 {
-                    sun_colors[index as usize] as u16
-                } else {
-                    0
-                };
-            }
-            if i > SUN_GLOW_UNTIL {
-                fader[29] = 0x800;
-                fader[30] = 0x400;
-            } else {
-                let j = (i + 30) / 2;
-                fader[29] = (0x100 * j) as u16;
-                fader[30] = (0x100 * (j / 2)) as u16;
-            }
+            fader = sunrise_palette(i);
             LoadRGB4(
                 &raw mut vp_page,
                 (&raw const fader).cast(),
@@ -407,6 +388,32 @@ pub fn win_colors() {
             COLOR_COUNT as i32,
         );
     }
+}
+
+/// The palette for step `i` of the sunrise over the ending picture. Colours 1 and 28 are white,
+/// 0 and 31 black; the sky and sun colours come from `sun_colors` offset by `i`, and the glow
+/// (29, 30) is a fixed orange at first and then fades out.
+fn sunrise_palette(i: i32) -> [u16; 32] {
+    let mut colors = [0u16; 32];
+    colors[1] = 0xfff;
+    colors[28] = 0xfff;
+    for j in SUNRISE_COLORS {
+        let index = i + j as i32;
+        colors[j] = if index > 0 {
+            sun_colors[index as usize] as u16
+        } else {
+            0
+        };
+    }
+    if i > SUN_GLOW_UNTIL {
+        colors[29] = 0x800;
+        colors[30] = 0x400;
+    } else {
+        let j = (i + 30) / 2;
+        colors[29] = (0x100 * j) as u16;
+        colors[30] = (0x100 * (j / 2)) as u16;
+    }
+    colors
 }
 
 // Daylight: the page colours follow the time of day.
@@ -459,6 +466,22 @@ mod tests {
         assert_eq!(down.first(), Some(&100));
         assert_eq!(down.last(), Some(&0));
         assert_eq!(down.len(), 21);
+    }
+
+    #[test]
+    fn sunrise_palette_keeps_fixed_colours_and_fades_the_glow() {
+        unsafe {
+            let early = sunrise_palette(SUNRISE_START);
+            assert_eq!(
+                (early[0], early[1], early[28], early[31]),
+                (0, 0xfff, 0xfff, 0)
+            );
+            assert_eq!((early[29], early[30]), (0x800, 0x400));
+            let late = sunrise_palette(SUN_GLOW_UNTIL);
+            assert_eq!((late[29], late[30]), (0x100 * 8, 0x100 * 4));
+            // the sky colours at the very end (index <= 0) are black
+            assert!(sunrise_palette(-30)[2..28].iter().all(|&c| c == 0));
+        }
     }
 }
 

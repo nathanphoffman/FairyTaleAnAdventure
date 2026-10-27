@@ -207,31 +207,45 @@ pub fn savegame(chosen_entry: i16) {
             });
         }
         if on_floppy {
-            loop {
-                FLOCK = Lock(c"df0:winpic".as_ptr(), ACCESS_READ);
-                if FLOCK != 0 {
-                    UnLock(FLOCK);
-                    break;
-                }
-                print(c"Please insert GAME disk.".as_ptr());
-                wait_for_disk();
-            }
+            wait_for_game_disk();
         }
         if is_saving == 0 {
-            wt = 0;
-            encounter_number = 0;
-            load_start_sprites();
-            update_menu_availability();
-            view_status = VIEW_CORRUPT;
-            queue_print(PRINT_VITALITY);
-            queue_print(PRINT_STATS);
-            print(c"".as_ptr());
-            print(c"".as_ptr());
-            print(c"".as_ptr());
-            encounter_type = 0;
-            actors_loading = 0;
+            reset_after_load();
         }
         SetFont(current_rastport, story_font);
+    }
+}
+
+/// Asks for the game disk back until the winpic file can be found on drive 0.
+unsafe fn wait_for_game_disk() {
+    unsafe {
+        loop {
+            FLOCK = Lock(c"df0:winpic".as_ptr(), ACCESS_READ);
+            if FLOCK != 0 {
+                UnLock(FLOCK);
+                return;
+            }
+            print(c"Please insert GAME disk.".as_ptr());
+            wait_for_disk();
+        }
+    }
+}
+
+/// After loading a game: clears the encounter state and redraws the status panel for the new hero.
+unsafe fn reset_after_load() {
+    unsafe {
+        wt = 0;
+        encounter_number = 0;
+        load_start_sprites();
+        update_menu_availability();
+        view_status = VIEW_CORRUPT;
+        queue_print(PRINT_VITALITY);
+        queue_print(PRINT_STATS);
+        print(c"".as_ptr());
+        print(c"".as_ptr());
+        print(c"".as_ptr());
+        encounter_type = 0;
+        actors_loading = 0;
     }
 }
 

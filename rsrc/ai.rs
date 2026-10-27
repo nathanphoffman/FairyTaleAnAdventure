@@ -126,14 +126,7 @@ unsafe fn think(i: usize, battle2: i8) {
             }
         }
         let mut r = bitrand(15) == 0;
-        let hero_state = actor_list[0].state;
-        if hero_state == DEAD || hero_state == FALL {
-            mode = if leader == 0 { FLEE } else { FOLLOWER };
-        } else if (*an).vitality < NEARLY_DEAD
-            || (extent_type > SPECIAL_XTYPE && (*an).race != (*current_extent).v3)
-        {
-            mode = FLEE; // special encounters don't flee in the 60+ zones
-        }
+        mode = adjust_mode_for_situation(an, mode);
 
         if tactic == FRUST || tactic == SHOOTFRUST {
             if (*an).weapon & BOW_BIT != 0 {
@@ -165,6 +158,23 @@ unsafe fn think(i: usize, battle2: i8) {
         (*an).goal = mode as i8;
         if leader == 0 {
             leader = i as i16;
+        }
+    }
+}
+
+/// Overrides an actor's mode when the situation demands: flee or follow when the hero is down,
+/// flee when nearly dead.
+unsafe fn adjust_mode_for_situation(an: *mut Shape, mode: i16) -> i16 {
+    unsafe {
+        let hero_state = actor_list[0].state;
+        if hero_state == DEAD || hero_state == FALL {
+            if leader == 0 { FLEE } else { FOLLOWER }
+        } else if (*an).vitality < NEARLY_DEAD
+            || (extent_type > SPECIAL_XTYPE && (*an).race != (*current_extent).v3)
+        {
+            FLEE // special encounters don't flee in the 60+ zones
+        } else {
+            mode
         }
     }
 }

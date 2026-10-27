@@ -364,63 +364,92 @@ pub fn turn_page() {
         let (a, b) = (&raw mut pagea, &raw mut pageb);
         for frame in 0..FLIP_RATE.len() {
             let temp = (*(*drawing_page).ri_page).BitMap;
-            let mut dcol: i32 = 0;
             let rate = FLIP_RATE[frame];
             let wide = FLIP_WIDE[frame] as i32;
             if frame < FIRST_HALF {
-                let bcol = 161 - wide;
-                copy_rect(b, 160, 0, temp, 160, 0, PAGE_HALF_WIDTH, SCREEN_HEIGHT);
-                if rate != 0 {
-                    let mut h = 0;
-                    let mut scol = wide as i16;
-                    while scol < PAGE_STRIP_END {
-                        h = super::asm_map::page_turn_inset(scol as i32);
-                        copy_rect(
-                            a,
-                            bcol + scol as i32,
-                            h,
-                            temp,
-                            161 + dcol,
-                            h,
-                            wide,
-                            SCREEN_HEIGHT - h - h,
-                        );
-                        dcol += wide;
-                        scol += rate;
-                    }
-                    copy_rect(a, 296, 7, temp, 161 + dcol, h, 1, 186);
-                }
+                turn_right_page_frame(a, b, temp, rate, wide);
             } else {
-                let bcol = 160;
-                if rate == 0 {
-                    copy_rect(b, 24, 0, temp, 24, 0, PAGE_HALF_WIDTH, SCREEN_HEIGHT);
-                } else {
-                    copy_rect(a, 24, 0, temp, 24, 0, PAGE_HALF_WIDTH, SCREEN_HEIGHT);
-                    let mut scol = wide as i16;
-                    while scol < PAGE_STRIP_END {
-                        let h = super::asm_map::page_turn_inset(scol as i32);
-                        dcol += wide;
-                        copy_rect(
-                            b,
-                            bcol - scol as i32,
-                            h,
-                            temp,
-                            bcol - dcol,
-                            h,
-                            wide,
-                            SCREEN_HEIGHT - h - h,
-                        );
-                        scol += rate;
-                    }
-                    let h = 7;
-                    copy_rect(b, 24, h, temp, 159 - dcol, h, 1, SCREEN_HEIGHT - h - h);
-                }
+                turn_left_page_frame(a, b, temp, rate, wide);
             }
             flip_pages();
             if FLIP_DELAY[frame] != 0 {
                 Delay(FLIP_DELAY[frame]);
             }
         }
+    }
+}
+
+/// One frame of the first half of the page turn: the right page `b` stays and the strips of the old
+/// page `a` bend away from the spine, each `wide` pixels wide and `rate` apart.
+unsafe fn turn_right_page_frame(
+    a: *mut BitMap,
+    b: *mut BitMap,
+    temp: *mut BitMap,
+    rate: i16,
+    wide: i32,
+) {
+    unsafe {
+        let bcol = 161 - wide;
+        let mut dcol: i32 = 0;
+        copy_rect(b, 160, 0, temp, 160, 0, PAGE_HALF_WIDTH, SCREEN_HEIGHT);
+        if rate == 0 {
+            return;
+        }
+        let mut h = 0;
+        let mut scol = wide as i16;
+        while scol < PAGE_STRIP_END {
+            h = super::asm_map::page_turn_inset(scol as i32);
+            copy_rect(
+                a,
+                bcol + scol as i32,
+                h,
+                temp,
+                161 + dcol,
+                h,
+                wide,
+                SCREEN_HEIGHT - h - h,
+            );
+            dcol += wide;
+            scol += rate;
+        }
+        copy_rect(a, 296, 7, temp, 161 + dcol, h, 1, 186);
+    }
+}
+
+/// One frame of the second half of the page turn: the strips of the new page `b` land on the left.
+unsafe fn turn_left_page_frame(
+    a: *mut BitMap,
+    b: *mut BitMap,
+    temp: *mut BitMap,
+    rate: i16,
+    wide: i32,
+) {
+    unsafe {
+        let bcol = 160;
+        if rate == 0 {
+            copy_rect(b, 24, 0, temp, 24, 0, PAGE_HALF_WIDTH, SCREEN_HEIGHT);
+            return;
+        }
+        copy_rect(a, 24, 0, temp, 24, 0, PAGE_HALF_WIDTH, SCREEN_HEIGHT);
+        let mut dcol: i32 = 0;
+        let mut scol = wide as i16;
+        while scol < PAGE_STRIP_END {
+            let h = super::asm_map::page_turn_inset(scol as i32);
+            dcol += wide;
+            copy_rect(
+                b,
+                bcol - scol as i32,
+                h,
+                temp,
+                bcol - dcol,
+                h,
+                wide,
+                SCREEN_HEIGHT - h - h,
+            );
+            scol += rate;
+        }
+        let h = 7;
+        copy_rect(b, 24, h, temp, 159 - dcol, h, 1, SCREEN_HEIGHT - h - h);
     }
 }
 

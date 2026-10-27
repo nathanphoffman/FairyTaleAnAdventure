@@ -143,17 +143,7 @@ pub fn advance_missiles() {
 unsafe fn fly(i: usize, ms: *mut Missile) {
     unsafe {
         let mut s = (*ms).speed as i16 * 2;
-        let flight = (*ms).time_of_flight;
-        let expired = if (*ms).missile_type == MISSILE_NONE
-            || (*ms).missile_type == MISSILE_SPENT
-            || s == 0
-        {
-            true
-        } else {
-            (*ms).time_of_flight = flight.wrapping_add(1);
-            flight > MAX_FLIGHT
-        };
-        if expired {
+        if missile_expired(ms, s) {
             (*ms).missile_type = MISSILE_NONE;
             return;
         }
@@ -165,44 +155,67 @@ unsafe fn fly(i: usize, ms: *mut Missile) {
             s = 0;
         }
         let fc = (*ms).direction as i32;
-        let range = if (*ms).missile_type == MISSILE_ROCK {
+        hit_first_actor_in_path(i, ms, xs, ys);
+        (*ms).abs_x = step_x((*ms).abs_x as i32, fc, s as i32) as u16;
+        (*ms).abs_y = step_y((*ms).abs_y as i32, fc, s as i32) as u16;
+    }
+}
+
+/// Whether the missile is unused, spent, standing still (`s` is its doubled speed) or has been in
+/// the air too long. Counts one more tick of flight when it has not expired.
+unsafe fn missile_expired(ms: *mut Missile, s: i16) -> bool {
+    unsafe {
+        let flight = (*ms).time_of_flight;
+        if (*ms).missile_type == MISSILE_NONE || (*ms).missile_type == MISSILE_SPENT || s == 0 {
+            return true;
+        }
+        (*ms).time_of_flight = flight.wrapping_add(1);
+        flight > MAX_FLIGHT
+    }
+}
+
+/// Hits the first actor close enough to the missile at (`xs`, `ys`) and stops the missile.
+/// `i` is the missile's own index; the hero (actor 0) gets a dodge chance from `brave`, others a
+/// fixed one.
+unsafe fn hit_first_actor_in_path(i: usize, ms: *mut Missile, xs: i16, ys: i16) {
+    unsafe {
+        let fc = (*ms).direction as i32;
+        let is_rock = (*ms).missile_type == MISSILE_ROCK;
+        let range = if is_rock {
             FIREBALL_HIT_RANGE
         } else {
             ARROW_HIT_RANGE
         };
-
         let mut j = 0;
         while j < actor_count() {
-            let bv = if j == 0 { brave } else { OTHER_DODGE };
+            let dodge = if j == 0 { brave } else { OTHER_DODGE };
             let target = &raw const actor_list[j];
-            if j == RAFT
+            let untouchable = j == RAFT
                 || (*ms).archer as i16 == j as i16
                 || (*target).state == DEAD
-                || (*target).kind == CARRIER
-            {
-                j += 1;
+                || (*target).kind == CARRIER;
+            j += 1;
+            if untouchable {
                 continue;
             }
             let xd = ((*target).abs_x as i32 - xs as i32) as i16;
             let yd = ((*target).abs_y as i32 - ys as i32) as i16;
             // the original tests the missile's own index here, not the target's
-            if (i != 0 || bitrand(DODGE_RANGE) > bv as i32) && chebyshev(xd, yd) < range {
-                let by = if (*ms).missile_type == MISSILE_ROCK {
-                    BY_FIREBALL
-                } else {
-                    BY_ARROW
-                };
-                hit_actor(by, j as i32, fc, (rand8() + MISSILE_DAMAGE_BASE) as i16);
+            if (i != 0 || bitrand(DODGE_RANGE) > dodge as i32) && chebyshev(xd, yd) < range {
+                let by = if is_rock { BY_FIREBALL } else { BY_ARROW };
+                hit_actor(
+                    by,
+                    (j - 1) as i32,
+                    fc,
+                    (rand8() + MISSILE_DAMAGE_BASE) as i16,
+                );
                 (*ms).speed = 0;
-                if (*ms).missile_type == MISSILE_ROCK {
+                if is_rock {
                     (*ms).missile_type = MISSILE_SPENT;
                 }
-                break;
+                return;
             }
-            j += 1;
         }
-        (*ms).abs_x = step_x((*ms).abs_x as i32, fc, s as i32) as u16;
-        (*ms).abs_y = step_y((*ms).abs_y as i32, fc, s as i32) as u16;
     }
 }
 
@@ -272,5 +285,33 @@ mod tests {
         assert_eq!(chebyshev(3, -5), 5);
         assert_eq!(chebyshev(-7, 2), 7);
         assert_eq!(chebyshev(0, 0), 0);
+    }
+
+    fn missile(kind: i8, speed: i8, time_of_flight: i8) -> Missile {
+        let mut ms: Missile = unsafe { std::mem::zeroed() };
+        ms.missile_type = kind;
+        ms.speed = speed;
+        ms.time_of_flight = time_of_flight;
+        ms
+    }
+
+    #[test]
+    fn unused_spent_and_stopped_missiles_expire() {
+        unsafe {
+            assert!(missile_expired(&mut missile(MISSILE_NONE, 5, 0), 10));
+            assert!(missile_expired(&mut missile(MISSILE_SPENT, 5, 0), 10));
+            assert!(missile_expired(&mut missile(MISSILE_ROCK, 0, 0), 0));
+        }
+    }
+
+    #[test]
+    fn missile_counts_flight_time_until_it_runs_out() {
+        unsafe {
+            let mut ms = missile(MISSILE_ROCK, 5, 0);
+            assert!(!missile_expired(&mut ms, 10));
+            assert_eq!(ms.time_of_flight, 1);
+            let mut old = missile(MISSILE_ROCK, 5, MAX_FLIGHT + 1);
+            assert!(missile_expired(&mut old, 10));
+        }
     }
 }

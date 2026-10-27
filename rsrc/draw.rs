@@ -675,7 +675,14 @@ unsafe fn mask_against_scenery(
 mod tests {
     use super::*;
 
-    fn sprite_at(atype: i16, inum: i16, xstart: i16, ystart: i16, xstop: i16, ystop: i16) -> Sprite {
+    fn sprite_at(
+        atype: i16,
+        inum: i16,
+        xstart: i16,
+        ystart: i16,
+        xstop: i16,
+        ystop: i16,
+    ) -> Sprite {
         Sprite {
             atype,
             inum,
@@ -715,7 +722,10 @@ mod tests {
     fn a_sprite_inside_the_screen_is_not_cut() {
         let mut sprite = sprite_at(PHIL, 5, 100, 50, 131, 81);
         let clip = clip_to_screen(&mut sprite);
-        assert_eq!((clip.xstart, clip.ystart, clip.xstop, clip.ystop), (100, 50, 131, 81));
+        assert_eq!(
+            (clip.xstart, clip.ystart, clip.xstop, clip.ystop),
+            (100, 50, 131, 81)
+        );
         assert_eq!((clip.xoff, clip.yoff), (0, 0));
     }
 
