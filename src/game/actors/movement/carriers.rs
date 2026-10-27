@@ -27,18 +27,21 @@ fn turtle_heading(dir: i16, water_ahead: impl Fn(i16) -> bool) -> i16 {
         return dir;
     }
 
+    // Masks with FACING_MASK, keeping only the bits that matter here.
     let right = (dir + 1) & FACING_MASK;
 
     if water_ahead(right) {
         return right;
     }
 
+    // Masks with FACING_MASK, keeping only the bits that matter here.
     let left = (right - 2) & FACING_MASK;
 
     if water_ahead(left) {
         return left;
     }
 
+    // Masks with FACING_MASK, keeping only the bits that matter here.
     (left - 1) & FACING_MASK
 }
 
@@ -102,6 +105,7 @@ impl Ctx {
                 self.image = self.facing + self.facing;
 
                 if (*hero).state as i16 == WALKING {
+                    // Masks off the low bits (a cheap remainder or a flag test).
                     self.image += self.cycle & 1;
                 }
             } else {
@@ -132,6 +136,7 @@ impl Ctx {
             XTEST = pos_x(ax, self.facing, TURTLE_STEP);
             YTEST = pos_y(ay, self.facing, TURTLE_STEP);
             the_hero.riding = 0;
+            // Masks off the low bits (a cheap remainder or a flag test).
             self.image = self.facing + self.facing + (self.cycle & 1);
         }
     }

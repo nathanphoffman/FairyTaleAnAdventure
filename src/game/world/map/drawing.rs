@@ -118,6 +118,7 @@ const DIRECTION_MASK: usize = 7;
 /// Shifts the map one tile in one of 8 directions (the blitter did this on the Amiga).
 /// Moving down copies from the bottom up, so lines are not overwritten before they are read.
 pub fn scroll_map(dir: i32) {
+    // Masks with SCROLL_MODES, keeping only the bits that matter here.
     let m = &SCROLL_MODES[dir as usize & DIRECTION_MASK];
     unsafe {
         for p in 0..PLANE_COUNT {

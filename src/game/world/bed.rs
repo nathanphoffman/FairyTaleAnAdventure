@@ -38,7 +38,9 @@ pub fn check_bed() {
 
         if the_world.region == INSIDE_REGION {
             let tile = *tile_address(
+                // Shifts by TILE_WIDTH_SHIFT, converting between pixels, tiles, sectors or bytes.
                 (the_hero.x >> TILE_WIDTH_SHIFT) as i32,
+                // Shifts by TILE_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
                 (the_hero.y >> TILE_HEIGHT_SHIFT) as i32,
             );
             let (wait, action) = bed_step(

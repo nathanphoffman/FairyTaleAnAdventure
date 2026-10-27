@@ -179,6 +179,7 @@ impl Ctx {
     pub(super) unsafe fn check_dev1(&mut self) -> Pc {
         unsafe {
             let actor = self.actor;
+            // Masks with FACING_MASK, keeping only the bits that matter here.
             self.facing = (self.facing + 1) & FACING_MASK;
             XTEST = pos_x((*actor).abs_x as i32, self.facing, self.step);
             YTEST = pos_y((*actor).abs_y as i32, self.facing, self.step);
@@ -195,6 +196,7 @@ impl Ctx {
     pub(super) unsafe fn check_dev2(&mut self) -> Pc {
         unsafe {
             let actor = self.actor;
+            // Masks with FACING_MASK, keeping only the bits that matter here.
             self.facing = (self.facing - 2) & FACING_MASK;
             XTEST = pos_x((*actor).abs_x as i32, self.facing, self.step);
             YTEST = pos_y((*actor).abs_y as i32, self.facing, self.step);
@@ -249,6 +251,7 @@ impl Ctx {
 
             if !(the_hero.riding != 0 && self.slot == 0) && (*actor).race != RACE_WRAITH {
                 self.image = (self.image as i32
+                    // Masks with WALK_FRAMES_MASK, keeping only the bits that matter here.
                     + ((self.cycle as i32 + self.slot) & WALK_FRAMES_MASK))
                     as i16;
             }

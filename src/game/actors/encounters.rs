@@ -109,6 +109,7 @@ pub fn place_encounter(i: u16, spread: u16) -> i32 {
         let race = encounter_race();
         (*actor).race = race as u8;
 
+        // Masks with MIX_RANDOM_WEAPON, keeping only the bits that matter here.
         if the_encounter.mix_flag & MIX_RANDOM_WEAPON != 0 {
             the_encounter.weapon_type = rand4() as i16;
         }
@@ -120,6 +121,7 @@ pub fn place_encounter(i: u16, spread: u16) -> i32 {
         (*actor).environ = 0;
         (*actor).facing = 0;
 
+        // Masks with BOW_BIT, keeping only the bits that matter here.
         if (*actor).weapon & BOW_BIT != 0 {
             (*actor).goal = ARCHER1 + chart.cleverness;
         } else {
@@ -174,7 +176,9 @@ unsafe fn find_open_spot(i: u16, spread: u16) -> Option<(u16, u16)> {
 /// (except encounter type 4).
 unsafe fn encounter_race() -> i32 {
     unsafe {
+        // Masks with MIX_RACE_PAIR, keeping only the bits that matter here.
         if (the_encounter.mix_flag & MIX_RACE_PAIR) != 0 && the_encounter.kind != KIND_NO_MIX {
+            // Masks with PAIR_MASK, keeping only the bits that matter here.
             (the_encounter.kind & PAIR_MASK) as i32 + rand2()
         } else {
             the_encounter.kind as i32

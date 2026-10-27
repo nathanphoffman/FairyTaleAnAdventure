@@ -52,6 +52,7 @@ pub(super) fn hunger_effects(hero: &mut Hero, body: &mut Shape) -> HungerReport 
         report.events.push(EVENT_HUNGRY);
     } else if hero.hunger == VERY_HUNGRY {
         report.events.push(EVENT_VERY_HUNGRY);
+    // Masks with HUNGER_STEP_MASK, keeping only the bits that matter here.
     } else if hero.hunger & HUNGER_STEP_MASK == 0 {
         if body.vitality > WEAK_VITALITY {
             if hero.hunger > MUCH_HUNGER || hero.fatigue > MUCH_FATIGUE {

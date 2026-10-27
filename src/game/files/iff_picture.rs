@@ -116,6 +116,7 @@ const EVEN_BYTES_MASK: i32 = 0xfffe;
 unsafe fn read_body(bmhd: &BitMapHeader, bitmap: &BitMap, offset: usize) {
     unsafe {
         pack_cursor = the_memory.shape_mem.cast();
+        // Masks with WORD_ROUNDING, keeping only the bits that matter here.
         row_byte_count = ((bmhd.width as i32 + WORD_ROUNDING) / PIXELS_PER_BYTE) & EVEN_BYTES_MASK;
         read_chunk_length();
         Read(

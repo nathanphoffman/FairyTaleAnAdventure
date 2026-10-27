@@ -30,7 +30,9 @@ pub fn check_door() {
             return;
         }
 
+        // Masks with TILE_X_MASK, keeping only the bits that matter here.
         let xtest = the_hero.x & TILE_X_MASK;
+        // Masks with TILE_Y_MASK, keeping only the bits that matter here.
         let ytest = the_hero.y & TILE_Y_MASK;
 
         if the_world.region < FIRST_INSIDE_REGION {

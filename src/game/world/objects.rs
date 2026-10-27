@@ -145,7 +145,9 @@ pub fn leave_item(i: i16, object: i16) {
 pub fn change_object(id: i32, flag: i32) {
     unsafe {
         let vitality = (*(&raw const the_actors.list))[id as usize].vitality;
+        // Masks with OBJECT_INDEX_MASK, keeping only the bits that matter here.
         let index = (vitality & OBJECT_INDEX_MASK) as usize;
+        // Masks with GLOBAL_LIST_BIT, keeping only the bits that matter here.
         let object = if vitality & GLOBAL_LIST_BIT != 0 {
             (&raw mut ob_listg).cast::<WorldObject>().add(index)
         } else {
@@ -172,8 +174,10 @@ unsafe fn distribute_treasure() {
             let (mut x, mut y);
 
             loop {
+                // Masks with REGION_WIDTH, keeping only the bits that matter here.
                 x = (bitrand(REGION_WIDTH - 1) + ((the_world.region & 1) as i32 * REGION_WIDTH))
                     as i16;
+                // Masks with REGION_HEIGHT, keeping only the bits that matter here.
                 y = (bitrand(REGION_HEIGHT - 1) + ((the_world.region & 6) as i32 * REGION_ROW_STEP))
                     as i16;
 

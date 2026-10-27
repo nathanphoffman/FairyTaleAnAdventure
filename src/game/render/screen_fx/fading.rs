@@ -106,7 +106,9 @@ fn faded_color(
     let color = color as i32;
     // Colours are 12 bit 0RGB. Red is moved down a nibble so all three work on the same scale.
     let mut r1 = (color & RED_MASK) >> NIBBLE_BITS;
+    // Masks with GREEN_MASK, keeping only the bits that matter here.
     let mut g1 = color & GREEN_MASK;
+    // Masks with BLUE_MASK, keeping only the bits that matter here.
     let mut b1 = color & BLUE_MASK;
 
     if lit && r1 < g1 {
@@ -205,6 +207,7 @@ pub fn day_fade() {
             0
         };
 
+        // Masks with FADE_TICK_MASK, keeping only the bits that matter here.
         if the_world.day_clock & FADE_TICK_MASK == 0 || the_screen.view_status > VIEW_REBUILD {
             let colors = (&raw const page_colors).cast();
 

@@ -37,6 +37,7 @@ pub fn update_hero(cycle: i16) {
             // nothing to do
         } else if mouse_buttons() & RIGHT_BUTTON != 0
             || the_ui.fight_key_held != 0
+            // Masks with FIRE_BUTTON, keeping only the bits that matter here.
             || (fta_pia & FIRE_BUTTON) == 0
         {
             state = fighting_state(state);
@@ -155,11 +156,13 @@ pub(super) unsafe fn walking_state(state: i8) -> i8 {
             compass_lit_direction,
             the_hero.hunger,
             || rand4() == 0,
+            // Masks off the low bits (a cheap remainder or a flag test).
             || fta_rand() & 1 != 0,
         );
 
         the_actors.list[0].facing = compass_lit_direction as i8;
 
+        // Masks with LEFT_BUTTON, keeping only the bits that matter here.
         if mouse_buttons() & LEFT_BUTTON != 0 || the_ui.held_direction != 0 {
             return WALKING;
         }
@@ -178,8 +181,10 @@ pub(super) fn stumble(
 ) -> i16 {
     if hunger > STUMBLE_HUNGER && trips() {
         if turns_right() {
+            // Masks with FACING_MASK, keeping only the bits that matter here.
             (direction + 1) & FACING_MASK
         } else {
+            // Masks with FACING_MASK, keeping only the bits that matter here.
             (direction - 1) & FACING_MASK
         }
     } else {

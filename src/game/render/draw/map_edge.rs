@@ -42,8 +42,10 @@ pub fn repair_map_and_witch(dif_x: i16, dif_y: i16) {
 
         let witch = &raw const the_actors.list[WITCH_SLOT];
         let page = the_screen.drawing_page;
+        // Masks with TILE_X_MASK, keeping only the bits that matter here.
         (*page).witchx = ((*witch).abs_x as i32 - (the_world.map_x & TILE_X_MASK) as i32) as i16;
         (*page).witchy = (((*witch).abs_y as i32 - WITCH_ANCHOR_Y)
+            // Masks with TILE_Y_MASK, keeping only the bits that matter here.
             - (the_world.map_y & TILE_Y_MASK) as i32) as i16;
 
         if rand4() == 0 {

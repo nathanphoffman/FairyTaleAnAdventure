@@ -113,6 +113,7 @@ unsafe fn think(i: usize, battle2: i8) {
 /// A carrier (raft, turtle, swan) keeps steering toward the hero every few frames.
 unsafe fn aim_carrier(i: usize) {
     unsafe {
+        // Masks with CARRIER_AIM_MASK, keeping only the bits that matter here.
         if the_world.day_clock & CARRIER_AIM_MASK == 0 {
             steer_actor(
                 i as i32,
@@ -167,6 +168,7 @@ unsafe fn act_on_goal(
 ) -> i16 {
     unsafe {
         if tactic == FRUST || tactic == SHOOTFRUST {
+            // Masks with BOW_BIT, keeping only the bits that matter here.
             if (*actor).weapon & BOW_BIT != 0 {
                 run_tactic(i as i32, rand4() + ARCHER_FRUSTRATION_TACTIC);
             } else {
@@ -175,6 +177,7 @@ unsafe fn act_on_goal(
         } else if (*actor).state == SHOOT1 {
             (*actor).state = SHOOT3;
         } else if mode <= ARCHER2 {
+            // Masks off the low bits (a cheap remainder or a flag test).
             if mode & 2 == 0 {
                 new_tactic_roll = rand4() == 0;
             }

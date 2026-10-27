@@ -89,6 +89,7 @@ fn period_event(period: i16) -> Option<i32> {
 
 /// Slow healing: once per `HEAL_MASK + 1` clock ticks, if hurt and alive.
 fn heal_due(clock: u16, vitality: i16, bravery: i16, state: i8) -> bool {
+    // Masks with HEAL_MASK, keeping only the bits that matter here.
     clock & HEAL_MASK == 0 && vitality < HEAL_BASE + bravery / BRAVERY_DIVISOR && state != DEAD
 }
 

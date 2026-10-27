@@ -173,6 +173,7 @@ pub fn speak(n: i32) {
 /// per tick, which spreads the redrawing work over several frames.
 pub fn queue_print(x: i32) {
     unsafe {
+        // Masks with PRINT_QUEUE_MASK, keeping only the bits that matter here.
         let next = (prec + 1) & PRINT_QUEUE_MASK;
 
         if next == pplay {

@@ -158,8 +158,11 @@ const WORD_PIXELS_MASK: i16 = 15;
 
 unsafe fn place_on_screen(sprite: &mut Sprite) -> i8 {
     unsafe {
+        // Masks with TILE_X_MASK, keeping only the bits that matter here.
         sprite.xstart += (the_world.map_x as i32 & TILE_X_MASK) as i16;
+        // Masks with TILE_Y_MASK, keeping only the bits that matter here.
         sprite.ystart += (the_world.map_y as i32 & TILE_Y_MASK) as i16;
+        // Masks with TILE_Y_MASK, keeping only the bits that matter here.
         sprite.ground += (the_world.map_y as i32 & TILE_Y_MASK) as i16;
 
         let seq = sprite_sheet(sprite.atype);
@@ -186,10 +189,12 @@ fn is_off_screen(sprite: &Sprite) -> bool {
 fn blit_extent(clip: &Clip) -> (i8, i8, i8) {
     // Pixel columns to word columns (16 pixels to a word).
     let xbw = (clip.xstart >> WORD_SHIFT) as i8;
+    // Shifts by WORD_SHIFT, converting between pixels, tiles, sectors or bytes.
     let xew = (clip.xstop >> WORD_SHIFT) as i8;
     let mut blitwide = (xew as i16 - xbw as i16 + 1) as i8;
     let blithigh = (clip.ystop - clip.ystart + 1) as i8;
 
+    // Masks with WORD_PIXELS_MASK, keeping only the bits that matter here.
     if clip.xoff as i16 & WORD_PIXELS_MASK != 0 {
         blitwide = blitwide.wrapping_add(1);
     }

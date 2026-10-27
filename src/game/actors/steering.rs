@@ -82,6 +82,7 @@ fn steer(xdif: i16, ydif: i16, mode: i32, random_bit: impl FnOnce() -> bool) -> 
     facing += if random_bit() { deviation } else { -deviation };
 
     Course::Face {
+        // Masks with FACING_MASK, keeping only the bits that matter here.
         facing: facing & FACING_MASK,
     }
 }
@@ -89,12 +90,14 @@ fn steer(xdif: i16, ydif: i16, mode: i32, random_bit: impl FnOnce() -> bool) -> 
 /// An axis less than half as far as the other is ignored, so the actor goes straight along the
 /// long one.
 fn along_the_long_axis((xdir, ydir): (i32, i32), xabs: u16, yabs: u16) -> (i32, i32) {
+    // Shifts by IGNORE_SHIFT, converting between pixels, tiles, sectors or bytes.
     let ydir = if (yabs as i16) < (xabs >> IGNORE_SHIFT) as i16 {
         0
     } else {
         ydir
     };
 
+    // Shifts by IGNORE_SHIFT, converting between pixels, tiles, sectors or bytes.
     let xdir = if (xabs as i16) < (yabs >> IGNORE_SHIFT) as i16 {
         0
     } else {
@@ -116,6 +119,7 @@ fn wobble(mode: i32, close: i16) -> i32 {
 /// The random number is only drawn when the actor moves, as in the original, so recorded games
 /// stay in step.
 pub fn steer_actor(object: i32, target_x: i32, target_y: i32, mode: i32) {
+    // Masks with MODE_MASK, keeping only the bits that matter here.
     let mode = mode & MODE_MASK;
     unsafe {
         let actor = &mut (*(&raw mut the_actors.list))[object as usize];
@@ -128,6 +132,7 @@ pub fn steer_actor(object: i32, target_x: i32, target_y: i32, mode: i32) {
             )
         };
 
+        // Masks off the low bits (a cheap remainder or a flag test).
         match steer(xdif, ydif, mode, || fta_rand() & 2 != 0) {
             Course::Stop => actor.state = STILL,
             Course::Face { facing } => {

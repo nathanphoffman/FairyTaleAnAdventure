@@ -61,6 +61,7 @@ pub fn spawn_encounters() {
             the_actors.active = FIRST_ENEMY_ACTOR;
         }
 
+        // Masks with PLACE_PERIOD_MASK, keeping only the bits that matter here.
         if the_world.day_clock & PLACE_PERIOD_MASK == 0
             && the_encounter.number != 0
             && the_actors.loading == 0
@@ -77,6 +78,7 @@ pub fn spawn_encounters() {
 /// A new random encounter is rolled now and then, when nothing else is going on.
 unsafe fn random_encounter_due() -> bool {
     unsafe {
+        // Masks with ROLL_PERIOD_MASK, keeping only the bits that matter here.
         the_world.day_clock & ROLL_PERIOD_MASK == 0
             && the_actors.on_screen == 0
             && the_actors.loading == 0
@@ -129,6 +131,7 @@ unsafe fn place_waiting_encounters() {
 
         the_encounter.weapon_type = rand4() as i16;
 
+        // Masks with NO_MIX_MASK, keeping only the bits that matter here.
         if the_world.extent_type & NO_MIX_MASK == 0 {
             the_encounter.mix_flag = 0;
         }

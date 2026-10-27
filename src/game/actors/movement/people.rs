@@ -15,6 +15,7 @@ impl Ctx {
     pub(super) unsafe fn setfig(&mut self) -> Pc {
         unsafe {
             let actor = self.actor;
+            // Masks with PERSON_MASK, keeping only the bits that matter here.
             self.terrain = ((*actor).race & PERSON_MASK) as i16;
             let entry = &*(&raw const setfig_table)
                 .cast::<SetFigEntry>()

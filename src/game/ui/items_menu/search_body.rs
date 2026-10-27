@@ -154,6 +154,7 @@ unsafe fn roll_body_treasure(actor: *mut Shape) -> u32 {
     const SETFIG_RACE_BIT: u8 = 0x80;
     const TREASURE_CLASS_SIZE: i32 = 8;
     unsafe {
+        // Masks with SETFIG_RACE_BIT, keeping only the bits that matter here.
         if (*actor).race & SETFIG_RACE_BIT != 0 {
             return 0;
         }

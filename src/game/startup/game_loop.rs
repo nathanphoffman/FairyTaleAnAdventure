@@ -93,7 +93,9 @@ const STATUS_COLOR: i32 = 31;
 /// How the map moved since the last frame, in sectors (x wraps at 10 bits).
 unsafe fn scroll_step() -> (i16, i16) {
     unsafe {
+        // Shifts by TILE_WIDTH_SHIFT, converting between pixels, tiles, sectors or bytes.
         the_world.tile_x = the_world.map_x >> TILE_WIDTH_SHIFT;
+        // Shifts by TILE_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
         the_world.tile_y = the_world.map_y >> TILE_HEIGHT_SHIFT;
         let dif_x = (the_world.tile_x as i32 - (*the_screen.drawing_page).isv_x) as i16;
         let dif_y = (the_world.tile_y as i32 - (*the_screen.drawing_page).isv_y) as i16;
@@ -104,9 +106,11 @@ unsafe fn scroll_step() -> (i16, i16) {
 
 /// The map's horizontal step as a 10 bit signed number (the map wraps round at the edges).
 fn wrap_scroll_difference(difference: i16) -> i16 {
+    // Masks with DIF_SIGN_BIT, keeping only the bits that matter here.
     if difference as i32 & DIF_SIGN_BIT != 0 {
         (difference as i32 | DIF_SIGN_EXTEND) as i16
     } else {
+        // Masks with DIF_MASK, keeping only the bits that matter here.
         (difference as i32 & DIF_MASK) as i16
     }
 }
@@ -152,6 +156,7 @@ unsafe fn run_frame(state: &mut FrameState) {
 
         read_walk_direction();
 
+        // Masks with GAME_MENU, keeping only the bits that matter here.
         if menus[GAME_MENU].enabled[PAUSE_ENTRY] & 1 != 0 {
             Delay(1);
 
@@ -181,6 +186,7 @@ unsafe fn run_frame(state: &mut FrameState) {
 unsafe fn read_keyboard() {
     unsafe {
         let key = next_key() as i8;
+        // Masks with GAME_MENU, keeping only the bits that matter here.
         let notpause = menus[GAME_MENU].enabled[PAUSE_ENTRY] & 1 == 0;
 
         if key != 0 {
@@ -197,6 +203,7 @@ unsafe fn handle_view_status() -> bool {
             Delay(PAUSE_WAIT);
             the_screen.view_status = VIEW_REDRAW;
         } else if the_screen.view_status == VIEW_BIG || the_screen.view_status == VIEW_BIG_STILL {
+            // Masks with FLASH_BIT, keeping only the bits that matter here.
             if the_screen.flasher & FLASH_BIT != 0 && the_screen.view_status == VIEW_BIG {
                 SetRGB4(
                     &raw mut the_screen.vp_page,
@@ -354,8 +361,10 @@ unsafe fn draw_frame(state: &mut FrameState, scroll_x: i16, scroll_y: i16) {
         state.last_terrain = the_actors.drawn;
         WaitBlit();
         (*(*the_screen.drawing_page).ri_page).RxOffset =
+            // Masks with TILE_X_MASK, keeping only the bits that matter here.
             (the_world.map_x as i32 & TILE_X_MASK) as i16;
         (*(*the_screen.drawing_page).ri_page).RyOffset =
+            // Masks with TILE_Y_MASK, keeping only the bits that matter here.
             (the_world.map_y as i32 & TILE_Y_MASK) as i16;
         flip_pages();
 

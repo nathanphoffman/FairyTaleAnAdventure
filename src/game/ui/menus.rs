@@ -116,11 +116,13 @@ pub fn print_options() {
         for entry in 0..menu.num as usize {
             let enabled = menu.enabled[entry];
 
+            // Masks with SHOWN, keeping only the bits that matter here.
             if enabled & SHOWN == 0 {
                 continue;
             }
 
             the_ui.slot_entries[slot] = entry as i8;
+            // Masks off the low bits (a cheap remainder or a flag test).
             print_menu_entry(slot as i16, (enabled & 1) as i16);
             slot += 1;
 
@@ -139,6 +141,7 @@ unsafe fn blank_slots_from(first: usize) {
         SetBPen(&raw mut the_screen.rp_text2, 0);
 
         for slot in first..SLOTS {
+            // Masks off the low bits (a cheap remainder or a flag test).
             let x = if slot & 1 != 0 {
                 RIGHT_COLUMN_X
             } else {
@@ -160,6 +163,7 @@ unsafe fn blank_slots_from(first: usize) {
 /// Switches to menu `mode` and redraws it, unless the game is paused.
 pub fn go_to_menu(mode: i16) {
     unsafe {
+        // Masks with GAME, keeping only the bits that matter here.
         if menus[GAME].enabled[PAUSE_ENTRY] & 1 != 0 {
             return;
         }
@@ -199,6 +203,7 @@ pub fn print_menu_entry(j: i16, pena: i16) {
         SetBPen(r, entry_box_pen(entry));
 
         let offset = entry * LABEL_LEN;
+        // Masks off the low bits (a cheap remainder or a flag test).
         let x = if j & 1 != 0 {
             RIGHT_COLUMN_X
         } else {

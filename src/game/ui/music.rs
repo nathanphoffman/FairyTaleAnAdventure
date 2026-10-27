@@ -83,6 +83,7 @@ pub fn set_mood(now: i8) {
     unsafe {
         let at = pick_tune() * TRACKS_PER_TUNE;
 
+        // Masks with GAME_MENU, keeping only the bits that matter here.
         if menus[GAME_MENU].enabled[MUSIC_ENTRY] & 1 != 0 {
             if now != 0 {
                 playscore(

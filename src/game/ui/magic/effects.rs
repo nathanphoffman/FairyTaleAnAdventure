@@ -52,10 +52,12 @@ pub(super) unsafe fn show_map() {
 
         // The hero on the overview map: his tile column minus the left edge of the shown sectors.
         let x = ((the_hero.x >> TILE_SHIFT) as i64
+            // Shifts by TILE_SHIFT, converting between pixels, tiles, sectors or bytes.
             - ((the_world.sector_x as i64 + the_world.origin_x as i64) << TILE_SHIFT)
             - MARK_X_OFFSET) as u32;
         // The hero on the overview map: his position in 16 pixel steps minus the top edge of the shown sectors.
         let y = ((the_hero.y >> TILE_SHIFT) as i64
+            // Shifts by TILE_SHIFT, converting between pixels, tiles, sectors or bytes.
             - ((the_world.sector_y as i64 + the_world.origin_y as i64) << TILE_SHIFT)
             + MARK_Y_OFFSET) as u32;
         the_screen.rp_map.BitMap = the_screen.bm_draw;
@@ -123,10 +125,12 @@ fn stone_target(sector: i16, px: u16, py: u16, facing: i8, list: &[u8]) -> Stone
         return StoneJump::Refused;
     }
 
+    // Masks with SECTOR_MASK, keeping only the bits that matter here.
     if (px & SECTOR_MASK) / STONE_COLUMN_WIDTH != 1 || (py & SECTOR_MASK) / STONE_ROW_HEIGHT != 1 {
         return StoneJump::Refused;
     }
 
+    // Shifts by SECTOR_SHIFT, converting between pixels, tiles, sectors or bytes.
     let (sector_x, sector_y) = (px >> SECTOR_SHIFT, py >> SECTOR_SHIFT);
 
     for ring in 0..STONE_CIRCLES {
@@ -139,6 +143,7 @@ fn stone_target(sector: i16, px: u16, py: u16, facing: i8, list: &[u8]) -> Stone
 
             // Back to pixels: the target sector, then the same spot inside it.
             let x = ((list[target * 2] as u16) << SECTOR_SHIFT) + (px & SECTOR_MASK);
+            // Shifts by SECTOR_SHIFT, converting between pixels, tiles, sectors or bytes.
             let y = ((list[target * 2 + 1] as u16) << SECTOR_SHIFT) + (py & SECTOR_MASK);
 
             return StoneJump::To(x, y);

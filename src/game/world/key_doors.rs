@@ -107,6 +107,7 @@ pub fn open_door_near(x: u16, y: u16, keytype: u32) -> i32 {
 
         // we know where the door starts; now which type is it?
         let sector_id = *tile(x, y);
+        // Shifts by MAP_SET_SHIFT, converting between pixels, tiles, sectors or bytes.
         let map_id = loaded_blocks.image[(sector_id >> MAP_SET_SHIFT) as usize];
 
         if let Some(open) = find_open(sector_id, map_id, keytype) {
@@ -161,7 +162,9 @@ fn find_door_corner(x: u16, y: u16) -> Option<(i32, i32)> {
     }
 
     Some((
+        // Shifts by TILE_WIDTH_SHIFT, converting between pixels, tiles, sectors or bytes.
         (x >> TILE_WIDTH_SHIFT) as i32,
+        // Shifts by TILE_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
         (y >> TILE_HEIGHT_SHIFT) as i32,
     ))
 }

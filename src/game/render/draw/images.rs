@@ -148,6 +148,7 @@ unsafe fn pick_of_pair(actor: *const Shape, i: i32, inum: i16) -> i16 {
                 return inum + SNAKE_FIRST_IMAGE;
             }
         } else if i > 0 {
+            // Masks off the low bits (a cheap remainder or a flag test).
             if (*actor).race & 1 != 0 {
                 return inum | IMAGE_PAIR_BIT;
             }
@@ -165,6 +166,7 @@ pub(super) fn image_height(atype: i16, inum: i16, sheet_height: i8) -> i8 {
         || SMALL_OBJECT_RANGES
             .iter()
             .any(|range| range.contains(&inum))
+        // Masks with OBJECT_FLAG_SMALL, keeping only the bits that matter here.
         || (inum & OBJECT_FLAG_SMALL) != 0;
 
     if atype == OBJECTS && small_object {
@@ -217,6 +219,7 @@ unsafe fn sink_body(
             sprite.ystart += BUBBLES_DROP;
             sprite.ystop = sprite.ystart + BUBBLES_HEIGHT;
             sprite.atype = OBJECTS;
+            // Masks with OBJ_SUNK, keeping only the bits that matter here.
             sprite.inum = OBJ_SUNK + ((cycle as i32 + i) & 1) as i16;
         } else if depth > SHALLOW_DEPTH {
             sprite.ystart += depth;

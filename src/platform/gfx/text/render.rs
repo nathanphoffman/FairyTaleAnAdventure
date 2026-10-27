@@ -13,6 +13,7 @@ const LEFTMOST_BIT_FIRST: u8 = 0x80;
 /// Draws one character of the built-in 8x8 font and returns how far the pen moves.
 fn draw_builtin_glyph(rp: &RastPort, bm: &BitMap, ch: u8) -> WORD {
     let top = rp.cp_y as i32 - BUILTIN_BASELINE;
+    // Masks with BASIC_LEGACY, keeping only the bits that matter here.
     let glyph = font8x8::legacy::BASIC_LEGACY[(ch & ASCII_MASK) as usize];
     let jam2 = rp.DrawMode & JAM2 != 0;
 

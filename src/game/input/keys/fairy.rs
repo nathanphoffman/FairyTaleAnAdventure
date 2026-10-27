@@ -52,6 +52,7 @@ unsafe fn place_fairy(cycle: i16) {
             .wrapping_sub(FAIRY_X_OFFSET);
         (*fairy).abs_y = the_hero.y;
         (*fairy).kind = OBJECTS;
+        // Masks with FAIRY_IMAGE, keeping only the bits that matter here.
         (*fairy).index = FAIRY_IMAGE + (cycle & 1) as i8;
         (*fairy).state = STILL;
         (*fairy).weapon = 0;

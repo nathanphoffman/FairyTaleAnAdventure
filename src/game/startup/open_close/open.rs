@@ -185,6 +185,7 @@ pub(super) unsafe fn open_fonts() -> Result<(), i32> {
             return Err(ERROR_NO_FONT);
         }
 
+        // Shifts by BPTR_SHIFT, converting between pixels, tiles, sectors or bytes.
         font_header = ((font_segment << BPTR_SHIFT) + FONT_HEADER_OFFSET) as *mut DiskFontHeader;
         set_flag(AL_FONT);
 
@@ -519,6 +520,7 @@ pub(super) unsafe fn open_audio() {
             (*request).io_flags = IOF_QUICK;
             BeginIO(request.cast());
 
+            // Masks with IOF_QUICK, keeping only the bits that matter here.
             if (*request).io_flags & IOF_QUICK == 0 {
                 WaitIO(request.cast());
             }

@@ -103,6 +103,7 @@ pub fn copy_protection_check() {
 /// Copies `oldpointer` into chip memory (memory the Amiga's graphics chips can see) if it is not there already.
 pub fn into_chip(oldpointer: *mut u8, size: i32) -> *mut u8 {
     unsafe {
+        // Masks with MEMF_CHIP, keeping only the bits that matter here.
         if TypeOfMem(oldpointer) & MEMF_CHIP != 0 {
             return oldpointer;
         }

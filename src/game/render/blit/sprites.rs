@@ -64,6 +64,7 @@ pub fn combine_masks() {
 
         t.a = the_memory.mask_buffer.offset(sprite_mask_offset as isize);
         t.amod = sprite_mask_modulo as i32;
+        // Masks with SHIFT_MASK, keeping only the bits that matter here.
         t.ashift = (sprite_x_shift & SHIFT_MASK) as u32;
         t.c = the_memory
             .bmask_mem
@@ -78,9 +79,11 @@ pub fn combine_masks() {
 /// The first and last word masks stop the sprite's shifted edges leaking into neighbouring pixels.
 pub fn draw_shape() {
     unsafe {
+        // Masks with SHIFT_MASK, keeping only the bits that matter here.
         let bit_shift = (sprite_x_shift & SHIFT_MASK) as u32;
         // The first word is masked so the bits left of the sprite's pixel offset stay clear.
         let first = ALL_BITS >> bit_shift;
+        // Masks with ALL_BITS, keeping only the bits that matter here.
         let mut last = !first & ALL_BITS;
 
         if last == 0 {

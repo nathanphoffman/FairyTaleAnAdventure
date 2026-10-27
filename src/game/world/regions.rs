@@ -99,7 +99,9 @@ pub fn refresh_minimap() {
 unsafe fn follow_outdoor_region() {
     unsafe {
         if the_world.new_region < NO_REGION {
+            // Masks with MAP_X_WRAP, keeping only the bits that matter here.
             let xs = the_world.map_x as u32 & MAP_X_WRAP;
+            // Masks with MAP_Y_WRAP, keeping only the bits that matter here.
             let ys = the_world.map_y as u32 & MAP_Y_WRAP;
 
             if (ys > MAP_Y_MIN_FOR_LOAD && ys < MAP_Y_MAX_FOR_LOAD) && !DEAD_STRIP_X.contains(&xs) {
@@ -129,10 +131,13 @@ unsafe fn update_region_origin() {
         let xr = if the_world.target_region >= FIRST_INDOOR_REGION {
             0
         } else {
+            // Masks off the low bits (a cheap remainder or a flag test).
             the_world.target_region & 1
         };
 
+        // Shifts by REGION_WIDTH_SHIFT, converting between pixels, tiles, sectors or bytes.
         the_world.origin_x = xr << REGION_WIDTH_SHIFT;
+        // Shifts by REGION_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
         the_world.origin_y = yr << REGION_HEIGHT_SHIFT;
     }
 }
@@ -142,7 +147,9 @@ unsafe fn update_region_origin() {
 pub fn center_sector() -> (u32, u32) {
     unsafe {
         (
+            // Shifts by SECTOR_PIXELS_SHIFT, converting between pixels, tiles, sectors or bytes.
             (the_world.map_x as u32 + CENTER_OFFSET_X) >> SECTOR_PIXELS_SHIFT,
+            // Shifts by SECTOR_PIXELS_SHIFT, converting between pixels, tiles, sectors or bytes.
             (the_world.map_y as u32 + CENTER_OFFSET_Y) >> SECTOR_PIXELS_SHIFT,
         )
     }

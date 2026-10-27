@@ -146,7 +146,9 @@ pub(super) unsafe fn mask_against_scenery(
     blitwide: i8,
 ) {
     unsafe {
+        // Shifts by TILE_ROW_SHIFT, converting between pixels, tiles, sectors or bytes.
         let ym1 = (ystart1 >> TILE_ROW_SHIFT) as u8;
+        // Shifts by TILE_ROW_SHIFT, converting between pixels, tiles, sectors or bytes.
         let ym2 = ((ystop1 >> TILE_ROW_SHIFT) as u8).wrapping_sub(ym1);
         let tiles = SpriteTiles {
             actor,
@@ -177,6 +179,7 @@ impl SpriteTiles {
                 ((xm + self.xbw as i32) * MINIMAP_COLUMN_TILES + ym + self.ym1 as i32) as i16;
             cm = (minimap[cm as usize] as i32 * TERRAIN_ENTRY_BYTES) as i16;
             let mut k =
+                // Masks with TERRAIN_TYPE_MASK, keeping only the bits that matter here.
                 (*the_memory.terrain_mem.offset(cm as isize + 1) & TERRAIN_TYPE_MASK) as i16;
 
             if (*self.actor).state == FALL {

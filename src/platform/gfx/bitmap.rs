@@ -117,6 +117,7 @@ pub(in crate::platform::gfx) unsafe fn set_bit(
 
 /// Whether the pixel (`x`, `y`) is inside the bitmap.
 pub(in crate::platform::gfx) fn in_bounds(bm: &BitMap, x: i32, y: i32) -> bool {
+    // Shifts by BYTE_PIXELS_SHIFT, converting between pixels, tiles, sectors or bytes.
     x >= 0 && y >= 0 && y < bm.Rows as i32 && x < bm.BytesPerRow as i32 * (1 << BYTE_PIXELS_SHIFT)
 }
 

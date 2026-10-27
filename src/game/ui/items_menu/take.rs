@@ -105,6 +105,7 @@ unsafe fn take_object() -> bool {
     unsafe {
         let actor = &raw mut the_actors.list[the_actors.nearest_object as usize];
         let id = (*actor).index as u8 as u32;
+        // Masks with OWNER_MASK, keeping only the bits that matter here.
         let owner = (*actor).vitality as u32 & OWNER_MASK;
 
         match classify_take(id, the_hero.hunger, the_world.region) {

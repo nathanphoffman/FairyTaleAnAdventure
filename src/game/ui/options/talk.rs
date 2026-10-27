@@ -74,6 +74,7 @@ pub(super) unsafe fn talk_option(chosen_entry: i16) -> bool {
 /// What the Talk code needs to know about the actor the hero is talking to.
 unsafe fn describe_target(actor: *const Shape) -> Target {
     unsafe {
+        // Masks with PERSON_MASK, keeping only the bits that matter here.
         let person = (*actor).race & PERSON_MASK;
         let can_talk = (*(&raw const setfig_table)
             .cast::<SetFigEntry>()
@@ -102,6 +103,7 @@ unsafe fn carry_out(action: TalkAction, actor: *mut Shape) {
                     (*actor).tactic = TACTIC_TALK;
                 }
 
+                // Masks with PERSON_MASK, keeping only the bits that matter here.
                 person_speaks((*actor).race & PERSON_MASK, actor);
             }
 

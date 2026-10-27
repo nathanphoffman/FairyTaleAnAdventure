@@ -30,10 +30,12 @@ fn rgb4(c: u16) -> u32 {
     let r = (c >> RED_NIBBLE_SHIFT & NIBBLE_MASK) as u32;
     // Takes the 4 bit colour component out of the 12 bit colour.
     let g = (c >> GREEN_NIBBLE_SHIFT & NIBBLE_MASK) as u32;
+    // Masks with NIBBLE_MASK, keeping only the bits that matter here.
     let b = (c & NIBBLE_MASK) as u32;
 
     // Puts the three components, each stretched from 4 to 8 bits, side by side in one pixel.
     (r * NIBBLE_TO_BYTE) << RED_BYTE_SHIFT
+        // Shifts by GREEN_BYTE_SHIFT, converting between pixels, tiles, sectors or bytes.
         | (g * NIBBLE_TO_BYTE) << GREEN_BYTE_SHIFT
         | (b * NIBBLE_TO_BYTE)
 }
@@ -120,6 +122,7 @@ fn draw_viewport(v: &ViewPort, ri: &RasInfo, frame: &mut [u32]) {
     let bm = unsafe { &*ri.BitMap };
 
     let cm = unsafe { &*v.ColorMap };
+    // Masks with HIRES, keeping only the bits that matter here.
     let hires = v.Modes & HIRES != 0;
 
     for row in 0..v.DHeight as i32 {
@@ -172,10 +175,12 @@ pub(super) fn compose(view: *const View, frame: &mut [u32]) {
         let v = unsafe { &*vp };
         vp = v.Next;
 
+        // Masks with VP_HIDE, keeping only the bits that matter here.
         if v.RasInfo.is_null() || v.ColorMap.is_null() || v.Modes & VP_HIDE != 0 {
             continue;
         }
 
+        // Masks with SPRITES, keeping only the bits that matter here.
         if v.Modes & SPRITES != 0 {
             pointer_colors = v.ColorMap;
         }

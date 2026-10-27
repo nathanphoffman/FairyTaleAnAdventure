@@ -93,6 +93,7 @@ pub fn read_sample() {
 /// Plays sound effect `num` at the pitch `speed`, unless sound effects are switched off.
 pub fn play_effect(num: i16, speed: i32) {
     unsafe {
+        // Masks with GAME_MENU, keeping only the bits that matter here.
         if menus[GAME_MENU].enabled[SOUND_ENTRY] & 1 != 0 {
             let n = num as usize;
             playsample(

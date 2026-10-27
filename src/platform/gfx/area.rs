@@ -46,6 +46,7 @@ pub extern "C" fn AreaEnd(rp: *mut RastPort) -> LONG {
     }
 
     let bm = unsafe { &*rp.BitMap };
+    // Masks with COMPLEMENT, keeping only the bits that matter here.
     let complement = rp.DrawMode & COMPLEMENT != 0;
 
     // a layer limits drawing to its rectangle (x1/y1 are the last pixel)

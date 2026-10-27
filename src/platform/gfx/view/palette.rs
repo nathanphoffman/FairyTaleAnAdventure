@@ -41,7 +41,9 @@ pub extern "C" fn SetRGB4(vp: *mut ViewPort, n: LONG, r: ULONG, g: ULONG, b: ULO
     unsafe {
         // A 12 bit colour: four bits each of red, green and blue.
         *(*cm).ColorTable.add(n as usize) = ((r & COMPONENT_MASK) << RED_SHIFT
+            // Shifts by GREEN_SHIFT, converting between pixels, tiles, sectors or bytes.
             | (g & COMPONENT_MASK) << GREEN_SHIFT
+            // Masks with COMPONENT_MASK, keeping only the bits that matter here.
             | (b & COMPONENT_MASK)) as UWORD
     };
 }

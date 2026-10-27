@@ -93,6 +93,7 @@ fn push_key(code: i32) {
         let data = &mut *(&raw mut the_ui.handler_data);
         let slot = data.laydown;
         data.keybuf[slot as usize] = code as u8;
+        // Masks with KEY_BUFFER_MASK, keeping only the bits that matter here.
         let next = (slot + 1) & KEY_BUFFER_MASK;
 
         if next != data.pickup {
@@ -138,6 +139,7 @@ pub fn next_key() -> i32 {
         }
 
         let code = data.keybuf[data.pickup as usize];
+        // Masks with KEY_BUFFER_MASK, keeping only the bits that matter here.
         data.pickup = (data.pickup + 1) & KEY_BUFFER_MASK;
 
         code as i32
@@ -181,6 +183,7 @@ pub extern "C" fn fta_mouse_button(left: i32, right: i32) {
 
         // Xor with the old state leaves only the bits that changed: the left button was pressed or released.
         if (new_qualifier ^ data.qualifier) & LEFT_BUTTON != 0 {
+            // Masks with LEFT_BUTTON, keeping only the bits that matter here.
             let key = if new_qualifier & LEFT_BUTTON != 0 {
                 menu_key_at(data.xsprite as i32, data.ysprite as i32)
             } else if data.lastmenu != 0 {

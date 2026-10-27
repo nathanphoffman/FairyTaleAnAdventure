@@ -134,7 +134,9 @@ fn side(p1: (i16, i16), p2: (i16, i16), xh: i16, yh: i16) -> (i16, i16) {
 pub fn witch_fx(fp: *mut FPage) {
     unsafe {
         let fp = &*fp;
+        // Masks with TILE_X_MASK, keeping only the bits that matter here.
         let xh = the_hero.x.wrapping_sub(the_world.map_x & TILE_X_MASK) as i16;
+        // Masks with TILE_Y_MASK, keeping only the bits that matter here.
         let yh = the_hero.y.wrapping_sub(the_world.map_y & TILE_Y_MASK) as i16;
 
         LAYER = CreateUpfrontLayer(

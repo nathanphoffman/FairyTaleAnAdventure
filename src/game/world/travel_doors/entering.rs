@@ -27,6 +27,7 @@ const IN_COLUMN_LIMIT: u16 = 6;
 pub(super) fn inside_spot(d: &Door) -> (u16, u16) {
     if d.kind == CAVE {
         (d.xc2.wrapping_add(CAVE_IN.0), d.yc2.wrapping_add(CAVE_IN.1))
+    // Masks off the low bits (a cheap remainder or a flag test).
     } else if d.kind & 1 != 0 {
         (
             d.xc2.wrapping_add(HORIZONTAL_IN.0),
@@ -43,9 +44,12 @@ pub(super) fn inside_spot(d: &Door) -> (u16, u16) {
 /// The hero can go in when lined up with the door (horizontal doors by y, vertical ones by x), and
 /// the desert door needs the gold statues.
 pub(super) fn may_enter(d: &Door, hero_x: u16, hero_y: u16, statues: u8) -> bool {
+    // Masks off the low bits (a cheap remainder or a flag test).
     let lined_up = if d.kind & 1 != 0 {
+        // Masks with LOWER_HALF_BIT, keeping only the bits that matter here.
         hero_y & LOWER_HALF_BIT == 0
     } else {
+        // Masks with TILE_COLUMN_MASK, keeping only the bits that matter here.
         hero_x & TILE_COLUMN_MASK <= IN_COLUMN_LIMIT
     };
 
@@ -105,6 +109,7 @@ unsafe fn find_outdoor_door(xtest: u16, ytest: u16) -> Option<i32> {
                 high = j - 1;
             } else if d.xc1 as i32 + TILE_WIDTH < xtest as i32 {
                 low = j + 1;
+            // Masks off the low bits (a cheap remainder or a flag test).
             } else if d.xc1 < xtest && d.kind & 1 == 0 {
                 low = j + 1; // vertical door: its x must match exactly
             } else if d.yc1 > ytest {

@@ -60,6 +60,7 @@ pub extern "C" fn stopscore() {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn set_tempo(t: i32) {
+    // Masks with TEMPO_MASK, keeping only the bits that matter here.
     with_sound(|s| s.tempo = t & TEMPO_MASK);
 }
 
