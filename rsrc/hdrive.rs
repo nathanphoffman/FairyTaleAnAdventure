@@ -145,8 +145,8 @@ pub fn open_disk() -> i32 {
             return ERR_NO_DEVICE;
         }
         set_flag(AL_TDISK);
-        for num in 0..LOADING_REQUESTS {
-            DISKREQS[num] = *DISKREQ1;
+        for request in (*(&raw mut DISKREQS)).iter_mut().take(LOADING_REQUESTS) {
+            *request = *DISKREQ1;
         }
         0
     }

@@ -14,6 +14,7 @@
 //!    opaque and nothing is in front of it.
 //! 4. `draw_shape` draws the sprite's pixels through that mask into the 5 bitplanes of the screen.
 //! 5. Next frame `restore_background` puts the saved background back, which erases the sprite.
+//!
 //! `make_sprite_masks` builds each frame's own mask once, when the sprite sheet is loaded.
 
 use super::globals::{aoff, bmod, boff, shift, shp, wmask};

@@ -331,6 +331,7 @@ const PAGE_HALF_WIDTH: i32 = 135;
 const PAGE_STRIP_END: i16 = 136;
 
 /// Copies a rectangle between bitmaps (all five planes, plain copy).
+#[allow(clippy::too_many_arguments)] // source and destination bitmap with their rectangle
 unsafe fn copy_rect(
     src: *mut BitMap,
     sx: i32,
@@ -475,24 +476,6 @@ pub fn copy_protection_riddle() -> i32 {
     1
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn sprite_table_matches_the_c_struct() {
-        assert_eq!(size_of::<CFileInfo>(), 8);
-        assert_eq!(sprite_files.len(), 18);
-        assert_eq!(sprite_files[16].file_id, 946); // witch
-    }
-
-    #[test]
-    fn flip_tables_have_one_entry_per_frame() {
-        assert_eq!(FLIP_RATE.len(), FLIP_WIDE.len());
-        assert_eq!(FLIP_RATE.len(), FLIP_DELAY.len());
-    }
-}
-
 /// Where the sound effects are on the disk (block) and how many blocks they take.
 const SAMPLE_BLOCK: i16 = 920;
 const SAMPLE_BLOCKS: i16 = 11;
@@ -522,7 +505,7 @@ pub fn read_sample() {
             let length = u32::from_be_bytes([*at, *at.add(1), *at.add(2), *at.add(3)]);
             at = at.add(4);
             the_memory.sample[i] = at;
-            the_memory.sample_size[i] = length as u32;
+            the_memory.sample_size[i] = length;
             at = at.add(length as usize);
         }
     }
@@ -539,5 +522,23 @@ pub fn play_effect(num: i16, speed: i32) {
                 speed,
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sprite_table_matches_the_c_struct() {
+        assert_eq!(size_of::<CFileInfo>(), 8);
+        assert_eq!(sprite_files.len(), 18);
+        assert_eq!(sprite_files[16].file_id, 946); // witch
+    }
+
+    #[test]
+    fn flip_tables_have_one_entry_per_frame() {
+        assert_eq!(FLIP_RATE.len(), FLIP_WIDE.len());
+        assert_eq!(FLIP_RATE.len(), FLIP_DELAY.len());
     }
 }

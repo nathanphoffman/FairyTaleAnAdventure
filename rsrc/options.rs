@@ -236,7 +236,9 @@ enum TalkAction {
     /// Yelling at someone standing right next to you.
     TooCloseToYell,
     /// A person answers (and turns to talk if it can).
-    Person { starts_talking: bool },
+    Person {
+        starts_talking: bool,
+    },
     TurtleHasShell,
     TurtleGivesShell,
     /// An enemy says its line (the speech number is its race).
@@ -257,7 +259,9 @@ fn talk_action(
         SETFIG if yelling && (distance as u32) < TOO_CLOSE_TO_YELL as u32 => {
             TalkAction::TooCloseToYell
         }
-        SETFIG => TalkAction::Person { starts_talking: target.can_talk },
+        SETFIG => TalkAction::Person {
+            starts_talking: target.can_talk,
+        },
         CARRIER if active_carrier == CARRIER_TURTLE => {
             if has_shell {
                 TalkAction::TurtleHasShell
@@ -309,7 +313,11 @@ struct Talker {
 /// because they also change things.
 fn plain_speech(person: u8, t: &Talker) -> Option<i32> {
     match person {
-        WIZARD => Some(if t.kindness < KIND_ENOUGH { 35 } else { 27 + t.goal }),
+        WIZARD => Some(if t.kindness < KIND_ENOUGH {
+            35
+        } else {
+            27 + t.goal
+        }),
         GUARD_FRONT | GUARD_BACK => Some(15),
         PRINCESS if t.princess_freed => Some(16),
         KING if t.princess_freed => Some(17),
@@ -324,7 +332,11 @@ fn plain_speech(person: u8, t: &Talker) -> Option<i32> {
         WITCH => Some(46),
         SPECTRE => Some(47),
         GHOST => Some(49),
-        RANGER => Some(if t.region == RANGER_SWAMP_REGION { 22 } else { 53 + t.goal }),
+        RANGER => Some(if t.region == RANGER_SWAMP_REGION {
+            22
+        } else {
+            53 + t.goal
+        }),
         BEGGAR => Some(23),
         _ => None,
     }
@@ -415,7 +427,9 @@ fn priest_action(has_writ: bool, reward_stat: i8, kindness: i16, clock: u16) -> 
     } else if kindness < KIND_ENOUGH {
         PriestAction::Scold
     } else {
-        PriestAction::Bless { speech: 36 + (clock % PRIEST_BLESSINGS) as i32 }
+        PriestAction::Bless {
+            speech: 36 + (clock % PRIEST_BLESSINGS) as i32,
+        }
     }
 }
 
@@ -439,7 +453,10 @@ fn buy_gate(person: i16, race: u8, entry: i16, table: &[i8]) -> BuyGate {
         return BuyGate::NotHandled;
     }
     let pair = ((entry - FIRST_MENU_ENTRY) * 2) as usize;
-    BuyGate::Offer { item: table[pair] as u8 as usize, price: table[pair + 1] as i16 }
+    BuyGate::Offer {
+        item: table[pair] as u8 as usize,
+        price: table[pair + 1] as i16,
+    }
 }
 
 /// The hero must have strictly more gold than the price.
@@ -472,7 +489,10 @@ fn purchase(wealth: i16, price: i16, item: usize) -> Purchase {
     } else {
         Bought::Item
     };
-    Purchase::Bought { wealth_left: wealth - price, what }
+    Purchase::Bought {
+        wealth_left: wealth - price,
+        what,
+    }
 }
 
 /// Buys what the bartender sells, if the hero can pay.
@@ -480,8 +500,12 @@ unsafe fn buy_option(chosen_entry: i16) -> bool {
     unsafe {
         the_actors.nearest_object = the_actors.nearest_person;
         let near = the_actors.nearest_object;
-        let race = if near == 0 { 0 } else { the_actors.list[near as usize].race };
-        let (item, price) = match buy_gate(near as i16, race, chosen_entry, &jtrans) {
+        let race = if near == 0 {
+            0
+        } else {
+            the_actors.list[near as usize].race
+        };
+        let (item, price) = match buy_gate(near, race, chosen_entry, &jtrans) {
             BuyGate::Nothing => return true,
             BuyGate::NotHandled => return false,
             BuyGate::Offer { item, price } => (item, price),
@@ -660,19 +684,37 @@ mod tests {
     fn priest_rules() {
         assert_eq!(priest_action(true, 0, 0, 0), PriestAction::WritReward);
         assert_eq!(priest_action(true, 1, 99, 0), PriestAction::WritAgain);
-        assert_eq!(priest_action(false, 0, KIND_ENOUGH - 1, 0), PriestAction::Scold);
-        assert_eq!(priest_action(false, 0, KIND_ENOUGH, 0), PriestAction::Bless { speech: 36 });
-        assert_eq!(priest_action(false, 0, KIND_ENOUGH, 1), PriestAction::Bless { speech: 37 });
+        assert_eq!(
+            priest_action(false, 0, KIND_ENOUGH - 1, 0),
+            PriestAction::Scold
+        );
+        assert_eq!(
+            priest_action(false, 0, KIND_ENOUGH, 0),
+            PriestAction::Bless { speech: 36 }
+        );
+        assert_eq!(
+            priest_action(false, 0, KIND_ENOUGH, 1),
+            PriestAction::Bless { speech: 37 }
+        );
         let wrap = PRIEST_BLESSINGS;
-        assert_eq!(priest_action(false, 0, KIND_ENOUGH, wrap), PriestAction::Bless { speech: 36 });
+        assert_eq!(
+            priest_action(false, 0, KIND_ENOUGH, wrap),
+            PriestAction::Bless { speech: 36 }
+        );
     }
 
     #[test]
     fn buy_gate_rules() {
         let first = FIRST_MENU_ENTRY;
         assert_eq!(buy_gate(0, BARTENDER_RACE, first, &SHOP), BuyGate::Nothing);
-        assert_eq!(buy_gate(3, BARTENDER_RACE + 1, first, &SHOP), BuyGate::Nothing);
-        assert_eq!(buy_gate(3, BARTENDER_RACE, LAST_BUY_ENTRY + 1, &SHOP), BuyGate::NotHandled);
+        assert_eq!(
+            buy_gate(3, BARTENDER_RACE + 1, first, &SHOP),
+            BuyGate::Nothing
+        );
+        assert_eq!(
+            buy_gate(3, BARTENDER_RACE, LAST_BUY_ENTRY + 1, &SHOP),
+            BuyGate::NotHandled
+        );
         assert_eq!(
             buy_gate(3, BARTENDER_RACE, first, &SHOP),
             BuyGate::Offer { item: 0, price: 3 }
@@ -682,7 +724,10 @@ mod tests {
             BuyGate::Offer { item: 8, price: 10 }
         );
         // not a bartender wins over an entry past the end
-        assert_eq!(buy_gate(3, BARTENDER_RACE + 1, LAST_BUY_ENTRY + 1, &SHOP), BuyGate::Nothing);
+        assert_eq!(
+            buy_gate(3, BARTENDER_RACE + 1, LAST_BUY_ENTRY + 1, &SHOP),
+            BuyGate::Nothing
+        );
     }
 
     #[test]
@@ -695,51 +740,155 @@ mod tests {
     #[test]
     fn purchases() {
         assert_eq!(purchase(3, 3, 0), Purchase::TooPoor);
-        assert_eq!(purchase(10, 3, FOOD), Purchase::Bought { wealth_left: 7, what: Bought::Food });
-        assert_eq!(purchase(10, 3, ARROWS), Purchase::Bought { wealth_left: 7, what: Bought::Arrows });
+        assert_eq!(
+            purchase(10, 3, FOOD),
+            Purchase::Bought {
+                wealth_left: 7,
+                what: Bought::Food
+            }
+        );
+        assert_eq!(
+            purchase(10, 3, ARROWS),
+            Purchase::Bought {
+                wealth_left: 7,
+                what: Bought::Arrows
+            }
+        );
         assert_eq!(purchase(10, 10, 12), Purchase::TooPoor);
-        assert_eq!(purchase(11, 10, 12), Purchase::Bought { wealth_left: 1, what: Bought::Item });
+        assert_eq!(
+            purchase(11, 10, 12),
+            Purchase::Bought {
+                wealth_left: 1,
+                what: Bought::Item
+            }
+        );
     }
 
     fn target(kind: i8, state: i8, can_talk: bool) -> Target {
-        Target { kind, state, race: 7, can_talk }
+        Target {
+            kind,
+            state,
+            race: 7,
+            can_talk,
+        }
     }
 
     #[test]
     fn talking() {
         use TalkAction::*;
         let figure = target(SETFIG, 0, true);
-        assert_eq!(talk_action(&figure, false, 10, 0, false), Person { starts_talking: true });
-        assert_eq!(talk_action(&target(SETFIG, 0, false), false, 10, 0, false), Person { starts_talking: false });
+        assert_eq!(
+            talk_action(&figure, false, 10, 0, false),
+            Person {
+                starts_talking: true
+            }
+        );
+        assert_eq!(
+            talk_action(&target(SETFIG, 0, false), false, 10, 0, false),
+            Person {
+                starts_talking: false
+            }
+        );
         // yelling at someone close is refused; far enough is fine; talking is always fine
-        assert_eq!(talk_action(&figure, true, TOO_CLOSE_TO_YELL - 1, 0, false), TooCloseToYell);
-        assert_eq!(talk_action(&figure, true, TOO_CLOSE_TO_YELL, 0, false), Person { starts_talking: true });
-        assert_eq!(talk_action(&figure, false, 1, 0, false), Person { starts_talking: true });
+        assert_eq!(
+            talk_action(&figure, true, TOO_CLOSE_TO_YELL - 1, 0, false),
+            TooCloseToYell
+        );
+        assert_eq!(
+            talk_action(&figure, true, TOO_CLOSE_TO_YELL, 0, false),
+            Person {
+                starts_talking: true
+            }
+        );
+        assert_eq!(
+            talk_action(&figure, false, 1, 0, false),
+            Person {
+                starts_talking: true
+            }
+        );
         // the dead say nothing
-        assert_eq!(talk_action(&target(SETFIG, DEAD, true), false, 10, 0, false), Nothing);
+        assert_eq!(
+            talk_action(&target(SETFIG, DEAD, true), false, 10, 0, false),
+            Nothing
+        );
         // the turtle gives the shell once
         let turtle = target(CARRIER, 0, false);
-        assert_eq!(talk_action(&turtle, false, 10, CARRIER_TURTLE, false), TurtleGivesShell);
-        assert_eq!(talk_action(&turtle, false, 10, CARRIER_TURTLE, true), TurtleHasShell);
-        assert_eq!(talk_action(&turtle, false, 10, CARRIER_TURTLE + 1, false), Nothing);
-        assert_eq!(talk_action(&target(ENEMY, 0, false), false, 10, 0, false), EnemyShouts(7));
+        assert_eq!(
+            talk_action(&turtle, false, 10, CARRIER_TURTLE, false),
+            TurtleGivesShell
+        );
+        assert_eq!(
+            talk_action(&turtle, false, 10, CARRIER_TURTLE, true),
+            TurtleHasShell
+        );
+        assert_eq!(
+            talk_action(&turtle, false, 10, CARRIER_TURTLE + 1, false),
+            Nothing
+        );
+        assert_eq!(
+            talk_action(&target(ENEMY, 0, false), false, 10, 0, false),
+            EnemyShouts(7)
+        );
     }
 
     fn talker() -> Talker {
-        Talker { kindness: 20, fatigue: 0, day_period: 3, region: 0, goal: 2, princess_freed: false }
+        Talker {
+            kindness: 20,
+            fatigue: 0,
+            day_period: 3,
+            region: 0,
+            goal: 2,
+            princess_freed: false,
+        }
     }
 
     #[test]
     fn what_people_say() {
         let t = talker();
         assert_eq!(plain_speech(WIZARD, &t), Some(29));
-        assert_eq!(plain_speech(WIZARD, &Talker { kindness: KIND_ENOUGH - 1, ..talker() }), Some(35));
+        assert_eq!(
+            plain_speech(
+                WIZARD,
+                &Talker {
+                    kindness: KIND_ENOUGH - 1,
+                    ..talker()
+                }
+            ),
+            Some(35)
+        );
         assert_eq!(plain_speech(GUARD_BACK, &t), Some(15));
         assert_eq!(plain_speech(PRINCESS, &t), None);
-        assert_eq!(plain_speech(PRINCESS, &Talker { princess_freed: true, ..talker() }), Some(16));
-        assert_eq!(plain_speech(KING, &Talker { princess_freed: true, ..talker() }), Some(17));
+        assert_eq!(
+            plain_speech(
+                PRINCESS,
+                &Talker {
+                    princess_freed: true,
+                    ..talker()
+                }
+            ),
+            Some(16)
+        );
+        assert_eq!(
+            plain_speech(
+                KING,
+                &Talker {
+                    princess_freed: true,
+                    ..talker()
+                }
+            ),
+            Some(17)
+        );
         assert_eq!(plain_speech(RANGER, &t), Some(55));
-        assert_eq!(plain_speech(RANGER, &Talker { region: RANGER_SWAMP_REGION, ..talker() }), Some(22));
+        assert_eq!(
+            plain_speech(
+                RANGER,
+                &Talker {
+                    region: RANGER_SWAMP_REGION,
+                    ..talker()
+                }
+            ),
+            Some(22)
+        );
         assert_eq!(plain_speech(PRIEST, &t), None);
         assert_eq!(plain_speech(SORCERESS, &t), None);
     }
@@ -747,7 +896,14 @@ mod tests {
     #[test]
     fn the_bartender_notices_tiredness_and_the_hour() {
         let said = |fatigue, day_period| {
-            plain_speech(BARTENDER, &Talker { fatigue, day_period, ..talker() })
+            plain_speech(
+                BARTENDER,
+                &Talker {
+                    fatigue,
+                    day_period,
+                    ..talker()
+                },
+            )
         };
         assert_eq!(said(TIRED - 1, 0), Some(13));
         assert_eq!(said(TIRED, NIGHT_PERIOD), Some(14));

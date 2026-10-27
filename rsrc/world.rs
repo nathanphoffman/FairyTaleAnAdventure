@@ -9,7 +9,7 @@ use super::asm_text::{queue_print, show_event, speak};
 use super::encounters::load_enemy_sprites;
 use super::encounters::place_encounter;
 use super::game_tables::door_list;
-use super::globals::{shp, sleepwait};
+use super::globals::shp;
 use super::hdrive::{motor_off, read_finished};
 use super::loading::finish_sprite_load;
 use super::mood::set_mood;
@@ -97,15 +97,19 @@ pub fn check_bed() {
     unsafe {
         let hero = &raw mut the_actors.list[0];
         if (*hero).state != STILL {
-            sleepwait = 0;
+            the_world.bed_wait = 0;
         }
         the_hero.x = (*hero).abs_x;
         the_hero.y = (*hero).abs_y;
 
         if the_world.region == INSIDE_REGION {
             let tile = *tile_address((the_hero.x >> 4) as i32, (the_hero.y >> 5) as i32);
-            let (wait, action) = bed_step(sleepwait, BED_TILES.contains(&tile), the_hero.fatigue);
-            sleepwait = wait;
+            let (wait, action) = bed_step(
+                the_world.bed_wait,
+                BED_TILES.contains(&tile),
+                the_hero.fatigue,
+            );
+            the_world.bed_wait = wait;
             match action {
                 BedAction::Nothing => {}
                 BedAction::NotTired => show_event(EVENT_NOT_TIRED),
@@ -192,7 +196,11 @@ fn may_enter(d: &Door, hero_x: u16, hero_y: u16, statues: u8) -> bool {
 
 /// Which indoor region a door leads to.
 fn region_inside(d: &Door) -> u16 {
-    if d.secs == 1 { REGION_INSIDE } else { REGION_INSIDE_OTHER }
+    if d.secs == 1 {
+        REGION_INSIDE
+    } else {
+        REGION_INSIDE_OTHER
+    }
 }
 
 /// Whether a door's inside entrance is where the hero stands (`xtest`, `ytest`: the hero's position
@@ -351,13 +359,21 @@ fn clock_step(clock: u16, frozen: bool) -> u16 {
     if frozen {
         return clock;
     }
-    if clock >= DAY_LENGTH { 0 } else { clock.wrapping_add(1) }
+    if clock >= DAY_LENGTH {
+        0
+    } else {
+        clock.wrapping_add(1)
+    }
 }
 
 /// The light level for a clock value: it rises to `LIGHT_PEAK` at midday and falls again.
 fn light_level(clock: u16) -> u16 {
     let level = clock / DARK;
-    if level >= LIGHT_PEAK { 2 * LIGHT_PEAK - level } else { level }
+    if level >= LIGHT_PEAK {
+        2 * LIGHT_PEAK - level
+    } else {
+        level
+    }
 }
 
 /// The lamp post is lit when it is dark.
@@ -372,7 +388,10 @@ fn day_period(clock: u16) -> i16 {
 
 /// The message said when `period` starts, if it has one.
 fn period_event(period: i16) -> Option<i32> {
-    PERIOD_EVENTS.iter().find(|(p, _)| *p == period).map(|(_, e)| *e)
+    PERIOD_EVENTS
+        .iter()
+        .find(|(p, _)| *p == period)
+        .map(|(_, e)| *e)
 }
 
 /// Slow healing: once per `HEAL_MASK + 1` clock ticks, if hurt and alive.
@@ -442,7 +461,11 @@ fn day_step(
         light,
         lamp_on: lamp_is_on(light),
         period,
-        period_event: if period != old_period { period_event(period) } else { None },
+        period_event: if period != old_period {
+            period_event(period)
+        } else {
+            None
+        },
         heal: heal_due(clock, vitality, bravery, state),
     }
 }
@@ -847,7 +870,14 @@ mod tests {
     }
 
     fn door(kind: i8, secs: i8) -> Door {
-        Door { xc1: 100, yc1: 200, xc2: 300, yc2: 400, kind, secs }
+        Door {
+            xc1: 100,
+            yc1: 200,
+            xc2: 300,
+            yc2: 400,
+            kind,
+            secs,
+        }
     }
 
     #[test]
@@ -963,7 +993,10 @@ mod tests {
         let (mut facts, mut hero, mut body) = calm_hero(&mut pack);
         facts.clock = 8;
         facts.battle = false;
-        assert_eq!(survival_step(&facts, &mut hero, &mut body), vec![SurvivalStep::PickMusic]);
+        assert_eq!(
+            survival_step(&facts, &mut hero, &mut body),
+            vec![SurvivalStep::PickMusic]
+        );
         facts.battle = true;
         assert!(survival_step(&facts, &mut hero, &mut body).is_empty());
     }
@@ -974,14 +1007,21 @@ mod tests {
         let (mut facts, mut hero, mut body) = calm_hero(&mut pack);
         facts.clock = 0; // also a music frame; battle suppresses it
         hero.hunger = HUNGRY - 1;
-        assert_eq!(survival_step(&facts, &mut hero, &mut body), vec![SurvivalStep::Event(0)]);
+        assert_eq!(
+            survival_step(&facts, &mut hero, &mut body),
+            vec![SurvivalStep::Event(0)]
+        );
         // damage is shown (stats) before the starving messages, and the tired one comes last
         hero.hunger = 103;
         hero.fatigue = TIRED_AT - 1;
         let steps = survival_step(&facts, &mut hero, &mut body);
         assert_eq!(
             steps,
-            vec![SurvivalStep::RedrawStats, SurvivalStep::Event(2), SurvivalStep::Event(3)]
+            vec![
+                SurvivalStep::RedrawStats,
+                SurvivalStep::Event(2),
+                SurvivalStep::Event(3)
+            ]
         );
         assert_eq!(body.vitality, 48);
     }
@@ -1002,7 +1042,17 @@ mod tests {
     #[test]
     fn a_frame_of_the_day() {
         let t = day_step(1999, false, 0, 50, 0, STILL);
-        assert_eq!((t.clock, t.light, t.lamp_on, t.period, t.period_event, t.heal), (2000, 50, false, 1, None, false));
+        assert_eq!(
+            (
+                t.clock,
+                t.light,
+                t.lamp_on,
+                t.period,
+                t.period_event,
+                t.heal
+            ),
+            (2000, 50, false, 1, None, false)
+        );
         // a new period with a message
         let t = day_step(7999, false, 3, 50, 0, STILL);
         assert_eq!((t.period, t.period_event), (4, Some(29)));
@@ -1041,7 +1091,10 @@ mod tests {
 
     #[test]
     fn a_rested_hero_is_told_he_is_not_tired() {
-        assert_eq!(bed_step(BED_WAIT - 1, true, TOO_RESTED - 1).1, BedAction::NotTired);
+        assert_eq!(
+            bed_step(BED_WAIT - 1, true, TOO_RESTED - 1).1,
+            BedAction::NotTired
+        );
     }
 
     #[test]
@@ -1076,7 +1129,9 @@ mod tests {
         assert_eq!(day_period(1999), 0);
         assert_eq!(day_period(2000), 1);
         assert_eq!(day_period(23999), 11);
-        let said: Vec<_> = (0..12).filter_map(|p| period_event(p).map(|e| (p, e))).collect();
+        let said: Vec<_> = (0..12)
+            .filter_map(|p| period_event(p).map(|e| (p, e)))
+            .collect();
         assert_eq!(said, vec![(0, 28), (4, 29), (6, 30), (9, 31)]);
     }
 
@@ -1214,4 +1269,3 @@ mod tests {
         }
     }
 }
-

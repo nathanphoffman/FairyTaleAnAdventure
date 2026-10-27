@@ -255,8 +255,8 @@ fn sign(v: i16) -> i32 {
 /// pick one of 8 directions from a table; if both are zero the actor is on the target and stops.
 /// The wobble adds or subtracts one direction step at random when the target is close.
 fn steer(xdif: i16, ydif: i16, mode: i32, random_bit: impl FnOnce() -> bool) -> Course {
-    let xabs = (xdif as i32).abs() as u16;
-    let yabs = (ydif as i32).abs() as u16;
+    let xabs = (xdif as i32).unsigned_abs() as u16;
+    let yabs = (ydif as i32).unsigned_abs() as u16;
     let (mut xdir, mut ydir) = (sign(xdif), sign(ydif));
 
     if mode != 4 {

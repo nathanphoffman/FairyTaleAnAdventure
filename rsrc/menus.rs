@@ -161,7 +161,7 @@ pub fn print_menu_entry(j: i16, pena: i16) {
         SetAPen(r, pena as u32);
         SetBPen(r, box_pen);
 
-        let offset = entry * LABEL_LEN as i32;
+        let offset = entry * LABEL_LEN;
         let x = if j & 1 != 0 {
             RIGHT_COLUMN_X
         } else {

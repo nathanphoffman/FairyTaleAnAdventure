@@ -271,42 +271,42 @@ pub static mut stone_ring_sectors: [u8; 22] = [54, 43, 71, 77, 78, 102, 66, 121,
 
 /// Every item: its picture, where it sits on the item list, how many show, and its name.
 pub static mut item_list: [InvItem; 36] = [
-    InvItem { image_number: 12, xoff: 10, yoff: 0, ydelta: 0, img_off: 0, img_height: 8, maxshown: 1, name: b"Dirk\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 9, xoff: 10, yoff: 10, ydelta: 0, img_off: 0, img_height: 8, maxshown: 1, name: b"Mace\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 8, xoff: 10, yoff: 20, ydelta: 0, img_off: 0, img_height: 8, maxshown: 1, name: b"Sword\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 10, xoff: 10, yoff: 30, ydelta: 0, img_off: 0, img_height: 8, maxshown: 1, name: b"Bow\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 17, xoff: 10, yoff: 40, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: b"Magic Wand\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 27, xoff: 10, yoff: 50, ydelta: 0, img_off: 0, img_height: 8, maxshown: 1, name: b"Golden Lasso\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 23, xoff: 10, yoff: 60, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: b"Sea Shell\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 27, xoff: 10, yoff: 70, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: b"Sun Stone\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 3, xoff: 30, yoff: 0, ydelta: 3, img_off: 7, img_height: 1, maxshown: 45, name: b"Arrows\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 18, xoff: 50, yoff: 0, ydelta: 9, img_off: 0, img_height: 8, maxshown: 15, name: b"Blue Stone\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 19, xoff: 65, yoff: 0, ydelta: 6, img_off: 0, img_height: 5, maxshown: 23, name: b"Green Jewel\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 22, xoff: 80, yoff: 0, ydelta: 8, img_off: 0, img_height: 7, maxshown: 17, name: b"Glass Vial\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 21, xoff: 95, yoff: 0, ydelta: 7, img_off: 0, img_height: 6, maxshown: 20, name: b"Crystal Orb\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 23, xoff: 110, yoff: 0, ydelta: 10, img_off: 0, img_height: 9, maxshown: 14, name: b"Bird Totem\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 17, xoff: 125, yoff: 0, ydelta: 6, img_off: 0, img_height: 5, maxshown: 23, name: b"Gold Ring\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 24, xoff: 140, yoff: 0, ydelta: 10, img_off: 0, img_height: 9, maxshown: 14, name: b"Jade Skull\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 25, xoff: 160, yoff: 0, ydelta: 5, img_off: 0, img_height: 5, maxshown: 25, name: b"Gold Key\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 25, xoff: 172, yoff: 0, ydelta: 5, img_off: 8, img_height: 5, maxshown: 25, name: b"Green Key\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 114, xoff: 184, yoff: 0, ydelta: 5, img_off: 0, img_height: 5, maxshown: 25, name: b"Blue Key\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 114, xoff: 196, yoff: 0, ydelta: 5, img_off: 8, img_height: 5, maxshown: 25, name: b"Red Key\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 26, xoff: 208, yoff: 0, ydelta: 5, img_off: 0, img_height: 5, maxshown: 25, name: b"Grey Key\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 26, xoff: 220, yoff: 0, ydelta: 5, img_off: 8, img_height: 5, maxshown: 25, name: b"White Key\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 11, xoff: 0, yoff: 80, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: b"Talisman\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 19, xoff: 0, yoff: 90, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: b"Rose\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 20, xoff: 0, yoff: 100, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: b"Fruit\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 21, xoff: 232, yoff: 0, ydelta: 10, img_off: 8, img_height: 8, maxshown: 5, name: b"Gold Statue\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 22, xoff: 0, yoff: 110, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: b"Book\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 8, xoff: 14, yoff: 80, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: b"Herb\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 9, xoff: 14, yoff: 90, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: b"Writ\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 10, xoff: 14, yoff: 100, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: b"Bone\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 12, xoff: 14, yoff: 110, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: b"Shard\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 0, xoff: 0, yoff: 0, ydelta: 0, img_off: 0, img_height: 0, maxshown: 2, name: b"2 Gold Pieces\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 0, xoff: 0, yoff: 0, ydelta: 0, img_off: 0, img_height: 0, maxshown: 5, name: b"5 Gold Pieces\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 0, xoff: 0, yoff: 0, ydelta: 0, img_off: 0, img_height: 0, maxshown: 10, name: b"10 Gold Pieces\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 0, xoff: 0, yoff: 0, ydelta: 0, img_off: 0, img_height: 0, maxshown: 100, name: b"100 Gold Pieces\0".as_ptr().cast::<c_char>() },
-    InvItem { image_number: 0, xoff: 0, yoff: 0, ydelta: 0, img_off: 0, img_height: 0, maxshown: 0, name: b"quiver of arrows\0".as_ptr().cast::<c_char>() },
+    InvItem { image_number: 12, xoff: 10, yoff: 0, ydelta: 0, img_off: 0, img_height: 8, maxshown: 1, name: c"Dirk".as_ptr() },
+    InvItem { image_number: 9, xoff: 10, yoff: 10, ydelta: 0, img_off: 0, img_height: 8, maxshown: 1, name: c"Mace".as_ptr() },
+    InvItem { image_number: 8, xoff: 10, yoff: 20, ydelta: 0, img_off: 0, img_height: 8, maxshown: 1, name: c"Sword".as_ptr() },
+    InvItem { image_number: 10, xoff: 10, yoff: 30, ydelta: 0, img_off: 0, img_height: 8, maxshown: 1, name: c"Bow".as_ptr() },
+    InvItem { image_number: 17, xoff: 10, yoff: 40, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: c"Magic Wand".as_ptr() },
+    InvItem { image_number: 27, xoff: 10, yoff: 50, ydelta: 0, img_off: 0, img_height: 8, maxshown: 1, name: c"Golden Lasso".as_ptr() },
+    InvItem { image_number: 23, xoff: 10, yoff: 60, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: c"Sea Shell".as_ptr() },
+    InvItem { image_number: 27, xoff: 10, yoff: 70, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: c"Sun Stone".as_ptr() },
+    InvItem { image_number: 3, xoff: 30, yoff: 0, ydelta: 3, img_off: 7, img_height: 1, maxshown: 45, name: c"Arrows".as_ptr() },
+    InvItem { image_number: 18, xoff: 50, yoff: 0, ydelta: 9, img_off: 0, img_height: 8, maxshown: 15, name: c"Blue Stone".as_ptr() },
+    InvItem { image_number: 19, xoff: 65, yoff: 0, ydelta: 6, img_off: 0, img_height: 5, maxshown: 23, name: c"Green Jewel".as_ptr() },
+    InvItem { image_number: 22, xoff: 80, yoff: 0, ydelta: 8, img_off: 0, img_height: 7, maxshown: 17, name: c"Glass Vial".as_ptr() },
+    InvItem { image_number: 21, xoff: 95, yoff: 0, ydelta: 7, img_off: 0, img_height: 6, maxshown: 20, name: c"Crystal Orb".as_ptr() },
+    InvItem { image_number: 23, xoff: 110, yoff: 0, ydelta: 10, img_off: 0, img_height: 9, maxshown: 14, name: c"Bird Totem".as_ptr() },
+    InvItem { image_number: 17, xoff: 125, yoff: 0, ydelta: 6, img_off: 0, img_height: 5, maxshown: 23, name: c"Gold Ring".as_ptr() },
+    InvItem { image_number: 24, xoff: 140, yoff: 0, ydelta: 10, img_off: 0, img_height: 9, maxshown: 14, name: c"Jade Skull".as_ptr() },
+    InvItem { image_number: 25, xoff: 160, yoff: 0, ydelta: 5, img_off: 0, img_height: 5, maxshown: 25, name: c"Gold Key".as_ptr() },
+    InvItem { image_number: 25, xoff: 172, yoff: 0, ydelta: 5, img_off: 8, img_height: 5, maxshown: 25, name: c"Green Key".as_ptr() },
+    InvItem { image_number: 114, xoff: 184, yoff: 0, ydelta: 5, img_off: 0, img_height: 5, maxshown: 25, name: c"Blue Key".as_ptr() },
+    InvItem { image_number: 114, xoff: 196, yoff: 0, ydelta: 5, img_off: 8, img_height: 5, maxshown: 25, name: c"Red Key".as_ptr() },
+    InvItem { image_number: 26, xoff: 208, yoff: 0, ydelta: 5, img_off: 0, img_height: 5, maxshown: 25, name: c"Grey Key".as_ptr() },
+    InvItem { image_number: 26, xoff: 220, yoff: 0, ydelta: 5, img_off: 8, img_height: 5, maxshown: 25, name: c"White Key".as_ptr() },
+    InvItem { image_number: 11, xoff: 0, yoff: 80, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: c"Talisman".as_ptr() },
+    InvItem { image_number: 19, xoff: 0, yoff: 90, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: c"Rose".as_ptr() },
+    InvItem { image_number: 20, xoff: 0, yoff: 100, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: c"Fruit".as_ptr() },
+    InvItem { image_number: 21, xoff: 232, yoff: 0, ydelta: 10, img_off: 8, img_height: 8, maxshown: 5, name: c"Gold Statue".as_ptr() },
+    InvItem { image_number: 22, xoff: 0, yoff: 110, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: c"Book".as_ptr() },
+    InvItem { image_number: 8, xoff: 14, yoff: 80, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: c"Herb".as_ptr() },
+    InvItem { image_number: 9, xoff: 14, yoff: 90, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: c"Writ".as_ptr() },
+    InvItem { image_number: 10, xoff: 14, yoff: 100, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: c"Bone".as_ptr() },
+    InvItem { image_number: 12, xoff: 14, yoff: 110, ydelta: 0, img_off: 8, img_height: 8, maxshown: 1, name: c"Shard".as_ptr() },
+    InvItem { image_number: 0, xoff: 0, yoff: 0, ydelta: 0, img_off: 0, img_height: 0, maxshown: 2, name: c"2 Gold Pieces".as_ptr() },
+    InvItem { image_number: 0, xoff: 0, yoff: 0, ydelta: 0, img_off: 0, img_height: 0, maxshown: 5, name: c"5 Gold Pieces".as_ptr() },
+    InvItem { image_number: 0, xoff: 0, yoff: 0, ydelta: 0, img_off: 0, img_height: 0, maxshown: 10, name: c"10 Gold Pieces".as_ptr() },
+    InvItem { image_number: 0, xoff: 0, yoff: 0, ydelta: 0, img_off: 0, img_height: 0, maxshown: 100, name: c"100 Gold Pieces".as_ptr() },
+    InvItem { image_number: 0, xoff: 0, yoff: 0, ydelta: 0, img_off: 0, img_height: 0, maxshown: 0, name: c"quiver of arrows".as_ptr() },
 ];
 
 /// The mouse pointer sprite.
@@ -399,7 +399,7 @@ pub static mut menu_shortcuts: [Letter; 37] = [
 ];
 
 /// The brothers' names.
-pub static mut brother_names: [*const c_char; 3] = [b"Julian\0".as_ptr().cast(), b"Phillip\0".as_ptr().cast(), b"Kevin\0".as_ptr().cast()];
+pub static mut brother_names: [*const c_char; 3] = [c"Julian".as_ptr(), c"Phillip".as_ptr(), c"Kevin".as_ptr()];
 
 /// The disk blocks each of the ten map regions needs.
 pub static mut region_disk_blocks: [Need; 10] = [
@@ -418,10 +418,8 @@ pub static mut region_disk_blocks: [Need; 10] = [
 /// What the region loader has loaded so far (starts as "nothing useful").
 pub static mut loaded_blocks: Need = Need { image: [0, 0, 0, 0], terra1: 1, terra2: 2, sector: 0, region: 0, setchar: 0 };
 
-/// The region the hero is in (the start is region 3).
-
 /// The font the text panel asks for.
-pub static mut topaz_attr: TextAttr = TextAttr { ta_Name: b"topaz.font\0".as_ptr(), ta_YSize: 8, ta_Style: 0, ta_Flags: 1 };
+pub static mut topaz_attr: TextAttr = TextAttr { ta_Name: c"topaz.font".as_ptr().cast(), ta_YSize: 8, ta_Style: 0, ta_Flags: 1 };
 
 /// The instrument waveforms for the music, as pairs of values.
 pub static mut instrument_waves: [i16; 12] = [0x0000, 0x0000, 0x0000, 0x0000, 0x0005, 0x0202, 0x0101, 0x0103, 0x0004, 0x0504, 0x0100, 0x0500];

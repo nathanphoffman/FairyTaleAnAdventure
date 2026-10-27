@@ -38,8 +38,10 @@ static mut INPUT_REQUEST: *mut c_void = std::ptr::null_mut();
 pub fn flip_pages() {
     unsafe {
         let finished = the_screen.drawing_page;
-        the_screen.drawing_page = the_screen.viewing_page;
-        the_screen.viewing_page = finished;
+        std::ptr::swap(
+            &raw mut the_screen.drawing_page,
+            &raw mut the_screen.viewing_page,
+        );
         the_screen.vp_page.RasInfo = (*finished).ri_page;
         v.LOFCprList = (*finished).savecop;
 

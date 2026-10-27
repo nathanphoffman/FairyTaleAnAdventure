@@ -7,6 +7,7 @@
 //! actors in `actor_list`, so the game never handles more than 20 actors at once:
 //! - people (state 3 or 4) go in slots starting at 2, counted by `j1`;
 //! - ordinary items go after the monsters, counted by `drawn_actor_count`.
+//!
 //! The actor's `vitality` field is borrowed to remember which list entry it came from (the entry
 //! number, plus 0x80 for the global list), so `change_object` can find the entry again later.
 

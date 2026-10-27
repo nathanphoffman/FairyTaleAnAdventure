@@ -5,7 +5,6 @@ use super::asm_map::draw_overview_map;
 use super::asm_text::{queue_print, show_event, speak};
 use super::encounters::check_death;
 use super::game_tables::stone_ring_sectors;
-use super::globals::{secx, secy};
 use super::menus::update_menu_availability;
 use super::messages::print;
 use super::places::transfer_hero;
@@ -161,9 +160,10 @@ unsafe fn show_map() {
         draw_overview_map(the_world.map_x as i32, the_world.map_y as i32);
 
         let x = ((the_hero.x >> 4) as i64
-            - ((secx as i64 + the_world.origin_x as i64) << 4)
+            - ((the_world.sector_x as i64 + the_world.origin_x as i64) << 4)
             - MARK_X_OFFSET) as u32;
-        let y = ((the_hero.y >> 4) as i64 - ((secy as i64 + the_world.origin_y as i64) << 4)
+        let y = ((the_hero.y >> 4) as i64
+            - ((the_world.sector_y as i64 + the_world.origin_y as i64) << 4)
             + MARK_Y_OFFSET) as u32;
         the_screen.rp_map.BitMap = the_screen.bm_draw;
         SetDrMd(&raw mut the_screen.rp_map, JAM1);
@@ -303,7 +303,10 @@ mod tests {
     fn spell_gate_checks_in_order() {
         assert_eq!(spell_gate(4, 1, 0, 0, 0, 0), SpellGate::NoSpell);
         assert_eq!(spell_gate(SPELL_LIGHT, 0, 0, 0, 0, 0), SpellGate::NoSpell);
-        assert_eq!(spell_gate(SPELL_LIGHT, 1, NO_MAGIC_ZONE, 0, 0, 0), SpellGate::QuietZone);
+        assert_eq!(
+            spell_gate(SPELL_LIGHT, 1, NO_MAGIC_ZONE, 0, 0, 0),
+            SpellGate::QuietZone
+        );
         assert_eq!(spell_gate(SPELL_FREEZE, 1, 0, 2, 0, 0), SpellGate::Refused);
         assert_eq!(spell_gate(SPELL_FREEZE, 1, 0, 1, 0, 0), SpellGate::Proceed);
         assert_eq!(spell_gate(SPELL_LIGHT, 1, 0, 5, 0, 9), SpellGate::Proceed);
@@ -319,15 +322,27 @@ mod tests {
         assert_eq!(stone_target(143, x, y, 0, &LIST), StoneJump::Refused);
         assert_eq!(stone_target(144, x + 100, y, 0, &LIST), StoneJump::Refused);
         assert_eq!(stone_target(144, x, y + 100, 0, &LIST), StoneJump::Refused);
-        assert_eq!(stone_target(144, 0x0500 + 100, 0x0500 + 70, 0, &LIST), StoneJump::NoRing);
+        assert_eq!(
+            stone_target(144, 0x0500 + 100, 0x0500 + 70, 0, &LIST),
+            StoneJump::NoRing
+        );
         // Facing 0 goes one circle on, same offset inside the sector.
-        assert_eq!(stone_target(144, x, y, 0, &LIST), StoneJump::To((71 << 8) + 100, (77 << 8) + 70));
+        assert_eq!(
+            stone_target(144, x, y, 0, &LIST),
+            StoneJump::To((71 << 8) + 100, (77 << 8) + 70)
+        );
         // From the last circle the list wraps: 10 + 8 - 11 = 7.
         let (x, y) = ((84 << 8) + 90, (60 << 8) + 65);
-        assert_eq!(stone_target(144, x, y, 7, &LIST), StoneJump::To((73 << 8) + 90, (21 << 8) + 65));
+        assert_eq!(
+            stone_target(144, x, y, 7, &LIST),
+            StoneJump::To((73 << 8) + 90, (21 << 8) + 65)
+        );
         // Landing exactly on the last index does not wrap.
         let (x, y) = ((54 << 8) + 90, (43 << 8) + 65);
-        assert_eq!(stone_target(144, x, y, 9, &LIST), StoneJump::To((84 << 8) + 90, (60 << 8) + 65));
+        assert_eq!(
+            stone_target(144, x, y, 9, &LIST),
+            StoneJump::To((84 << 8) + 90, (60 << 8) + 65)
+        );
     }
 
     #[test]

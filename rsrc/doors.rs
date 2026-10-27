@@ -220,6 +220,9 @@ mod tests {
         let (c, n) = open_changes(find_open(136, 800, GOLD as u32).unwrap(), 10, 5);
         assert_eq!(&c[..n], &[(10, 5, 133), (11, 5, 134), (12, 5, 135)]);
         let (c, n) = open_changes(find_open(165, 800, GREEN as u32).unwrap(), 10, 5);
-        assert_eq!(&c[..n], &[(10, 5, 85), (10, 4, 87), (11, 5, 86), (11, 4, 88)]);
+        assert_eq!(
+            &c[..n],
+            &[(10, 5, 85), (10, 4, 87), (11, 5, 86), (11, 4, 88)]
+        );
     }
 }

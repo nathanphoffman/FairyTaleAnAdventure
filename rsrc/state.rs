@@ -53,6 +53,11 @@ pub struct World {
     pub secret_timer: i16,
     pub extent: *mut Extent,
     pub extent_type: u16,
+    /// The map sector at the top left of the view (set when the map is drawn).
+    pub sector_x: i32,
+    pub sector_y: i32,
+    /// How many frames the hero has stood on a bed.
+    pub bed_wait: i16,
 }
 
 pub static mut the_world: World = World {

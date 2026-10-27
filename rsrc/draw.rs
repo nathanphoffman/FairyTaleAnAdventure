@@ -188,7 +188,7 @@ unsafe fn weapon_passmode(an: *const Shape, pass: &mut u8) -> bool {
         let state = (*an).state;
         if (*an).weapon > 0
             && (*an).weapon < 8
-            && (state < DEAD || state >= SHOOT1 || the_world.extent_type > 80)
+            && (!(DEAD..SHOOT1).contains(&state) || the_world.extent_type > 80)
         {
             let facing = (*an).facing as i32;
             let flipped = *pass ^ 1;
@@ -315,6 +315,7 @@ fn clip_to_screen(sprite: &mut Sprite) -> Clip {
 /// Fills in the blitter's registers and the queue entry for this sprite: sizes, where the image,
 /// its mask and the saved background are, and the shifts. Returns false when the save buffer is
 /// full.
+#[allow(clippy::too_many_arguments)] // the blit set-up of the original, kept as one call
 unsafe fn set_up_blit(
     frame: &mut Frame,
     sprite: &Sprite,
@@ -631,6 +632,7 @@ fn scenery_rule(k: i16, xm: i32, ym: i32, ystop: i16, on_bridge: bool) -> Scener
 
 /// Cuts out the parts of the sprite that scenery (trees, walls, roofs) should hide, one map tile at a
 /// time, by marking them in the mask buffer.
+#[allow(clippy::too_many_arguments)] // the tile loop of the original, kept as one call
 unsafe fn mask_against_scenery(
     an: *const Shape,
     i: i32,

@@ -306,9 +306,13 @@ unsafe fn take_object() -> bool {
 enum Take {
     Gold,
     /// The scrap of paper; the second message depends on being indoors.
-    Paper { indoors: bool },
+    Paper {
+        indoors: bool,
+    },
     /// Fruit: kept in the pack when not hungry, otherwise eaten.
-    Fruit { keep: bool },
+    Fruit {
+        keep: bool,
+    },
     /// Turtle eggs cannot be taken.
     Eggs,
     Bones,
@@ -323,8 +327,12 @@ enum Take {
 fn classify_take(id: u32, hunger: i16, region: u16) -> Take {
     match id {
         GOLD_PILE => Take::Gold,
-        SCRAP_OF_PAPER => Take::Paper { indoors: region > FIRST_INDOOR_REGION },
-        FRUIT => Take::Fruit { keep: hunger < NOT_HUNGRY },
+        SCRAP_OF_PAPER => Take::Paper {
+            indoors: region > FIRST_INDOOR_REGION,
+        },
+        FRUIT => Take::Fruit {
+            keep: hunger < NOT_HUNGRY,
+        },
         TURTLE_EGGS => Take::Eggs,
         BROTHER_BONES => Take::Bones,
         CHEST => Take::Container(c"a chest"),
@@ -452,7 +460,10 @@ fn roll_contents(mut pick4: impl FnMut() -> i32, mut pick8: impl FnMut() -> i32)
             if second == 8 {
                 second = ARROWBASE as i32;
             }
-            Contents::Two { first: first as usize, second: second as usize }
+            Contents::Two {
+                first: first as usize,
+                second: second as usize,
+            }
         }
         _ => {
             let i = pick8() + 8;
@@ -536,11 +547,25 @@ fn body_loot(
     treasure_roll: impl FnOnce() -> u32,
 ) -> BodyLoot {
     let weapon = body_weapon(body_weapon_raw);
-    let hero_weapon = if weapon != 0 { better_weapon(hero_weapon, weapon) } else { hero_weapon };
+    let hero_weapon = if weapon != 0 {
+        better_weapon(hero_weapon, weapon)
+    } else {
+        hero_weapon
+    };
     if weapon == ARCHER_WEAPON {
-        return BodyLoot { weapon, hero_weapon, arrows: Some(arrow_roll()), treasure: 0 };
+        return BodyLoot {
+            weapon,
+            hero_weapon,
+            arrows: Some(arrow_roll()),
+            treasure: 0,
+        };
     }
-    BodyLoot { weapon, hero_weapon, arrows: None, treasure: treasure_roll() }
+    BodyLoot {
+        weapon,
+        hero_weapon,
+        arrows: None,
+        treasure: treasure_roll(),
+    }
 }
 
 /// The heaviest weapon an enemy can carry and be searched for.
@@ -548,12 +573,20 @@ const MAX_BODY_WEAPON: i8 = 5;
 
 /// The weapon a body yields (0 for none): the unarmed and odd values count as nothing.
 fn body_weapon(raw: i8) -> u32 {
-    if raw as u8 as u32 > MAX_BODY_WEAPON as u32 { 0 } else { raw as u8 as u32 }
+    if raw as u8 as u32 > MAX_BODY_WEAPON as u32 {
+        0
+    } else {
+        raw as u8 as u32
+    }
 }
 
 /// The hero keeps a better weapon in hand and only takes up a found one that is better.
 fn better_weapon(current: i8, found: u32) -> i8 {
-    if found as i8 > current { found as i8 } else { current }
+    if found as i8 > current {
+        found as i8
+    } else {
+        current
+    }
 }
 
 /// Picks what a dead enemy carries besides its weapon, from the treasure table for its race.
@@ -606,11 +639,35 @@ mod tests {
         assert_eq!(rolls(1, &[0]), Contents::One(ARROWBASE));
         assert_eq!(rolls(1, &[3]), Contents::One(11));
         // two things: a first item and a different second one
-        assert_eq!(rolls(2, &[2, 5]), Contents::Two { first: 10, second: 13 });
+        assert_eq!(
+            rolls(2, &[2, 5]),
+            Contents::Two {
+                first: 10,
+                second: 13
+            }
+        );
         // 100 gold first can never match the second roll, so the arrows are accepted
-        assert_eq!(rolls(2, &[0, 0]), Contents::Two { first: HUNDRED_GOLD as usize, second: ARROWBASE });
-        assert_eq!(rolls(2, &[0, 4]), Contents::Two { first: HUNDRED_GOLD as usize, second: 12 });
-        assert_eq!(rolls(2, &[3, 3, 0]), Contents::Two { first: 11, second: ARROWBASE });
+        assert_eq!(
+            rolls(2, &[0, 0]),
+            Contents::Two {
+                first: HUNDRED_GOLD as usize,
+                second: ARROWBASE
+            }
+        );
+        assert_eq!(
+            rolls(2, &[0, 4]),
+            Contents::Two {
+                first: HUNDRED_GOLD as usize,
+                second: 12
+            }
+        );
+        assert_eq!(
+            rolls(2, &[3, 3, 0]),
+            Contents::Two {
+                first: 11,
+                second: ARROWBASE
+            }
+        );
         // three of one thing, or three keys
         assert_eq!(rolls(3, &[4]), Contents::ThreeOf(12));
         assert_eq!(rolls(3, &[0, 0, 5, 6]), Contents::ThreeKeys([16, 21, 16]));
@@ -620,12 +677,18 @@ mod tests {
     fn body_loot_rules() {
         let none = || -> u32 { 0 };
         let l = body_loot(2, 1, || unreachable!(), || 7);
-        assert_eq!((l.weapon, l.hero_weapon, l.arrows, l.treasure), (2, 2, None, 7));
+        assert_eq!(
+            (l.weapon, l.hero_weapon, l.arrows, l.treasure),
+            (2, 2, None, 7)
+        );
         // a weaker weapon does not replace the one in hand
         assert_eq!(body_loot(2, 3, || unreachable!(), none).hero_weapon, 3);
         // an archer gives arrows and nothing else
         let l = body_loot(4, 1, || 5, || unreachable!());
-        assert_eq!((l.weapon, l.arrows, l.treasure, l.hero_weapon), (4, Some(5), 0, 4));
+        assert_eq!(
+            (l.weapon, l.arrows, l.treasure, l.hero_weapon),
+            (4, Some(5), 0, 4)
+        );
         // no weapon at all
         let l = body_loot(0, 2, || unreachable!(), none);
         assert_eq!((l.weapon, l.hero_weapon, l.treasure), (0, 2, 0));
@@ -652,10 +715,22 @@ mod tests {
     #[test]
     fn take_classes() {
         assert_eq!(classify_take(GOLD_PILE, 0, 0), Take::Gold);
-        assert_eq!(classify_take(SCRAP_OF_PAPER, 0, FIRST_INDOOR_REGION), Take::Paper { indoors: false });
-        assert_eq!(classify_take(SCRAP_OF_PAPER, 0, FIRST_INDOOR_REGION + 1), Take::Paper { indoors: true });
-        assert_eq!(classify_take(FRUIT, NOT_HUNGRY - 1, 0), Take::Fruit { keep: true });
-        assert_eq!(classify_take(FRUIT, NOT_HUNGRY, 0), Take::Fruit { keep: false });
+        assert_eq!(
+            classify_take(SCRAP_OF_PAPER, 0, FIRST_INDOOR_REGION),
+            Take::Paper { indoors: false }
+        );
+        assert_eq!(
+            classify_take(SCRAP_OF_PAPER, 0, FIRST_INDOOR_REGION + 1),
+            Take::Paper { indoors: true }
+        );
+        assert_eq!(
+            classify_take(FRUIT, NOT_HUNGRY - 1, 0),
+            Take::Fruit { keep: true }
+        );
+        assert_eq!(
+            classify_take(FRUIT, NOT_HUNGRY, 0),
+            Take::Fruit { keep: false }
+        );
         assert_eq!(classify_take(TURTLE_EGGS, 0, 0), Take::Eggs);
         assert_eq!(classify_take(BROTHER_BONES, 0, 0), Take::Bones);
         assert_eq!(classify_take(CHEST, 0, 0), Take::Container(c"a chest"));

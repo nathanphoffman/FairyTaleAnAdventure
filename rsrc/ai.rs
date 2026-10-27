@@ -188,6 +188,7 @@ fn on_screen(xd: i16, yd: i16) -> bool {
 /// The mode after the hero's state and the actor's own health are taken into account: everyone
 /// flees (or follows the leader) when the hero is dead or falling, the nearly dead flee, and so do
 /// actors of a special encounter that are not the zone's own race in the 60+ zones.
+#[allow(clippy::too_many_arguments)] // the whole situation of one actor, from plain values
 fn adjusted_mode(
     mode: i16,
     hero_state: i8,
@@ -394,7 +395,10 @@ mod tests {
         assert_eq!(adjusted_mode(1, FALL, 3, 10, 0, 0, 0), FOLLOWER);
         assert_eq!(adjusted_mode(1, STILL, 0, NEARLY_DEAD - 1, 0, 0, 0), FLEE);
         assert_eq!(adjusted_mode(1, STILL, 0, NEARLY_DEAD, 0, 0, 0), 1);
-        assert_eq!(adjusted_mode(1, STILL, 0, 10, SPECIAL_XTYPE + 1, 5, 6), FLEE);
+        assert_eq!(
+            adjusted_mode(1, STILL, 0, 10, SPECIAL_XTYPE + 1, 5, 6),
+            FLEE
+        );
         assert_eq!(adjusted_mode(1, STILL, 0, 10, SPECIAL_XTYPE + 1, 6, 6), 1);
         assert_eq!(adjusted_mode(1, STILL, 0, 10, SPECIAL_XTYPE, 5, 6), 1);
     }
@@ -408,18 +412,37 @@ mod tests {
     #[test]
     fn strike_rules() {
         let near = STRIKE_BASE - ATTACK_MODE;
-        assert_eq!(hostile_choice(0, 1, 10, ATTACK_MODE, near - 1, near - 1), Hostile::Strike);
-        assert_eq!(hostile_choice(0, 1, 10, ATTACK_MODE, near, 5), Hostile::Tactic);
-        // bows never strike
-        assert_eq!(hostile_choice(0, BOW_BIT, 10, ATTACK_MODE, 1, 1), Hostile::Tactic);
         assert_eq!(
-            hostile_choice(DKNIGHT, 1, 10, ATTACK_MODE, DKNIGHT_STRIKE - 1, DKNIGHT_STRIKE - 1),
+            hostile_choice(0, 1, 10, ATTACK_MODE, near - 1, near - 1),
+            Hostile::Strike
+        );
+        assert_eq!(
+            hostile_choice(0, 1, 10, ATTACK_MODE, near, 5),
+            Hostile::Tactic
+        );
+        // bows never strike
+        assert_eq!(
+            hostile_choice(0, BOW_BIT, 10, ATTACK_MODE, 1, 1),
+            Hostile::Tactic
+        );
+        assert_eq!(
+            hostile_choice(
+                DKNIGHT,
+                1,
+                10,
+                ATTACK_MODE,
+                DKNIGHT_STRIKE - 1,
+                DKNIGHT_STRIKE - 1
+            ),
             Hostile::Strike
         );
         assert_eq!(
             hostile_choice(DKNIGHT, 1, 10, ATTACK_MODE, DKNIGHT_STRIKE, 5),
             Hostile::KnightGuard
         );
-        assert_eq!(hostile_choice(DKNIGHT, 1, 0, ATTACK_MODE, DKNIGHT_STRIKE, 5), Hostile::Tactic);
+        assert_eq!(
+            hostile_choice(DKNIGHT, 1, 0, ATTACK_MODE, DKNIGHT_STRIKE, 5),
+            Hostile::Tactic
+        );
     }
 }

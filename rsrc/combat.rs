@@ -150,6 +150,7 @@ enum SwingResult {
 /// within reach; an enemy also has to get past the hero's bravery (`dodge_roll` is a 0-255 draw,
 /// taken before anything else is checked, only for enemies). Nothing hits while time is frozen,
 /// and touch attacks make no sound.
+#[allow(clippy::too_many_arguments)] // the whole situation of one swing, from plain values
 fn swing_result(
     by_hero: bool,
     dist: i16,
@@ -417,16 +418,34 @@ mod tests {
     #[test]
     fn the_hero_always_hits_within_reach() {
         let never = || -> i32 { unreachable!("the hero does not roll") };
-        assert_eq!(swing_result(true, 4, 5, false, 3, 100, never), SwingResult::Hit);
-        assert_eq!(swing_result(true, 5, 5, false, 3, 100, never), SwingResult::Whoosh);
-        assert_eq!(swing_result(true, 7, 5, false, 3, 100, never), SwingResult::Miss);
+        assert_eq!(
+            swing_result(true, 4, 5, false, 3, 100, never),
+            SwingResult::Hit
+        );
+        assert_eq!(
+            swing_result(true, 5, 5, false, 3, 100, never),
+            SwingResult::Whoosh
+        );
+        assert_eq!(
+            swing_result(true, 7, 5, false, 3, 100, never),
+            SwingResult::Miss
+        );
     }
 
     #[test]
     fn an_enemy_must_beat_the_heros_bravery() {
-        assert_eq!(swing_result(false, 1, 5, false, 3, 100, || 101), SwingResult::Hit);
-        assert_eq!(swing_result(false, 1, 5, false, 3, 100, || 100), SwingResult::Whoosh);
-        assert_eq!(swing_result(false, 1, 5, false, 3, 100, || 0), SwingResult::Whoosh);
+        assert_eq!(
+            swing_result(false, 1, 5, false, 3, 100, || 101),
+            SwingResult::Hit
+        );
+        assert_eq!(
+            swing_result(false, 1, 5, false, 3, 100, || 100),
+            SwingResult::Whoosh
+        );
+        assert_eq!(
+            swing_result(false, 1, 5, false, 3, 100, || 0),
+            SwingResult::Whoosh
+        );
     }
 
     #[test]
@@ -441,9 +460,18 @@ mod tests {
 
     #[test]
     fn nothing_hits_while_time_is_frozen_and_touches_are_silent() {
-        assert_eq!(swing_result(true, 1, 5, true, 3, 0, || 0), SwingResult::Whoosh);
-        assert_eq!(swing_result(true, 1, 5, true, TOUCH_WEAPON, 0, || 0), SwingResult::Miss);
-        assert_eq!(swing_result(true, 5, 5, false, TOUCH_WEAPON, 0, || 0), SwingResult::Miss);
+        assert_eq!(
+            swing_result(true, 1, 5, true, 3, 0, || 0),
+            SwingResult::Whoosh
+        );
+        assert_eq!(
+            swing_result(true, 1, 5, true, TOUCH_WEAPON, 0, || 0),
+            SwingResult::Miss
+        );
+        assert_eq!(
+            swing_result(true, 5, 5, false, TOUCH_WEAPON, 0, || 0),
+            SwingResult::Miss
+        );
     }
 
     #[test]

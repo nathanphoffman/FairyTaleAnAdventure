@@ -448,7 +448,7 @@ unsafe fn fighting_state(state: i8) -> i8 {
             }
             return state;
         }
-        if (compass_lit_direction as i16) < NOT_WALKING {
+        if compass_lit_direction < NOT_WALKING {
             (*hero).facing = compass_lit_direction as i8;
         }
         if state >= WALKING {
@@ -514,7 +514,15 @@ mod tests {
     #[test]
     fn only_a_starving_hero_stumbles() {
         let mut drawn = 0;
-        let dir = stumble(3, STUMBLE_HUNGER, || { drawn += 1; true }, || true);
+        let dir = stumble(
+            3,
+            STUMBLE_HUNGER,
+            || {
+                drawn += 1;
+                true
+            },
+            || true,
+        );
         assert_eq!((dir, drawn), (3, 0));
         assert_eq!(stumble(3, STUMBLE_HUNGER + 1, || false, || true), 3);
         assert_eq!(stumble(3, STUMBLE_HUNGER + 1, || true, || true), 4);
@@ -527,7 +535,15 @@ mod tests {
     #[test]
     fn the_turn_is_only_drawn_after_a_trip() {
         let mut drawn = 0;
-        stumble(3, STUMBLE_HUNGER + 1, || false, || { drawn += 1; true });
+        stumble(
+            3,
+            STUMBLE_HUNGER + 1,
+            || false,
+            || {
+                drawn += 1;
+                true
+            },
+        );
         assert_eq!(drawn, 0);
     }
 

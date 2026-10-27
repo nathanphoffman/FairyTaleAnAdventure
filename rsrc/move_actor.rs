@@ -175,7 +175,11 @@ enum Wading {
 /// The depth after one frame in water of terrain type `j` (shallow 4 or deep 5), and what that does.
 /// The depth moves one step towards its limit; the dead are not affected.
 fn wade_step(depth: i8, j: i16, dead_or_dying: bool) -> (i8, Wading) {
-    let limit: i8 = if j == TERRAIN_SLOW_SINK { 10 } else { ENVIRON_DROWNED };
+    let limit: i8 = if j == TERRAIN_SLOW_SINK {
+        10
+    } else {
+        ENVIRON_DROWNED
+    };
     if depth > limit {
         (depth - 1, Wading::Nothing)
     } else if depth < limit {
@@ -453,7 +457,7 @@ impl Ctx {
                     self.dex += 2;
                 }
             } else if witch {
-                steer_actor(self.i as i32, the_hero.x as i32, the_hero.y as i32, 0);
+                steer_actor(self.i, the_hero.x as i32, the_hero.y as i32, 0);
                 self.dex = ((*an).facing / 2) as i16;
                 the_witch.on_screen = 1;
             } else if self.s == TALKING {
@@ -1058,14 +1062,26 @@ mod tests {
     fn wading_deeper_sinks_then_drowns() {
         // deep water (5): wade towards ENVIRON_DROWNED
         assert_eq!(wade_step(0, 5, false), (1, Wading::Nothing));
-        assert_eq!(wade_step(ENVIRON_SINKING, 5, false), (ENVIRON_SINKING + 1, Wading::Sinking));
-        assert_eq!(wade_step(ENVIRON_DROWNED - 1, 5, false), (ENVIRON_DROWNED, Wading::Drowned));
-        assert_eq!(wade_step(ENVIRON_DROWNED, 5, false), (ENVIRON_DROWNED, Wading::Nothing));
+        assert_eq!(
+            wade_step(ENVIRON_SINKING, 5, false),
+            (ENVIRON_SINKING + 1, Wading::Sinking)
+        );
+        assert_eq!(
+            wade_step(ENVIRON_DROWNED - 1, 5, false),
+            (ENVIRON_DROWNED, Wading::Drowned)
+        );
+        assert_eq!(
+            wade_step(ENVIRON_DROWNED, 5, false),
+            (ENVIRON_DROWNED, Wading::Nothing)
+        );
         // shallow water (4) stops at 10 and comes back up from deeper
         assert_eq!(wade_step(9, 4, false), (10, Wading::Nothing));
         assert_eq!(wade_step(10, 4, false), (10, Wading::Nothing));
         assert_eq!(wade_step(12, 4, false), (11, Wading::Nothing));
         // the dead are not affected
-        assert_eq!(wade_step(ENVIRON_SINKING, 5, true), (ENVIRON_SINKING + 1, Wading::Nothing));
+        assert_eq!(
+            wade_step(ENVIRON_SINKING, 5, true),
+            (ENVIRON_SINKING + 1, Wading::Nothing)
+        );
     }
 }

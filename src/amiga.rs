@@ -1,6 +1,8 @@
 //! Rust mirrors of the stand-in Amiga structs in csrc/amiga.h.
 //! The sizes are checked against the C compiler's at startup (see `check_layout`).
 #![allow(non_snake_case, non_camel_case_types, dead_code)]
+// These keep the Amiga's own type names (APTR, UWORD, ...), so the structs match the C headers.
+#![allow(clippy::upper_case_acronyms)]
 
 use std::os::raw::c_void;
 

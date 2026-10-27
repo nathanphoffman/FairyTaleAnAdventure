@@ -135,8 +135,8 @@ pub fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: *const u16) {
             b = b.max(0);
             g2 = 0;
         }
-        for i in 0..COLOR_COUNT {
-            fader[i] = faded_color(
+        for (i, slot) in (*(&raw mut fader)).iter_mut().take(COLOR_COUNT).enumerate() {
+            *slot = faded_color(
                 i,
                 *colors.add(i),
                 (r, g, b),
@@ -191,8 +191,8 @@ fn faded_color(
 pub fn flicker_colors() {
     unsafe {
         for _ in 0..COLOR_COUNT {
-            for i in 1..COLOR_COUNT {
-                fader[i] = bitrand(0xfff) as u16;
+            for slot in (*(&raw mut fader)).iter_mut().take(COLOR_COUNT).skip(1) {
+                *slot = bitrand(0xfff) as u16;
             }
             LoadRGB4(
                 &raw mut the_screen.vp_page,
@@ -473,6 +473,45 @@ pub fn day_fade() {
     }
 }
 
+/// The size of the picture during the intro's zoom: `x` is half the width in pixels (0 to 160),
+/// the height keeps the 8:5 shape. Moves the page and text view ports to match, fades the colours
+/// with the size (black when small), and shows the result.
+pub fn set_intro_zoom(x: i32) {
+    unsafe {
+        let y = (x * 5) / 8;
+
+        Delay(2);
+
+        let left = (160 - x) as i16;
+        the_screen.ri_page2.RxOffset = left;
+        the_screen.ri_page1.RxOffset = left;
+        the_screen.vp_page.DxOffset = left;
+        the_screen.vp_page.DWidth = (x + x) as i16;
+
+        let top = (100 - y) as i16;
+        the_screen.ri_page2.RyOffset = top;
+        the_screen.ri_page1.RyOffset = top;
+        the_screen.vp_page.DyOffset = top;
+        the_screen.vp_page.DHeight = (y + y) as i16;
+
+        the_screen.vp_text.DxOffset = 0;
+        the_screen.vp_text.DyOffset = 0;
+        the_screen.vp_text.DHeight = (95 - y) as i16;
+
+        let colors = (&raw const intro_colors).cast::<u16>();
+        fade_page(
+            (y * 2 - 40) as i16,
+            (y * 2 - 70) as i16,
+            (y * 2 - 100) as i16,
+            0,
+            colors,
+        );
+
+        MakeVPort(&raw mut v, &raw mut the_screen.vp_text);
+        flip_pages();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -531,44 +570,5 @@ mod tests {
         assert_eq!((late[29], late[30]), (0x100 * 8, 0x100 * 4));
         // the sky colours at the very end (index <= 0) are black
         assert!(sunrise_palette(-30)[2..28].iter().all(|&c| c == 0));
-    }
-}
-
-/// The size of the picture during the intro's zoom: `x` is half the width in pixels (0 to 160),
-/// the height keeps the 8:5 shape. Moves the page and text view ports to match, fades the colours
-/// with the size (black when small), and shows the result.
-pub fn set_intro_zoom(x: i32) {
-    unsafe {
-        let y = (x * 5) / 8;
-
-        Delay(2);
-
-        let left = (160 - x) as i16;
-        the_screen.ri_page2.RxOffset = left;
-        the_screen.ri_page1.RxOffset = left;
-        the_screen.vp_page.DxOffset = left;
-        the_screen.vp_page.DWidth = (x + x) as i16;
-
-        let top = (100 - y) as i16;
-        the_screen.ri_page2.RyOffset = top;
-        the_screen.ri_page1.RyOffset = top;
-        the_screen.vp_page.DyOffset = top;
-        the_screen.vp_page.DHeight = (y + y) as i16;
-
-        the_screen.vp_text.DxOffset = 0;
-        the_screen.vp_text.DyOffset = 0;
-        the_screen.vp_text.DHeight = (95 - y) as i16;
-
-        let colors = (&raw const intro_colors).cast::<u16>();
-        fade_page(
-            (y * 2 - 40) as i16,
-            (y * 2 - 70) as i16,
-            (y * 2 - 100) as i16,
-            0,
-            colors,
-        );
-
-        MakeVPort(&raw mut v, &raw mut the_screen.vp_text);
-        flip_pages();
     }
 }

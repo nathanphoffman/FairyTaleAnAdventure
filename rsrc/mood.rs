@@ -37,7 +37,9 @@ const GAME_MENU: usize = 4;
 const MUSIC_ENTRY: usize = 6;
 
 /// The tunes in order of their number, with the intro (3) where the game plays it at the start.
-const TUNE_NAMES: [&str; 7] = ["day", "battle", "night", "intro", "astral", "indoors", "death"];
+const TUNE_NAMES: [&str; 7] = [
+    "day", "battle", "night", "intro", "astral", "indoors", "death",
+];
 
 /// Writes every tune as a WAV file into `dir` (the indoors tune twice: with the house and the cave
 /// instrument). A tool for listening to the music; the game then ends.

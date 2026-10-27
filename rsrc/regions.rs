@@ -55,7 +55,7 @@ pub fn refresh_minimap() {
             if the_world.new_region < NO_REGION {
                 let xs = the_world.map_x as u32 & 0x3fff;
                 let ys = the_world.map_y as u32 & 0x1fff;
-                if (ys > 109 && ys < 7936) && (xs > 16156 || xs < 16128) {
+                if (ys > 109 && ys < 7936) && !(16128..=16156).contains(&xs) {
                     load_region_now();
                 }
             }

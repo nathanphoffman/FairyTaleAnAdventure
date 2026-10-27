@@ -211,13 +211,17 @@ order; all six are done. Sizes are the C line counts.
 The port is finished. What remains afterwards (optional, no firm end) is the cleanup pass:
 - Give the Rust functions readable names with thin wrappers that keep the C names for any C still
   left (`layout.c`, `statedump.c`), then delete the wrappers.
-- Replace the `static mut` globals and raw pointers with proper structs (this is step 3). Started:
-  `rsrc/state.rs` has `Hero`, `World`, `Encounters` and `Actors` (statics `the_hero`, `the_world`,
-  `the_encounter`, `the_actors`); the rest of the loose variables (screen structures, memory areas,
-  flags) are still in `globals.rs`. `statedump.c` is now `rsrc/statedump.rs`, so no C reads Rust
+- Replace the `static mut` globals with structs (this is step 3). Done for the game state:
+  `rsrc/state.rs` has `Hero`, `World`, `Encounters`, `Actors`, `Screen`, `Memory`, `Ui` and `Witch`
+  (statics `the_hero`, `the_world`, ...). `globals.rs` keeps only the Amiga base pointers, fonts,
+  scratch variables and the audio ones. `statedump.c` is now `rsrc/statedump.rs`, so no C reads Rust
   variables any more. All long functions are split (done).
-- Scenarios: done for swan/turtle, key doors, `win_colors`, `rescue`, `witch_fx` (see above); the freeze and
-  fear spells are still open.
+- Unit tests instead of playtests (done): the rules are plain functions that take values or the state
+  structs and return what should happen (hunger, tactics, melee and missile hits, death, revive,
+  talking, shops, loot, doors, spells, riding, water, beds, the day clock). The callers do the sounds,
+  text and drawing. 192 unit tests. The playtests went from 49 to 24 (13 pixel, 11 state); the ones
+  left check drawing, save/load and that the game reaches the rules. `cargo clippy` is clean.
+- `FTA_MUSIC_EXPORT=dir` writes every tune as a WAV file and quits (`rsrc/mood.rs`).
 - See the note below on keeping an all-C "original" build possible while doing this.
 
 ### Keeping an all-C "original" build possible

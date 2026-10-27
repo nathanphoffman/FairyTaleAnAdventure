@@ -13,7 +13,6 @@
 //! visible area, and `draw_map`, `draw_map_column`, `draw_map_row` copy the tile graphics to the screen.
 //! `scroll_map` shifts the picture by one tile so only a new edge has to be drawn.
 
-use super::globals::{secx, secy};
 use super::state::{the_hero, the_memory, the_screen, the_world};
 use super::tables::minimap;
 
@@ -430,12 +429,12 @@ fn overview_origin(mx: i32, my: i32, region_x: u16, region_y: u16) -> (i16, i16)
 
 /// Draws the overview map (the magic map spell): each sector is one 16 by 8 block of pixels drawn
 /// twice as tall, 18 x 9 sectors across the screen. Each pixel's colour is the tile's overview
-/// colour (terrain table byte 3). `secx` / `secy` tell the caller which sector is at the top left.
+/// colour (terrain table byte 3). `sector_x` / `sector_y` tell the caller which sector is at the top left.
 pub fn draw_overview_map(mx: i32, my: i32) {
     unsafe {
         let (x, y) = overview_origin(mx, my, the_world.origin_x, the_world.origin_y);
-        secx = x as i32;
-        secy = y as i32;
+        the_world.sector_x = x as i32;
+        the_world.sector_y = y as i32;
         let mut offset = 0usize;
         for j in 0..OVERVIEW_ROWS {
             for i in 0..OVERVIEW_COLUMNS {

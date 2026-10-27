@@ -13,8 +13,8 @@
 mod calls;
 mod channel;
 mod dump;
-mod sequencer;
 mod export;
+mod sequencer;
 mod tables;
 
 pub use dump::dump;

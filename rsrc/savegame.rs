@@ -134,11 +134,11 @@ unsafe fn save_all() {
         for i in 0..glbobs as usize {
             transfer_object((&raw mut ob_listg).cast::<WorldObject>().add(i));
         }
-        for i in 0..OBJECT_REGIONS {
-            transfer_u16((&raw mut mapobs[i]).cast());
+        for count in (*(&raw mut mapobs)).iter_mut().take(OBJECT_REGIONS) {
+            transfer_u16((count as *mut i16).cast());
         }
-        for i in 0..OBJECT_REGIONS {
-            transfer_u16((&raw mut dstobs[i]).cast());
+        for count in (*(&raw mut dstobs)).iter_mut().take(OBJECT_REGIONS) {
+            transfer_u16((count as *mut i16).cast());
         }
         for i in 0..OBJECT_REGIONS {
             for k in 0..mapobs[i] as usize {

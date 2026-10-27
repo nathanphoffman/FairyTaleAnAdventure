@@ -336,7 +336,10 @@ mod tests {
         world.freeze_timer = 7;
         world.region = 9;
         reset_for_next_brother(&mut hero, &mut world);
-        assert_eq!((world.secret_timer, world.light_timer, world.freeze_timer), (0, 0, 0));
+        assert_eq!(
+            (world.secret_timer, world.light_timer, world.freeze_timer),
+            (0, 0, 0)
+        );
         assert_eq!(world.region, FIRST_REGION);
         assert_eq!(
             (hero.safe_x, hero.safe_y, hero.safe_r),
@@ -351,7 +354,10 @@ mod tests {
         hero.safe_y = 2000;
         hero.safe_r = 5;
         move_to_safe_spot(&mut hero, &mut body, &mut world);
-        assert_eq!((hero.x, hero.y, body.abs_x, body.abs_y), (1000, 2000, 1000, 2000));
+        assert_eq!(
+            (hero.x, hero.y, body.abs_x, body.abs_y),
+            (1000, 2000, 1000, 2000)
+        );
         assert_eq!(
             (world.map_x, world.map_y),
             (1000 - CAMERA_OFFSET.0, 2000 - CAMERA_OFFSET.1)
@@ -369,9 +375,15 @@ mod tests {
         body.environ = 3;
         world.day_clock = 100;
         restore_stats(&mut hero, &mut body, &mut world);
-        assert_eq!((body.vitality, body.state, body.environ, body.race), (25, STILL, 0, 255));
+        assert_eq!(
+            (body.vitality, body.state, body.environ, body.race),
+            (25, STILL, 0, 255)
+        );
         assert_eq!((hero.hunger, hero.fatigue), (0, 0));
-        assert_eq!((world.day_clock, world.light_level), (START_DAYNIGHT, START_LIGHT));
+        assert_eq!(
+            (world.day_clock, world.light_level),
+            (START_DAYNIGHT, START_LIGHT)
+        );
     }
 
     #[test]

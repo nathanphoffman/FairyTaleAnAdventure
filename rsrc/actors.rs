@@ -169,7 +169,10 @@ enum BattleReport {
     /// The hero is dead, or nothing worth saying.
     Silent,
     Bravely,
-    Foes { dead: i32, fled: i32 },
+    Foes {
+        dead: i32,
+        fled: i32,
+    },
 }
 
 /// `dead` and `fled` count the enemies that fell and that ran away.
@@ -641,14 +644,23 @@ mod tests {
     fn what_is_said_after_a_fight() {
         let calm = PEACEFUL_EXTENT - 1;
         assert_eq!(battle_report(0, 3, 0, calm), BattleReport::Silent);
-        assert_eq!(battle_report(BRAVE_LOW_VITALITY - 1, 1, 0, calm), BattleReport::Bravely);
+        assert_eq!(
+            battle_report(BRAVE_LOW_VITALITY - 1, 1, 0, calm),
+            BattleReport::Bravely
+        );
         // nearly dead but nobody died: the normal report
         assert_eq!(
             battle_report(BRAVE_LOW_VITALITY - 1, 0, 2, calm),
             BattleReport::Foes { dead: 0, fled: 2 }
         );
-        assert_eq!(battle_report(50, 2, 1, calm), BattleReport::Foes { dead: 2, fled: 1 });
+        assert_eq!(
+            battle_report(50, 2, 1, calm),
+            BattleReport::Foes { dead: 2, fled: 1 }
+        );
         // peaceful places say nothing
-        assert_eq!(battle_report(50, 2, 1, PEACEFUL_EXTENT), BattleReport::Silent);
+        assert_eq!(
+            battle_report(50, 2, 1, PEACEFUL_EXTENT),
+            BattleReport::Silent
+        );
     }
 }

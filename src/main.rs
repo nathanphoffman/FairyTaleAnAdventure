@@ -2,7 +2,9 @@ mod amiga;
 mod platform;
 // The game state lives in lower-case `static mut` variables (named for what they hold) until it
 // moves into structs.
-#[allow(non_upper_case_globals)]
+// `&mut *(&raw mut the_x)` is how a `static mut` is borrowed without the `static_mut_refs` lint, so
+// clippy's `deref_addrof` advice (use the static directly) would not compile.
+#[allow(non_upper_case_globals, clippy::deref_addrof)]
 #[path = "../rsrc/mod.rs"]
 mod rsrc;
 
