@@ -1,14 +1,15 @@
 //! The blitter in software: combines up to three source channels into a destination, with shifts and
 //! a minterm, the way the Amiga chip did.
 
-use super::{ALL_BITS, USE_A, USE_B, USE_C, USE_D};
+use super::{ALL_BITS, Area, Loc, USE_A, USE_B, USE_C, USE_D};
+use crate::gfx::{Bitmap, PAD};
 
-/// A blitter job: pointers and strides for the channels, as the blitter registers held them.
+/// A blitter job: places and strides for the channels, as the blitter registers held them.
 pub(super) struct Blit {
-    pub(super) a: *const u8,
-    pub(super) b: *const u8,
-    pub(super) c: *mut u8,
-    pub(super) d: *mut u8,
+    pub(super) a: Loc,
+    pub(super) b: Loc,
+    pub(super) c: Loc,
+    pub(super) d: Loc,
     /// Bytes to skip at the end of each line.
     pub(super) amod: i32,
     pub(super) bmod: i32,
@@ -24,6 +25,76 @@ pub(super) struct Blit {
     /// In words and lines.
     pub(super) width: i32,
     pub(super) height: i32,
+}
+
+/// The memory a blit can reach: the bit planes being drawn on, the two work regions and the sprite
+/// sheets. A read outside an area gives zeros, and a write outside it is dropped.
+pub(super) struct BlitMem<'a> {
+    pub(super) bitmap: &'a mut Bitmap,
+    pub(super) queue: &'a mut [u8],
+    pub(super) mask: &'a mut [u8],
+    pub(super) shapes: &'a mut [u8],
+}
+
+impl BlitMem<'_> {
+    /// The bytes of an area, and how far in the position 0 of the area is.
+    fn area(&self, area: Area) -> (&[u8], isize) {
+        match area {
+            Area::Plane(p) if (p as usize) < self.bitmap.depth() => {
+                (self.bitmap.padded_plane(p as usize), PAD as isize)
+            }
+            Area::Plane(_) => (&[], 0),
+            Area::Queue => (self.queue, 0),
+            Area::Mask => (self.mask, 0),
+            Area::Shapes => (self.shapes, 0),
+        }
+    }
+
+    fn area_mut(&mut self, area: Area) -> (&mut [u8], isize) {
+        match area {
+            Area::Plane(p) if (p as usize) < self.bitmap.depth() => {
+                (self.bitmap.padded_plane_mut(p as usize), PAD as isize)
+            }
+            Area::Plane(_) => (&mut [], 0),
+            Area::Queue => (self.queue, 0),
+            Area::Mask => (self.mask, 0),
+            Area::Shapes => (self.shapes, 0),
+        }
+    }
+
+    pub(super) fn byte(&self, at: Loc) -> u8 {
+        let (bytes, base) = self.area(at.area);
+
+        usize::try_from(base + at.pos)
+            .ok()
+            .and_then(|i| bytes.get(i))
+            .copied()
+            .unwrap_or(0)
+    }
+
+    pub(super) fn set_byte(&mut self, at: Loc, value: u8) {
+        let (bytes, base) = self.area_mut(at.area);
+
+        if let Some(byte) = usize::try_from(base + at.pos)
+            .ok()
+            .and_then(|i| bytes.get_mut(i))
+        {
+            *byte = value;
+        }
+    }
+
+    /// Reads a big-endian 16-bit word.
+    fn read_word(&self, at: Loc) -> u32 {
+        // Words are big-endian in memory: the first byte is the high half.
+        ((self.byte(at) as u32) << BYTE_BITS) | self.byte(at.add(1)) as u32
+    }
+
+    /// Writes a big-endian 16-bit word.
+    fn write_word(&mut self, at: Loc, v: u32) {
+        // Big-endian: the high byte is stored first.
+        self.set_byte(at, (v >> BYTE_BITS) as u8);
+        self.set_byte(at.add(1), v as u8);
+    }
 }
 
 /// BLTSIZE: the width in words is the low 6 bits, the height the 10 bits above them.
@@ -58,21 +129,6 @@ pub(super) fn blit_width(size: i16) -> i32 {
     }
 }
 
-/// Reads a big-endian 16-bit word.
-pub(super) unsafe fn read_word(p: *const u8) -> u32 {
-    // Words are big-endian in memory: the first byte is the high half.
-    unsafe { ((*p as u32) << BYTE_BITS) | *p.add(1) as u32 }
-}
-
-/// Writes a big-endian 16-bit word.
-pub(super) unsafe fn write_word(p: *mut u8, v: u32) {
-    unsafe {
-        // Big-endian: the high byte is stored first.
-        *p = (v >> BYTE_BITS) as u8;
-        *p.add(1) = v as u8;
-    }
-}
-
 /// One 16 bit word of the minterm: for every bit, the result is picked by the A, B and C bits.
 ///
 /// The minterm is a table of 8 result bits, one for each combination of the A, B and C bits
@@ -103,116 +159,108 @@ pub(super) fn minterm_word(minterm: u32, a: u32, b: u32, c: u32) -> u32 {
 /// For each line it reads a word from each channel in use, shifts A and B (the shifted-out bits
 /// of the previous word carry into the next, which lets a sprite sit at any pixel position, not
 /// just on 16-pixel boundaries), combines them with the minterm and writes the result to D.
-pub(super) unsafe fn blit(t: &mut Blit) {
-    unsafe {
-        for _ in 0..t.height {
-            blit_row(t);
-            skip_row_modulos(t);
-        }
+pub(super) fn blit(t: &mut Blit, mem: &mut BlitMem) {
+    for _ in 0..t.height {
+        blit_row(t, mem);
+        skip_row_modulos(t);
     }
 }
 
 /// The A source word for column `x` of a row (all ones when A is not in use): the first and last
 /// words of the row are masked.
-unsafe fn next_a_word(t: &mut Blit, x: i32) -> u32 {
-    unsafe {
-        // Masks with USE_A, keeping only the bits that matter here.
-        if t.uses & USE_A == 0 {
-            return ALL_BITS;
-        }
-
-        let mut aw = read_word(t.a);
-        t.a = t.a.add(2);
-
-        if x == 0 {
-            aw &= t.afwm;
-        }
-
-        if x == t.width - 1 {
-            aw &= t.alwm;
-        }
-
-        aw
+fn next_a_word(t: &mut Blit, mem: &BlitMem, x: i32) -> u32 {
+    // Masks with USE_A, keeping only the bits that matter here.
+    if t.uses & USE_A == 0 {
+        return ALL_BITS;
     }
+
+    let mut aw = mem.read_word(t.a);
+    t.a = t.a.add(2);
+
+    if x == 0 {
+        aw &= t.afwm;
+    }
+
+    if x == t.width - 1 {
+        aw &= t.alwm;
+    }
+
+    aw
 }
 
 /// Blits one row of `t.width` words, working through the A, B and C sources and the D destination
 /// that are in use. A and B can be shifted, and carry bits over from the previous word.
-pub(super) unsafe fn blit_row(t: &mut Blit) {
-    unsafe {
-        let (mut a_prev, mut b_prev) = (0u32, 0u32);
+pub(super) fn blit_row(t: &mut Blit, mem: &mut BlitMem) {
+    let (mut a_prev, mut b_prev) = (0u32, 0u32);
 
-        for x in 0..t.width {
-            let (mut bw, mut cw) = (0, 0);
-            let aw = next_a_word(t, x);
-
-            // Masks with USE_B, keeping only the bits that matter here.
-            if t.uses & USE_B != 0 {
-                bw = read_word(t.b);
-                t.b = t.b.add(2);
-            }
-
-            // Masks with USE_C, keeping only the bits that matter here.
-            if t.uses & USE_C != 0 {
-                cw = read_word(t.c);
-            }
-
-            // Shifting right across two words: the bits that fell off the previous word enter from the left.
-            let shifted_a = ((a_prev << WORD_BITS | aw) >> t.ashift) & ALL_BITS;
-
-            // Shifting right across two words: the bits that fell off the previous word enter from the left.
-            let shifted_b = ((b_prev << WORD_BITS | bw) >> t.bshift) & ALL_BITS;
-            a_prev = aw;
-            b_prev = bw;
-
-            let dw = minterm_word(t.minterm, shifted_a, shifted_b, cw);
-
-            // Masks with USE_D, keeping only the bits that matter here.
-            if t.uses & USE_D != 0 {
-                write_word(t.d, dw);
-                t.d = t.d.add(2);
-            }
-
-            // Masks with USE_C, keeping only the bits that matter here.
-            if t.uses & USE_C != 0 {
-                t.c = t.c.add(2);
-            }
-        }
-    }
-}
-
-/// After a row, moves each pointer in use on by its modulo (bytes to skip to reach the next row).
-pub(super) unsafe fn skip_row_modulos(t: &mut Blit) {
-    unsafe {
-        // Masks with USE_A, keeping only the bits that matter here.
-        if t.uses & USE_A != 0 {
-            t.a = t.a.offset(t.amod as isize);
-        }
+    for x in 0..t.width {
+        let (mut bw, mut cw) = (0, 0);
+        let aw = next_a_word(t, mem, x);
 
         // Masks with USE_B, keeping only the bits that matter here.
         if t.uses & USE_B != 0 {
-            t.b = t.b.offset(t.bmod as isize);
+            bw = mem.read_word(t.b);
+            t.b = t.b.add(2);
         }
 
         // Masks with USE_C, keeping only the bits that matter here.
         if t.uses & USE_C != 0 {
-            t.c = t.c.offset(t.cmod as isize);
+            cw = mem.read_word(t.c);
         }
+
+        // Shifting right across two words: the bits that fell off the previous word enter from the left.
+        let shifted_a = ((a_prev << WORD_BITS | aw) >> t.ashift) & ALL_BITS;
+
+        // Shifting right across two words: the bits that fell off the previous word enter from the left.
+        let shifted_b = ((b_prev << WORD_BITS | bw) >> t.bshift) & ALL_BITS;
+        a_prev = aw;
+        b_prev = bw;
+
+        let dw = minterm_word(t.minterm, shifted_a, shifted_b, cw);
 
         // Masks with USE_D, keeping only the bits that matter here.
         if t.uses & USE_D != 0 {
-            t.d = t.d.offset(t.dmod as isize);
+            mem.write_word(t.d, dw);
+            t.d = t.d.add(2);
         }
+
+        // Masks with USE_C, keeping only the bits that matter here.
+        if t.uses & USE_C != 0 {
+            t.c = t.c.add(2);
+        }
+    }
+}
+
+/// After a row, moves each place in use on by its modulo (bytes to skip to reach the next row).
+pub(super) fn skip_row_modulos(t: &mut Blit) {
+    // Masks with USE_A, keeping only the bits that matter here.
+    if t.uses & USE_A != 0 {
+        t.a = t.a.add(t.amod as isize);
+    }
+
+    // Masks with USE_B, keeping only the bits that matter here.
+    if t.uses & USE_B != 0 {
+        t.b = t.b.add(t.bmod as isize);
+    }
+
+    // Masks with USE_C, keeping only the bits that matter here.
+    if t.uses & USE_C != 0 {
+        t.c = t.c.add(t.cmod as isize);
+    }
+
+    // Masks with USE_D, keeping only the bits that matter here.
+    if t.uses & USE_D != 0 {
+        t.d = t.d.add(t.dmod as isize);
     }
 }
 
 impl Blit {
     pub(super) fn new(uses: u8, minterm: u32, blitsize: i16) -> Blit {
         Blit {
-            a: std::ptr::null(),
-            b: std::ptr::null(),
-            c: std::ptr::null_mut(),
-            d: std::ptr::null_mut(),
+            a: Loc::NONE,
+            b: Loc::NONE,
+            c: Loc::NONE,
+            d: Loc::NONE,
             amod: 0,
             bmod: 0,
             cmod: 0,
@@ -267,28 +315,67 @@ mod tests {
         assert_eq!(blit_width(0x0800), 64);
     }
 
+    /// Runs `job` on work memory holding `shapes` and two empty regions of 8 bytes.
+    fn run(shapes: &[u8], job: impl FnOnce(&mut BlitMem)) -> [u8; 8] {
+        let mut bitmap = Bitmap::empty();
+        let mut queue = [0u8; 8];
+        let mut mask = [0u8; 8];
+        let mut shapes = shapes.to_vec();
+        job(&mut BlitMem {
+            bitmap: &mut bitmap,
+            queue: &mut queue,
+            mask: &mut mask,
+            shapes: &mut shapes,
+        });
+
+        queue
+    }
+
+    fn at(area: Area) -> Loc {
+        Loc { area, pos: 0 }
+    }
+
     #[test]
     fn copy_blit_copies_words() {
         let src = [1u8, 2, 3, 4, 5, 6, 7, 8];
-        let mut dst = [0u8; 8];
-        let mut t = Blit::new(USE_B | USE_D, D_EQUALS_B, 2 << 6 | 2); // size word: height 2 lines, width 2 words
-        t.b = src.as_ptr();
-        t.d = dst.as_mut_ptr();
+        let dst = run(&src, |mem| {
+            let mut t = Blit::new(USE_B | USE_D, D_EQUALS_B, 2 << 6 | 2); // size word: height 2 lines, width 2 words
+            t.b = at(Area::Shapes);
+            t.d = at(Area::Queue);
+            blit(&mut t, mem);
+        });
 
-        unsafe { blit(&mut t) };
         assert_eq!(dst, src);
     }
 
     #[test]
     fn shifted_copy_moves_bits_right() {
-        let src = [0xffu8, 0x00];
-        let mut dst = [0u8; 2];
-        let mut t = Blit::new(USE_B | USE_D, D_EQUALS_B, 1 << 6 | 1); // size word: height 1 line, width 1 word
-        t.b = src.as_ptr();
-        t.d = dst.as_mut_ptr();
-        t.bshift = 4;
+        let dst = run(&[0xff, 0x00], |mem| {
+            let mut t = Blit::new(USE_B | USE_D, D_EQUALS_B, 1 << 6 | 1); // size word: height 1 line, width 1 word
+            t.b = at(Area::Shapes);
+            t.d = at(Area::Queue);
+            t.bshift = 4;
+            blit(&mut t, mem);
+        });
 
-        unsafe { blit(&mut t) };
-        assert_eq!(dst, [0x0f, 0xf0]);
+        assert_eq!(dst[..2], [0x0f, 0xf0]);
+    }
+
+    #[test]
+    fn reads_outside_an_area_are_zero_and_writes_are_dropped() {
+        let dst = run(&[9, 9], |mem| {
+            let mut t = Blit::new(USE_B | USE_D, D_EQUALS_B, 1 << 6 | 1);
+            t.b = Loc {
+                area: Area::Shapes,
+                pos: -1,
+            };
+            t.d = Loc {
+                area: Area::Queue,
+                pos: 7,
+            };
+            blit(&mut t, mem);
+        });
+
+        assert_eq!(dst[7], 0);
     }
 }

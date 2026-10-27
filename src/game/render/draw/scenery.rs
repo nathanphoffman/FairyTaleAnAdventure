@@ -2,11 +2,11 @@
 
 use super::{CARRIER, FALL, OBJECTS, RAFT_SLOT};
 use crate::game::data::object_tables::minimap;
-use crate::game::data::state::{the_hero, the_memory, the_world};
+use crate::game::data::state::{memory, the_hero, the_world};
 use crate::game::data::types::Shape;
 use crate::game::render::blit::{add_scenery_mask, clear_memory};
 
-/// The mask buffer (`bmask_mem`) is cleared before each sprite: 96 lines of 64 words, plus 5.
+/// The mask buffer (the mask region) is cleared before each sprite: 96 lines of 64 words, plus 5.
 const MASK_CLEAR_SIZE: i32 = (96 << 6) + 5;
 
 /// Terrain flag bits `terrain_mem[tile*4+1] & 15` says how a tile hides what is behind it.
@@ -55,10 +55,8 @@ const TALL_HEIGHT: i16 = 35;
 const LOW_HEIGHT: i16 = 20;
 
 /// Zeroes the scenery mask buffer, ready for the next sprite.
-pub(super) unsafe fn clear_scenery_mask() {
-    unsafe {
-        clear_memory(the_memory.bmask_mem, MASK_CLEAR_SIZE);
-    }
+pub(super) fn clear_scenery_mask() {
+    clear_memory(MASK_CLEAR_SIZE);
 }
 
 /// True for sprites drawn in front of everything: carriers, the hero when riding the swan or in
@@ -178,7 +176,7 @@ impl SpriteTiles {
             cm = (minimap[cm as usize] as i32 * TERRAIN_ENTRY_BYTES) as i16;
             let mut k =
                 // Masks with TERRAIN_TYPE_MASK, keeping only the bits that matter here.
-                (*the_memory.terrain_mem.offset(cm as isize + 1) & TERRAIN_TYPE_MASK) as i16;
+                (memory().terrain_byte(cm as usize + 1) & TERRAIN_TYPE_MASK) as i16;
 
             if (*self.actor).state == FALL {
                 if cm <= FALL_TILE_LIMIT {
@@ -196,7 +194,7 @@ impl SpriteTiles {
                 SceneryRule::UseTileMask => {}
             }
 
-            Some(*the_memory.terrain_mem.offset(cm as isize) as i32)
+            Some(memory().terrain_byte(cm as usize) as i32)
         }
     }
 }

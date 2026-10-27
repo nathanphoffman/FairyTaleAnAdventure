@@ -3,7 +3,7 @@
 //! The layout must match the C exactly (`#[repr(C)]`), because the C code that is left reads and
 //! writes the same memory. The unit tests at the bottom check the sizes.
 
-use std::ffi::c_void;
+use crate::game::render::blit::{Loc, SShape};
 
 /// One actor (`struct shape`): the hero, a monster, a person or an object lying around.
 ///
@@ -71,15 +71,25 @@ pub struct Missile {
 
 /// Where a sprite sequence (all the frames of one kind of character) is in memory (`struct seq_info`),
 /// and where its transparency mask is.
-#[repr(C)]
 pub struct SeqInfo {
     pub width: i16,
     pub height: i16,
     pub count: i16,
-    pub location: *mut u8,
-    pub maskloc: *mut u8,
+    /// Where the frames start in the sprite memory, and where the masks start.
+    pub location: usize,
+    pub maskloc: usize,
     pub bytes: i16,
-    pub current_file: i16,
+}
+
+impl SeqInfo {
+    pub const EMPTY: SeqInfo = SeqInfo {
+        width: 0,
+        height: 0,
+        count: 0,
+        location: 0,
+        maskloc: 0,
+        bytes: 0,
+    };
 }
 
 /// One of the two display pages being drawn and shown (`struct fpage`). The game draws on one
@@ -91,8 +101,10 @@ pub struct FPage {
     pub isv_x: i32,
     pub isv_y: i32,
     pub obcount: i16,
-    pub shape_queue: *mut c_void,
-    pub backsave: *mut u8,
+    /// How each sprite drawn on this page was drawn, to undo them.
+    pub shape_queue: Vec<SShape>,
+    /// Where this page's saved backgrounds start.
+    pub backsave: Loc,
     pub saveused: i32,
     pub witchx: i16,
     pub witchy: i16,
@@ -107,8 +119,8 @@ impl FPage {
             isv_x: 0,
             isv_y: 0,
             obcount: 0,
-            shape_queue: std::ptr::null_mut(),
-            backsave: std::ptr::null_mut(),
+            shape_queue: Vec::new(),
+            backsave: Loc::NONE,
             saveused: 0,
             witchx: 0,
             witchy: 0,
@@ -207,7 +219,6 @@ mod tests {
         assert_eq!(size_of::<Extent>(), 12);
         assert_eq!(size_of::<WorldObject>(), 6);
         assert_eq!(size_of::<Missile>(), 10);
-        assert_eq!(size_of::<SeqInfo>(), 32);
         assert_eq!(size_of::<Need>(), 18);
         assert_eq!(size_of::<Menu>(), 24);
         assert_eq!(size_of::<Bro>(), 16);

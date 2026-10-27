@@ -2,8 +2,7 @@
 
 use super::{GOLDBASE, OBJECTS, item};
 use crate::game::data::object_tables::page_colors;
-use crate::game::data::state::{the_hero, the_memory};
-use crate::game::data::types::SeqInfo;
+use crate::game::data::state::{memory, the_hero};
 use crate::game::render::screen::{BitmapId, PortId, ViewPortId, screen};
 use crate::game::render::screen_fx::show_still_screen;
 use crate::game::ui::text::queue_print;
@@ -36,7 +35,7 @@ pub(super) unsafe fn show_item_list() {
     let page = screen.drawing_bitmap_id();
     screen.port_mut(PortId::Map).target = Some(page);
     screen.clear(PortId::Map, 0);
-    screen.set_bitmap(BitmapId::Items, unsafe { item_pictures() });
+    screen.set_bitmap(BitmapId::Items, item_pictures());
 
     draw_item_icons(page);
 
@@ -50,14 +49,10 @@ pub(super) unsafe fn show_item_list() {
 
 /// The pictures of the objects as one long bitmap: the object sprite sheet holds each plane of an
 /// image 32 bytes after the one before, so plane `p` starts `p * 32` bytes into the sheet.
-unsafe fn item_pictures() -> Bitmap {
-    unsafe {
-        let sheet = (*(&raw mut the_memory.seq_list)
-            .cast::<SeqInfo>()
-            .add(OBJECTS as usize))
-        .location;
-        let end = the_memory.shape_mem.add(SHAPE_AREA_BYTES);
-        let available = end.offset_from(sheet).max(0) as usize;
+fn item_pictures() -> Bitmap {
+    {
+        let sheet = memory().seq_list[OBJECTS as usize].location;
+        let available = SHAPE_AREA_BYTES.saturating_sub(sheet);
         let mut pictures = Bitmap::new(ITEM_IMAGE_WIDTH, ITEM_IMAGE_ROWS, ITEM_IMAGE_PLANES);
 
         for plane in 0..ITEM_IMAGE_PLANES {
@@ -66,7 +61,8 @@ unsafe fn item_pictures() -> Bitmap {
                 .plane(plane)
                 .len()
                 .min(available.saturating_sub(start));
-            let source = std::slice::from_raw_parts(sheet.add(start), bytes);
+            let from = sheet + start;
+            let source = &memory().shape[from..from + bytes];
             pictures.plane_mut(plane)[..bytes].copy_from_slice(source);
         }
 

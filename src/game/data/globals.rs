@@ -21,6 +21,6 @@ pub static mut princesses_rescued: i16 = unsafe { std::mem::zeroed() };
 
 pub static mut sprite_x_shift: i16 = unsafe { std::mem::zeroed() };
 
-pub static mut current_sshape: *mut SShape = unsafe { std::mem::zeroed() };
+pub static mut current_sshape: SShape = SShape::new();
 
 pub static mut last_word_mask: i16 = unsafe { std::mem::zeroed() };

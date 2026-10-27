@@ -7,7 +7,6 @@
 //! check a read just report that it is done.
 
 use crate::platform::paths::resolve;
-use std::ffi::c_void;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::sync::Mutex;
@@ -87,16 +86,15 @@ fn read_into(file: &mut File, first: i16, buffer: &mut [u8]) {
 
 /// Reads `count` blocks from block `first` into `buffer`. The game used a different request number
 /// for each kind of data so that several reads could be under way at once on a real disk.
-pub fn load_track_range(first: i16, count: i16, buffer: *mut c_void, _request: i16) {
+pub fn load_track_range(first: i16, count: i16, buffer: &mut [u8], _request: i16) {
     let mut guard = image();
     let Some(file) = guard.as_mut() else {
         return;
     };
 
-    let bytes = count as usize * BLOCK_SIZE as usize;
-    let buffer = unsafe { std::slice::from_raw_parts_mut(buffer.cast::<u8>(), bytes) };
+    let bytes = (count.max(0) as usize * BLOCK_SIZE as usize).min(buffer.len());
 
-    read_into(file, first, buffer);
+    read_into(file, first, &mut buffer[..bytes]);
 }
 
 /// Waits for read request `num` to finish (it already has).

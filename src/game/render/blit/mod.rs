@@ -26,16 +26,69 @@ pub use self::sprites::{
     restore_background, save_background,
 };
 
-/// Mirror of `struct sshape` in csrc/ftale.h: how one sprite is drawn this frame and where its
-/// background is saved. `coff` is the byte offset of the sprite in a bitplane and `cmod` the bytes
-/// to skip to the next line; `blitsize` is the blitter size word (height * 64 + width in words).
-#[repr(C)]
+/// The areas of memory a blit reads and writes: a bit plane of the page being drawn, the work
+/// regions of the blitter, and the sprite sheets.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Area {
+    Plane(u8),
+    Queue,
+    Mask,
+    Shapes,
+}
+
+/// A place in an area: `pos` bytes from its start (for a plane, from the first visible byte, so it
+/// can reach a little before it).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Loc {
+    pub area: Area,
+    pub pos: isize,
+}
+
+impl Loc {
+    /// A place that is not used.
+    pub const NONE: Loc = Loc {
+        area: Area::Queue,
+        pos: 0,
+    };
+
+    pub fn new(area: Area, pos: usize) -> Loc {
+        Loc {
+            area,
+            pos: pos as isize,
+        }
+    }
+
+    /// The place `bytes` further on.
+    pub fn add(self, bytes: isize) -> Loc {
+        Loc {
+            area: self.area,
+            pos: self.pos + bytes,
+        }
+    }
+}
+
+/// How one sprite is drawn this frame and where its background is saved (`struct sshape` in
+/// csrc/ftale.h). `coff` is the byte offset of the sprite in a bitplane and `cmod` the bytes to
+/// skip to the next line; `blitsize` is the blitter size word (height * 64 + width in words).
+#[derive(Clone, Copy)]
 pub struct SShape {
-    pub backsave: *mut u8,
+    pub backsave: Loc,
     pub savesize: i16,
     pub blitsize: i16,
     pub coff: i16,
     pub cmod: i16,
+}
+
+impl SShape {
+    pub const fn new() -> SShape {
+        SShape {
+            backsave: Loc::NONE,
+            savesize: 0,
+            blitsize: 0,
+            coff: 0,
+            cmod: 0,
+        }
+    }
 }
 
 // Which channels a blit uses.
@@ -58,5 +111,5 @@ const ALL_BITS: u32 = 0xffff;
 const TILE_MASK_BYTES: usize = 64;
 const TILE_LINES: usize = 32;
 
-/// The scenery mask starts this many bytes into `bmask_mem`.
+/// The scenery mask starts this many bytes into the mask region.
 const MASK_START: usize = 2;

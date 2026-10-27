@@ -2,7 +2,7 @@
 
 use super::weapons::weapon_image;
 use super::{CARRIER, DEAD, DYING, ENEMY, FALL, OBJECTS, PHIL, RAFT, Sprite};
-use crate::game::data::state::{the_actors, the_hero, the_memory};
+use crate::game::data::state::{memory, the_actors, the_hero};
 use crate::game::data::tables::animation_frames;
 use crate::game::data::types::{SeqInfo, Shape, StateEntry};
 
@@ -59,12 +59,10 @@ pub(super) fn byte_of(table: &[i8; 32], inum: i16) -> i16 {
 }
 
 /// Where the images of one kind of sprite are (`seq_list` entry `atype`).
-pub(super) unsafe fn sprite_sheet(atype: i16) -> &'static SeqInfo {
-    unsafe {
-        &*(&raw const the_memory.seq_list)
-            .cast::<SeqInfo>()
-            .offset(atype as isize)
-    }
+pub(super) fn sprite_sheet(atype: i16) -> &'static SeqInfo {
+    static NO_SHEET: SeqInfo = SeqInfo::EMPTY;
+
+    memory().seq_list.get(atype as usize).unwrap_or(&NO_SHEET)
 }
 
 /// Picks the image for this pass: the weapon's (`passmode`) or the actor's own, and where its top

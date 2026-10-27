@@ -188,8 +188,7 @@ pub struct Screen {
     pub draw_target: BitmapId,
     /// The mouse pointer's picture, once it is set up.
     pub pointer: Option<&'static [u32]>,
-    /// The sprite blitter's work memory: the shape queues and saved backgrounds, and the scenery
-    /// mask. (The blitter reaches into these through raw pointers.)
+    /// The sprite blitter's work memory: saved backgrounds, and the scenery mask.
     pub queue_region: Vec<u8>,
     pub mask_region: Vec<u8>,
     pub planesize: i16,
@@ -324,6 +323,15 @@ impl Screen {
     }
 
     /// The bitmap the map and sprites are being drawn on.
+    /// What the sprite blitter works on: the bitmap being drawn on and its two work regions.
+    pub fn blitter_memory(&mut self) -> (&mut Bitmap, &mut [u8], &mut [u8]) {
+        (
+            &mut self.bitmaps[self.draw_target.index()],
+            &mut self.queue_region,
+            &mut self.mask_region,
+        )
+    }
+
     pub fn draw_bitmap_mut(&mut self) -> &mut Bitmap {
         let id = self.draw_target;
 

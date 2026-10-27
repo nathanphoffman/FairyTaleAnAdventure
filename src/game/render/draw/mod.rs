@@ -26,6 +26,7 @@ use self::scenery::{clear_scenery_mask, drawn_in_front};
 use self::weapons::weapon_passmode;
 
 use crate::game::data::globals::current_sshape;
+use crate::game::render::blit::{Loc, SShape};
 
 use crate::game::data::state::{the_actors, the_world};
 use crate::game::data::types::Shape;
@@ -49,7 +50,7 @@ struct Frame {
     /// How many spare planes have been used for small background saves.
     crack: u8,
     /// Next free byte of the page's background-save buffer.
-    backalloc: *mut u8,
+    backalloc: Loc,
 }
 
 /// How one actor's drawing ended.
@@ -214,7 +215,7 @@ unsafe fn blit_sprite(
         if !set_up_blit(frame, sprite, clip, bytes_wide, xbw, blitwide, blithigh) {
             return Drawn::OutOfRoom; // no more blits if no room
         }
-        save_background((*current_sshape).backsave);
+        save_background(current_sshape.backsave);
 
         if !drawn_in_front(actor, i, sprite.atype, sprite.inum) {
             mask_against_scenery(
@@ -231,10 +232,24 @@ unsafe fn blit_sprite(
         combine_masks();
         draw_shape();
         (*actor).visible = 1;
-        screen().drawing_page_mut().obcount += 1;
+        queue_shape(current_sshape);
 
         Drawn::Done
     }
+}
+
+/// Notes how the sprite just drawn was drawn, so it can be undone next frame.
+fn queue_shape(shape: SShape) {
+    let page = screen().drawing_page_mut();
+    let index = page.obcount as usize;
+
+    if index < page.shape_queue.len() {
+        page.shape_queue[index] = shape;
+    } else {
+        page.shape_queue.push(shape);
+    }
+
+    page.obcount += 1;
 }
 
 /// A sprite of `atype` and `inum` over the given rectangle, for the tests of the pieces.

@@ -5,7 +5,7 @@
 //! indoor ones (8: buildings, 9: dungeons and caves). `region_num` is the region now loaded;
 //! `new_region` is the one being loaded, or `NO_REGION` when nothing is waiting to load.
 
-use crate::game::data::state::{the_hero, the_memory, the_world};
+use crate::game::data::state::{MAP_OFFSET, memory, the_hero, the_world};
 use crate::game::data::tables::{loaded_blocks, region_disk_blocks};
 use crate::game::data::types::Need;
 use crate::game::files::disk::{
@@ -13,7 +13,6 @@ use crate::game::files::disk::{
 };
 
 use crate::game::world::map::fill_minimap;
-use std::ffi::c_void;
 
 /// `new_region` value meaning no region is waiting to be loaded.
 const NO_REGION: u16 = 10;
@@ -209,7 +208,7 @@ unsafe fn load_changed_map_tables(need: &Need) {
             load_track_range(
                 need.sector as i16,
                 SECTOR_BLOCKS,
-                the_memory.sector_mem.cast::<c_void>(),
+                &mut memory().sector[..MAP_OFFSET],
                 REQ_SECTOR,
             );
 
@@ -220,7 +219,7 @@ unsafe fn load_changed_map_tables(need: &Need) {
             load_track_range(
                 need.region as i16,
                 REGION_MAP_BLOCKS,
-                the_memory.map_mem.cast::<c_void>(),
+                &mut memory().sector[MAP_OFFSET..],
                 REQ_MAP,
             );
 
@@ -236,7 +235,7 @@ unsafe fn load_changed_terrain(need: &Need) {
             load_track_range(
                 TERRA_BLOCK + need.terra1 as i16,
                 1,
-                the_memory.terrain_mem.cast::<c_void>(),
+                &mut memory().terrain[..TERRA_TABLE_SIZE],
                 REQ_TERRA1,
             );
 
@@ -244,10 +243,7 @@ unsafe fn load_changed_terrain(need: &Need) {
         }
 
         if need.terra2 != loaded_blocks.terra2 {
-            let dest = the_memory
-                .terrain_mem
-                .add(TERRA_TABLE_SIZE)
-                .cast::<c_void>();
+            let dest = &mut memory().terrain[TERRA_TABLE_SIZE..];
             load_track_range(TERRA_BLOCK + need.terra2 as i16, 1, dest, REQ_TERRA2);
             loaded_blocks.terra2 = need.terra2;
         }
@@ -258,14 +254,15 @@ unsafe fn load_changed_terrain(need: &Need) {
 /// loaded one (only one bank per call, so the game keeps running), false if all are up to date.
 unsafe fn load_next_image_bank(need: &Need) -> bool {
     unsafe {
-        let mut bank_mem = the_memory.image_mem;
+        let mut bank_mem = 0;
 
         for bank in 0..4 {
             if need.image[bank] != loaded_blocks.image[bank] {
                 let first = need.image[bank] as i16;
 
                 for plane in 0..5 {
-                    let dest = bank_mem.add(plane * IMAGE_PLANE_SIZE).cast::<c_void>();
+                    let from = bank_mem + plane * IMAGE_PLANE_SIZE;
+                    let dest = &mut memory().image[from..];
                     let block = first + plane as i16 * IMAGE_PLANE_BLOCKS;
                     load_track_range(
                         block,
@@ -280,7 +277,7 @@ unsafe fn load_next_image_bank(need: &Need) -> bool {
                 return true;
             }
 
-            bank_mem = bank_mem.add(QUARTER_PLANE_SIZE);
+            bank_mem += QUARTER_PLANE_SIZE;
         }
 
         false
@@ -294,7 +291,7 @@ unsafe fn block_desert_door_without_statues() {
             && *the_hero.stuff.add(STATUE_SLOT) < STATUES_NEEDED
         {
             for offset in [0, 1, MAP_ROW_BYTES, MAP_ROW_BYTES + 1] {
-                *the_memory.map_mem.add(DESERT_DOOR_TILE + offset) = BLOCKED_TILE;
+                memory().set_map_byte(DESERT_DOOR_TILE + offset, BLOCKED_TILE);
             }
         }
     }

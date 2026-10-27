@@ -1,7 +1,7 @@
 //! Loading the sprite sheets of the hero, enemies, carriers and objects, and the pending region.
 
 use super::{CARRIER, CFileInfo, DRAGON, cfile};
-use crate::game::data::state::{the_actors, the_hero, the_memory, the_world};
+use crate::game::data::state::{memory, the_actors, the_hero, the_memory, the_world};
 use crate::game::data::types::SeqInfo;
 use crate::game::files::disk::{
     is_last_read_pending, last_read_finished, load_track_range, mark_read_unused, motor_off,
@@ -17,6 +17,9 @@ const OBJECTS: u8 = 1;
 const ENEMY: u8 = 2;
 const RAFT: u8 = 3;
 const SETFIG: u8 = 4;
+
+/// Bytes in a disk block.
+const BLOCK_BYTES: usize = 512;
 
 /// Scratch memory for sprites: bytes available in `shape_mem`.
 pub const SHAPE_SIZE: usize = 78000;
@@ -63,7 +66,7 @@ const RAFT_FILE: i32 = 4;
 /// current monsters and set figures, then the region.
 pub fn load_start_sprites() {
     unsafe {
-        the_memory.nextshape = the_memory.shape_mem;
+        the_memory.nextshape = 0;
         load_sprite_file(OBJECTS_FILE);
         finish_sprite_load(OBJECTS as i16);
         load_sprite_file(the_hero.brother as i32 - 1);
@@ -82,12 +85,8 @@ pub fn load_start_sprites() {
 }
 
 /// The `seq_list` entry for a sprite slot (PHIL, OBJECTS, ENEMY ...).
-pub(super) unsafe fn sequence(slot: u8) -> &'static mut SeqInfo {
-    unsafe {
-        &mut *(&raw mut the_memory.seq_list)
-            .cast::<SeqInfo>()
-            .add(slot as usize)
-    }
+pub(super) fn sequence(slot: u8) -> &'static mut SeqInfo {
+    &mut memory().seq_list[slot as usize]
 }
 
 /// Starts loading sprite file `num` into the next free shape memory, if it fits.
@@ -105,17 +104,21 @@ pub fn load_sprite_file(num: i32) {
         slot.height = file.height as i16;
         slot.count = file.count as i16;
 
-        if the_memory.nextshape.add(size * SIZE_WITH_MASK) <= the_memory.shape_mem.add(SHAPE_SIZE) {
+        let next = the_memory.nextshape;
+
+        if next + size * SIZE_WITH_MASK <= SHAPE_SIZE {
+            let end = (next + file.numblocks as usize * BLOCK_BYTES).min(memory().shape.len());
+            let area = &mut memory().shape[next..end];
             load_track_range(
                 file.file_id as i16,
                 file.numblocks as i16,
-                the_memory.nextshape.cast(),
+                area,
                 SPRITE_REQUEST,
             );
 
-            the_memory.nextshape = the_memory.nextshape.add(size * SIZE_WITHOUT_MASK);
+            the_memory.nextshape = next + size * SIZE_WITHOUT_MASK;
             slot.maskloc = the_memory.nextshape;
-            the_memory.nextshape = the_memory.nextshape.add(size);
+            the_memory.nextshape += size;
         }
     }
 }
@@ -124,7 +127,7 @@ pub fn load_sprite_file(num: i32) {
 pub fn finish_sprite_load(slot: i16) {
     wait_for_read(SPRITE_REQUEST as i32);
     mark_read_unused(SPRITE_REQUEST as i32);
-    unsafe {
+    {
         let s = sequence(slot as u8);
         make_sprite_masks(
             s.location,

@@ -3,9 +3,11 @@
 use crate::game::actors::interaction::blocked_at;
 use crate::game::data::object_tables::weapon_probs;
 use crate::game::data::random::{bitrand, rand2, rand4, rnd};
-use crate::game::data::state::{Hero, the_actors, the_encounter, the_hero, the_memory, the_world};
+use crate::game::data::state::{
+    Hero, memory, the_actors, the_encounter, the_hero, the_memory, the_world,
+};
 use crate::game::data::tables::{encounter_chart, extent_list};
-use crate::game::data::types::{Extent, SeqInfo, Shape};
+use crate::game::data::types::{Extent, Shape};
 use crate::game::files::disk::motor_off;
 use crate::game::files::loading::{finish_sprite_load, load_sprite_file};
 use crate::game::ui::music::set_mood;
@@ -277,10 +279,7 @@ pub fn load_carrier(n: i16) {
         };
 
         if the_actors.loaded_actor_file != n {
-            the_memory.nextshape = (*(&raw mut the_memory.seq_list)
-                .cast::<SeqInfo>()
-                .add(SEQ_ENEMY))
-            .location;
+            the_memory.nextshape = memory().seq_list[SEQ_ENEMY].location;
             load_sprite_file(n as i32);
             finish_sprite_load((*actor).kind as i16);
             motor_off();
@@ -313,10 +312,7 @@ pub fn load_enemy_sprites() {
         if the_actors.loaded_actor_file != file {
             the_actors.loaded_actor_file = file;
             the_actors.active = FIRST_ENEMY_SLOT;
-            the_memory.nextshape = (*(&raw const the_memory.seq_list)
-                .cast::<SeqInfo>()
-                .add(ENEMY as usize))
-            .location;
+            the_memory.nextshape = memory().seq_list[ENEMY as usize].location;
             load_sprite_file(the_actors.loaded_actor_file as i32);
             the_actors.loading = 1;
             the_actors.active_carrier = 0;

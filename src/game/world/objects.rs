@@ -17,9 +17,9 @@ use crate::game::data::object_tables::{
 };
 
 use crate::game::data::random::bitrand;
-use crate::game::data::state::{the_actors, the_memory, the_witch, the_world};
+use crate::game::data::state::{memory, the_actors, the_memory, the_witch, the_world};
 use crate::game::data::tables::setfig_table;
-use crate::game::data::types::{SeqInfo, Shape, WorldObject};
+use crate::game::data::types::{Shape, WorldObject};
 use crate::game::files::disk::motor_off;
 use crate::game::files::loading::sprite_files;
 use crate::game::files::loading::{finish_sprite_load, load_sprite_file};
@@ -215,10 +215,7 @@ unsafe fn load_set_figure(id: i8) {
             != sprite_files[the_actors.loaded_setfig_file as usize].file_id
         {
             the_actors.loaded_setfig_file = entry as i16;
-            the_memory.nextshape = (*(&raw mut the_memory.seq_list)
-                .cast::<SeqInfo>()
-                .add(SETFIG as usize))
-            .location;
+            the_memory.nextshape = memory().seq_list[SETFIG as usize].location;
             load_sprite_file(entry as i32);
             finish_sprite_load(SETFIG as i16);
             motor_off();

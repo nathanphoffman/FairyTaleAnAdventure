@@ -1,14 +1,13 @@
 //! Opening everything the game needs: the screen, fonts, memory, music and the disk image.
 
 use super::{
-    BACKSAVE_OFFSET, IMAGE_SZ, MAXSHAPES, S_VOLBUF, S_WAVBUF, SAMPLE_SZ, SECTOR_OFF, SECTOR_SZ,
-    SHADOW_SZ, SHAPE_SZ, TERRA_SZ,
+    BACKSAVE_OFFSET, IMAGE_SZ, S_VOLBUF, S_WAVBUF, SECTOR_SZ, SHADOW_SZ, SHAPE_SZ, TERRA_SZ,
 };
 use crate::game::data::state::{the_memory, the_screen};
 use crate::game::data::story_text::{HINOR, HIVAR};
 use crate::game::data::tables::{instrument_waves, pointer_sprite_data};
 use crate::game::files::disk::open_disk;
-use crate::game::render::blit::SShape;
+use crate::game::render::blit::{Area, Loc};
 use crate::game::render::screen::FontKind;
 use crate::gfx::Font;
 use crate::platform::audio::init_music;
@@ -72,37 +71,26 @@ fn open_fonts() -> Result<(), i32> {
     Ok(())
 }
 
-/// A memory area for the whole run of the game (zeroed, with a little slack).
-fn static_area(size: usize) -> *mut u8 {
-    Box::leak(vec![0u8; size + AREA_SLACK].into_boxed_slice()).as_mut_ptr()
+/// A zeroed memory area (with a little slack).
+fn area(size: usize) -> Vec<u8> {
+    vec![0u8; size + AREA_SLACK]
 }
 
-/// Points the shape queues and the saved backgrounds of the two pages into the blitter's work memory.
-unsafe fn set_up_blitter_memory() {
-    unsafe {
-        let screen = &mut *(&raw mut the_screen);
-        let queue = screen.queue_region.as_mut_ptr();
-        let mask = screen.mask_region.as_mut_ptr();
-        the_memory.queue_mem = queue;
-        the_memory.bmask_mem = mask;
-
-        screen.pages[0].backsave = queue.add(BACKSAVE_OFFSET);
-        screen.pages[1].backsave = mask.add(BACKSAVE_OFFSET);
-        screen.pages[0].shape_queue = queue.cast();
-        screen.pages[1].shape_queue = queue.add(size_of::<SShape>() * MAXSHAPES).cast();
-    }
+/// Points the saved backgrounds of the two pages into the blitter's work memory.
+fn set_up_blitter_memory() {
+    let screen = crate::game::render::screen::screen();
+    screen.pages[0].backsave = Loc::new(Area::Queue, BACKSAVE_OFFSET);
+    screen.pages[1].backsave = Loc::new(Area::Mask, BACKSAVE_OFFSET);
 }
 
-/// Makes the picture, sector, shape, shadow-mask, sample and terrain areas.
+/// Makes the picture, sector, shape, shadow-mask and terrain areas.
 unsafe fn allocate_game_memory() {
     unsafe {
-        the_memory.image_mem = static_area(IMAGE_SZ);
-        the_memory.sector_mem = static_area(SECTOR_SZ);
-        the_memory.map_mem = the_memory.sector_mem.add(SECTOR_OFF);
-        the_memory.shape_mem = static_area(SHAPE_SZ);
-        the_memory.shadow_mem = static_area(SHADOW_SZ);
-        the_memory.sample_mem = static_area(SAMPLE_SZ);
-        the_memory.terrain_mem = static_area(TERRA_SZ);
+        the_memory.image = area(IMAGE_SZ);
+        the_memory.sector = area(SECTOR_SZ);
+        the_memory.shape = area(SHAPE_SZ);
+        the_memory.shadow = area(SHADOW_SZ);
+        the_memory.terrain = area(TERRA_SZ);
     }
 }
 

@@ -13,5 +13,5 @@ pub mod font;
 
 pub mod scene;
 
-pub use self::bitmap::Bitmap;
+pub use self::bitmap::{Bitmap, PAD};
 pub use self::font::Font;

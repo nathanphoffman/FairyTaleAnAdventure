@@ -9,8 +9,8 @@ use crate::game::data::globals::{
 };
 use crate::game::data::types::SeqInfo;
 
-use crate::game::data::state::the_memory;
-use crate::game::render::blit::SShape;
+use crate::game::data::state::memory;
+use crate::game::render::blit::{Area, Loc, SShape};
 use crate::game::render::screen::screen;
 
 // ---- draw_sprites ----
@@ -86,19 +86,16 @@ pub(super) unsafe fn assign_background_save(frame: &mut Frame) -> bool {
     unsafe {
         let page = screen().drawing_page_mut();
 
-        if (*current_sshape).savesize < SMALL_SAVE && frame.crack < SPARE_SAVES {
-            (*current_sshape).backsave = screen()
-                .draw_bitmap_mut()
-                .plane_ptr(frame.crack as usize)
-                .add(SPARE_PLANE_OFFSET);
+        if current_sshape.savesize < SMALL_SAVE && frame.crack < SPARE_SAVES {
+            current_sshape.backsave = Loc::new(Area::Plane(frame.crack), SPARE_PLANE_OFFSET);
             frame.crack += 1;
 
             return true;
         }
 
-        (*current_sshape).backsave = frame.backalloc;
-        let bytes = PLANES * (*current_sshape).savesize as i32;
-        frame.backalloc = frame.backalloc.offset(bytes as isize);
+        current_sshape.backsave = frame.backalloc;
+        let bytes = PLANES * current_sshape.savesize as i32;
+        frame.backalloc = frame.backalloc.add(bytes as isize);
         page.saveused += bytes;
 
         page.saveused < SAVE_LIMIT
@@ -122,16 +119,12 @@ pub(super) unsafe fn set_up_blit(
         // The sheet is looked up again: a sunk actor is drawn from the objects sheet, but is as wide
         // and high as its own.
         let seq = sprite_sheet(sprite.atype);
-        let page = screen().drawing_page();
-        current_sshape = page
-            .shape_queue
-            .cast::<SShape>()
-            .offset(page.obcount as isize);
+        current_sshape = SShape::new();
         screen().planesize = seq.bytes;
-        (*current_sshape).savesize = (blitwide as i32 * blithigh as i32 * WORD_BYTES) as i16;
+        current_sshape.savesize = (blitwide as i32 * blithigh as i32 * WORD_BYTES) as i16;
 
         // Blitter size word: height in the high bits, width in words in the low 6 bits.
-        (*current_sshape).blitsize =
+        current_sshape.blitsize =
             // Shifts by BLIT_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
             (((blithigh as i32) << BLIT_HEIGHT_SHIFT) + blitwide as i32) as i16;
 
@@ -148,15 +141,10 @@ pub(super) unsafe fn set_up_blit(
 }
 
 /// Points the blitter at the picture and the mask of image `inum` in its sprite sheet.
-unsafe fn locate_sprite_data(seq: &SeqInfo, inum: i16) {
-    unsafe {
-        the_memory.shapedata = seq
-            .location
-            .offset(screen().planesize as isize * PLANES as isize * inum as isize);
-        the_memory.mask_buffer = seq
-            .maskloc
-            .offset(screen().planesize as isize * inum as isize);
-    }
+fn locate_sprite_data(seq: &SeqInfo, inum: i16) {
+    let planesize = screen().planesize as usize;
+    memory().shapedata = seq.location + planesize * PLANES as usize * inum as usize;
+    memory().mask_buffer = seq.maskloc + planesize * inum as usize;
 }
 
 /// Sets the blitter's mask offsets, shift and modulo for the clipped sprite, and where in the page
@@ -170,7 +158,7 @@ unsafe fn set_blitter_registers(sprite: &Sprite, clip: &Clip, cwide: i8, xbw: i8
         // Where the visible part starts in the mask: whole words (2 bytes per 16 pixels) in, and whole rows down.
         sprite_mask_offset = ((clip.xoff >> WORD_PIXELS_SHIFT) as i32 * WORD_BYTES
             + cwide as i32 * clip.yoff as i32) as i16;
-        (*current_sshape).coff =
+        current_sshape.coff =
             (xbw as i32 * WORD_BYTES + clip.ystart as i32 * PAGE_ROW_BYTES) as i16;
 
         // Masks with WORD_PIXELS_MASK, keeping only the bits that matter here.
@@ -178,14 +166,14 @@ unsafe fn set_blitter_registers(sprite: &Sprite, clip: &Clip, cwide: i8, xbw: i8
 
         // Masks with WORD_PIXELS_MASK, keeping only the bits that matter here.
         if clip.xoff & WORD_PIXELS_MASK as i8 != 0 {
-            (*current_sshape).coff -= WORD_BYTES as i16;
+            current_sshape.coff -= WORD_BYTES as i16;
             last_word_mask = 0;
         } else {
             last_word_mask = -1;
         }
 
         sprite_mask_modulo = (cwide as i32 - blitwide as i32 * WORD_BYTES) as i16;
-        (*current_sshape).cmod = (PAGE_ROW_BYTES - blitwide as i32 * WORD_BYTES) as i16;
+        current_sshape.cmod = (PAGE_ROW_BYTES - blitwide as i32 * WORD_BYTES) as i16;
     }
 }
 

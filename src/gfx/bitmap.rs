@@ -90,10 +90,14 @@ impl Bitmap {
         &mut self.planes[p][PAD..PAD + len]
     }
 
-    /// A pointer to the first visible byte of plane `p`, for code that works on the plane memory
-    /// directly (the sprite blitter, which may reach a little outside, into the padding).
-    pub fn plane_ptr(&mut self, p: usize) -> *mut u8 {
-        self.planes[p][PAD..].as_mut_ptr()
+    /// Plane `p` with its padding: the visible bytes start `PAD` bytes in. The sprite blitter may
+    /// reach a little outside the visible bytes, into the padding.
+    pub fn padded_plane(&self, p: usize) -> &[u8] {
+        &self.planes[p]
+    }
+
+    pub fn padded_plane_mut(&mut self, p: usize) -> &mut [u8] {
+        &mut self.planes[p]
     }
 
     pub fn contains(&self, x: i32, y: i32) -> bool {

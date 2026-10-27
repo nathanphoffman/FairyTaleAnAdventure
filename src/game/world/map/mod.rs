@@ -25,6 +25,6 @@ mod steps;
 
 pub use self::camera::{move_camera_to, page_turn_inset};
 pub use self::drawing::{draw_map, draw_map_column, draw_map_row, scroll_map};
-pub use self::lookup::{fill_minimap, probe_collision, terrain_at, tile_address};
+pub use self::lookup::{fill_minimap, probe_collision, terrain_at, tile_index};
 pub use self::overview::draw_overview_map;
 pub use self::steps::{step_x, step_y, wrap_coordinate};

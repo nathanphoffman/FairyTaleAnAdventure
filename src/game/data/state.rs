@@ -125,22 +125,79 @@ pub static mut the_screen: Screen = Screen::new();
 
 /// The big memory areas the game loads its data into.
 pub struct Memory {
-    pub image_mem: *mut u8,
-    pub map_mem: *mut u8,
-    pub sector_mem: *mut u8,
-    pub terrain_mem: *mut u8,
-    pub shadow_mem: *mut u8,
-    pub shape_mem: *mut u8,
-    pub shapedata: *mut u8,
-    pub mask_buffer: *mut u8,
-    pub bmask_mem: *mut u8,
-    pub queue_mem: *mut u8,
-    pub sample_mem: *mut u8,
-    pub nextshape: *mut u8,
+    /// The tile pictures: five planes of 256 tiles for each of the four image banks.
+    pub image: Vec<u8>,
+    /// The 256 sectors of 128 tile numbers each, then (from `MAP_OFFSET`) the region map.
+    pub sector: Vec<u8>,
+    /// The terrain table: four bytes per tile.
+    pub terrain: Vec<u8>,
+    /// The masks that hide sprites behind scenery tiles.
+    pub shadow: Vec<u8>,
+    /// The sprite sheets: each sheet is its frames (five planes each) followed by their masks.
+    pub shape: Vec<u8>,
+    /// Where the image and the mask of the sprite being drawn start in `shape`.
+    pub shapedata: usize,
+    pub mask_buffer: usize,
+    /// Where the next sprite sheet loads in `shape`.
+    pub nextshape: usize,
     pub seq_list: [SeqInfo; SPRITE_SHEETS],
 }
 
-pub static mut the_memory: Memory = unsafe { std::mem::zeroed() };
+/// The memory areas, which the whole game shares (single threaded; no caller holds on to them across
+/// a call that uses them again).
+pub fn memory() -> &'static mut Memory {
+    unsafe { &mut *(&raw mut the_memory) }
+}
+
+/// Where the region map starts in `Memory::sector`.
+pub const MAP_OFFSET: usize = 128 * 256;
+
+impl Memory {
+    pub const fn new() -> Memory {
+        Memory {
+            image: Vec::new(),
+            sector: Vec::new(),
+            terrain: Vec::new(),
+            shadow: Vec::new(),
+            shape: Vec::new(),
+            shapedata: 0,
+            mask_buffer: 0,
+            nextshape: 0,
+            seq_list: [const { SeqInfo::EMPTY }; SPRITE_SHEETS],
+        }
+    }
+
+    /// The sector number at byte `index` of the region map (0 outside it).
+    pub fn map_byte(&self, index: usize) -> u8 {
+        self.sector.get(MAP_OFFSET + index).copied().unwrap_or(0)
+    }
+
+    /// Changes the sector number at byte `index` of the region map.
+    pub fn set_map_byte(&mut self, index: usize, value: u8) {
+        if let Some(byte) = self.sector.get_mut(MAP_OFFSET + index) {
+            *byte = value;
+        }
+    }
+
+    /// The tile number at byte `index` of the sector table (0 outside it).
+    pub fn sector_byte(&self, index: usize) -> u8 {
+        self.sector.get(index).copied().unwrap_or(0)
+    }
+
+    /// Changes the tile number at byte `index` of the sector table.
+    pub fn set_sector_byte(&mut self, index: usize, value: u8) {
+        if let Some(byte) = self.sector.get_mut(index) {
+            *byte = value;
+        }
+    }
+
+    /// Byte `index` of the terrain table (0 outside it).
+    pub fn terrain_byte(&self, index: usize) -> u8 {
+        self.terrain.get(index).copied().unwrap_or(0)
+    }
+}
+
+pub static mut the_memory: Memory = Memory::new();
 
 /// The menus, the keyboard and mouse state, and test and debug switches.
 pub struct Ui {

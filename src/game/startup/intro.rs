@@ -2,7 +2,7 @@
 //! first frame of the game.
 
 use crate::game::actors::revive::revive;
-use crate::game::data::state::{the_memory, the_ui};
+use crate::game::data::state::{memory, the_ui};
 use crate::game::data::story_text::TITLE_TEXT;
 use crate::game::data::tables::{black_colors, text_colors};
 use crate::game::files::disk::load_track_range;
@@ -176,14 +176,7 @@ fn show_play_screen_background() {
     set_intro_zoom(ZOOM_NORMAL);
     set_page_color(BACKGROUND_COLOR, LOADING_BLUE);
 
-    unsafe {
-        load_track_range(
-            SHADOW_BLOCK.0,
-            SHADOW_BLOCK.1,
-            the_memory.shadow_mem.cast(),
-            0,
-        );
-    }
+    load_track_range(SHADOW_BLOCK.0, SHADOW_BLOCK.1, &mut memory().shadow, 0);
 
     set_page_color(BACKGROUND_COLOR, TITLE_BLUE);
     load_picture("hiscreen", screen.bitmap_mut(BitmapId::Text), 0, 0);

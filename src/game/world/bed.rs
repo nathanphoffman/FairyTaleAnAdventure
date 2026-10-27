@@ -1,9 +1,9 @@
 //! Sleeping in a bed: standing on a bed tile indoors for a while puts a tired hero to sleep (from
 //! the main loop in csrc/fmain.c).
 
-use crate::game::data::state::{the_actors, the_hero, the_world};
+use crate::game::data::state::{memory, the_actors, the_hero, the_world};
 use crate::game::ui::text::show_event;
-use crate::game::world::map::tile_address;
+use crate::game::world::map::tile_index;
 
 // Actor kinds and states (csrc/ftale.h).
 const STILL: i8 = 13;
@@ -37,12 +37,12 @@ pub fn check_bed() {
         the_hero.y = (*hero).abs_y;
 
         if the_world.region == INSIDE_REGION {
-            let tile = *tile_address(
+            let tile = memory().sector_byte(tile_index(
                 // Shifts by TILE_WIDTH_SHIFT, converting between pixels, tiles, sectors or bytes.
                 (the_hero.x >> TILE_WIDTH_SHIFT) as i32,
                 // Shifts by TILE_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
                 (the_hero.y >> TILE_HEIGHT_SHIFT) as i32,
-            );
+            ));
 
             let (wait, action) = bed_step(
                 the_world.bed_wait,

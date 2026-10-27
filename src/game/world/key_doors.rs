@@ -4,10 +4,10 @@
 //! needed) swaps those tiles for the "open" ones. `open_list` says, per door and per map set,
 //! which tiles to swap in and which key is needed.
 
-use crate::game::data::state::{the_screen, the_ui};
+use crate::game::data::state::{memory, the_screen, the_ui};
 use crate::game::data::tables::loaded_blocks;
 use crate::game::ui::messages::print;
-use crate::game::world::map::{terrain_at, tile_address};
+use crate::game::world::map::{terrain_at, tile_index};
 
 /// Set after a locked door was bumped, so "It's locked." is only said once until the hero moves on.
 pub static mut bumped_locked_door: i8 = 0;
@@ -90,9 +90,14 @@ const OPEN_LIST: [DoorOpen; 17] = [
     door(210, 840, 208, 209, SIDE, NOKEY),         // BLUE
 ];
 
-/// The tile byte at tile position (x, y) of the map, to change it.
-fn tile(x: i32, y: i32) -> *mut u8 {
-    tile_address(x, y).cast_mut()
+/// The tile number at tile position (x, y) of the map.
+fn tile(x: i32, y: i32) -> u8 {
+    memory().sector_byte(tile_index(x, y))
+}
+
+/// Changes the tile number at tile position (x, y) of the map.
+fn set_tile(x: i32, y: i32, value: u8) {
+    memory().set_sector_byte(tile_index(x, y), value);
 }
 
 /// Tries to open a door near the pixel (x, y) with a key of type `keytype` (0 when walking into it
@@ -106,7 +111,7 @@ pub fn open_door_near(x: u16, y: u16, keytype: u32) -> i32 {
         };
 
         // we know where the door starts; now which type is it?
-        let sector_id = *tile(x, y);
+        let sector_id = tile(x, y);
 
         // Shifts by MAP_SET_SHIFT, converting between pixels, tiles, sectors or bytes.
         let map_id = loaded_blocks.image[(sector_id >> MAP_SET_SHIFT) as usize];
@@ -172,13 +177,11 @@ fn find_door_corner(x: u16, y: u16) -> Option<(i32, i32)> {
 
 /// Replaces the closed door tile at (`x`, `y`) with its open version, and the neighbouring tiles
 /// the door covers (which ones depends on the door's layout).
-unsafe fn swap_in_open_door_tiles(open: &DoorOpen, x: i32, y: i32) {
-    unsafe {
-        let (changes, count) = open_changes(open, x, y);
+fn swap_in_open_door_tiles(open: &DoorOpen, x: i32, y: i32) {
+    let (changes, count) = open_changes(open, x, y);
 
-        for &(tx, ty, value) in &changes[..count] {
-            *tile(tx, ty) = value;
-        }
+    for &(tx, ty, value) in &changes[..count] {
+        set_tile(tx, ty, value);
     }
 }
 

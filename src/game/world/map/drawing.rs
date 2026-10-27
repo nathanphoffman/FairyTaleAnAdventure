@@ -1,7 +1,7 @@
 //! Drawing the map into the play field: single tiles, whole screens, new edges and scrolling.
 
 use crate::game::data::object_tables::minimap;
-use crate::game::data::state::the_memory;
+use crate::game::data::state::memory;
 use crate::game::render::screen::screen;
 
 /// One bitplane of 256 tiles, 64 bytes per tile.
@@ -18,22 +18,18 @@ pub(super) const SCREEN_COLUMNS: usize = 19;
 pub(super) const SCREEN_ROWS: usize = 6;
 
 /// Draws one tile at byte offset `dst` in each of the five planes (2 bytes wide, 32 lines).
-pub(super) unsafe fn draw_tile(tile: i32, dst: usize) {
-    unsafe {
-        for p in 0..PLANE_COUNT {
-            let mut src = the_memory
-                .image_mem
-                .add(p * IMAGE_PLANE_SIZE)
-                .offset(tile as isize * TILE_BYTES as isize);
-            let plane = screen().draw_bitmap_mut().plane_mut(p);
-            let mut d = dst;
+pub(super) fn draw_tile(tile: i32, dst: usize) {
+    for p in 0..PLANE_COUNT {
+        let mut src = p * IMAGE_PLANE_SIZE + tile as usize * TILE_BYTES;
+        let image = &memory().image;
+        let plane = screen().draw_bitmap_mut().plane_mut(p);
+        let mut d = dst;
 
-            for _ in 0..TILE_LINES {
-                plane[d] = *src;
-                plane[d + 1] = *src.add(1);
-                src = src.add(2);
-                d += ROW_BYTES;
-            }
+        for _ in 0..TILE_LINES {
+            plane[d] = image[src];
+            plane[d + 1] = image[src + 1];
+            src += 2;
+            d += ROW_BYTES;
         }
     }
 }
