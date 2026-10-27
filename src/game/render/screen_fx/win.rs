@@ -42,6 +42,21 @@ pub fn win_colors() {
         placard_text(WIN_MESSAGE_SECOND);
         draw_placard_border();
         Delay(WIN_MESSAGE_PAUSE);
+        show_win_picture_in_black();
+        rise_sun();
+
+        Delay(SUNRISE_END_PAUSE);
+        LoadRGB4(
+            &raw mut the_screen.vp_page,
+            (&raw const black_colors).cast::<u16>(),
+            COLOR_COUNT as i32,
+        );
+    }
+}
+
+/// Loads the winning picture with every colour black, so the sunrise can fade it in.
+unsafe fn show_win_picture_in_black() {
+    unsafe {
         the_screen.bm_draw = (*(*the_screen.drawing_page).ri_page).BitMap;
         load_picture(c"winpic".as_ptr(), the_screen.bm_draw, 0, 0);
         LoadRGB4(
@@ -58,7 +73,12 @@ pub fn win_colors() {
 
         the_screen.vp_text.Modes = HIRES | SPRITES | VP_HIDE;
         set_intro_zoom(WIN_SCREEN_SIZE);
+    }
+}
 
+/// Steps through the sunrise palettes, one pause each.
+unsafe fn rise_sun() {
+    unsafe {
         for i in (SUNRISE_END + 1..=SUNRISE_START).rev() {
             fader = sunrise_palette(i);
             LoadRGB4(
@@ -73,13 +93,6 @@ pub fn win_colors() {
 
             Delay(SUNRISE_STEP_PAUSE);
         }
-
-        Delay(SUNRISE_END_PAUSE);
-        LoadRGB4(
-            &raw mut the_screen.vp_page,
-            (&raw const black_colors).cast::<u16>(),
-            COLOR_COUNT as i32,
-        );
     }
 }
 

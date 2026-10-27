@@ -129,9 +129,16 @@ pub fn print_options() {
             }
         }
 
+        blank_slots_from(slot);
+    }
+}
+
+/// Blanks the slots from `first` to the last one: nothing is shown there.
+unsafe fn blank_slots_from(first: usize) {
+    unsafe {
         SetBPen(&raw mut the_screen.rp_text2, 0);
 
-        while slot < SLOTS {
+        for slot in first..SLOTS {
             let x = if slot & 1 != 0 {
                 RIGHT_COLUMN_X
             } else {
@@ -146,7 +153,6 @@ pub fn print_options() {
                 ENTRY_WIDTH,
             );
             the_ui.slot_entries[slot] = -1;
-            slot += 1;
         }
     }
 }

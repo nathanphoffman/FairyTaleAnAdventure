@@ -123,17 +123,7 @@ unsafe fn body_image(actor: *const Shape, i: i32, mut inum: i16) -> Option<(i16,
                 inum = state_entry(inum).figure as i16;
             }
 
-            if (*actor).race == RACE_SNAKE {
-                if (*actor).state < DYING {
-                    inum += SNAKE_FIRST_IMAGE;
-                }
-            } else if i > 0 {
-                if (*actor).race & 1 != 0 {
-                    inum |= IMAGE_PAIR_BIT;
-                } else {
-                    inum &= !IMAGE_PAIR_BIT;
-                }
-            }
+            inum = pick_of_pair(actor, i, inum);
         }
 
         if atype == OBJECTS && (*actor).race == 0 {
@@ -146,6 +136,26 @@ unsafe fn body_image(actor: *const Shape, i: i32, mut inum: i16) -> Option<(i16,
         }
 
         Some((atype, inum))
+    }
+}
+
+/// Snakes use their own pictures; other enemies have two pictures per figure, picked by the race
+/// (the hero, actor 0, has just the one).
+unsafe fn pick_of_pair(actor: *const Shape, i: i32, inum: i16) -> i16 {
+    unsafe {
+        if (*actor).race == RACE_SNAKE {
+            if (*actor).state < DYING {
+                return inum + SNAKE_FIRST_IMAGE;
+            }
+        } else if i > 0 {
+            if (*actor).race & 1 != 0 {
+                return inum | IMAGE_PAIR_BIT;
+            }
+
+            return inum & !IMAGE_PAIR_BIT;
+        }
+
+        inum
     }
 }
 

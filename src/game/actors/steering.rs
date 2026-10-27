@@ -61,27 +61,11 @@ fn steer(xdif: i16, ydif: i16, mode: i32, random_bit: impl FnOnce() -> bool) -> 
     let (mut xdir, mut ydir) = (sign(xdif), sign(ydif));
 
     if mode != STEER_STRAIGHT {
-        // An axis less than half as far as the other is ignored, so the actor goes straight along the long one.
-        if (yabs as i16) < (xabs >> IGNORE_SHIFT) as i16 {
-            ydir = 0;
-        }
-
-        // An axis less than half as far as the other is ignored, so the actor goes straight along the long one.
-        if (xabs as i16) < (yabs >> IGNORE_SHIFT) as i16 {
-            xdir = 0;
-        }
+        (xdir, ydir) = along_the_long_axis((xdir, ydir), xabs, yabs);
     }
 
     let close = (xabs as i32 + yabs as i32) as i16;
-    let mut deviation = 0;
-
-    if mode == STEER_WOBBLE_FAR && close < WOBBLE_DISTANCE_FAR {
-        deviation = 1;
-    }
-
-    if mode == STEER_WOBBLE_NEAR && close < WOBBLE_DISTANCE_NEAR {
-        deviation = 1;
-    }
+    let deviation = wobble(mode, close);
 
     if mode == STEER_AWAY {
         xdir = -xdir;
@@ -100,6 +84,32 @@ fn steer(xdif: i16, ydif: i16, mode: i32, random_bit: impl FnOnce() -> bool) -> 
     Course::Face {
         facing: facing & FACING_MASK,
     }
+}
+
+/// An axis less than half as far as the other is ignored, so the actor goes straight along the
+/// long one.
+fn along_the_long_axis((xdir, ydir): (i32, i32), xabs: u16, yabs: u16) -> (i32, i32) {
+    let ydir = if (yabs as i16) < (xabs >> IGNORE_SHIFT) as i16 {
+        0
+    } else {
+        ydir
+    };
+
+    let xdir = if (xabs as i16) < (yabs >> IGNORE_SHIFT) as i16 {
+        0
+    } else {
+        xdir
+    };
+
+    (xdir, ydir)
+}
+
+/// The sideways wobble (one direction step) of modes 1 and 2 when the target is close, else 0.
+fn wobble(mode: i32, close: i16) -> i32 {
+    let wobbles = (mode == STEER_WOBBLE_FAR && close < WOBBLE_DISTANCE_FAR)
+        || (mode == STEER_WOBBLE_NEAR && close < WOBBLE_DISTANCE_NEAR);
+
+    wobbles as i32
 }
 
 /// Points an actor toward (or away from) a target and sets it walking (see `steer` for modes).

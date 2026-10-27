@@ -47,38 +47,47 @@ pub fn handle_print_request() {
         pplay = (pplay + 1) & QUEUE_MASK;
 
         match request {
-            REQUEST_DEBUG_COORDS => {
-                print(c"Coords = ".as_ptr());
-                print_number(the_hero.x as i32, COORD_DIGITS);
-                print_number(the_hero.y as i32, COORD_DIGITS);
-                print(c"Memory Available: ".as_ptr());
-                print_number(AvailMem(0) as i32, COORD_DIGITS);
-            }
-
-            REQUEST_DEBUG_SECTOR => {
-                print(c"You are at: ".as_ptr());
-                print_number(the_hero.x as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
-                print_number(the_hero.y as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
-                print(c"H/Sector = ".as_ptr());
-                print_number(the_hero.sector as i32, SECTOR_DIGITS);
-                draw_text(c" Extent = ".as_ptr(), EXTENT_LABEL_LEN);
-                print_number(the_world.extent_type as i32, EXTENT_DIGITS);
-            }
-
-            REQUEST_VITALITY => {
-                move_to(VITALITY_POSITION.0, VITALITY_POSITION.1);
-                draw_text(c"Vit:".as_ptr(), VITALITY_LABEL_LEN);
-                print_number(the_actors.list[0].vitality as i32, VITALITY_DIGITS);
-            }
-
-            REQUEST_OPTIONS => {
-                print_options();
-            }
-
+            REQUEST_DEBUG_COORDS => show_debug_coords(),
+            REQUEST_DEBUG_SECTOR => show_debug_sector(),
+            REQUEST_VITALITY => draw_vitality(),
+            REQUEST_OPTIONS => print_options(),
             REQUEST_STATS => draw_stats(),
             REQUEST_TAKE_WHAT => print(c"Take What?".as_ptr()),
             _ => {}
         }
+    }
+}
+
+/// Debug information: the hero's map position and the memory left.
+unsafe fn show_debug_coords() {
+    unsafe {
+        print(c"Coords = ".as_ptr());
+        print_number(the_hero.x as i32, COORD_DIGITS);
+        print_number(the_hero.y as i32, COORD_DIGITS);
+        print(c"Memory Available: ".as_ptr());
+        print_number(AvailMem(0) as i32, COORD_DIGITS);
+    }
+}
+
+/// Debug information: the hero's sector and the type of the extent the hero is in.
+unsafe fn show_debug_sector() {
+    unsafe {
+        print(c"You are at: ".as_ptr());
+        print_number(the_hero.x as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
+        print_number(the_hero.y as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
+        print(c"H/Sector = ".as_ptr());
+        print_number(the_hero.sector as i32, SECTOR_DIGITS);
+        draw_text(c" Extent = ".as_ptr(), EXTENT_LABEL_LEN);
+        print_number(the_world.extent_type as i32, EXTENT_DIGITS);
+    }
+}
+
+/// The hero's vitality on the stats line.
+unsafe fn draw_vitality() {
+    unsafe {
+        move_to(VITALITY_POSITION.0, VITALITY_POSITION.1);
+        draw_text(c"Vit:".as_ptr(), VITALITY_LABEL_LEN);
+        print_number(the_actors.list[0].vitality as i32, VITALITY_DIGITS);
     }
 }
 

@@ -140,28 +140,42 @@ unsafe fn place_waiting_encounters() {
                 continue;
             }
 
-            while the_encounter.number != 0 && the_actors.active < LAST_ENEMY_ACTOR {
-                if place_encounter(the_actors.active as u16, SPREAD) != 0 {
-                    the_actors.active += 1;
-                }
+            place_in_free_slots();
+            place_in_dead_slots();
 
+            break;
+        }
+    }
+}
+
+/// Puts the waiting monsters into the actor slots that are still free.
+unsafe fn place_in_free_slots() {
+    unsafe {
+        while the_encounter.number != 0 && the_actors.active < LAST_ENEMY_ACTOR {
+            if place_encounter(the_actors.active as u16, SPREAD) != 0 {
+                the_actors.active += 1;
+            }
+
+            the_encounter.number -= 1;
+        }
+    }
+}
+
+/// Puts the monsters still waiting in place of dead ones that are no longer on screen (a wraith
+/// can be replaced even while its body is seen).
+unsafe fn place_in_dead_slots() {
+    unsafe {
+        let mut i = FIRST_ENEMY_ACTOR as usize;
+
+        while i < LAST_ENEMY_ACTOR as usize && the_encounter.number != 0 {
+            let actor = &raw const the_actors.list[i];
+
+            if (*actor).state == DEAD && ((*actor).visible == 0 || (*actor).race == WRAITH) {
+                place_encounter(i as u16, SPREAD);
                 the_encounter.number -= 1;
             }
 
-            let mut i = FIRST_ENEMY_ACTOR as usize;
-
-            while i < LAST_ENEMY_ACTOR as usize && the_encounter.number != 0 {
-                let actor = &raw const the_actors.list[i];
-
-                if (*actor).state == DEAD && ((*actor).visible == 0 || (*actor).race == WRAITH) {
-                    place_encounter(i as u16, SPREAD);
-                    the_encounter.number -= 1;
-                }
-
-                i += 1;
-            }
-
-            break;
+            i += 1;
         }
     }
 }

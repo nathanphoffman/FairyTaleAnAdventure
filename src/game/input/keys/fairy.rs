@@ -34,26 +34,31 @@ pub(super) unsafe fn fairy_or_revive(state: i8, cycle: i16) -> i8 {
             }
 
             FairyAction::Wait => {}
-            FairyAction::FlyIn => {
-                let fairy = &raw mut the_actors.list[FAIRY_SLOT];
-                the_actors.active = NO_ACTORS_LOADED;
-                (*fairy).abs_x = the_hero
-                    .x
-                    .wrapping_add(the_hero.good_fairy_timer as u16 * FAIRY_SPEED)
-                    .wrapping_sub(FAIRY_X_OFFSET);
-                (*fairy).abs_y = the_hero.y;
-                (*fairy).kind = OBJECTS;
-                (*fairy).index = FAIRY_IMAGE + (cycle & 1) as i8;
-                (*fairy).state = STILL;
-                (*fairy).weapon = 0;
-                (*fairy).environ = 0;
-                (*fairy).race = FAIRY_RACE;
-                the_actors.on_screen = 1;
-                the_actors.battle_flag = 0;
-            }
+            FairyAction::FlyIn => place_fairy(cycle),
         }
 
         state
+    }
+}
+
+/// Puts the fairy near the hero, closer each frame, and clears the other actors away.
+unsafe fn place_fairy(cycle: i16) {
+    unsafe {
+        let fairy = &raw mut the_actors.list[FAIRY_SLOT];
+        the_actors.active = NO_ACTORS_LOADED;
+        (*fairy).abs_x = the_hero
+            .x
+            .wrapping_add(the_hero.good_fairy_timer as u16 * FAIRY_SPEED)
+            .wrapping_sub(FAIRY_X_OFFSET);
+        (*fairy).abs_y = the_hero.y;
+        (*fairy).kind = OBJECTS;
+        (*fairy).index = FAIRY_IMAGE + (cycle & 1) as i8;
+        (*fairy).state = STILL;
+        (*fairy).weapon = 0;
+        (*fairy).environ = 0;
+        (*fairy).race = FAIRY_RACE;
+        the_actors.on_screen = 1;
+        the_actors.battle_flag = 0;
     }
 }
 

@@ -189,7 +189,7 @@ mod tests {
     }
 
     #[test]
-    fn talking() {
+    fn people_answer_when_talked_to() {
         use TalkAction::*;
         let figure = target(SETFIG, 0, true);
         assert_eq!(
@@ -206,7 +206,20 @@ mod tests {
             }
         );
 
-        // yelling at someone close is refused; far enough is fine; talking is always fine
+        assert_eq!(
+            talk_action(&figure, false, 1, 0, false),
+            Person {
+                starts_talking: true
+            }
+        );
+    }
+
+    #[test]
+    fn yelling_at_someone_close_is_refused() {
+        use TalkAction::*;
+        let figure = target(SETFIG, 0, true);
+
+        // far enough is fine; talking is always fine
         assert_eq!(
             talk_action(&figure, true, TOO_CLOSE_TO_YELL - 1, 0, false),
             TooCloseToYell
@@ -218,21 +231,20 @@ mod tests {
                 starts_talking: true
             }
         );
+    }
 
-        assert_eq!(
-            talk_action(&figure, false, 1, 0, false),
-            Person {
-                starts_talking: true
-            }
-        );
-
-        // the dead say nothing
+    #[test]
+    fn the_dead_say_nothing() {
+        use TalkAction::*;
         assert_eq!(
             talk_action(&target(SETFIG, DEAD, true), false, 10, 0, false),
             Nothing
         );
+    }
 
-        // the turtle gives the shell once
+    #[test]
+    fn the_turtle_gives_the_shell_once() {
+        use TalkAction::*;
         let turtle = target(CARRIER, 0, false);
         assert_eq!(
             talk_action(&turtle, false, 10, CARRIER_TURTLE, false),
@@ -248,7 +260,11 @@ mod tests {
             talk_action(&turtle, false, 10, CARRIER_TURTLE + 1, false),
             Nothing
         );
+    }
 
+    #[test]
+    fn enemies_shout_their_line() {
+        use TalkAction::*;
         assert_eq!(
             talk_action(&target(ENEMY, 0, false), false, 10, 0, false),
             EnemyShouts(7)

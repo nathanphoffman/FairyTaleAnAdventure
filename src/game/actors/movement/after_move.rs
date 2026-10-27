@@ -30,26 +30,7 @@ impl Ctx {
             let s = self.state;
 
             if s == DYING {
-                let d = self.facing;
-
-                if (*actor).tactic > DYING_FIRST_HALF {
-                    self.image = if d == 0 || d > DYING_FACING_LIMIT {
-                        FRAME_DYING.0
-                    } else {
-                        FRAME_DYING.1
-                    };
-                } else if (*actor).tactic > 0 {
-                    self.image = if d == 0 || d > DYING_FACING_LIMIT {
-                        FRAME_DYING.1
-                    } else {
-                        FRAME_DYING.0
-                    };
-                } else {
-                    (*actor).state = DEAD as i8;
-                    self.image = FRAME_FLAT;
-                }
-
-                the_actors.frustration = 0;
+                self.dying_frame();
             } else if s == DEAD || s == FROZEN {
                 self.image = FRAME_FLAT;
             } else if s == OSCIL {
@@ -59,15 +40,52 @@ impl Ctx {
             } else if s == SLEEP {
                 self.image = FRAME_SLEEP;
             } else if s == FALL && (*actor).tactic < FALL_STEPS {
-                self.terrain =
-                    (*actor).tactic as i16 / FALL_STEPS_PER_FRAME + the_hero.brother * FALL_FRAMES;
-                self.image = fallstates.get(self.terrain as usize).copied().unwrap_or(0) as i16;
-                (*actor).tactic += 1;
-                (*actor).vel_x = ((*actor).vel_x as i32 * FALL_DRAG.0 / FALL_DRAG.1) as i8;
-                (*actor).vel_y = ((*actor).vel_y as i32 * FALL_DRAG.0 / FALL_DRAG.1) as i8;
+                self.falling_frame();
             }
 
             Pc::Cpx
+        }
+    }
+
+    /// A dying actor flips between two frames, which way round depends on its facing; when the
+    /// countdown (the tactic) ends it is dead and lies flat.
+    unsafe fn dying_frame(&mut self) {
+        unsafe {
+            let actor = self.actor;
+            let d = self.facing;
+            let facing_back = d == 0 || d > DYING_FACING_LIMIT;
+
+            if (*actor).tactic > DYING_FIRST_HALF {
+                self.image = if facing_back {
+                    FRAME_DYING.0
+                } else {
+                    FRAME_DYING.1
+                };
+            } else if (*actor).tactic > 0 {
+                self.image = if facing_back {
+                    FRAME_DYING.1
+                } else {
+                    FRAME_DYING.0
+                };
+            } else {
+                (*actor).state = DEAD as i8;
+                self.image = FRAME_FLAT;
+            }
+
+            the_actors.frustration = 0;
+        }
+    }
+
+    /// One step of the fall into the pit: the next falling frame, and the slide slows down.
+    unsafe fn falling_frame(&mut self) {
+        unsafe {
+            let actor = self.actor;
+            self.terrain =
+                (*actor).tactic as i16 / FALL_STEPS_PER_FRAME + the_hero.brother * FALL_FRAMES;
+            self.image = fallstates.get(self.terrain as usize).copied().unwrap_or(0) as i16;
+            (*actor).tactic += 1;
+            (*actor).vel_x = ((*actor).vel_x as i32 * FALL_DRAG.0 / FALL_DRAG.1) as i8;
+            (*actor).vel_y = ((*actor).vel_y as i32 * FALL_DRAG.0 / FALL_DRAG.1) as i8;
         }
     }
 

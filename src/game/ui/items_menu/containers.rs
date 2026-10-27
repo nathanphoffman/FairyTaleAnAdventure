@@ -167,8 +167,17 @@ mod tests {
         assert_eq!(rolls(0, &[]), Contents::Nothing);
         assert_eq!(rolls(1, &[0]), Contents::One(ARROWBASE));
         assert_eq!(rolls(1, &[3]), Contents::One(11));
+    }
 
-        // two things: a first item and a different second one
+    #[test]
+    fn two_things_are_never_the_same() {
+        let rolls = |kind: i32, items: &[i32]| {
+            let mut next = items.iter().copied();
+
+            roll_contents(|| kind, || next.next().unwrap())
+        };
+
+        // a first item and a different second one
         assert_eq!(
             rolls(2, &[2, 5]),
             Contents::Two {
@@ -201,8 +210,16 @@ mod tests {
                 second: ARROWBASE
             }
         );
+    }
 
-        // three of one thing, or three keys
+    #[test]
+    fn three_of_one_thing_or_three_keys() {
+        let rolls = |kind: i32, items: &[i32]| {
+            let mut next = items.iter().copied();
+
+            roll_contents(|| kind, || next.next().unwrap())
+        };
+
         assert_eq!(rolls(3, &[4]), Contents::ThreeOf(12));
         assert_eq!(rolls(3, &[0, 0, 5, 6]), Contents::ThreeKeys([16, 21, 16]));
     }

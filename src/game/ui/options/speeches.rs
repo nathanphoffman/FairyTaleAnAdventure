@@ -273,7 +273,7 @@ mod tests {
     }
 
     #[test]
-    fn what_people_say() {
+    fn the_wizard_is_short_with_the_unkind() {
         let t = talker();
         assert_eq!(plain_speech(WIZARD, &t), Some(29));
         assert_eq!(
@@ -286,7 +286,11 @@ mod tests {
             ),
             Some(35)
         );
+    }
 
+    #[test]
+    fn guards_and_royalty_speak_once_the_princess_is_free() {
+        let t = talker();
         assert_eq!(plain_speech(GUARD_BACK, &t), Some(15));
         assert_eq!(plain_speech(PRINCESS, &t), None);
         assert_eq!(
@@ -310,7 +314,11 @@ mod tests {
             ),
             Some(17)
         );
+    }
 
+    #[test]
+    fn the_ranger_depends_on_the_region() {
+        let t = talker();
         assert_eq!(plain_speech(RANGER, &t), Some(55));
         assert_eq!(
             plain_speech(
@@ -322,7 +330,11 @@ mod tests {
             ),
             Some(22)
         );
+    }
 
+    #[test]
+    fn the_priest_and_sorceress_say_nothing_plainly() {
+        let t = talker();
         assert_eq!(plain_speech(PRIEST, &t), None);
         assert_eq!(plain_speech(SORCERESS, &t), None);
     }

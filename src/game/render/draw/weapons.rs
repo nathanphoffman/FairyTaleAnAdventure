@@ -71,48 +71,55 @@ pub(super) unsafe fn weapon_passmode(actor: *const Shape, pass: &mut u8) -> bool
     }
 }
 
+/// The picture of the bow for an animation frame: it is drawn up, middle or down as the frames go.
+fn bow_image(frame_number: i16) -> i16 {
+    let bow_phase = frame_number / BOW_PHASE_FRAMES;
+
+    if bow_phase & 1 != 0 {
+        OBJ_BOW_UP
+    } else if bow_phase & 2 != 0 {
+        OBJ_BOW_MID
+    } else {
+        OBJ_BOW_DOWN
+    }
+}
+
 /// The weapon's sprite: where it is held for this animation frame, and which image it is.
 pub(super) unsafe fn weapon_image(actor: *const Shape, mut sprite: Sprite) -> Sprite {
     unsafe {
-        let mut kind = (*actor).weapon as i16;
+        let kind = (*actor).weapon as i16;
         let frame_number = sprite.inum;
-        let is_bow_frame = kind == WEAPON_BOW as i16 && frame_number < BOW_FRAMES;
 
-        if is_bow_frame {
+        if kind == WEAPON_BOW as i16 && frame_number < BOW_FRAMES {
             sprite.xstart += byte_of(&bow_x, frame_number);
             sprite.ystart += byte_of(&bow_y, frame_number);
+            sprite.inum = bow_image(frame_number);
         } else {
             let entry = state_entry(frame_number);
             sprite.xstart += entry.wpn_x as i16;
             sprite.ystart += entry.wpn_y as i16;
-        }
 
-        if is_bow_frame {
-            let bow_phase = frame_number / BOW_PHASE_FRAMES;
-            sprite.inum = if bow_phase & 1 != 0 {
-                OBJ_BOW_UP
-            } else if bow_phase & 2 != 0 {
-                OBJ_BOW_MID
+            if kind == WEAPON_FIREBALL as i16 {
+                sprite.inum = (*actor).facing as i16 + OBJ_ARROW_BASE;
+
+                if (*actor).facing == FIREBALL_FACING_EAST {
+                    sprite.ystart -= FIREBALL_EAST_LIFT;
+                }
             } else {
-                OBJ_BOW_DOWN
-            };
-        } else if kind == WEAPON_FIREBALL as i16 {
-            sprite.inum = (*actor).facing as i16 + OBJ_ARROW_BASE;
-
-            if (*actor).facing == FIREBALL_FACING_EAST {
-                sprite.ystart -= FIREBALL_EAST_LIFT;
+                sprite.inum = entry.wpn_no as i16 + hand_weapon_images(kind);
             }
-        } else {
-            // hand weapons: each kind has its own block of images
-            if let Some(&(_, base)) = WEAPON_SPRITE_BASE.iter().find(|(w, _)| *w as i16 == kind) {
-                kind = base;
-            }
-
-            sprite.inum = state_entry(frame_number).wpn_no as i16 + kind;
         }
 
         sprite.atype = OBJECTS;
 
         sprite
     }
+}
+
+/// Hand weapons each have their own block of images; the first image of the block for `kind`.
+fn hand_weapon_images(kind: i16) -> i16 {
+    WEAPON_SPRITE_BASE
+        .iter()
+        .find(|(w, _)| *w as i16 == kind)
+        .map_or(kind, |&(_, base)| base)
 }

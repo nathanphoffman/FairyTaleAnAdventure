@@ -170,26 +170,33 @@ pub(super) unsafe fn show_brother_placards() {
             the_ui.quit_requested = 1;
             Delay(GAME_OVER_PAUSE);
         } else if the_hero.brother > JULIAN {
-            Delay(SHORT_PAUSE);
-            SetAPen(the_screen.current_rastport, PEN_BLACK);
-            RectFill(
-                the_screen.current_rastport,
-                PANEL.0,
-                PANEL.1,
-                PANEL.2,
-                PANEL.3,
-            );
-
-            Delay(TINY_PAUSE);
-            SetAPen(the_screen.current_rastport, PEN_TEXT);
-
-            placard_text(if the_hero.brother == PHILLIP {
-                PLACARD_PHILLIP_FOLLOW_UP
-            } else {
-                PLACARD_KEVIN_FOLLOW_UP
-            });
-            Delay(SHOW_PLACARD);
+            show_follow_up_placard();
         }
+    }
+}
+
+/// After the first story page the panel is cleared and the follow-up page for this brother is shown.
+unsafe fn show_follow_up_placard() {
+    unsafe {
+        Delay(SHORT_PAUSE);
+        SetAPen(the_screen.current_rastport, PEN_BLACK);
+        RectFill(
+            the_screen.current_rastport,
+            PANEL.0,
+            PANEL.1,
+            PANEL.2,
+            PANEL.3,
+        );
+
+        Delay(TINY_PAUSE);
+        SetAPen(the_screen.current_rastport, PEN_TEXT);
+
+        placard_text(if the_hero.brother == PHILLIP {
+            PLACARD_PHILLIP_FOLLOW_UP
+        } else {
+            PLACARD_KEVIN_FOLLOW_UP
+        });
+        Delay(SHOW_PLACARD);
     }
 }
 

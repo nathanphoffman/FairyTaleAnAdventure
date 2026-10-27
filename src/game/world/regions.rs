@@ -81,48 +81,59 @@ const BLOCKED_TILE: u8 = 254;
 pub fn refresh_minimap() {
     unsafe {
         if the_world.region < FIRST_INDOOR_REGION {
-            if the_world.new_region < NO_REGION {
-                let xs = the_world.map_x as u32 & MAP_X_WRAP;
-                let ys = the_world.map_y as u32 & MAP_Y_WRAP;
-
-                if (ys > MAP_Y_MIN_FOR_LOAD && ys < MAP_Y_MAX_FOR_LOAD)
-                    && !DEAD_STRIP_X.contains(&xs)
-                {
-                    load_region_now();
-                }
-            }
-
-            let (xs, ys) = center_sector();
-            // The map is two regions wide (64 sectors each).
-            let xr = (xs >> REGION_WIDTH_SHIFT) & 1;
-            // The map is four regions high (32 sectors each).
-            let yr = (ys >> REGION_HEIGHT_SHIFT) & REGION_ROW_MASK;
-            the_world.target_region = (xr + yr + yr) as u16;
-
-            if the_world.target_region != the_world.region {
-                the_world.new_region = the_world.target_region;
-                load_region_now();
-            }
+            follow_outdoor_region();
         } else {
             the_world.target_region = the_world.region;
         }
 
         if (read_finished(2) != 0 && read_finished(0) != 0) || the_world.new_region >= NO_REGION {
-            // Regions are numbered along the row: two to a row, so the row is the number halved.
-            let yr = the_world.target_region >> 1;
-            let xr = if the_world.target_region >= FIRST_INDOOR_REGION {
-                0
-            } else {
-                the_world.target_region & 1
-            };
-
-            // Where the region starts in sectors: 64 across, 32 down.
-            the_world.origin_x = xr << REGION_WIDTH_SHIFT;
-            // Where the region starts in sectors: 64 across, 32 down.
-            the_world.origin_y = yr << REGION_HEIGHT_SHIFT;
+            update_region_origin();
         }
 
         fill_minimap(the_world.tile_x as i32, the_world.tile_y as i32);
+    }
+}
+
+/// Outdoors: loads a pending region when the camera is in the loadable band, then works out the
+/// region at the middle of the screen and starts loading it if it is not the current one.
+unsafe fn follow_outdoor_region() {
+    unsafe {
+        if the_world.new_region < NO_REGION {
+            let xs = the_world.map_x as u32 & MAP_X_WRAP;
+            let ys = the_world.map_y as u32 & MAP_Y_WRAP;
+
+            if (ys > MAP_Y_MIN_FOR_LOAD && ys < MAP_Y_MAX_FOR_LOAD) && !DEAD_STRIP_X.contains(&xs) {
+                load_region_now();
+            }
+        }
+
+        let (xs, ys) = center_sector();
+        // The map is two regions wide (64 sectors each).
+        let xr = (xs >> REGION_WIDTH_SHIFT) & 1;
+        // The map is four regions high (32 sectors each).
+        let yr = (ys >> REGION_HEIGHT_SHIFT) & REGION_ROW_MASK;
+        the_world.target_region = (xr + yr + yr) as u16;
+
+        if the_world.target_region != the_world.region {
+            the_world.new_region = the_world.target_region;
+            load_region_now();
+        }
+    }
+}
+
+/// Where the target region starts, in sectors: 64 across, 32 down.
+unsafe fn update_region_origin() {
+    unsafe {
+        // Regions are numbered along the row: two to a row, so the row is the number halved.
+        let yr = the_world.target_region >> 1;
+        let xr = if the_world.target_region >= FIRST_INDOOR_REGION {
+            0
+        } else {
+            the_world.target_region & 1
+        };
+
+        the_world.origin_x = xr << REGION_WIDTH_SHIFT;
+        the_world.origin_y = yr << REGION_HEIGHT_SHIFT;
     }
 }
 
@@ -175,6 +186,14 @@ pub fn load_region_piece() {
 /// Loads the sector data, region map and two terrain tables that differ from the loaded ones.
 unsafe fn load_changed_tables(need: &Need) {
     unsafe {
+        load_changed_sectors_and_map(need);
+        load_changed_terrain(need);
+    }
+}
+
+/// Loads the sector table and the region map if they changed.
+unsafe fn load_changed_sectors_and_map(need: &Need) {
+    unsafe {
         if need.sector != loaded_blocks.sector {
             load_track_range(
                 need.sector as i16,
@@ -196,7 +215,12 @@ unsafe fn load_changed_tables(need: &Need) {
 
             loaded_blocks.region = need.region;
         }
+    }
+}
 
+/// Loads the two terrain tables if they changed.
+unsafe fn load_changed_terrain(need: &Need) {
+    unsafe {
         if need.terra1 != loaded_blocks.terra1 {
             load_track_range(
                 TERRA_BLOCK + need.terra1 as i16,

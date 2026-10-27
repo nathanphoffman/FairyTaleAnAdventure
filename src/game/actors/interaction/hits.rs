@@ -167,22 +167,7 @@ fn vitality_after_hit(vitality: i16, wt: i16) -> i16 {
 /// nearly dead. Then, if turtle eggs are around, the turtle story event is checked.
 pub fn report_battle_result() {
     unsafe {
-        let (mut dead, mut fled) = (0, 0);
-
-        for i in FIRST_MONSTER_SLOT..the_actors.active as i32 {
-            let a = actor_at(i);
-
-            if (*a).kind != ENEMY {
-                continue;
-            }
-
-            if (*a).state == DEAD {
-                dead += 1;
-            } else if (*a).goal == FLEE {
-                fled += 1;
-            }
-        }
-
+        let (dead, fled) = count_dead_and_fled();
         let vitality = (*actor_at(HERO as i32)).vitality;
 
         match battle_report(vitality, dead, fled, the_world.extent_type) {
@@ -207,6 +192,29 @@ pub fn report_battle_result() {
         if turtle_eggs != 0 {
             summon_turtle();
         }
+    }
+}
+
+/// How many of the enemies are dead and how many have fled.
+unsafe fn count_dead_and_fled() -> (i32, i32) {
+    unsafe {
+        let (mut dead, mut fled) = (0, 0);
+
+        for i in FIRST_MONSTER_SLOT..the_actors.active as i32 {
+            let a = actor_at(i);
+
+            if (*a).kind != ENEMY {
+                continue;
+            }
+
+            if (*a).state == DEAD {
+                dead += 1;
+            } else if (*a).goal == FLEE {
+                fled += 1;
+            }
+        }
+
+        (dead, fled)
     }
 }
 
