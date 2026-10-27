@@ -3,9 +3,9 @@
 use super::fairy::fairy_revival;
 use super::{
     BIRD, DEAD, DISMOUNT_CHECK, DISMOUNT_SPEED, DISMOUNT_STEP, DYING, EVENT_LAVA, EVENT_TOO_FAST,
-    EVENT_ZONE_81, EVENT_ZONE_82, FACING_MASK, FALL, FIGHTING, FIRE_BUTTON, LAVA_X, LAVA_Y,
-    LEFT_BUTTON, NOT_WALKING, RIGHT_BUTTON, SHOOT1, SHOOT3, SHOOTING_ZONE, SINK, SLEEP, STILL,
-    STUMBLE_HUNGER, WALKING, WEAPON_BOW, WEAPON_WAND, ZONE_ARROW_FAST, ZONE_ARROW_SLOW,
+    EVENT_ZONE_81, EVENT_ZONE_82, FACING_MASK, FALL, FIGHTING, LAVA_X, LAVA_Y, LEFT_BUTTON,
+    NOT_WALKING, RIGHT_BUTTON, SHOOT1, SHOOT3, SHOOTING_ZONE, SINK, SLEEP, STILL, STUMBLE_HUNGER,
+    WALKING, WEAPON_BOW, WEAPON_WAND, ZONE_ARROW_FAST, ZONE_ARROW_SLOW,
 };
 
 use crate::game::actors::interaction::blocked_at;
@@ -13,7 +13,7 @@ use crate::game::data::random::{fta_rand, rand4};
 use crate::game::data::state::{the_actors, the_hero, the_ui, the_world};
 use crate::game::data::tables::compass_lit_direction;
 use crate::game::data::types::Shape;
-use crate::game::input::handler::{fta_pia, mouse_buttons};
+use crate::game::input::handler::{joystick_fire, mouse_buttons};
 use crate::game::ui::text::show_event;
 
 /// Counts the timers down and sets the hero's state from the controls: the good fairy when dead
@@ -38,8 +38,8 @@ pub fn update_hero(cycle: i16) {
         } else if mouse_buttons() & RIGHT_BUTTON != 0
 
             || the_ui.fight_key_held != 0
-            // Masks with FIRE_BUTTON, keeping only the bits that matter here.
-            || (fta_pia & FIRE_BUTTON) == 0
+            // Masks with keeping only the bits that matter here.
+            || joystick_fire()
         {
             state = fighting_state(state);
         } else if state == SHOOT1 {

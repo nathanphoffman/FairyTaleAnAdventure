@@ -6,7 +6,7 @@
 //! device; here every read is finished when the call returns, so the functions that wait for or
 //! check a read just report that it is done.
 
-use crate::platform::dos::resolve;
+use crate::platform::paths::resolve;
 use std::ffi::c_void;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};

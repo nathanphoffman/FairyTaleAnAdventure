@@ -11,6 +11,7 @@ use crate::game::files::loading::{
     copy_protection_check, copy_protection_riddle, intro_skip_requested, intro_skipped,
     read_sample, read_score, show_story_page, track,
 };
+use crate::game::input::handler::reset_key_buffer;
 use crate::game::render::display::{delay, flip_pages};
 use crate::game::render::screen::{BitmapId, FontKind, PortId, ViewPortId, screen};
 use crate::game::render::screen_fx::{set_intro_zoom, show_still_screen};
@@ -195,10 +196,7 @@ fn show_play_screen_background() {
     screen.set_a_pen(PortId::Map, TITLE_PEN);
     placard_text(PLACARD_COPYRIGHT);
 
-    unsafe {
-        the_ui.handler_data.laydown = 0;
-        the_ui.handler_data.pickup = 0;
-    }
+    reset_key_buffer();
 }
 
 /// Starts the first brother and sets up the text page and the colours for play.

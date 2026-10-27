@@ -1,5 +1,3 @@
-mod amiga;
-
 mod gfx;
 
 mod platform;

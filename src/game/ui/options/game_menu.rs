@@ -2,7 +2,7 @@
 
 use super::{FILE, GAME, SAVEX};
 use crate::game::data::state::the_ui;
-use crate::game::files::savegame::{is_saving, savegame};
+use crate::game::files::savegame::savegame;
 use crate::game::ui::menus::go_to_menu;
 use crate::game::ui::music::set_mood;
 
@@ -27,7 +27,7 @@ pub(super) unsafe fn game_option(chosen_entry: i16) -> bool {
         }
 
         if chosen_entry == LOAD {
-            is_saving = 0;
+            the_ui.saving = false;
             go_to_menu(FILE as i16);
         }
 
@@ -43,7 +43,7 @@ pub(super) unsafe fn save_exit_option(chosen_entry: i16) -> bool {
         }
 
         if chosen_entry == SAVE {
-            is_saving = 1;
+            the_ui.saving = true;
             go_to_menu(FILE as i16);
         }
 
@@ -53,7 +53,7 @@ pub(super) unsafe fn save_exit_option(chosen_entry: i16) -> bool {
 
 /// A save slot was chosen: save or load, then back to the game menu.
 pub(super) fn file_option(chosen_entry: i16) -> bool {
-    savegame(chosen_entry);
+    savegame(chosen_entry, unsafe { the_ui.saving });
     go_to_menu(GAME as i16);
 
     true

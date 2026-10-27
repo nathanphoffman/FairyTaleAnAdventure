@@ -1,26 +1,93 @@
 //! Saving and loading the game (from csrc/fmain2.c). The save file is written field by field in
-//! big-endian order, so it does not depend on how the C compiler laid out the variables.
-//!
-//! The same code does saving and loading: each `transfer_*` function writes a value when `is_saving` is set
-//! and reads it back when it is clear. So the order of the calls in `save_all` is the file format:
-//! the misc variables, the region, the actors, the inventories and missiles, the extents and the
-//! object lists.
-//!
-//! The original asked for a floppy disk with a free drive (df1: or df0:). When a file named `image`
-//! exists (always, on Linux) the save is just named `A.faery`, `B.faery` ... (one letter per menu
-//! choice) and the platform layer puts the files in the `saves/` folder.
+//! big-endian order, so it does not depend on how the C compiler laid out the variables (see
+//! `transfer`). Games are named `A.faery`, `B.faery` ... (one letter per menu choice) and the
+//! platform layer puts the files in the `saves/` folder.
 
-mod records;
+mod transfer;
 
-mod slots;
+use self::transfer::{Transfer, transfer_all};
+use crate::game::data::state::{the_actors, the_encounter, the_screen};
+use crate::game::files::loading::load_start_sprites;
+use crate::game::render::screen::{FontKind, screen};
+use crate::game::ui::menus::update_menu_availability;
+use crate::game::ui::messages::print;
+use crate::game::ui::text::queue_print;
+use crate::platform::paths::resolve;
 
-pub use self::slots::savegame;
+/// The first letter of a save file name; the menu choice picks the letter.
+const FIRST_SLOT_LETTER: u8 = b'A';
 
-use crate::amiga::BPTR;
+/// Value of `view_status` meaning the screen must be redrawn from scratch.
+const VIEW_CORRUPT: i8 = 99;
 
-/// Set when saving, clear when loading.
-pub static mut is_saving: i8 = 0;
-pub static mut SVFILE: i32 = 0;
-pub static mut SVERR: i32 = 0;
-pub static mut SAVENAME: [u8; 12] = *b"df1:A.faery\0";
-pub static mut FLOCK: BPTR = 0;
+/// Print queue requests that redraw the vitality line and the stats line.
+const PRINT_VITALITY: i32 = 4;
+const PRINT_STATS: i32 = 7;
+
+/// Saves the game into slot `slot` (0 = A ...) when `saving`, or loads it from there.
+pub fn savegame(slot: i16, saving: bool) {
+    set_current_font(FontKind::Panel);
+
+    let name = format!(
+        "{}.faery",
+        (FIRST_SLOT_LETTER.wrapping_add(slot as u8)) as char
+    );
+
+    if saving {
+        if write_game(&name).is_err() {
+            print(c"ERROR: Couldn't save game.".as_ptr());
+        }
+    } else {
+        if read_game(&name).is_err() {
+            print(c"ERROR: Couldn't load game.".as_ptr());
+        }
+
+        reset_after_load();
+    }
+
+    set_current_font(FontKind::Story);
+}
+
+/// Writes the game to the save file `name`.
+fn write_game(name: &str) -> std::io::Result<()> {
+    let mut transfer = Transfer::saving();
+    transfer_all(&mut transfer);
+
+    let path = resolve(name, true).ok_or(std::io::ErrorKind::NotFound)?;
+
+    std::fs::write(path, transfer.finish())
+}
+
+/// Reads the game from the save file `name`.
+fn read_game(name: &str) -> std::io::Result<()> {
+    let path = resolve(name, false).ok_or(std::io::ErrorKind::NotFound)?;
+    let mut transfer = Transfer::loading(std::fs::read(path)?);
+    transfer_all(&mut transfer);
+
+    Ok(())
+}
+
+/// Writes in the given font from now on.
+fn set_current_font(kind: FontKind) {
+    let screen = screen();
+    let current = screen.current_port;
+    screen.set_font_kind(current, kind);
+}
+
+/// After loading a game: clears the encounter state and redraws the status panel for the new hero.
+fn reset_after_load() {
+    unsafe {
+        the_encounter.weapon_type = 0;
+        the_encounter.number = 0;
+        load_start_sprites();
+        update_menu_availability();
+        the_screen.view_status = VIEW_CORRUPT;
+        queue_print(PRINT_VITALITY);
+        queue_print(PRINT_STATS);
+        print(c"".as_ptr());
+        print(c"".as_ptr());
+        print(c"".as_ptr());
+        the_encounter.kind = 0;
+        the_actors.loading = 0;
+    }
+}

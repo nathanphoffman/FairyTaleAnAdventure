@@ -3,7 +3,7 @@
 use crate::game::data::tables::menus;
 use crate::game::files::disk::read_blocks;
 use crate::platform::audio::{Track, playsample};
-use crate::platform::dos::resolve;
+use crate::platform::paths::resolve;
 use std::sync::Mutex;
 
 /// The file with the song tracks.

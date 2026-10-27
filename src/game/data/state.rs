@@ -3,7 +3,6 @@
 //! Each struct has one `static mut` instance (`the_hero`, `the_world`, ...).
 //! They start out zero apart from the few values listed below.
 use crate::game::data::types::{Extent, Missile, SeqInfo, Shape};
-use crate::game::input::handler::InWork;
 use crate::game::render::screen::Screen;
 
 /// How many items a brother can carry (the size of the `stuff` list).
@@ -152,7 +151,8 @@ pub struct Ui {
     pub fight_key_held: i16,
     pub cheat_enabled: i16,
     pub quit_requested: i8,
-    pub handler_data: InWork,
+    /// The file menu is for saving (else for loading).
+    pub saving: bool,
     pub slot_entries: [i8; MENU_SLOTS],
 }
 

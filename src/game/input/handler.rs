@@ -17,38 +17,53 @@
 use crate::game::data::state::the_ui;
 use crate::game::data::tables::compass_lit_direction;
 use crate::game::render::screen_fx::draw_compass;
-use std::ffi::c_void;
+use std::collections::VecDeque;
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-/// Mirror of `struct in_work` in csrc/ftale.h, the input handler's data area.
-#[repr(C)]
-pub struct InWork {
-    // Pointer position, in lores pixels (x) and screen lines (y).
-    pub xsprite: i16,
-    pub ysprite: i16,
-    // Which mouse buttons are down (bit 0x4000 left, 0x2000 right).
+/// What the keyboard and the mouse did since the game last looked.
+struct Handler {
+    /// Pointer position, in lores pixels (x) and screen lines (y).
+    pointer: (i16, i16),
+    /// Which mouse buttons are down (bit 0x4000 left, 0x2000 right).
     qualifier: i16,
-    // Ring buffer write position (where the next key goes).
-    pub laydown: u8,
-    // Ring buffer read position (the next key `next_key` returns).
-    pub pickup: u8,
-    // Set when a disk was inserted (only the Amiga needs this).
-    newdisk: i8,
-    // The last menu key sent, so its release can be sent with the same code.
-    lastmenu: i8,
-    // Amiga library pointers the original handler kept; unused now.
-    pub gbase: *mut c_void,
-    pub pbase: *mut c_void,
-    pub vbase: *mut c_void,
-    // The key ring buffer.
-    keybuf: [u8; KEY_BUFFER_SIZE],
-    ticker: i16,
+    /// Keys pressed and released, oldest first (`next_key` takes the oldest).
+    keys: VecDeque<u8>,
+    /// The last menu key sent, so its release can be sent with the same code.
+    last_menu: i8,
 }
 
-/// Stand-in for the CIA port A register the game peeks at (0xbfe001). Bit 7 low = joystick fire.
-pub static mut fta_pia: u8 = 0xff;
+static HANDLER: Mutex<Handler> = Mutex::new(Handler {
+    pointer: (POINTER_START, POINTER_START),
+    qualifier: 0,
+    keys: VecDeque::new(),
+    last_menu: 0,
+});
 
-const KEY_BUFFER_SIZE: usize = 128;
-const KEY_BUFFER_MASK: u8 = (KEY_BUFFER_SIZE - 1) as u8;
+/// The pointer starts off the play field.
+const POINTER_START: i16 = 320;
+
+/// Whether the joystick fire button is held.
+static JOYSTICK_FIRE: AtomicBool = AtomicBool::new(false);
+
+fn handler() -> std::sync::MutexGuard<'static, Handler> {
+    HANDLER
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// The joystick fire button was pressed or released.
+pub fn set_joystick_fire(down: bool) {
+    JOYSTICK_FIRE.store(down, Ordering::Relaxed);
+}
+
+/// Whether the joystick fire button is held.
+pub fn joystick_fire() -> bool {
+    JOYSTICK_FIRE.load(Ordering::Relaxed)
+}
+
+/// The most keys the buffer holds (it was a ring of 128 bytes with one slot always empty).
+const KEY_BUFFER_CAPACITY: usize = 127;
 const KEY_RELEASED: i32 = 0x80;
 
 // Qualifier bits for the mouse buttons.
@@ -83,78 +98,46 @@ const DIR_NONE: i16 = 9;
 const KEYDIR_BASE: i16 = 20;
 const DIRECTION_COUNT: i16 = 10;
 
-/// Appends a key to the ring buffer; the key is dropped if the buffer is full.
-///
-/// The buffer is full when moving the write position forward would make it equal the read
-/// position (one slot is always left empty, which is how a full buffer is told from an empty one).
-fn push_key(code: i32) {
-    unsafe {
-        let data = &mut *(&raw mut the_ui.handler_data);
-        let slot = data.laydown;
-        data.keybuf[slot as usize] = code as u8;
-
-        // Masks with KEY_BUFFER_MASK, keeping only the bits that matter here.
-        let next = (slot + 1) & KEY_BUFFER_MASK;
-
-        if next != data.pickup {
-            data.laydown = next;
-        }
+/// Appends a key to the buffer; the key is dropped if the buffer is full.
+fn push_key(handler: &mut Handler, code: i32) {
+    if handler.keys.len() < KEY_BUFFER_CAPACITY {
+        handler.keys.push_back(code as u8);
     }
 }
 
 /// Key event from the platform layer. `code` is the game's key code, bit 7 set = key released.
-pub fn fta_key(code: i32) {
-    push_key(code);
+pub fn key_event(code: i32) {
+    push_key(&mut handler(), code);
 }
 
-/// Empties the key buffer (used when the input handler is installed).
+/// Empties the key buffer (the hero is being revived, so old key presses are dropped).
 pub fn reset_key_buffer() {
-    unsafe {
-        let data = &mut *(&raw mut the_ui.handler_data);
-        data.laydown = 0;
-        data.pickup = 0;
-    }
+    handler().keys.clear();
 }
 
 /// The mouse buttons held (bit 0x4000 left, 0x2000 right).
 pub fn mouse_buttons() -> i16 {
-    unsafe { (*(&raw const the_ui.handler_data)).qualifier }
+    handler().qualifier
 }
 
 /// Forgets the last menu key sent, so its release is not sent (used when a menu is switched).
 pub fn forget_last_menu() {
-    unsafe {
-        (*(&raw mut the_ui.handler_data)).lastmenu = 0;
-    }
+    handler().last_menu = 0;
 }
 
-/// Pops the next key code from the ring buffer, or 0 if there is none.
+/// Pops the oldest key code from the buffer, or 0 if there is none.
 pub fn next_key() -> i32 {
-    unsafe {
-        let data = &mut *(&raw mut the_ui.handler_data);
-
-        if data.pickup == data.laydown {
-            return 0;
-        }
-
-        let code = data.keybuf[data.pickup as usize];
-
-        // Masks with KEY_BUFFER_MASK, keeping only the bits that matter here.
-        data.pickup = (data.pickup + 1) & KEY_BUFFER_MASK;
-
-        code as i32
-    }
+    handler().keys.pop_front().map_or(0, |code| code as i32)
 }
 
 /// Pointer position in lores pixels (x 0-319) and screen lines (y 0-199).
 /// The pointer is kept inside the text panel (the bottom of the screen), where the menus and
 /// the compass are, because that is the only place the mouse is used.
-pub fn fta_mouse_move(x: i32, y: i32) {
-    unsafe {
-        let data = &mut *(&raw mut the_ui.handler_data);
-        data.xsprite = x.clamp(POINTER_MIN_X, POINTER_MAX_X) as i16;
-        data.ysprite = y.clamp(POINTER_MIN_Y, POINTER_MAX_Y) as i16;
-    }
+pub fn mouse_moved(x: i32, y: i32) {
+    handler().pointer = (
+        x.clamp(POINTER_MIN_X, POINTER_MAX_X) as i16,
+        y.clamp(POINTER_MIN_Y, POINTER_MAX_Y) as i16,
+    );
 }
 
 /// The menu key under the pointer, if any: 'a' plus twice the row number, plus one for the
@@ -173,36 +156,34 @@ fn menu_key_at(x: i32, y: i32) -> Option<i32> {
 /// Mouse button change. A left click in the menu column becomes a menu key on press and the same
 /// key with bit 7 set on release, as if it had been typed. The right button only sets a flag
 /// (it makes the hero fight, see `read_walk_direction`).
-pub fn fta_mouse_button(left: i32, right: i32) {
+pub fn mouse_buttons_changed(left: bool, right: bool) {
     let new_qualifier =
-        (if left != 0 { LEFT_BUTTON } else { 0 }) | (if right != 0 { RIGHT_BUTTON } else { 0 });
-    unsafe {
-        let data = &mut *(&raw mut the_ui.handler_data);
+        (if left { LEFT_BUTTON } else { 0 }) | (if right { RIGHT_BUTTON } else { 0 });
+    let handler = &mut handler();
 
-        // Xor with the old state leaves only the bits that changed: the left button was pressed or released.
-        if (new_qualifier ^ data.qualifier) & LEFT_BUTTON != 0 {
-            // Masks with LEFT_BUTTON, keeping only the bits that matter here.
-            let key = if new_qualifier & LEFT_BUTTON != 0 {
-                menu_key_at(data.xsprite as i32, data.ysprite as i32)
-            } else if data.lastmenu != 0 {
-                let released = (data.lastmenu as u8 as i32) | KEY_RELEASED;
-                data.lastmenu = 0;
+    // Xor with the old state leaves only the bits that changed: the left button was pressed or released.
+    if (new_qualifier ^ handler.qualifier) & LEFT_BUTTON != 0 {
+        // Masks with LEFT_BUTTON, keeping only the bits that matter here.
+        let key = if new_qualifier & LEFT_BUTTON != 0 {
+            menu_key_at(handler.pointer.0 as i32, handler.pointer.1 as i32)
+        } else if handler.last_menu != 0 {
+            let released = (handler.last_menu as u8 as i32) | KEY_RELEASED;
+            handler.last_menu = 0;
 
-                Some(released)
-            } else {
-                None
-            };
+            Some(released)
+        } else {
+            None
+        };
 
-            if let Some(key) = key {
-                push_key(key);
+        if let Some(key) = key {
+            push_key(handler, key);
 
-                // as in the original: the last key sent is remembered, release included
-                data.lastmenu = key as i8;
-            }
+            // as in the original: the last key sent is remembered, release included
+            handler.last_menu = key as i8;
         }
-
-        data.qualifier = new_qualifier;
     }
+
+    handler.qualifier = new_qualifier;
 }
 
 /// Walking direction (0-7, 9 = none) for a pointer position over the on-screen compass.
@@ -231,25 +212,21 @@ fn compass_direction(x: i32, y: i32) -> i16 {
     }
 }
 
-/// True (once) if a new disk was inserted since the last call.
-pub fn take_new_disk() -> bool {
-    unsafe {
-        let data = &mut *(&raw mut the_ui.handler_data);
-
-        std::mem::replace(&mut data.newdisk, 0) != 0
-    }
-}
-
 /// Decides the walking direction from the mouse over the compass or from the keyboard direction
 /// keys, and redraws the compass when it changes.
 ///
 /// While a mouse button is down the pointer position decides; otherwise the direction key
 /// (numbered from 20, the keypad digits) does. Anything outside 20-29 means no direction.
 pub fn read_walk_direction() {
+    let (qualifier, pointer) = {
+        let handler = handler();
+
+        (handler.qualifier, handler.pointer)
+    };
+
     unsafe {
-        let data = &*(&raw const the_ui.handler_data);
-        let dir = if data.qualifier & (LEFT_BUTTON | RIGHT_BUTTON) != 0 {
-            compass_direction(data.xsprite as i32, data.ysprite as i32)
+        let dir = if qualifier & (LEFT_BUTTON | RIGHT_BUTTON) != 0 {
+            compass_direction(pointer.0 as i32, pointer.1 as i32)
         } else {
             let dir = the_ui.held_direction.wrapping_sub(KEYDIR_BASE);
 

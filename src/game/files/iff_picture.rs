@@ -8,7 +8,7 @@
 //! destination bitmap.
 
 use crate::gfx::Bitmap;
-use crate::platform::dos::resolve;
+use crate::platform::paths::resolve;
 
 /// Planes the brush loader fills.
 const BRUSH_PLANES: usize = 5;

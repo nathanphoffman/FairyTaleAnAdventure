@@ -73,7 +73,6 @@ const TYPE_RADIO: i32 = 12;
 // Mouse button bits in the input qualifier.
 const LEFT_BUTTON: i16 = 0x4000;
 const RIGHT_BUTTON: i16 = 0x2000;
-const FIRE_BUTTON: u8 = 0x80;
 
 // Debug keys.
 const CHEAT_CARRIER: i8 = b'B' as i8;

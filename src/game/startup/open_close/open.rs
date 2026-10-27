@@ -12,7 +12,7 @@ use crate::game::render::blit::SShape;
 use crate::game::render::screen::FontKind;
 use crate::gfx::Font;
 use crate::platform::audio::init_music;
-use crate::platform::dos::resolve;
+use crate::platform::paths::resolve;
 
 // The error numbers `show_error` shows when a start-up step fails.
 const ERROR_NO_FONT: i32 = 15;
