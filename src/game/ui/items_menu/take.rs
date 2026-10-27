@@ -19,6 +19,10 @@ use crate::game::ui::text::{queue_print, show_event};
 use crate::game::world::objects::change_object;
 
 // Object ids of things that are not plain pickups.
+/// Picking up a quiver gives ten arrows each; a dead brother's bones keep the owner in the low 7 bits.
+const ARROWS_PER_QUIVER: u32 = 10;
+const OWNER_MASK: u32 = 0x7f;
+
 const GOLD_PILE: u32 = 0x0d;
 const SCRAP_OF_PAPER: u32 = 0x14;
 const EMPTY_CHEST: u32 = 0x1d;
@@ -81,7 +85,10 @@ pub(super) unsafe fn take_nearest() {
 unsafe fn finish_pickup() {
     unsafe {
         change_object(the_actors.nearest_object as i32, 2);
-        add_stuff(ARROWS, (*the_hero.stuff.add(ARROWBASE) as u32 * 10) as u8);
+        add_stuff(
+            ARROWS,
+            (*the_hero.stuff.add(ARROWBASE) as u32 * ARROWS_PER_QUIVER) as u8,
+        );
 
         if *the_hero.stuff.add(TALISMAN) != 0 {
             the_ui.quit_requested = 1;
@@ -98,7 +105,7 @@ unsafe fn take_object() -> bool {
     unsafe {
         let actor = &raw mut the_actors.list[the_actors.nearest_object as usize];
         let id = (*actor).index as u8 as u32;
-        let owner = (*actor).vitality as u32 & 0x7f;
+        let owner = (*actor).vitality as u32 & OWNER_MASK;
 
         match classify_take(id, the_hero.hunger, the_world.region) {
             Take::Gold => {

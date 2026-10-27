@@ -39,6 +39,9 @@ const PERIOD_EVENTS: [(i16, i32); 4] = [(0, 28), (4, 29), (6, 30), (9, 31)];
 /// The hero heals a little every time the clock passes a multiple of this (minus one).
 const HEAL_MASK: u16 = 0x3ff;
 const HEAL_BASE: i16 = 15;
+
+/// A quarter of the bravery is added to the healing limit.
+const BRAVERY_DIVISOR: i16 = 4;
 const WAKE_Y_MASK: u16 = 0xffe0;
 
 /// The day clock after one frame: it stands still while time is frozen and wraps to 0 once it
@@ -86,7 +89,7 @@ fn period_event(period: i16) -> Option<i32> {
 
 /// Slow healing: once per `HEAL_MASK + 1` clock ticks, if hurt and alive.
 fn heal_due(clock: u16, vitality: i16, bravery: i16, state: i8) -> bool {
-    clock & HEAL_MASK == 0 && vitality < HEAL_BASE + bravery / 4 && state != DEAD
+    clock & HEAL_MASK == 0 && vitality < HEAL_BASE + bravery / BRAVERY_DIVISOR && state != DEAD
 }
 
 /// Sleeping, the day clock, the light level, the messages for the time of day and slow healing.

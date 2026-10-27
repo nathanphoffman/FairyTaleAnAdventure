@@ -28,6 +28,16 @@ const WORLD_DEAD_CHECK: i32 = 5;
 
 // Sound effects and their speeds.
 const EFFECT_ARROW_HIT: i16 = 2;
+
+/// Base pitch of each hit sound, and the random spread added to some of them.
+const PITCH_ARROW: i32 = 500;
+const PITCH_ROCK: i32 = 3200;
+const PITCH_HERO_HURT: i32 = 800;
+const PITCH_FOE_HURT: i32 = 400;
+const PITCH_SPREAD: i32 = 511;
+
+/// Slots from here on in the actor list are monsters.
+const FIRST_MONSTER_SLOT: i32 = 3;
 const EFFECT_ROCK_HIT: i16 = 5;
 const EFFECT_HERO_HURT: i16 = 0;
 const EFFECT_FOE_HURT: i16 = 3;
@@ -71,10 +81,12 @@ pub fn hit_actor(i: i32, j: i32, fc: i32, wt: i16) {
         (*target).vitality = vitality_after_hit((*target).vitality, wt);
 
         match hit_sound(i, j) {
-            HitSound::Arrow => play_effect(EFFECT_ARROW_HIT, 500 + rand64()),
-            HitSound::Rock => play_effect(EFFECT_ROCK_HIT, 3200 + bitrand(511)),
-            HitSound::HeroHurt => play_effect(EFFECT_HERO_HURT, 800 + bitrand(511)),
-            HitSound::FoeHurt => play_effect(EFFECT_FOE_HURT, 400 + rand256()),
+            HitSound::Arrow => play_effect(EFFECT_ARROW_HIT, PITCH_ARROW + rand64()),
+            HitSound::Rock => play_effect(EFFECT_ROCK_HIT, PITCH_ROCK + bitrand(PITCH_SPREAD)),
+            HitSound::HeroHurt => {
+                play_effect(EFFECT_HERO_HURT, PITCH_HERO_HURT + bitrand(PITCH_SPREAD))
+            }
+            HitSound::FoeHurt => play_effect(EFFECT_FOE_HURT, PITCH_FOE_HURT + rand256()),
         }
 
         // push back the foe
@@ -157,7 +169,7 @@ pub fn report_battle_result() {
     unsafe {
         let (mut dead, mut fled) = (0, 0);
 
-        for i in 3..the_actors.active as i32 {
+        for i in FIRST_MONSTER_SLOT..the_actors.active as i32 {
             let a = actor_at(i);
 
             if (*a).kind != ENEMY {

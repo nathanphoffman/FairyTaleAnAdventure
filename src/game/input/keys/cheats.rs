@@ -36,7 +36,7 @@ pub(super) unsafe fn cheat_items(key: i8) -> bool {
             true
         } else if key == CHEAT_STUFF {
             let slot = rnd(GOLDBASE) as usize;
-            *the_hero.stuff.add(slot) = (*the_hero.stuff.add(slot)).wrapping_add(3);
+            *the_hero.stuff.add(slot) = (*the_hero.stuff.add(slot)).wrapping_add(CHEAT_STUFF_COUNT);
             update_menu_availability();
 
             *the_hero.stuff.add(VIAL_SLOT) = 0;
@@ -46,6 +46,11 @@ pub(super) unsafe fn cheat_items(key: i8) -> bool {
         }
     }
 }
+
+/// The stuff cheat adds this many of a random item; the print requests show debug information.
+const CHEAT_STUFF_COUNT: u8 = 3;
+const PRQ_DEBUG_COORDS: i32 = 2;
+const PRQ_DEBUG_SECTOR: i32 = 3;
 
 /// Debug keys that rescue, redraw or move the hero about. Returns true if the key was one.
 pub(super) unsafe fn cheat_move(key: i8) -> bool {
@@ -58,8 +63,8 @@ pub(super) unsafe fn cheat_move(key: i8) -> bool {
 
         match key {
             CHEAT_RESCUE => rescue_princess(),
-            CHEAT_PRQ_2 => queue_print(2),
-            CHEAT_PRQ_3 => queue_print(3),
+            CHEAT_PRQ_2 => queue_print(PRQ_DEBUG_COORDS),
+            CHEAT_PRQ_3 => queue_print(PRQ_DEBUG_SECTOR),
             CHEAT_TIME => the_world.day_clock = the_world.day_clock.wrapping_add(CHEAT_TIME_STEP),
             CHEAT_NORTH => {
                 (*hero).abs_y = (*hero).abs_y.wrapping_sub(CHEAT_STEP_Y);

@@ -105,11 +105,27 @@ pub fn spawn_object_actors() {
             0,
         );
 
-        if J1 > 3 {
+        if J1 > FIRST_MONSTER_SLOT {
             the_actors.active = J1;
         }
     }
 }
+
+/// A dropped item lands this far below the actor's position.
+const DROP_OFFSET_Y: u16 = 10;
+
+/// Slots above this are monsters (the hero, raft and first person come before).
+const FIRST_MONSTER_SLOT: i16 = 3;
+
+/// A region is 16384 pixels wide and 8192 high (two columns of four rows make up the map); the
+/// random treasures are placed anywhere in it. Rows are 8192 apart, and the region number counts
+/// them in steps of 2, so a step is 0x1000 per unit.
+const REGION_WIDTH: i32 = 0x4000;
+const REGION_HEIGHT: i32 = 0x2000;
+const REGION_ROW_STEP: i32 = 0x1000;
+
+/// The number of different random treasures.
+const TREASURE_KINDS: i32 = 16;
 
 /// Drops `object` where actor `i` stands (slot 0 of the global list is used for this).
 /// That slot is reused for each item the hero or a monster leaves behind.
@@ -118,7 +134,7 @@ pub fn leave_item(i: i16, object: i16) {
         let drop = &mut *(&raw mut ob_listg).cast::<WorldObject>();
         let actor = &(*(&raw const the_actors.list))[i as usize];
         drop.xc = actor.abs_x;
-        drop.yc = actor.abs_y.wrapping_add(10);
+        drop.yc = actor.abs_y.wrapping_add(DROP_OFFSET_Y);
         drop.ob_id = object as i8;
         drop.ob_stat = STAT_SHOWN;
     }
@@ -156,8 +172,10 @@ unsafe fn distribute_treasure() {
             let (mut x, mut y);
 
             loop {
-                x = (bitrand(0x3fff) + ((the_world.region & 1) as i32 * 0x4000)) as i16;
-                y = (bitrand(0x1fff) + ((the_world.region & 6) as i32 * 0x1000)) as i16;
+                x = (bitrand(REGION_WIDTH - 1) + ((the_world.region & 1) as i32 * REGION_WIDTH))
+                    as i16;
+                y = (bitrand(REGION_HEIGHT - 1) + ((the_world.region & 6) as i32 * REGION_ROW_STEP))
+                    as i16;
 
                 if terrain_at(x as i32, y as i32) == 0 {
                     break;
@@ -169,7 +187,7 @@ unsafe fn distribute_treasure() {
             let object = &mut *objects.add(k);
             object.xc = x as u16;
             object.yc = y as u16;
-            object.ob_id = rand_treasure[bitrand(15) as usize] as i8;
+            object.ob_id = rand_treasure[bitrand(TREASURE_KINDS - 1) as usize] as i8;
             object.ob_stat = STAT_SHOWN;
         }
 

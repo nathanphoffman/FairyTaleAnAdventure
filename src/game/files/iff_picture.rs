@@ -108,10 +108,15 @@ unsafe fn read_bitmap_header() -> BitMapHeader {
 ///
 /// The compressed body is first read into `shape_mem` (a scratch area), then each picture row is
 /// unpacked once per bitplane (up to 5, fewer if the bitmap is shallower).
+/// A picture row is a whole number of 16 pixel words, as bytes: round up, divide by 8, make even.
+const WORD_ROUNDING: i32 = 15;
+const PIXELS_PER_BYTE: i32 = 8;
+const EVEN_BYTES_MASK: i32 = 0xfffe;
+
 unsafe fn read_body(bmhd: &BitMapHeader, bitmap: &BitMap, offset: usize) {
     unsafe {
         pack_cursor = the_memory.shape_mem.cast();
-        row_byte_count = ((bmhd.width as i32 + 15) / 8) & 0xfffe;
+        row_byte_count = ((bmhd.width as i32 + WORD_ROUNDING) / PIXELS_PER_BYTE) & EVEN_BYTES_MASK;
         read_chunk_length();
         Read(
             picture_file as BPTR,

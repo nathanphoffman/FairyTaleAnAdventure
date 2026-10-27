@@ -33,6 +33,13 @@ const CONFUSED: i16 = 10;
 
 // Tactics.
 const FRUST: i16 = 0;
+
+/// A new tactic is rolled one frame in 16.
+const NEW_TACTIC_ODDS: i32 = 16;
+
+/// After being frustrated, archers pick one of tactics 2 to 5 and the others 3 or 4.
+const ARCHER_FRUSTRATION_TACTIC: i32 = 2;
+const MELEE_FRUSTRATION_TACTIC: i32 = 3;
 const PURSUE: i16 = 1;
 const FOLLOW: i32 = 2;
 const RANDOM: i16 = 4;
@@ -127,7 +134,7 @@ unsafe fn think(i: usize, battle2: i8) {
         }
 
         let tactic = (*actor).tactic as i16;
-        let new_tactic_roll = bitrand(15) == 0;
+        let new_tactic_roll = bitrand(NEW_TACTIC_ODDS - 1) == 0;
         let mode = adjust_mode_for_situation(actor, (*actor).goal as i16);
         let mode = act_on_goal(i, actor, mode, tactic, (xd, yd), new_tactic_roll);
 
@@ -197,9 +204,9 @@ unsafe fn act_on_goal(
     unsafe {
         if tactic == FRUST || tactic == SHOOTFRUST {
             if (*actor).weapon & BOW_BIT != 0 {
-                run_tactic(i as i32, rand4() + 2);
+                run_tactic(i as i32, rand4() + ARCHER_FRUSTRATION_TACTIC);
             } else {
-                run_tactic(i as i32, rand2() + 3);
+                run_tactic(i as i32, rand2() + MELEE_FRUSTRATION_TACTIC);
             }
         } else if (*actor).state == SHOOT1 {
             (*actor).state = SHOOT3;

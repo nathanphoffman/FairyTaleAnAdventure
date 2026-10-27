@@ -30,12 +30,28 @@ const TIRED_AT: i16 = 70;
 
 /// Hunger, fatigue and the safe spot are checked when the clock is a multiple of 128; the
 /// music is picked when it is a multiple of 8.
+/// The music mood is picked every 8th tick, and hunger changes bite every 8 points.
+const MOOD_PERIOD_MASK: u16 = 7;
+const HUNGER_STEP_MASK: i16 = 7;
+
+/// Hungry enough to eat fruit at the safe spot.
+const EATS_FRUIT_AT: i16 = 30;
+
+// Event messages for hunger and tiredness.
+const EVENT_HUNGRY: i32 = 0;
+const EVENT_VERY_HUNGRY: i32 = 1;
+const EVENT_STARVING_WARNING: i32 = 2;
+const EVENT_TIRED: i32 = 3;
+const EVENT_STARVING: i32 = 4;
+const EVENT_COLLAPSE: i32 = 12;
+const EVENT_FAINT: i32 = 24;
+
 fn safe_check_due(clock: u16) -> bool {
     clock & SAFE_CHECK_MASK == 0
 }
 
 fn mood_due(clock: u16, battle: bool) -> bool {
-    clock & 7 == 0 && !battle
+    clock & MOOD_PERIOD_MASK == 0 && !battle
 }
 
 /// The hero is hungrier and more tired on a safe-check frame while alive and awake.
@@ -45,7 +61,7 @@ fn hunger_due(clock: u16, vitality: i16, state: i8) -> bool {
 
 /// Hungry enough to eat a piece of fruit at the safe spot (only when one is carried).
 fn eats_fruit(hungry: i16, fruit: u8) -> bool {
-    hungry > 30 && fruit != 0
+    hungry > EATS_FRUIT_AT && fruit != 0
 }
 
 /// Notes a safe spot, picks the music, and makes the hero hungrier and more tired.
@@ -136,9 +152,9 @@ fn survival_step(facts: &SurvivalFacts, hero: &mut Hero, body: &mut Shape) -> Ve
         steps.extend(report.events.into_iter().map(SurvivalStep::Event));
 
         if hero.fatigue == TIRED_AT {
-            steps.push(SurvivalStep::Event(3));
+            steps.push(SurvivalStep::Event(EVENT_TIRED));
         } else if hero.hunger == STARVING_AT {
-            steps.push(SurvivalStep::Event(4));
+            steps.push(SurvivalStep::Event(EVENT_STARVING));
         }
     }
 
@@ -160,10 +176,10 @@ fn hunger_effects(hero: &mut Hero, body: &mut Shape) -> HungerReport {
     let mut report = HungerReport::default();
 
     if hero.hunger == HUNGRY {
-        report.events.push(0);
+        report.events.push(EVENT_HUNGRY);
     } else if hero.hunger == VERY_HUNGRY {
-        report.events.push(1);
-    } else if hero.hunger & 7 == 0 {
+        report.events.push(EVENT_VERY_HUNGRY);
+    } else if hero.hunger & HUNGER_STEP_MASK == 0 {
         if body.vitality > WEAK_VITALITY {
             if hero.hunger > MUCH_HUNGER || hero.fatigue > MUCH_FATIGUE {
                 body.vitality -= 2;
@@ -171,13 +187,13 @@ fn hunger_effects(hero: &mut Hero, body: &mut Shape) -> HungerReport {
             }
 
             if hero.hunger > STARVING_AT {
-                report.events.push(2);
+                report.events.push(EVENT_STARVING_WARNING);
             }
         } else if hero.fatigue > COLLAPSE_FATIGUE {
-            report.events.push(12);
+            report.events.push(EVENT_COLLAPSE);
             body.state = SLEEP;
         } else if hero.hunger > FAINT_HUNGER {
-            report.events.push(24);
+            report.events.push(EVENT_FAINT);
             hero.hunger = FAINT_RESET;
             body.state = SLEEP;
         }
@@ -303,7 +319,7 @@ mod tests {
             vec![
                 SurvivalStep::RedrawStats,
                 SurvivalStep::Event(2),
-                SurvivalStep::Event(3)
+                SurvivalStep::Event(EVENT_TIRED)
             ]
         );
 

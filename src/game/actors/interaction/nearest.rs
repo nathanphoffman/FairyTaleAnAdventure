@@ -32,6 +32,10 @@ pub fn find_nearest_figure(constraint: c_char, mut dist: i16) -> i32 {
     }
 }
 
+/// The diagonal is approximated as 5/7 of the sum of the two offsets.
+const DIAGONAL_NUMERATOR: i32 = 5;
+const DIAGONAL_DENOMINATOR: i32 = 7;
+
 /// Distance between two actors. The game avoids a square root: if one axis is more than twice
 /// the other it is used alone, otherwise (x + y) * 5 / 7 approximates the diagonal.
 pub fn actor_distance(a: i32, b: i32) -> i32 {
@@ -44,6 +48,6 @@ pub fn actor_distance(a: i32, b: i32) -> i32 {
     } else if y > x + x {
         y
     } else {
-        (x + y) * 5 / 7
+        (x + y) * DIAGONAL_NUMERATOR / DIAGONAL_DENOMINATOR
     }
 }

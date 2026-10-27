@@ -112,10 +112,13 @@ pub(super) const SCROLL_MODES: [ScrollMode; 8] = [
     mode(0, 32, 2, 0, 36, 160),
 ];
 
+/// There are 8 scroll directions.
+const DIRECTION_MASK: usize = 7;
+
 /// Shifts the map one tile in one of 8 directions (the blitter did this on the Amiga).
 /// Moving down copies from the bottom up, so lines are not overwritten before they are read.
 pub fn scroll_map(dir: i32) {
-    let m = &SCROLL_MODES[dir as usize & 7];
+    let m = &SCROLL_MODES[dir as usize & DIRECTION_MASK];
     unsafe {
         for p in 0..PLANE_COUNT {
             let plane = *the_screen.planes.add(p);

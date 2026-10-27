@@ -135,6 +135,25 @@ const DRAGON_BREATH_FACING: i8 = 5;
 /// Hitting the pit: the luck it costs.
 const PIT_LUCK_COST: i16 = 2;
 
+/// The sound of a fireball and its base pitch.
+const EFFECT_FIREBALL: i16 = 5;
+const EFFECT_FIREBALL_PITCH: i32 = 1800;
+
+/// A person's race is the low 7 bits of `race`.
+const PERSON_MASK: u8 = 0x7f;
+
+/// A person's dying and dead frames come this far after the standing one (the witch's, 2 further).
+const PERSON_DYING_OFFSET: i16 = 2;
+const PERSON_DEAD_OFFSET: i16 = 3;
+const WITCH_EXTRA_OFFSET: i16 = 2;
+
+/// The dragon's frames when dying and when dead, and its fireball sound.
+const DRAGON_DYING_FRAME: i16 = 3;
+const DRAGON_DEAD_FRAME: i16 = 4;
+
+/// States 0 to 8 are the fighting swings; after them come the other states.
+const LAST_FIGHT_STATE: i16 = 8;
+
 /// Facings are 0-7 (clockwise from north-west).
 const FACING_MASK: i16 = 7;
 
@@ -158,6 +177,13 @@ const FALL_FRAMES: i16 = 6;
 
 /// A dying actor shows one of two frames, flipping at half the death time.
 const DYING_FIRST_HALF: i8 = 4;
+
+/// Facings above this (and 0) show the dying actor on its other side.
+const DYING_FACING_LIMIT: i16 = 4;
+
+/// The spectre cycles through 4 images two apart, and skips one from the image after this.
+const SPECTRE_CYCLE_MASK: i32 = 3;
+const SPECTRE_SKIP_FRAME: i16 = 4;
 const FRAME_DYING: (i16, i16) = (80, 81);
 
 /// Slides on ice and in a fall keep a quarter of the velocity per frame (3/4 when falling).
@@ -348,7 +374,7 @@ impl Ctx {
                 Pc::Still
             } else if self.state >= SHOOT1 {
                 self.shooting()
-            } else if self.state < 9 {
+            } else if self.state <= LAST_FIGHT_STATE {
                 self.fighting()
             } else {
                 self.other_states()

@@ -11,6 +11,10 @@ const SLEEP: i8 = 23;
 
 /// Indoors region, the tiles that are beds, and how long to stand still on one before sleeping.
 const INSIDE_REGION: u16 = 8;
+
+/// Tiles are 16 pixels wide and 32 high.
+const TILE_WIDTH_SHIFT: u32 = 4;
+const TILE_HEIGHT_SHIFT: u32 = 5;
 const BED_TILES: [u8; 4] = [161, 52, 162, 53];
 const BED_WAIT: i16 = 30;
 const TOO_RESTED: i16 = 50;
@@ -33,8 +37,10 @@ pub fn check_bed() {
         the_hero.y = (*hero).abs_y;
 
         if the_world.region == INSIDE_REGION {
-            // The tile under the hero: 16 pixels wide, 32 high.
-            let tile = *tile_address((the_hero.x >> 4) as i32, (the_hero.y >> 5) as i32);
+            let tile = *tile_address(
+                (the_hero.x >> TILE_WIDTH_SHIFT) as i32,
+                (the_hero.y >> TILE_HEIGHT_SHIFT) as i32,
+            );
             let (wait, action) = bed_step(
                 the_world.bed_wait,
                 BED_TILES.contains(&tile),

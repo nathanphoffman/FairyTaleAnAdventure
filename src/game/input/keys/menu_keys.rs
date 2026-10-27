@@ -1,8 +1,8 @@
 //! Keys and clicks on the menu entries: choosing an entry with the mouse or with its letter.
 
 use super::{
-    CODE_MASK, DISPLAYED, FIRST_MENU_CLICK, LETTER_COUNT, RELEASED, SAVEX, SELECTED,
-    TYPE_IMMEDIATE, TYPE_MASK, TYPE_RADIO, TYPE_TOGGLE,
+    CODE_MASK, DISPLAYED, FIRST_ACTION_MENU, FIRST_MENU_CLICK, LETTER_COUNT, PRQ_OPTIONS, RELEASED,
+    SAVEX, SELECTED, TYPE_IMMEDIATE, TYPE_MASK, TYPE_RADIO, TYPE_TOGGLE,
 };
 
 use crate::game::data::state::the_ui;
@@ -69,9 +69,9 @@ unsafe fn press_entry(slot: i16, chosen_entry: i16, entry: *mut i8, notpause: bo
             choose_menu_entry(chosen_entry);
         } else if !notpause {
             // paused: only the menu types above work
-        } else if kind == 0 && chosen_entry < 5 {
+        } else if kind == 0 && chosen_entry < FIRST_ACTION_MENU {
             the_ui.current_menu = chosen_entry;
-            queue_print(5);
+            queue_print(PRQ_OPTIONS);
         } else {
             print_menu_entry(slot, (*entry & SELECTED) as i16);
         }

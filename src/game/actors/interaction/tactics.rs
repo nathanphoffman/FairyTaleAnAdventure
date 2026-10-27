@@ -23,6 +23,11 @@ const COURSE_STRAIGHT: i32 = 4;
 const COURSE_TURN_ONLY: i32 = 5;
 const COURSE_WOBBLE_CLOSE: i32 = 2;
 
+/// An actor picks a new heading one frame in 8 (one in 4 for those that attack harder).
+const ACTS_ONE_IN_8: i32 = 7;
+const ACTS_ONE_IN_4: i32 = 3;
+const FACING_MASK: i32 = 7;
+
 /// The followers aim this far below the one they follow.
 const FOLLOW_OFFSET: i32 = 20;
 
@@ -39,12 +44,12 @@ const EGG_Y: i32 = 5667;
 /// - EVADE: keep away from another enemy.  - EGG_SEEK: go to the turtle eggs.
 pub fn run_tactic(i: i32, tactic: i32) {
     unsafe {
-        let mut acts_now = fta_rand() & 7 == 0;
+        let mut acts_now = fta_rand() & ACTS_ONE_IN_8 == 0;
         let actor = actor_at(i);
         (*actor).tactic = tactic as i8;
 
         if (*actor).goal == ATTACK2 {
-            acts_now = fta_rand() & 3 == 0;
+            acts_now = fta_rand() & ACTS_ONE_IN_4 == 0;
         }
 
         let (hx, hy) = (the_hero.x as i32, the_hero.y as i32);
@@ -102,7 +107,7 @@ unsafe fn shoot_or_approach(i: i32, actor: *mut Shape, hx: i32, hy: i32) {
 unsafe fn wander(actor: *mut Shape, acts_now: bool) {
     unsafe {
         if acts_now {
-            (*actor).facing = (fta_rand() & 7) as i8;
+            (*actor).facing = (fta_rand() & FACING_MASK) as i8;
         }
 
         (*actor).state = WALKING;

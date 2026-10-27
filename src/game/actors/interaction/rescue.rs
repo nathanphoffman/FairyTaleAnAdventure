@@ -13,6 +13,11 @@ use crate::game::world::places::transfer_hero;
 
 // The rescue scene.
 const PLACARD_PEN: u32 = 24;
+
+/// Each princess has three story placards, starting at 8 for the first; the closing two follow.
+const RESCUE_PLACARD_BASE: i32 = 8;
+const RESCUE_PLACARDS_EACH: i32 = 3;
+const AFTER_RESCUE_PLACARDS: (i32, i32) = (17, 18);
 const RESCUE_PAUSE: i32 = 380;
 const CLEAR_PAUSE: i32 = 10;
 const PLACARD_AREA: (i32, i32, i32, i32) = (13, 13, 271, 107);
@@ -40,12 +45,12 @@ pub fn rescue_princess() {
     unsafe {
         map_message();
         SetFont(the_screen.current_rastport, story_font);
-        let line = princesses_rescued as i32 * 3;
-        placard_text(8 + line);
+        let line = princesses_rescued as i32 * RESCUE_PLACARDS_EACH;
+        placard_text(RESCUE_PLACARD_BASE + line);
         name();
-        placard_text(9 + line);
+        placard_text(RESCUE_PLACARD_BASE + 1 + line);
         name();
-        placard_text(10 + line);
+        placard_text(RESCUE_PLACARD_BASE + 2 + line);
         draw_placard_border();
         Delay(RESCUE_PAUSE);
         SetAPen(the_screen.current_rastport, 0);
@@ -53,9 +58,9 @@ pub fn rescue_princess() {
         RectFill(the_screen.current_rastport, x0, y0, x1, y1);
         Delay(CLEAR_PAUSE);
         SetAPen(the_screen.current_rastport, PLACARD_PEN);
-        placard_text(17);
+        placard_text(AFTER_RESCUE_PLACARDS.0);
         name();
-        placard_text(18);
+        placard_text(AFTER_RESCUE_PLACARDS.1);
         Delay(RESCUE_PAUSE);
         message_off();
 

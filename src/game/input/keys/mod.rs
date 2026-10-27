@@ -54,6 +54,15 @@ const FIGHT_KEY: i8 = b'0' as i8;
 const VIEW_REDRAW: i8 = 99;
 
 // Bits in a menu entry's `enabled` byte.
+/// The facing of the hero is 0-7.
+const FACING_MASK: i16 = 7;
+
+/// The key menu's entries start at 5: key `1` is entry 5. A menu number below 5 is a menu to
+/// switch to, and the print request 5 redraws the options.
+const KEY_ENTRY_BASE: i8 = 5;
+const FIRST_ACTION_MENU: i16 = 5;
+const PRQ_OPTIONS: i32 = 5;
+
 const SELECTED: i8 = 1;
 const DISPLAYED: i8 = 2;
 const TYPE_MASK: i32 = 0xfc;
@@ -117,7 +126,7 @@ pub fn handle_key(key: i32, notpause: i32) {
             // handled
         } else if the_ui.current_menu == KEYS && key & RELEASED == 0 {
             if (b'1' as i8..=b'6' as i8).contains(&key) {
-                choose_menu_entry((key - b'1' as i8 + 5) as i16);
+                choose_menu_entry((key - b'1' as i8 + KEY_ENTRY_BASE) as i16);
             } else {
                 go_to_menu(ITEMS);
             }

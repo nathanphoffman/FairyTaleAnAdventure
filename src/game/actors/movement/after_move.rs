@@ -3,16 +3,16 @@
 
 use super::{
     ANCHOR_LARGE, ANCHOR_PERSON, ANCHOR_SWAN, CARRIER, CARRIER_SLOT, Ctx, DEAD, DEATH_DROWN,
-    DEATH_LAVA, DRAGON, DROWN_IMMUNE_RACES, DROWN_PERIOD_MASK, DYING, DYING_FIRST_HALF, ENEMY,
-    ENVIRON_BACKWARDS, ENVIRON_DROWNED, ENVIRON_ICE, ENVIRON_SHALLOW, ENVIRON_SINKING,
-    ENVIRON_SLOW, ENVIRON_WADE, FALL, FALL_DRAG, FALL_FRAMES, FALL_STEPS, FALL_STEPS_PER_FRAME,
-    FRAME_DYING, FRAME_FLAT, FRAME_OSCIL, FRAME_SLEEP, FROZEN, LASSO, NO_REGION, OSCIL,
-    OUTDOOR_REGIONS, PIT_LUCK_COST, PIT_XTYPE, Pc, RACE_LASSO_CARRIER, RACE_SNAKE, RACE_SPECTRE,
-    RACE_SPECTRE_ALIVE, RACE_WITCH, RACE_WITCH_BODY, RAFT, RIDING_SWAN, SINK, SLEEP,
-    SPECTRE_BASE_FRAMES, SPECTRE_DEAD_FRAME, SPECTRE_FRAME_GROUPS, STILL, STUFF_FIREPROOF,
-    TALISMAN, TERRAIN_BACKWARDS, TERRAIN_DEEP_WATER, TERRAIN_ICE, TERRAIN_PIT, TERRAIN_SHALLOW,
-    TERRAIN_SLOW, TERRAIN_SLOW_SINK, TERRAIN_WADE, VELOCITY_QUARTER, WALKING, WITCH_BODY_VITALITY,
-    WORLD_MAX, WORLD_MIN, diroff, terrain,
+    DEATH_LAVA, DRAGON, DROWN_IMMUNE_RACES, DROWN_PERIOD_MASK, DYING, DYING_FACING_LIMIT,
+    DYING_FIRST_HALF, ENEMY, ENVIRON_BACKWARDS, ENVIRON_DROWNED, ENVIRON_ICE, ENVIRON_SHALLOW,
+    ENVIRON_SINKING, ENVIRON_SLOW, ENVIRON_WADE, FALL, FALL_DRAG, FALL_FRAMES, FALL_STEPS,
+    FALL_STEPS_PER_FRAME, FRAME_DYING, FRAME_FLAT, FRAME_OSCIL, FRAME_SLEEP, FROZEN, LASSO,
+    NO_REGION, OSCIL, OUTDOOR_REGIONS, PIT_LUCK_COST, PIT_XTYPE, Pc, RACE_LASSO_CARRIER,
+    RACE_SNAKE, RACE_SPECTRE, RACE_SPECTRE_ALIVE, RACE_WITCH, RACE_WITCH_BODY, RAFT, RIDING_SWAN,
+    SINK, SLEEP, SPECTRE_BASE_FRAMES, SPECTRE_CYCLE_MASK, SPECTRE_DEAD_FRAME, SPECTRE_FRAME_GROUPS,
+    SPECTRE_SKIP_FRAME, STILL, STUFF_FIREPROOF, TALISMAN, TERRAIN_BACKWARDS, TERRAIN_DEEP_WATER,
+    TERRAIN_ICE, TERRAIN_PIT, TERRAIN_SHALLOW, TERRAIN_SLOW, TERRAIN_SLOW_SINK, TERRAIN_WADE,
+    VELOCITY_QUARTER, WALKING, WITCH_BODY_VITALITY, WORLD_MAX, WORLD_MIN, diroff, terrain,
 };
 
 use crate::game::actors::encounters::check_death;
@@ -33,13 +33,13 @@ impl Ctx {
                 let d = self.facing;
 
                 if (*actor).tactic > DYING_FIRST_HALF {
-                    self.image = if d == 0 || d > 4 {
+                    self.image = if d == 0 || d > DYING_FACING_LIMIT {
                         FRAME_DYING.0
                     } else {
                         FRAME_DYING.1
                     };
                 } else if (*actor).tactic > 0 {
-                    self.image = if d == 0 || d > 4 {
+                    self.image = if d == 0 || d > DYING_FACING_LIMIT {
                         FRAME_DYING.1
                     } else {
                         FRAME_DYING.0
@@ -153,7 +153,7 @@ impl Ctx {
                 self.environ = ENVIRON_BACKWARDS;
             } else if j == TERRAIN_PIT && i == 0 && the_world.extent_type == PIT_XTYPE {
                 if (*actor).state as i16 != FALL {
-                    self.image = fallstates[(the_hero.brother * 6) as usize] as i16;
+                    self.image = fallstates[(the_hero.brother * FALL_FRAMES) as usize] as i16;
                     (*actor).state = FALL as i8;
                     (*actor).tactic = 0;
                     the_hero.luck = the_hero.luck.wrapping_sub(PIT_LUCK_COST);
@@ -266,9 +266,9 @@ impl Ctx {
                 } else if state == DYING {
                     self.image = SPECTRE_DEAD_FRAME;
                 } else {
-                    self.image = ((cycle & 3) * 2) as i16;
+                    self.image = ((cycle & SPECTRE_CYCLE_MASK) * 2) as i16;
 
-                    if self.image > 4 {
+                    if self.image > SPECTRE_SKIP_FRAME {
                         self.image -= 1;
                     }
 

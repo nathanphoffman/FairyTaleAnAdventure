@@ -1,6 +1,9 @@
 //! People standing about (set figures): their pictures, talking, and the witch watching the hero.
 
-use super::{Ctx, DEAD, DYING, Pc, SETFIG_WITCH, STILL, TALKING};
+use super::{
+    Ctx, DEAD, DYING, PERSON_DEAD_OFFSET, PERSON_DYING_OFFSET, PERSON_MASK, Pc, SETFIG_WITCH,
+    STILL, TALKING, WITCH_EXTRA_OFFSET,
+};
 use crate::game::actors::steering::steer_actor;
 use crate::game::data::random::rand2;
 use crate::game::data::state::{the_hero, the_witch};
@@ -12,7 +15,7 @@ impl Ctx {
     pub(super) unsafe fn setfig(&mut self) -> Pc {
         unsafe {
             let actor = self.actor;
-            self.terrain = ((*actor).race & 0x7f) as i16;
+            self.terrain = ((*actor).race & PERSON_MASK) as i16;
             let entry = &*(&raw const setfig_table)
                 .cast::<SetFigEntry>()
                 .add(self.terrain as usize);
@@ -20,16 +23,16 @@ impl Ctx {
             let witch = self.terrain == SETFIG_WITCH;
 
             if self.state == DYING {
-                self.image += 2;
+                self.image += PERSON_DYING_OFFSET;
 
                 if witch {
-                    self.image += 2;
+                    self.image += WITCH_EXTRA_OFFSET;
                 }
             } else if self.state == DEAD {
-                self.image += 3;
+                self.image += PERSON_DEAD_OFFSET;
 
                 if witch {
-                    self.image += 2;
+                    self.image += WITCH_EXTRA_OFFSET;
                 }
             } else if witch {
                 steer_actor(self.slot, the_hero.x as i32, the_hero.y as i32, 0);

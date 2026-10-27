@@ -79,13 +79,22 @@ const SCROLL_UP_RIGHT: i32 = 7;
 const SCROLL_RIGHT: i32 = 0;
 const SCROLL_DOWN_RIGHT: i32 = 1;
 
+/// Tiles are 16 pixels wide and 32 high: the shifts that turn map positions into tile positions,
+/// and the masks of the part of a tile the map is offset by.
+const TILE_WIDTH_SHIFT: u32 = 4;
+const TILE_HEIGHT_SHIFT: u32 = 5;
+const TILE_X_MASK: i32 = 15;
+const TILE_Y_MASK: i32 = 31;
+
+/// The status colour (31) flashes on and off with this bit of the flasher counter.
+const FLASH_BIT: i8 = 16;
+const STATUS_COLOR: i32 = 31;
+
 /// How the map moved since the last frame, in sectors (x wraps at 10 bits).
 unsafe fn scroll_step() -> (i16, i16) {
     unsafe {
-        // Map position in tiles: 16 pixels wide, 32 high.
-        the_world.tile_x = the_world.map_x >> 4;
-        // Map position in tiles: 16 pixels wide, 32 high.
-        the_world.tile_y = the_world.map_y >> 5;
+        the_world.tile_x = the_world.map_x >> TILE_WIDTH_SHIFT;
+        the_world.tile_y = the_world.map_y >> TILE_HEIGHT_SHIFT;
         let dif_x = (the_world.tile_x as i32 - (*the_screen.drawing_page).isv_x) as i16;
         let dif_y = (the_world.tile_y as i32 - (*the_screen.drawing_page).isv_y) as i16;
 
@@ -188,16 +197,16 @@ unsafe fn handle_view_status() -> bool {
             Delay(PAUSE_WAIT);
             the_screen.view_status = VIEW_REDRAW;
         } else if the_screen.view_status == VIEW_BIG || the_screen.view_status == VIEW_BIG_STILL {
-            if the_screen.flasher & 16 != 0 && the_screen.view_status == VIEW_BIG {
+            if the_screen.flasher & FLASH_BIT != 0 && the_screen.view_status == VIEW_BIG {
                 SetRGB4(
                     &raw mut the_screen.vp_page,
-                    31,
+                    STATUS_COLOR,
                     FLASH_COLOR,
                     FLASH_COLOR,
                     FLASH_COLOR,
                 );
             } else {
-                SetRGB4(&raw mut the_screen.vp_page, 31, 0, 0, 0);
+                SetRGB4(&raw mut the_screen.vp_page, STATUS_COLOR, 0, 0, 0);
             }
 
             handle_print_request();
@@ -332,8 +341,10 @@ unsafe fn draw_frame(state: &mut FrameState, scroll_x: i16, scroll_y: i16) {
         // The drawing loop used to leave `j` here; the next frame's actor loop reads it.
         state.last_terrain = the_actors.drawn;
         WaitBlit();
-        (*(*the_screen.drawing_page).ri_page).RxOffset = (the_world.map_x & 15) as i16; // modulus 16
-        (*(*the_screen.drawing_page).ri_page).RyOffset = (the_world.map_y & 31) as i16; // modulus 32
+        (*(*the_screen.drawing_page).ri_page).RxOffset =
+            (the_world.map_x as i32 & TILE_X_MASK) as i16;
+        (*(*the_screen.drawing_page).ri_page).RyOffset =
+            (the_world.map_y as i32 & TILE_Y_MASK) as i16;
         flip_pages();
 
         if the_screen.view_status == VIEW_CHANGED {

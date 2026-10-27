@@ -1,8 +1,9 @@
 //! Shooting arrows and fireballs: starting a missile when an actor lets go.
 
 use super::{
-    Ctx, ENEMY, ENVIRON_SINKING, MISSILE_SPEED_ARROW, MISSILE_SPEED_FIREBALL, NO_SHOOT_XTYPE, Pc,
-    SHOOT1, SHOOT3, STILL, STUFF_ARROWS, WEAPON_FIREBALL, diroff,
+    Ctx, EFFECT_FIREBALL, EFFECT_FIREBALL_PITCH, ENEMY, ENVIRON_SINKING, MISSILE_SPEED_ARROW,
+    MISSILE_SPEED_FIREBALL, NO_SHOOT_XTYPE, Pc, SHOOT1, SHOOT3, STILL, STUFF_ARROWS,
+    WEAPON_FIREBALL, diroff,
 };
 
 use crate::game::data::random::rand256;
@@ -23,8 +24,6 @@ const MISSILE_WEAPON_BASE: i8 = 3;
 /// Sound effects for the bow and the fireball, and their base pitch.
 const EFFECT_ARROW: i16 = 4;
 const EFFECT_ARROW_PITCH: i32 = 400;
-const EFFECT_FIREBALL: i16 = 5;
-const EFFECT_FIREBALL_PITCH: i32 = 1800;
 
 impl Ctx {
     /// Aiming and firing a bow or a fireball. No shooting under water or in peaceful places.

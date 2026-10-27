@@ -91,16 +91,26 @@ const DIRECTIONS_BEFORE: i32 = 63;
 const DIRECTIONS_AFTER: i32 = 1;
 
 /// RASSIZE(w, h) from the Amiga headers: bytes needed for a raster.
+/// A raster row is a whole number of 16 bit words: round the pixel width up to a multiple of 16,
+/// then divide by 8 to get bytes.
+const WORD_ROUNDING: u32 = 15;
+const BYTE_SHIFT: u32 = 3;
+const EVEN_BYTES_MASK: u32 = 0xfffe;
+
+/// An edge is two (x, y) points of one byte each, so 4 bytes; the beam polygon has 4 corners.
+const EDGE_BYTES: usize = 4;
+const BEAM_CORNERS: usize = 4;
+
 fn raster_bytes(width: u32, height: u32) -> i32 {
     // Bytes in the raster: the width in pixels rounded up to a whole word, as bytes, times the height.
-    (height * ((width + 15) >> 3 & 0xfffe)) as i32
+    (height * ((width + WORD_ROUNDING) >> BYTE_SHIFT & EVEN_BYTES_MASK)) as i32
 }
 
 /// The two points of the beam edge for direction `dir`, relative to the witch.
 fn edge(dir: i16, fp: &FPage) -> ((i16, i16), (i16, i16)) {
     {
         let start = ((dir as i32 * POINT_BYTES) as u8) as usize;
-        let w = &witchpoints[start..start + 4];
+        let w = &witchpoints[start..start + EDGE_BYTES];
 
         (
             (w[0] as i16 + fp.witchx, w[1] as i16 + fp.witchy),
@@ -156,7 +166,7 @@ pub fn witch_fx(fp: *mut FPage) {
 
 /// Fills the beam's quadrilateral with corners `p` in complement mode, using a temporary raster
 /// and area buffer that are given back afterwards.
-unsafe fn paint_beam(r: *mut RastPort, p: [(i16, i16); 4]) {
+unsafe fn paint_beam(r: *mut RastPort, p: [(i16, i16); BEAM_CORNERS]) {
     unsafe {
         SetDrMd(r, COMPLEMENT);
         MY_RAS = AllocRaster(RASTER_SIZE, RASTER_SIZE);
@@ -186,7 +196,7 @@ unsafe fn paint_beam(r: *mut RastPort, p: [(i16, i16); 4]) {
 }
 
 /// Fills the quadrilateral with corners `p` (in drawing order) on the map rastport `r`.
-unsafe fn fill_beam(r: *mut RastPort, p: [(i16, i16); 4]) {
+unsafe fn fill_beam(r: *mut RastPort, p: [(i16, i16); BEAM_CORNERS]) {
     unsafe {
         AreaMove(r, p[0].0 as i32, p[0].1 as i32);
 

@@ -13,6 +13,9 @@ pub(super) const BOW_BIT: i16 = 4;
 
 /// Touch attacks (monsters' weapon codes 8 and up) are as strong as this weapon.
 pub(super) const TOUCH_WEAPON: i16 = 5;
+
+/// Weapon numbers from here on are natural weapons (bites, claws).
+const FIRST_TOUCH_WEAPON: i16 = 8;
 pub(super) const BRAVE_PER_REACH: i16 = 20;
 pub(super) const HERO_BASE_REACH: i16 = 5;
 pub(super) const ENEMY_BASE_REACH: i16 = 2;
@@ -54,7 +57,7 @@ pub fn resolve_melee() {
 pub(super) fn melee_weapon(weapon: i16) -> Option<i16> {
     if weapon & BOW_BIT != 0 {
         None
-    } else if weapon >= 8 {
+    } else if weapon >= FIRST_TOUCH_WEAPON {
         Some(TOUCH_WEAPON)
     } else {
         Some(weapon)

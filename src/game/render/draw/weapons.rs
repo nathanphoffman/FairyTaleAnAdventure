@@ -11,6 +11,24 @@ const OBJ_BOW_MID: i16 = 0x53;
 const OBJ_BOW_DOWN: i16 = 0x51;
 const OBJ_ARROW_BASE: i16 = 103;
 const WEAPON_BOW: i8 = 4;
+
+/// Weapon numbers from 1 to 7 are shown held; the others (the wand and missiles) are not.
+const LAST_HELD_WEAPON: i8 = 7;
+
+/// Bit 2 of the facing (and of the facing shifted by 2) says whether the weapon is drawn before or
+/// after the body.
+const FACING_LEFT_BIT: i32 = 4;
+const FACING_PICK_OFFSET: i32 = 2;
+
+/// Extents whose type is above this are peaceful, and the weapon is drawn even when resting.
+const PEACEFUL_XTYPE: u16 = 80;
+
+/// The bow's drawn image changes every 8 frames: bit 0 up, bit 1 mid, else down.
+const BOW_PHASE_FRAMES: i16 = 8;
+
+/// A fireball facing east (2) is drawn this many lines higher.
+const FIREBALL_FACING_EAST: i8 = 2;
+const FIREBALL_EAST_LIFT: i16 = 6;
 const WEAPON_FIREBALL: i8 = 5;
 
 /// The first frame of the bow's own drawing table; below this frames come from `bow_x`/`bow_y`.
@@ -25,20 +43,24 @@ pub(super) unsafe fn weapon_passmode(actor: *const Shape, pass: &mut u8) -> bool
         let state = (*actor).state;
 
         if (*actor).weapon > 0
-            && (*actor).weapon < 8
-            && (!(DEAD..SHOOT1).contains(&state) || the_world.extent_type > 80)
+            && (*actor).weapon <= LAST_HELD_WEAPON
+            && (!(DEAD..SHOOT1).contains(&state) || the_world.extent_type > PEACEFUL_XTYPE)
         {
             let facing = (*actor).facing as i32;
             // The other of the two passes (0 becomes 1, 1 becomes 0).
             let flipped = *pass ^ 1;
-            let mut pick = if ((facing - 2) & 4) != 0 {
+            let mut pick = if ((facing - FACING_PICK_OFFSET) & FACING_LEFT_BIT) != 0 {
                 flipped
             } else {
                 *pass
             };
 
             if (*actor).weapon == WEAPON_BOW && state < SHOOT1 {
-                pick = if (facing & 4) == 0 { flipped } else { *pass };
+                pick = if (facing & FACING_LEFT_BIT) == 0 {
+                    flipped
+                } else {
+                    *pass
+                };
             }
 
             passmode = pick != 0;
@@ -66,7 +88,7 @@ pub(super) unsafe fn weapon_image(actor: *const Shape, mut sprite: Sprite) -> Sp
         }
 
         if is_bow_frame {
-            let bow_phase = frame_number / 8;
+            let bow_phase = frame_number / BOW_PHASE_FRAMES;
             sprite.inum = if bow_phase & 1 != 0 {
                 OBJ_BOW_UP
             } else if bow_phase & 2 != 0 {
@@ -77,8 +99,8 @@ pub(super) unsafe fn weapon_image(actor: *const Shape, mut sprite: Sprite) -> Sp
         } else if kind == WEAPON_FIREBALL as i16 {
             sprite.inum = (*actor).facing as i16 + OBJ_ARROW_BASE;
 
-            if (*actor).facing == 2 {
-                sprite.ystart -= 6;
+            if (*actor).facing == FIREBALL_FACING_EAST {
+                sprite.ystart -= FIREBALL_EAST_LIFT;
             }
         } else {
             // hand weapons: each kind has its own block of images

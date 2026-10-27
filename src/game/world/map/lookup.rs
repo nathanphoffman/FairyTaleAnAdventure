@@ -59,6 +59,7 @@ const TILE_ROW_WRAP: u16 = 0x7fff;
 
 /// Regions above this number use the second half of the sector table.
 const LAST_FIRST_HALF_REGION: u16 = 7;
+const REGION_BYTE_MASK: u16 = 0xff;
 const SECOND_HALF_OFFSET: i32 = 256;
 
 /// The high byte of the hero's position is the sector.
@@ -242,7 +243,7 @@ pub fn fill_minimap(tile_x: i32, tile_y: i32) {
             .add(((hy << MAP_ROW_SHIFT).wrapping_add(hx)) as u16 as usize)
             as i32;
 
-        if the_world.region & 0xff > LAST_FIRST_HALF_REGION {
+        if the_world.region & REGION_BYTE_MASK > LAST_FIRST_HALF_REGION {
             sec += SECOND_HALF_OFFSET;
         }
 

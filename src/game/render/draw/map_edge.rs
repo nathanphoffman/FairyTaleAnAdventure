@@ -16,6 +16,12 @@ const ROW_TOP: i32 = 0;
 
 /// The witch's beam hurts the hero within this distance.
 const WITCH_REACH: i32 = 100;
+
+/// The witch's position is kept relative to the scrolled map: its x snaps to the 16 pixel tile grid
+/// and its y (15 pixels above her feet) to the 32 pixel one.
+const TILE_X_MASK: u16 = 0xfff0;
+const TILE_Y_MASK: u16 = 0xffe0;
+const WITCH_ANCHOR_Y: i32 = 15;
 const WITCH_SLOT: usize = 2;
 
 /// Finishes the scrolled map edge (`dif_x`, `dif_y` = scroll step) and runs the witch's beam and her
@@ -36,8 +42,9 @@ pub fn repair_map_and_witch(dif_x: i16, dif_y: i16) {
 
         let witch = &raw const the_actors.list[WITCH_SLOT];
         let page = the_screen.drawing_page;
-        (*page).witchx = ((*witch).abs_x as i32 - (the_world.map_x & 0xfff0) as i32) as i16;
-        (*page).witchy = (((*witch).abs_y as i32 - 15) - (the_world.map_y & 0xffe0) as i32) as i16;
+        (*page).witchx = ((*witch).abs_x as i32 - (the_world.map_x & TILE_X_MASK) as i32) as i16;
+        (*page).witchy = (((*witch).abs_y as i32 - WITCH_ANCHOR_Y)
+            - (the_world.map_y & TILE_Y_MASK) as i32) as i16;
 
         if rand4() == 0 {
             the_witch.direction = if s1 > 0 { 1 } else { -1 };

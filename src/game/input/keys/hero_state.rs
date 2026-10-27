@@ -3,9 +3,9 @@
 use super::fairy::fairy_or_revive;
 use super::{
     BIRD, DEAD, DISMOUNT_CHECK, DISMOUNT_SPEED, DISMOUNT_STEP, DYING, EVENT_LAVA, EVENT_TOO_FAST,
-    EVENT_ZONE_81, EVENT_ZONE_82, FALL, FIGHTING, FIRE_BUTTON, LAVA_X, LAVA_Y, LEFT_BUTTON,
-    NOT_WALKING, RIGHT_BUTTON, SHOOT1, SHOOT3, SHOOTING_ZONE, SINK, SLEEP, STILL, STUMBLE_HUNGER,
-    WALKING, WEAPON_BOW, WEAPON_WAND, ZONE_ARROW_FAST, ZONE_ARROW_SLOW,
+    EVENT_ZONE_81, EVENT_ZONE_82, FACING_MASK, FALL, FIGHTING, FIRE_BUTTON, LAVA_X, LAVA_Y,
+    LEFT_BUTTON, NOT_WALKING, RIGHT_BUTTON, SHOOT1, SHOOT3, SHOOTING_ZONE, SINK, SLEEP, STILL,
+    STUMBLE_HUNGER, WALKING, WEAPON_BOW, WEAPON_WAND, ZONE_ARROW_FAST, ZONE_ARROW_SLOW,
 };
 
 use crate::game::actors::interaction::blocked_at;
@@ -178,9 +178,9 @@ pub(super) fn stumble(
 ) -> i16 {
     if hunger > STUMBLE_HUNGER && trips() {
         if turns_right() {
-            (direction + 1) & 7
+            (direction + 1) & FACING_MASK
         } else {
-            (direction - 1) & 7
+            (direction - 1) & FACING_MASK
         }
     } else {
         direction

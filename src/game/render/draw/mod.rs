@@ -147,20 +147,29 @@ unsafe fn draw_one(
 
 /// Moves the sprite from map to screen coordinates and works out its size and bottom right corner.
 /// Returns the width of the image in bytes.
+/// The map scrolls in whole tiles (16 x 32 pixels), so the part of a tile it is offset by is added.
+const TILE_X_MASK: i32 = 15;
+const TILE_Y_MASK: i32 = 31;
+
+/// A word is 16 pixels (a shift of 4); a sprite's width in bytes is its width in pixels over 8.
+const WORD_SHIFT: u32 = 4;
+const PIXELS_PER_BYTE: i8 = 8;
+const WORD_PIXELS_MASK: i16 = 15;
+
 unsafe fn place_on_screen(sprite: &mut Sprite) -> i8 {
     unsafe {
-        sprite.xstart += (the_world.map_x & 15) as i16;
-        sprite.ystart += (the_world.map_y & 31) as i16;
-        sprite.ground += (the_world.map_y & 31) as i16;
+        sprite.xstart += (the_world.map_x as i32 & TILE_X_MASK) as i16;
+        sprite.ystart += (the_world.map_y as i32 & TILE_Y_MASK) as i16;
+        sprite.ground += (the_world.map_y as i32 & TILE_Y_MASK) as i16;
 
         let seq = sprite_sheet(sprite.atype);
         // Sprite width in pixels: 16 pixels to each word.
-        let xsize = (seq.width << 4) as i8;
+        let xsize = (seq.width << WORD_SHIFT) as i8;
         let ysize = image_height(sprite.atype, sprite.inum, seq.height as i8);
         sprite.xstop = sprite.xstart.wrapping_add(xsize as i16).wrapping_sub(1);
         sprite.ystop = sprite.ystart.wrapping_add(ysize as i16).wrapping_sub(1);
 
-        xsize / 8
+        xsize / PIXELS_PER_BYTE
     }
 }
 
@@ -183,13 +192,13 @@ unsafe fn blit_sprite(
 ) -> Drawn {
     unsafe {
         // word offsets
-        let xbw = (clip.xstart >> 4) as i8;
+        let xbw = (clip.xstart >> WORD_SHIFT) as i8;
         // Pixel column to word column (16 pixels to a word).
-        let xew = (clip.xstop >> 4) as i8;
+        let xew = (clip.xstop >> WORD_SHIFT) as i8;
         let mut blitwide = (xew as i16 - xbw as i16 + 1) as i8;
         let blithigh = (clip.ystop - clip.ystart + 1) as i8;
 
-        if clip.xoff & 15 != 0 {
+        if clip.xoff as i16 & WORD_PIXELS_MASK != 0 {
             blitwide = blitwide.wrapping_add(1);
         }
 

@@ -1,8 +1,8 @@
 //! The dragon: how it moves and breathes fire.
 
 use super::{
-    Ctx, DEAD, DRAGON_BREATH_FACING, DYING, MAX_MISSILE, MISSILE_ROCK_TYPE, MISSILE_SPEED_FIREBALL,
-    Pc, WEAPON_BOW,
+    Ctx, DEAD, DRAGON_BREATH_FACING, DRAGON_DEAD_FRAME, DRAGON_DYING_FRAME, DYING, EFFECT_FIREBALL,
+    EFFECT_FIREBALL_PITCH, MAX_MISSILE, MISSILE_ROCK_TYPE, MISSILE_SPEED_FIREBALL, Pc, WEAPON_BOW,
 };
 
 use crate::game::data::object_tables::{bowshotx, bowshoty, gunshoty};
@@ -19,14 +19,14 @@ impl Ctx {
             self.image = 0;
 
             if self.state == DYING {
-                self.image = 3;
+                self.image = DRAGON_DYING_FRAME;
             } else if self.state == DEAD {
-                self.image = 4;
+                self.image = DRAGON_DEAD_FRAME;
             } else if rand4() == 0 {
                 (*self.missile).speed = MISSILE_SPEED_FIREBALL;
                 the_actors.next_missile = the_actors.next_missile.wrapping_add(1);
                 self.image = (rand2() + 1) as i16;
-                play_effect(5, 1800 + rand256());
+                play_effect(EFFECT_FIREBALL, EFFECT_FIREBALL_PITCH + rand256());
                 (*actor).facing = DRAGON_BREATH_FACING;
                 (*self.missile).missile_type = MISSILE_ROCK_TYPE;
 

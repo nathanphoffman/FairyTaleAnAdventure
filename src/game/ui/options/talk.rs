@@ -19,6 +19,14 @@ const TALKING: i8 = 19;
 const TACTIC_TALK: i8 = 15;
 const SHELL: usize = 6;
 
+/// A person's race number is the low 7 bits of `race` (bit 7 marks a variant).
+const PERSON_MASK: u8 = 0x7f;
+
+// Speech numbers.
+const SPEECH_TOO_CLOSE_TO_YELL: i32 = 8;
+const SPEECH_TURTLE_HAS_SHELL: i32 = 57;
+const SPEECH_TURTLE_GIVES_SHELL: i32 = 56;
+
 /// `find_nearest_figure` search ranges for yelling and for the quieter talk options.
 const YELL_RANGE: i16 = 100;
 const TALK_RANGE: i16 = 50;
@@ -66,7 +74,7 @@ pub(super) unsafe fn talk_option(chosen_entry: i16) -> bool {
 /// What the Talk code needs to know about the actor the hero is talking to.
 unsafe fn describe_target(actor: *const Shape) -> Target {
     unsafe {
-        let person = (*actor).race & 0x7f;
+        let person = (*actor).race & PERSON_MASK;
         let can_talk = (*(&raw const setfig_table)
             .cast::<SetFigEntry>()
             .add(person as usize))
@@ -87,20 +95,20 @@ unsafe fn carry_out(action: TalkAction, actor: *mut Shape) {
     unsafe {
         match action {
             TalkAction::Nothing => {}
-            TalkAction::TooCloseToYell => speak(8),
+            TalkAction::TooCloseToYell => speak(SPEECH_TOO_CLOSE_TO_YELL),
             TalkAction::Person { starts_talking } => {
                 if starts_talking {
                     (*actor).state = TALKING;
                     (*actor).tactic = TACTIC_TALK;
                 }
 
-                person_speaks((*actor).race & 0x7f, actor);
+                person_speaks((*actor).race & PERSON_MASK, actor);
             }
 
-            TalkAction::TurtleHasShell => speak(57),
+            TalkAction::TurtleHasShell => speak(SPEECH_TURTLE_HAS_SHELL),
             TalkAction::TurtleGivesShell => {
                 *the_hero.stuff.add(SHELL) = 1;
-                speak(56);
+                speak(SPEECH_TURTLE_GIVES_SHELL);
             }
 
             TalkAction::EnemyShouts(race) => speak(race as i32),

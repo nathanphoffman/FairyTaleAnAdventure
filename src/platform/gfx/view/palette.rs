@@ -24,6 +24,11 @@ pub extern "C" fn FreeColorMap(cm: *mut ColorMap) {
     }
 }
 
+/// A colour channel is 4 bits, and the red and green ones sit 8 and 4 bits up.
+const COMPONENT_MASK: ULONG = 15;
+const RED_SHIFT: u32 = 8;
+const GREEN_SHIFT: u32 = 4;
+
 /// Colours are 12 bit: 0x0RGB with 4 bits per channel.
 #[unsafe(no_mangle)]
 pub extern "C" fn SetRGB4(vp: *mut ViewPort, n: LONG, r: ULONG, g: ULONG, b: ULONG) {
@@ -35,7 +40,9 @@ pub extern "C" fn SetRGB4(vp: *mut ViewPort, n: LONG, r: ULONG, g: ULONG, b: ULO
 
     unsafe {
         // A 12 bit colour: four bits each of red, green and blue.
-        *(*cm).ColorTable.add(n as usize) = ((r & 15) << 8 | (g & 15) << 4 | (b & 15)) as UWORD
+        *(*cm).ColorTable.add(n as usize) = ((r & COMPONENT_MASK) << RED_SHIFT
+            | (g & COMPONENT_MASK) << GREEN_SHIFT
+            | (b & COMPONENT_MASK)) as UWORD
     };
 }
 

@@ -4,8 +4,16 @@ use crate::amiga::*;
 use std::os::raw::c_void;
 use std::ptr::null_mut;
 
+/// Rows are a whole number of 16 pixel words (2 bytes each); 8 pixels fit in a byte, and the leftmost
+/// pixel of a byte is its top bit.
+const WORD_PIXELS: i32 = 16;
+const WORD_BYTES: i32 = 2;
+const BYTE_PIXELS_SHIFT: u32 = 3;
+const BYTE_PIXELS_MASK: i32 = 7;
+const LEFTMOST_PIXEL: u8 = 0x80;
+
 fn bytes_per_row(width: i32) -> usize {
-    (((width + 15) / 16) * 2) as usize
+    (((width + WORD_PIXELS - 1) / WORD_PIXELS) * WORD_BYTES) as usize
 }
 
 #[unsafe(no_mangle)]
@@ -78,10 +86,10 @@ pub(in crate::platform::gfx) unsafe fn get_bit(bm: &BitMap, plane: usize, x: i32
     unsafe {
         let base = bm.Planes[plane];
         // Byte holding the pixel: 8 pixels to a byte.
-        let off = y as usize * bm.BytesPerRow as usize + (x >> 3) as usize;
+        let off = y as usize * bm.BytesPerRow as usize + (x >> BYTE_PIXELS_SHIFT) as usize;
 
         // The leftmost pixel of a byte is its top bit.
-        *base.add(off) & (0x80 >> (x & 7)) != 0
+        *base.add(off) & (LEFTMOST_PIXEL >> (x & BYTE_PIXELS_MASK)) != 0
     }
 }
 
@@ -95,9 +103,9 @@ pub(in crate::platform::gfx) unsafe fn set_bit(
     unsafe {
         let base = bm.Planes[plane];
         // Byte holding the pixel: 8 pixels to a byte.
-        let off = y as usize * bm.BytesPerRow as usize + (x >> 3) as usize;
+        let off = y as usize * bm.BytesPerRow as usize + (x >> BYTE_PIXELS_SHIFT) as usize;
         // The leftmost pixel of a byte is its top bit.
-        let mask = 0x80u8 >> (x & 7);
+        let mask = LEFTMOST_PIXEL >> (x & BYTE_PIXELS_MASK);
 
         if on {
             *base.add(off) |= mask
@@ -109,7 +117,7 @@ pub(in crate::platform::gfx) unsafe fn set_bit(
 
 /// Whether the pixel (`x`, `y`) is inside the bitmap.
 pub(in crate::platform::gfx) fn in_bounds(bm: &BitMap, x: i32, y: i32) -> bool {
-    x >= 0 && y >= 0 && y < bm.Rows as i32 && x < bm.BytesPerRow as i32 * 8
+    x >= 0 && y >= 0 && y < bm.Rows as i32 && x < bm.BytesPerRow as i32 * (1 << BYTE_PIXELS_SHIFT)
 }
 
 /// Draws one pixel with `pen` (or flips it, in COMPLEMENT mode).

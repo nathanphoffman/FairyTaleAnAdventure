@@ -2,15 +2,29 @@
 
 use super::{
     Ctx, DEAD, DYING, ENVIRON_DROWNED, ENVIRON_SINKING, PIT_SECTOR, SINK, STILL, TERRAIN_SLOW_SINK,
+    TERRAIN_WADE,
 };
 
 use crate::game::data::state::{the_hero, the_world};
 use crate::game::world::places::{find_place, transfer_hero};
 
+/// Depth of water that starts to matter, and how deep each wadeable terrain may be before the
+/// actor climbs out: terrain 3 up to depth 5, terrain 4 up to depth 10.
+const WATER_DEPTH_MIN: i8 = 2;
+const WADE_LIMIT_SHALLOW: i8 = 5;
+const WADE_LIMIT_DEEP: i8 = 10;
+
+/// The hero who drowns in the pit goes to the dungeon region and arrives here.
+const DUNGEON_REGION: u16 = 9;
+const DUNGEON_ARRIVAL: (u16, u16) = (0x1080, 34950);
+
 /// Standing in water (depth `k` above 2) on ground that is dry (`j` 0), or wading with a depth over
 /// the limit of the terrain (3: 5, 4: 10): the actor climbs out one step a frame.
 pub(super) fn climbs_out_of_water(k: i8, j: i16) -> bool {
-    k > 2 && (j == 0 || (j == 3 && k > 5) || (j == 4 && k > 10))
+    k > WATER_DEPTH_MIN
+        && (j == 0
+            || (j == TERRAIN_WADE && k > WADE_LIMIT_SHALLOW)
+            || (j == TERRAIN_SLOW_SINK && k > WADE_LIMIT_DEEP))
 }
 
 /// What wading does to an actor this frame.
@@ -68,8 +82,8 @@ impl Ctx {
                     if the_hero.sector == PIT_SECTOR {
                         if self.slot == 0 {
                             self.environ = 0;
-                            the_world.new_region = 9;
-                            transfer_hero(0x1080, 34950, 0);
+                            the_world.new_region = DUNGEON_REGION;
+                            transfer_hero(DUNGEON_ARRIVAL.0, DUNGEON_ARRIVAL.1, 0);
                             find_place(1);
                         } else {
                             (*actor).vitality = 0;

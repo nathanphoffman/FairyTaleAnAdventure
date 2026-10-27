@@ -12,6 +12,13 @@ const NECROMANCER: i16 = 9;
 const DKNIGHT: i16 = 7;
 const PRINCESS_FREED_SLOT: usize = 9;
 
+// Speech numbers of what each person says on coming near.
+const SPEECH_BEGGAR: i32 = 23;
+const SPEECH_WITCH: i32 = 46;
+const SPEECH_PRINCESS: i32 = 16;
+const SPEECH_NECROMANCER: i32 = 43;
+const SPEECH_DKNIGHT: i32 = 41;
+
 /// The nearest person says something when they come near (once per person).
 pub fn speak_nearby() {
     unsafe {
@@ -19,16 +26,16 @@ pub fn speak_nearby() {
 
         if the_actors.nearest_person != 0 && race != the_actors.last_person {
             match race {
-                BEGGAR => speak(23),
-                WITCH => speak(46),
+                BEGGAR => speak(SPEECH_BEGGAR),
+                WITCH => speak(SPEECH_WITCH),
                 PRINCESS => {
                     if ob_list8[PRINCESS_FREED_SLOT].ob_stat != 0 {
-                        speak(16);
+                        speak(SPEECH_PRINCESS);
                     }
                 }
 
-                NECROMANCER => speak(43),
-                DKNIGHT => speak(41),
+                NECROMANCER => speak(SPEECH_NECROMANCER),
+                DKNIGHT => speak(SPEECH_DKNIGHT),
                 _ => {}
             }
 

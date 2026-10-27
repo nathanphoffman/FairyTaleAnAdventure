@@ -18,6 +18,24 @@ const FIRST_ENEMY_ACTOR: i16 = 3;
 const LAST_ENEMY_ACTOR: i16 = 7;
 const DISK_REQUEST_ACTORS: i32 = 8;
 const PLACE_TRIES: i32 = 10;
+
+/// Waiting encounters are placed on every 16th tick, and a new random one is rolled every 32nd.
+const PLACE_PERIOD_MASK: u16 = 15;
+const ROLL_PERIOD_MASK: u16 = 31;
+
+/// The danger of an encounter is the extent type plus this base (higher indoors); the roll to beat
+/// is 0-63.
+const DANGER_BASE_OUTDOORS: u16 = 2;
+const DANGER_BASE_INDOORS: u16 = 5;
+
+/// Encounter kinds chosen by rule: the dark knight extent turns a kind 2 into 4, the spider pit
+/// always gives 6 and the final extent 2.
+const KIND_DKNIGHT_SWAP: (u16, u16) = (2, 4);
+const KIND_SPIDER_PIT: u16 = 6;
+const KIND_FINAL: u16 = 2;
+
+/// Extents whose type is a multiple of 4 never mix races.
+const NO_MIX_MASK: u16 = 3;
 const SPREAD: u16 = 63;
 const PLAIN_TERRAIN: i32 = 0;
 const WRAITH: u8 = 2;
@@ -43,36 +61,41 @@ pub fn spawn_encounters() {
             the_actors.active = FIRST_ENEMY_ACTOR;
         }
 
-        if the_world.day_clock & 15 == 0 && the_encounter.number != 0 && the_actors.loading == 0 {
+        if the_world.day_clock & PLACE_PERIOD_MASK == 0
+            && the_encounter.number != 0
+            && the_actors.loading == 0
+        {
             place_waiting_encounters();
         }
 
-        if the_world.day_clock & 31 == 0
+        if the_world.day_clock & ROLL_PERIOD_MASK == 0
             && the_actors.on_screen == 0
             && the_actors.loading == 0
             && the_actors.active_carrier == 0
             && the_world.extent_type < NO_RANDOM_XTYPE
         {
             the_encounter.danger_level = (if the_world.region > INDOOR_REGION {
-                5 + the_world.extent_type
+                DANGER_BASE_INDOORS + the_world.extent_type
             } else {
-                2 + the_world.extent_type
+                DANGER_BASE_OUTDOORS + the_world.extent_type
             }) as u8;
 
             if rand64() <= the_encounter.danger_level as i32 {
                 the_encounter.kind = rand4() as u16;
 
-                if the_world.extent_type == DKNIGHT_XTYPE && the_encounter.kind == 2 {
-                    the_encounter.kind = 4;
+                if the_world.extent_type == DKNIGHT_XTYPE
+                    && the_encounter.kind == KIND_DKNIGHT_SWAP.0
+                {
+                    the_encounter.kind = KIND_DKNIGHT_SWAP.1;
                 }
 
                 if the_world.extent_type == SPIDER_PIT_XTYPE {
-                    the_encounter.kind = 6;
+                    the_encounter.kind = KIND_SPIDER_PIT;
                     the_encounter.mix_flag = 0;
                 }
 
                 if the_world.extent_type == FINAL_XTYPE {
-                    the_encounter.kind = 2;
+                    the_encounter.kind = KIND_FINAL;
                     the_encounter.mix_flag = 0;
                 }
 
@@ -94,7 +117,7 @@ unsafe fn place_waiting_encounters() {
 
         the_encounter.weapon_type = rand4() as i16;
 
-        if the_world.extent_type & 3 == 0 {
+        if the_world.extent_type & NO_MIX_MASK == 0 {
             the_encounter.mix_flag = 0;
         }
 
