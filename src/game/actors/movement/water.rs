@@ -10,7 +10,7 @@ pub(super) fn climbs_out_of_water(k: i8, j: i16) -> bool {
 
 /// What wading does to an actor this frame.
 #[derive(Debug, PartialEq, Eq)]
-pub(super) enum Wading {
+enum Wading {
     Nothing,
     /// Fully under: the actor stops moving (or falls through the pit).
     Drowned,
@@ -20,7 +20,7 @@ pub(super) enum Wading {
 
 /// The depth after one frame in water of terrain type `j` (shallow 4 or deep 5), and what that does.
 /// The depth moves one step towards its limit; the dead are not affected.
-pub(super) fn wade_step(depth: i8, j: i16, dead_or_dying: bool) -> (i8, Wading) {
+fn wade_step(depth: i8, j: i16, dead_or_dying: bool) -> (i8, Wading) {
     let limit: i8 = if j == TERRAIN_SLOW_SINK {
         10
     } else {

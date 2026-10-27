@@ -3,7 +3,7 @@
 use super::*;
 
 /// The hero's frame once the way has been blocked for a while: oscillating, then a frustrated one.
-pub(super) fn frustrated_frame(frustration: i8, cycle: i16) -> Option<i16> {
+fn frustrated_frame(frustration: i8, cycle: i16) -> Option<i16> {
     if frustration > 40 {
         Some(FRAME_FRUSTRATED)
     } else if frustration > 20 {
@@ -62,7 +62,7 @@ impl Ctx {
     /// On ice the actor keeps its momentum: pushes the velocity toward the wanted direction up to a
     /// limit and moves by it. Returns where to go next, or `None` when it hit something and should
     /// walk normally this tick.
-    pub(super) unsafe fn slide_on_ice(&mut self) -> Option<Pc> {
+    unsafe fn slide_on_ice(&mut self) -> Option<Pc> {
         unsafe {
             let an = self.an;
             self.e = if the_hero.riding == RIDING_SWAN {

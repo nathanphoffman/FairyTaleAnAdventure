@@ -3,19 +3,19 @@
 use super::*;
 
 /// The swan carries the hero once he is near, with the swan on its slot and the lasso in the pack.
-pub(super) fn swan_carries(nearness: i16, carrier_slot: i16, has_lasso: bool) -> bool {
+fn swan_carries(nearness: i16, carrier_slot: i16, has_lasso: bool) -> bool {
     nearness != 0 && carrier_slot == CARRIER_SLOT as i16 && has_lasso
 }
 
 /// The turtle carries the hero whenever he is near and on its slot.
-pub(super) fn turtle_carries(nearness: i16, carrier_slot: i16) -> bool {
+fn turtle_carries(nearness: i16, carrier_slot: i16) -> bool {
     nearness != 0 && carrier_slot == CARRIER_SLOT as i16
 }
 
 /// The turtle's direction of swimming: straight on while there is deep water ahead, otherwise one
 /// step right, then two to the left of that, then one more to the left; the last is used whether
 /// or not it is water. `water_ahead(dir)` says if the turtle could swim that way.
-pub(super) fn turtle_heading(dir: i16, water_ahead: impl Fn(i16) -> bool) -> i16 {
+fn turtle_heading(dir: i16, water_ahead: impl Fn(i16) -> bool) -> i16 {
     if water_ahead(dir) {
         return dir;
     }
@@ -83,7 +83,7 @@ impl Ctx {
 
     /// The turtle on its own: keeps going the same way while there is deep water ahead, otherwise
     /// tries turning right, then left, then back to straight on the left again.
-    pub(super) unsafe fn turtle_swims(&mut self) {
+    unsafe fn turtle_swims(&mut self) {
         unsafe {
             let an = self.an;
             let (ax, ay) = ((*an).abs_x as i32, (*an).abs_y as i32);

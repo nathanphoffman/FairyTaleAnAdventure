@@ -152,7 +152,7 @@ impl Ctx {
     }
 
     /// The sprite frames of snakes (race 4), the spectre (8) and the race-7 enemy at zero vitality.
-    pub(super) unsafe fn enemy_frame(&mut self, race: i8) {
+    unsafe fn enemy_frame(&mut self, race: i8) {
         unsafe {
             let an = self.an;
             let cycle = self.cycle as i32;
@@ -187,7 +187,7 @@ impl Ctx {
 
     /// The hero leaving the edge of the world comes back on the other side (outdoor regions only);
     /// whatever the hero rides is moved along.
-    pub(super) unsafe fn hero_wrap(&mut self) {
+    unsafe fn hero_wrap(&mut self) {
         unsafe {
             let an = self.an;
             if the_world.region >= OUTDOOR_REGIONS {
