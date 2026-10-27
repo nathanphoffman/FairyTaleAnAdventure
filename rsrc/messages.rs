@@ -8,8 +8,8 @@
 
 use super::asm_text::{draw_text, move_to};
 use super::game_tables::brother_names;
-use super::globals::current_rastport;
 use super::state::the_hero;
+use super::state::the_screen;
 use crate::amiga::RastPort;
 use std::ffi::{CStr, c_char};
 
@@ -62,7 +62,7 @@ unsafe fn brother_name() -> *const c_char {
 pub fn print(s: *const c_char) {
     unsafe {
         ScrollRaster(
-            current_rastport,
+            the_screen.current_rastport,
             0,
             LINE_HEIGHT,
             TEXT_X_MIN,

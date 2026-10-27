@@ -5,16 +5,14 @@ use super::asm_map::draw_overview_map;
 use super::asm_text::{queue_print, show_event, speak};
 use super::encounters::check_death;
 use super::game_tables::stone_ring_sectors;
-use super::globals::{
-    battle_flag, bm_draw, carrier_slot, cheat_enabled, drawing_page, planes, rp_map, secx, secy,
-    view_status,
-};
+use super::globals::{secx, secy};
 use super::menus::update_menu_availability;
 use super::messages::print;
 use super::places::transfer_hero;
 use super::random::rand8;
 use super::screen_fx::{flicker_colors, show_still_screen};
-use super::state::{the_actors, the_hero, the_world};
+use super::state::{the_actors, the_hero, the_screen, the_ui, the_world};
+use super::types::Shape;
 use crate::amiga::RastPort;
 use std::ffi::c_char;
 
@@ -96,7 +94,7 @@ pub unsafe fn magic_option(chosen_entry: i16) -> bool {
                 the_world.freeze_timer += FREEZE_TIME;
             }
             SPELL_MAP => {
-                if cheat_enabled == 0 && the_world.region > LAST_OUTDOOR_REGION {
+                if the_ui.cheat_enabled == 0 && the_world.region > LAST_OUTDOOR_REGION {
                     return false;
                 }
                 show_map();
@@ -123,8 +121,8 @@ pub unsafe fn magic_option(chosen_entry: i16) -> bool {
 /// Draws the overview map with a "+" where the hero is, and shows it.
 unsafe fn show_map() {
     unsafe {
-        bm_draw = (*(*drawing_page).ri_page).BitMap;
-        planes = (*bm_draw).Planes.as_mut_ptr();
+        the_screen.bm_draw = (*(*the_screen.drawing_page).ri_page).BitMap;
+        the_screen.planes = (*the_screen.bm_draw).Planes.as_mut_ptr();
         draw_overview_map(the_world.map_x as i32, the_world.map_y as i32);
 
         let x = ((the_hero.x >> 4) as i64
@@ -132,14 +130,14 @@ unsafe fn show_map() {
             - MARK_X_OFFSET) as u32;
         let y = ((the_hero.y >> 4) as i64 - ((secy as i64 + the_world.origin_y as i64) << 4)
             + MARK_Y_OFFSET) as u32;
-        rp_map.BitMap = bm_draw;
-        SetDrMd(&raw mut rp_map, JAM1);
-        SetAPen(&raw mut rp_map, MAP_MARK_PEN);
+        the_screen.rp_map.BitMap = the_screen.bm_draw;
+        SetDrMd(&raw mut the_screen.rp_map, JAM1);
+        SetAPen(&raw mut the_screen.rp_map, MAP_MARK_PEN);
         if x > 0 && x < MARK_MAX.0 && y > 0 && y < MARK_MAX.1 {
-            Move(&raw mut rp_map, x as i32, y as i32);
-            Text(&raw mut rp_map, c"+".as_ptr(), 1);
+            Move(&raw mut the_screen.rp_map, x as i32, y as i32);
+            Text(&raw mut the_screen.rp_map, c"+".as_ptr(), 1);
         }
-        view_status = VIEW_MAP;
+        the_screen.view_status = VIEW_MAP;
         show_still_screen();
         queue_print(PRQ_MAP);
     }
@@ -171,8 +169,10 @@ unsafe fn stone_jump() -> bool {
                 flicker_colors();
                 transfer_hero(x, y, 1);
                 if the_hero.riding != 0 {
-                    the_actors.list[carrier_slot as usize].abs_x = the_actors.list[0].abs_x;
-                    the_actors.list[carrier_slot as usize].abs_y = the_actors.list[0].abs_y;
+                    the_actors.list[the_actors.carrier_slot as usize].abs_x =
+                        the_actors.list[0].abs_x;
+                    the_actors.list[the_actors.carrier_slot as usize].abs_y =
+                        the_actors.list[0].abs_y;
                 }
                 break;
             }
@@ -184,16 +184,31 @@ unsafe fn stone_jump() -> bool {
 /// Heals the hero a little, up to a limit set by bravery.
 unsafe fn heal() {
     unsafe {
-        let cap = HEAL_CAP_BASE + the_hero.brave / 4;
         let hero = &raw mut the_actors.list[0];
-        (*hero).vitality = (*hero).vitality.wrapping_add((rand8() + HEAL_MIN) as i16);
-        if (*hero).vitality > cap {
-            (*hero).vitality = cap;
-        } else {
+        let (vitality, capped) = healed_vitality((*hero).vitality, the_hero.brave, rand8());
+        (*hero).vitality = vitality;
+        if !capped {
             print(c"That feels a lot better!".as_ptr());
         }
         queue_print(PRQ_STATS);
     }
+}
+
+/// Vitality after the heal spell: it adds 4 plus a roll (`roll`, 0-7), up to a limit that grows with
+/// bravery. Also says whether the limit was hit (then the hero was already nearly full).
+fn healed_vitality(vitality: i16, brave: i16, roll: i32) -> (i16, bool) {
+    let cap = HEAL_CAP_BASE + brave / 4;
+    let healed = vitality.wrapping_add((roll + HEAL_MIN) as i16);
+    if healed > cap {
+        (cap, true)
+    } else {
+        (healed, false)
+    }
+}
+
+/// Whether the fear spell kills this actor: a living enemy of one of the weaker races.
+fn is_scared_by_fear_spell(actor: &Shape) -> bool {
+    actor.vitality != 0 && actor.kind == ENEMY && actor.race < FEAR_RACE_LIMIT
 }
 
 /// Kills every weak enemy on the screen (and costs a little bravery for each).
@@ -202,15 +217,50 @@ unsafe fn scare_enemies() {
         let mut i = 1;
         while i < the_actors.active as usize {
             let an = &raw mut the_actors.list[i];
-            if (*an).vitality != 0 && (*an).kind == ENEMY && (*an).race < FEAR_RACE_LIMIT {
+            if is_scared_by_fear_spell(&*an) {
                 (*an).vitality = 0;
                 check_death(i as i32, 0);
                 the_hero.brave -= 1;
             }
             i += 1;
         }
-        if battle_flag != 0 {
+        if the_actors.battle_flag != 0 {
             show_event(BATTLE_EVENT);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn heal_adds_four_plus_the_roll() {
+        assert_eq!(healed_vitality(5, 0, 3), (12, false));
+    }
+
+    #[test]
+    fn heal_stops_at_a_cap_that_grows_with_bravery() {
+        assert_eq!(healed_vitality(14, 0, 7), (HEAL_CAP_BASE, true));
+        assert_eq!(healed_vitality(10, 40, 7), (21, false));
+        assert_eq!(healed_vitality(25, 40, 7), (HEAL_CAP_BASE + 10, true));
+        assert_eq!(healed_vitality(21, 40, 0), (HEAL_CAP_BASE + 10, false));
+    }
+
+    #[test]
+    fn fear_kills_living_weak_enemies_only() {
+        let mut a: Shape = unsafe { std::mem::zeroed() };
+        a.kind = ENEMY;
+        a.vitality = 5;
+        a.race = FEAR_RACE_LIMIT - 1;
+        assert!(is_scared_by_fear_spell(&a));
+        a.race = FEAR_RACE_LIMIT;
+        assert!(!is_scared_by_fear_spell(&a));
+        a.race = 0;
+        a.vitality = 0;
+        assert!(!is_scared_by_fear_spell(&a));
+        a.vitality = 5;
+        a.kind = 0;
+        assert!(!is_scared_by_fear_spell(&a));
     }
 }

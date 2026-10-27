@@ -11,13 +11,13 @@ use super::asm_text::{
 };
 use super::encounters::{check_death, load_carrier};
 use super::game_tables::extent_list;
-use super::globals::{current_rastport, i as c_i, princess, story_font};
+use super::globals::{i as c_i, princess, story_font};
 use super::loading::play_effect;
 use super::messages::{name, print, print_cont};
 use super::places::transfer_hero;
 use super::random::{bitrand, fta_rand, rand8, rand64, rand256};
 use super::screen_fx::{map_message, message_off};
-use super::state::{the_actors, the_encounter, the_hero, the_world};
+use super::state::{the_actors, the_encounter, the_hero, the_screen, the_world};
 use super::tables::ob_list8;
 use super::types::{Extent, Shape, WorldObject};
 use crate::amiga::{RastPort, TextFont};
@@ -113,18 +113,16 @@ fn actor(i: i32) -> *mut Shape {
 pub fn hit_actor(i: i32, j: i32, fc: i32, wt: i16) {
     unsafe {
         let target = actor(j);
-        if (*actor(HERO as i32)).weapon < MIN_HURT_WEAPON
-            && ((*target).race == RACE_SPIRIT
-                || ((*target).race == RACE_GHOST_KEEPER
-                    && *the_hero.stuff.add(SPIRIT_HURT_ITEM) == 0))
-        {
+        let hero_weapon = (*actor(HERO as i32)).weapon;
+        let has_spirit_item = *the_hero.stuff.add(SPIRIT_HURT_ITEM) != 0;
+        if too_weak_to_hurt((*target).race, hero_weapon, has_spirit_item) {
             speak(MESSAGE_NEEDS_WEAPON);
             return;
         }
         if RACE_UNHITTABLE.contains(&(*target).race) {
             return;
         }
-        (*target).vitality = ((*target).vitality - wt).max(0);
+        (*target).vitality = vitality_after_hit((*target).vitality, wt);
         match (i, j) {
             (-1, _) => play_effect(EFFECT_ARROW_HIT, 500 + rand64()),
             (-2, _) => play_effect(EFFECT_ROCK_HIT, 3200 + bitrand(511)),
@@ -141,6 +139,18 @@ pub fn hit_actor(i: i32, j: i32, fc: i32, wt: i16) {
         }
         check_death(j, WORLD_DEAD_CHECK);
     }
+}
+
+/// Spirits can only be hurt by a real weapon (`MIN_HURT_WEAPON` or better); the ghost keeper too,
+/// unless the hero carries the item that makes him vulnerable.
+fn too_weak_to_hurt(race: u8, hero_weapon: i8, has_spirit_item: bool) -> bool {
+    hero_weapon < MIN_HURT_WEAPON
+        && (race == RACE_SPIRIT || (race == RACE_GHOST_KEEPER && !has_spirit_item))
+}
+
+/// A hit of strength `wt` takes that much vitality, down to a minimum of 0.
+fn vitality_after_hit(vitality: i16, wt: i16) -> i16 {
+    (vitality - wt).max(0)
 }
 
 /// After a fight: reports how many foes were defeated or fled, or "Bravely done!" if the hero is
@@ -472,7 +482,7 @@ const REWARD_GOLD: i16 = 100;
 pub fn rescue_princess() {
     unsafe {
         map_message();
-        SetFont(current_rastport, story_font);
+        SetFont(the_screen.current_rastport, story_font);
         let line = princess as i32 * 3;
         placard_text(8 + line);
         name();
@@ -481,11 +491,11 @@ pub fn rescue_princess() {
         placard_text(10 + line);
         draw_placard_border();
         Delay(RESCUE_PAUSE);
-        SetAPen(current_rastport, 0);
+        SetAPen(the_screen.current_rastport, 0);
         let (x0, y0, x1, y1) = PLACARD_AREA;
-        RectFill(current_rastport, x0, y0, x1, y1);
+        RectFill(the_screen.current_rastport, x0, y0, x1, y1);
         Delay(CLEAR_PAUSE);
-        SetAPen(current_rastport, PLACARD_PEN);
+        SetAPen(the_screen.current_rastport, PLACARD_PEN);
         placard_text(17);
         name();
         placard_text(18);
@@ -539,6 +549,29 @@ pub fn pick_encounter_spot() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn spirits_need_a_real_weapon() {
+        assert!(too_weak_to_hurt(RACE_SPIRIT, MIN_HURT_WEAPON - 1, true));
+        assert!(!too_weak_to_hurt(RACE_SPIRIT, MIN_HURT_WEAPON, false));
+    }
+
+    #[test]
+    fn the_ghost_keeper_is_hurt_by_weak_weapons_only_with_the_item() {
+        assert!(too_weak_to_hurt(RACE_GHOST_KEEPER, 0, false));
+        assert!(!too_weak_to_hurt(RACE_GHOST_KEEPER, 0, true));
+    }
+
+    #[test]
+    fn ordinary_foes_are_always_hurt() {
+        assert!(!too_weak_to_hurt(0, 0, false));
+    }
+
+    #[test]
+    fn a_hit_never_takes_vitality_below_zero() {
+        assert_eq!(vitality_after_hit(10, 4), 6);
+        assert_eq!(vitality_after_hit(3, 9), 0);
+    }
 
     #[test]
     fn struct_sizes() {

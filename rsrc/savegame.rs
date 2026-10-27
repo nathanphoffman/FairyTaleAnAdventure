@@ -12,17 +12,12 @@
 
 use super::asm_text::queue_print;
 use super::game_tables::{brother_stats, extent_list};
-use super::globals::{
-    active_carrier, actors_loading, carrier_slot, cheat_enabled, current_menu, current_rastport,
-    julstuff, kevstuff, loaded_actor_file, loaded_setfig_file, pad1, pad2, pad3, panel_font,
-    philstuff, princess, raft_nearness, safe_r, safe_x, safe_y, story_font, turtle_nearness,
-    view_status,
-};
+use super::globals::{pad1, pad2, pad3, panel_font, princess, story_font};
 use super::input::take_new_disk;
 use super::loading::load_start_sprites;
 use super::menus::update_menu_availability;
 use super::messages::print;
-use super::state::{the_actors, the_encounter, the_hero, the_world};
+use super::state::{the_actors, the_encounter, the_hero, the_screen, the_ui, the_world};
 use super::tables::{dstobs, glbobs, mapobs, ob_listg, ob_table};
 use super::types::{Extent, Missile, Shape, WorldObject};
 use crate::amiga::{BPTR, RastPort, TextFont};
@@ -161,7 +156,7 @@ unsafe fn save_all() {
 pub fn savegame(chosen_entry: i16) {
     unsafe {
         SVERR = 0;
-        SetFont(current_rastport, panel_font);
+        SetFont(the_screen.current_rastport, panel_font);
 
         let mut on_floppy = true;
         let name_offset = loop {
@@ -175,7 +170,7 @@ pub fn savegame(chosen_entry: i16) {
                     print(c"Insert a writable disk in ANY drive.".as_ptr());
                     if wait_for_disk() == 0 {
                         print(c"Aborted.".as_ptr());
-                        SetFont(current_rastport, story_font);
+                        SetFont(the_screen.current_rastport, story_font);
                         return;
                     }
                 }
@@ -210,7 +205,7 @@ pub fn savegame(chosen_entry: i16) {
         if is_saving == 0 {
             reset_after_load();
         }
-        SetFont(current_rastport, story_font);
+        SetFont(the_screen.current_rastport, story_font);
     }
 }
 
@@ -236,14 +231,14 @@ unsafe fn reset_after_load() {
         the_encounter.number = 0;
         load_start_sprites();
         update_menu_availability();
-        view_status = VIEW_CORRUPT;
+        the_screen.view_status = VIEW_CORRUPT;
         queue_print(PRINT_VITALITY);
         queue_print(PRINT_STATS);
         print(c"".as_ptr());
         print(c"".as_ptr());
         print(c"".as_ptr());
         the_encounter.kind = 0;
-        actors_loading = 0;
+        the_actors.loading = 0;
     }
 }
 
@@ -291,17 +286,17 @@ fn save_variables() {
             &raw mut the_world.map_y,
             &raw mut the_hero.x,
             &raw mut the_hero.y,
-            &raw mut safe_x,
-            &raw mut safe_y,
-            &raw mut safe_r,
+            &raw mut the_hero.safe_x,
+            &raw mut the_hero.safe_y,
+            &raw mut the_hero.safe_r,
             &raw mut the_world.tile_x,
             &raw mut the_world.tile_y,
-            (&raw mut cheat_enabled).cast(),
+            (&raw mut the_ui.cheat_enabled).cast(),
             (&raw mut the_hero.riding).cast(),
             (&raw mut the_hero.flying).cast(),
-            (&raw mut carrier_slot).cast(),
-            (&raw mut turtle_nearness).cast(),
-            (&raw mut raft_nearness).cast(),
+            (&raw mut the_actors.carrier_slot).cast(),
+            (&raw mut the_actors.turtle_nearness).cast(),
+            (&raw mut the_actors.raft_nearness).cast(),
             (&raw mut the_hero.brave).cast(),
             (&raw mut the_hero.luck).cast(),
             (&raw mut the_hero.kindness).cast(),
@@ -314,15 +309,15 @@ fn save_variables() {
             &raw mut the_hero.place,
             &raw mut the_world.day_clock,
             &raw mut the_world.light_level,
-            (&raw mut loaded_actor_file).cast(),
-            (&raw mut loaded_setfig_file).cast(),
-            (&raw mut active_carrier).cast(),
+            (&raw mut the_actors.loaded_actor_file).cast(),
+            (&raw mut the_actors.loaded_setfig_file).cast(),
+            (&raw mut the_actors.active_carrier).cast(),
             &raw mut the_world.extent_type,
             (&raw mut the_actors.leader).cast(),
             (&raw mut the_world.secret_timer).cast(),
             (&raw mut the_world.light_timer).cast(),
             (&raw mut the_world.freeze_timer).cast(),
-            (&raw mut current_menu).cast(),
+            (&raw mut the_ui.current_menu).cast(),
             (&raw mut the_encounter.kind).cast(),
             &raw mut pad1,
             &raw mut pad2,
@@ -413,9 +408,9 @@ const STUFF_SIZE: i32 = 35;
 /// elsewhere). After loading, `stuff` points at the current brother's list.
 pub fn transfer_brothers_and_missiles() {
     unsafe {
-        transfer_bytes((&raw mut julstuff).cast(), STUFF_SIZE);
-        transfer_bytes((&raw mut philstuff).cast(), STUFF_SIZE);
-        transfer_bytes((&raw mut kevstuff).cast(), STUFF_SIZE);
+        transfer_bytes((&raw mut the_hero.julstuff).cast(), STUFF_SIZE);
+        transfer_bytes((&raw mut the_hero.philstuff).cast(), STUFF_SIZE);
+        transfer_bytes((&raw mut the_hero.kevstuff).cast(), STUFF_SIZE);
         the_hero.stuff = brother_stats[the_hero.brother as usize - 1].stuff;
         for i in 0..6 {
             transfer_missile((&raw mut the_actors.missiles).cast::<Missile>().add(i));

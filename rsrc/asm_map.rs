@@ -13,8 +13,8 @@
 //! visible area, and `draw_map`, `draw_map_column`, `draw_map_row` copy the tile graphics to the screen.
 //! `scroll_map` shifts the picture by one tile so only a new edge has to be drawn.
 
-use super::globals::{image_mem, map_mem, planes, sector_mem, secx, secy, terrain_mem};
-use super::state::{the_hero, the_world};
+use super::globals::{secx, secy};
+use super::state::{the_hero, the_memory, the_screen, the_world};
 use super::tables::minimap;
 
 /// One bitplane of 256 tiles, 64 bytes per tile.
@@ -52,7 +52,7 @@ fn clamp_secy(v: i16) -> u16 {
 /// The sector number for a sector column and row of the region map.
 unsafe fn sector_at(col: u16, row: u16) -> u8 {
     unsafe {
-        *map_mem.add(
+        *the_memory.map_mem.add(
             (row as usize * MAP_ROW_BYTES + col as usize + the_world.origin_x as usize) as u16
                 as usize,
         )
@@ -81,13 +81,13 @@ pub fn terrain_at(x: i32, y: i32) -> i32 {
         let col = wrap_secx((imx >> 4).wrapping_sub(the_world.origin_x));
         let row = clamp_secy((imy >> 3).wrapping_sub(the_world.origin_y) as i16);
         let sec = sector_at(col, row) as usize;
-        let tile = *sector_mem.add(
+        let tile = *the_memory.sector_mem.add(
             (sec * SECTOR_BYTES + (imy as usize & 7) * 16 + (imx as usize & 15)) as u16 as usize,
         ) as usize;
-        if *terrain_mem.add(tile * 4 + 2) & bit == 0 {
+        if *the_memory.terrain_mem.add(tile * 4 + 2) & bit == 0 {
             return 0;
         }
-        (*terrain_mem.add(tile * 4 + 1) >> 4) as i32
+        (*the_memory.terrain_mem.add(tile * 4 + 1) >> 4) as i32
     }
 }
 
@@ -116,7 +116,8 @@ pub fn tile_address(imx: i32, imy: i32) -> *const u8 {
             row = if row & 16 != 0 { 0 } else { 31 };
         }
         let sec = sector_at(col, row) as usize;
-        sector_mem
+        the_memory
+            .sector_mem
             .add((sec * SECTOR_BYTES + (uy as usize & 7) * 16 + (ux as usize & 15)) as u16 as usize)
     }
 }
@@ -134,10 +135,11 @@ pub fn fill_minimap(tile_x: i32, tile_y: i32) {
             for j in 0..SCREEN_ROWS as i32 {
                 let y = (tile_y + j) as u16 & 0x7fff;
                 let row = clamp_secy((y >> 3).wrapping_sub(the_world.origin_y) as i16);
-                let sec = *map_mem
+                let sec = *the_memory
+                    .map_mem
                     .add(((row as usize) << 7).wrapping_add(col as usize) as u16 as usize)
                     as usize;
-                let tile = *sector_mem.add(
+                let tile = *the_memory.sector_mem.add(
                     (sec * SECTOR_BYTES + (y as usize & 7) * 16 + (x as usize & 15)) as u16
                         as usize,
                 );
@@ -149,7 +151,9 @@ pub fn fill_minimap(tile_x: i32, tile_y: i32) {
         // the assembly read the high byte of hero_x and hero_y (68000 is big-endian)
         let hx = (the_hero.x >> 8) as i32;
         let hy = ((the_hero.y >> 8).wrapping_sub(the_world.origin_y)) as i16 as i32;
-        let mut sec = *map_mem.add(((hy << 7).wrapping_add(hx)) as u16 as usize) as i32;
+        let mut sec = *the_memory
+            .map_mem
+            .add(((hy << 7).wrapping_add(hx)) as u16 as usize) as i32;
         if the_world.region & 0xff > 7 {
             sec += 256;
         }
@@ -275,10 +279,11 @@ pub fn page_turn_inset(x: i32) -> i32 {
 unsafe fn draw_tile(tile: i32, dst: usize) {
     unsafe {
         for p in 0..PLANE_COUNT {
-            let mut src = image_mem
+            let mut src = the_memory
+                .image_mem
                 .add(p * IMAGE_PLANE_SIZE)
                 .offset(tile as isize * TILE_BYTES as isize);
-            let mut d = (*planes.add(p)).add(dst);
+            let mut d = (*the_screen.planes.add(p)).add(dst);
             for _ in 0..TILE_LINES {
                 *d = *src;
                 *d.add(1) = *src.add(1);
@@ -371,7 +376,7 @@ pub fn scroll_map(dir: i32) {
     let m = &SCROLL_MODES[dir as usize & 7];
     unsafe {
         for p in 0..PLANE_COUNT {
-            let plane = *planes.add(p);
+            let plane = *the_screen.planes.add(p);
             for i in 0..m.lines {
                 // copy bottom-up when moving down so rows are not overwritten before being read
                 let line = if m.dst_line > m.src_line {
@@ -436,19 +441,20 @@ pub fn draw_overview_map(mx: i32, my: i32) {
             for i in 0..OVERVIEW_COLUMNS {
                 let index =
                     the_world.origin_x as i32 + x as i32 + i as i32 + (((y + j) as i32) << 7);
-                let sec = *map_mem.add(index as u16 as usize) as usize;
-                let tiles = sector_mem.add(sec * SECTOR_BYTES);
+                let sec = *the_memory.map_mem.add(index as u16 as usize) as usize;
+                let tiles = the_memory.sector_mem.add(sec * SECTOR_BYTES);
                 for line in 0..SECTOR_TILE_ROWS {
                     let mut words = [0u32; PLANE_COUNT];
                     for px in 0..SECTOR_PIXELS {
                         let tile = *tiles.add(line * 16 + px) as usize;
-                        let color = *terrain_mem.add(tile * 4 + 3);
+                        let color = *the_memory.terrain_mem.add(tile * 4 + 3);
                         for (p, word) in words.iter_mut().enumerate() {
                             *word = (*word << 1) | ((color >> p) & 1) as u32;
                         }
                     }
                     for (p, word) in words.iter().enumerate() {
-                        let d = (*planes.add(p)).add(offset + line * OVERVIEW_LINE_BYTES);
+                        let d =
+                            (*the_screen.planes.add(p)).add(offset + line * OVERVIEW_LINE_BYTES);
                         *d = (word >> 8) as u8;
                         *d.add(OVERVIEW_LINE_COPY) = (word >> 8) as u8;
                         *d.add(1) = *word as u8;

@@ -4,8 +4,7 @@
 //! or just walking by day or night. `track` holds the four voices of each tune in order.
 
 use super::game_tables::{instrument_waves, menus};
-use super::globals::{battle_flag, track};
-use super::state::{the_actors, the_hero, the_world};
+use super::state::{the_actors, the_hero, the_memory, the_world};
 
 unsafe extern "C" {
     fn playscore(t1: *const u8, t2: *const u8, t3: *const u8, t4: *const u8);
@@ -49,7 +48,7 @@ pub fn set_mood(now: i8) {
             && the_hero.y < ASTRAL_Y.1
         {
             TUNE_ASTRAL
-        } else if battle_flag != 0 {
+        } else if the_actors.battle_flag != 0 {
             TUNE_BATTLE
         } else if the_world.region > INDOOR_REGION {
             let wave = (&raw mut instrument_waves).cast::<i16>().add(WAVE_SLOT);
@@ -68,9 +67,19 @@ pub fn set_mood(now: i8) {
 
         if menus[GAME_MENU].enabled[MUSIC_ENTRY] & 1 != 0 {
             if now != 0 {
-                playscore(track[at], track[at + 1], track[at + 2], track[at + 3]);
+                playscore(
+                    the_memory.track[at],
+                    the_memory.track[at + 1],
+                    the_memory.track[at + 2],
+                    the_memory.track[at + 3],
+                );
             } else {
-                setscore(track[at], track[at + 1], track[at + 2], track[at + 3]);
+                setscore(
+                    the_memory.track[at],
+                    the_memory.track[at + 1],
+                    the_memory.track[at + 2],
+                    the_memory.track[at + 3],
+                );
             }
         } else {
             stopscore();

@@ -5,7 +5,6 @@
 use super::actors::turtle_eggs;
 use super::actors::{report_battle_result, run_tactic};
 use super::asm_text::{queue_print, steer_actor};
-use super::globals::{actors_on_screen, battle_flag, good_fairy_timer};
 use super::mood::set_mood;
 use super::random::{bitrand, rand2, rand4};
 use super::state::{the_actors, the_hero, the_world};
@@ -72,22 +71,22 @@ const PRQ_VITALITY: i32 = 7;
 /// Decides each enemy's goal and tactic, and starts or ends the battle mood.
 pub fn update_enemy_goals() {
     unsafe {
-        actors_on_screen = 0;
+        the_actors.on_screen = 0;
         the_actors.leader = 0;
-        let battle2 = battle_flag;
-        battle_flag = 0;
+        let battle2 = the_actors.battle_flag;
+        the_actors.battle_flag = 0;
         let mut i = FIRST_AI_ACTOR;
         while i < the_actors.active as usize {
-            if good_fairy_timer != 0 && good_fairy_timer < FAIRY_ARRIVES {
+            if the_hero.good_fairy_timer != 0 && the_hero.good_fairy_timer < FAIRY_ARRIVES {
                 break;
             }
             think(i, battle2);
             i += 1;
         }
-        if battle2 == 0 && battle_flag != 0 {
+        if battle2 == 0 && the_actors.battle_flag != 0 {
             set_mood(1);
         }
-        if battle_flag == 0 && battle2 != 0 {
+        if the_actors.battle_flag == 0 && battle2 != 0 {
             queue_print(PRQ_VITALITY);
             queue_print(PRQ_STATS);
             report_battle_result();
@@ -120,12 +119,12 @@ unsafe fn think(i: usize, battle2: i8) {
         let yd = ((*an).abs_y as i32 - the_hero.y as i32) as i16;
         let (xd, yd) = (xd.wrapping_abs(), yd.wrapping_abs());
         if xd < SCREEN_RANGE && yd < SCREEN_RANGE {
-            actors_on_screen = 1;
+            the_actors.on_screen = 1;
             if (*an).vitality < 1 {
                 return;
             }
             if (*an).visible != 0 || battle2 != 0 {
-                battle_flag = 1;
+                the_actors.battle_flag = 1;
             }
         }
         let mut r = bitrand(15) == 0;
@@ -187,29 +186,57 @@ unsafe fn adjust_mode_for_situation(an: *mut Shape, mode: i16) -> i16 {
 }
 
 /// A hostile enemy picks a new tactic. May also change its mode to wandering if it has no weapon.
-unsafe fn choose_tactic(an: *mut Shape, mut mode: i16, xd: i16, yd: i16) -> (i16, i16) {
+unsafe fn choose_tactic(an: *mut Shape, mode: i16, xd: i16, yd: i16) -> (i16, i16) {
     unsafe {
-        let tactic;
-        if (*an).race == SPIDER_EGGS_RACE && turtle_eggs != 0 {
-            tactic = EGG_SEEK;
-        } else if (*an).weapon < 1 {
-            mode = CONFUSED;
-            tactic = RANDOM;
-        } else if (*an).vitality < WEAK && rand2() != 0 {
-            tactic = EVADE;
-        } else if mode >= ARCHER1 {
-            tactic = if xd < ARCHER_TOO_CLOSE.0 && yd < ARCHER_TOO_CLOSE.1 {
-                BACKUP as i16
-            } else if xd < ARCHER_IN_RANGE && yd < ARCHER_IN_RANGE {
-                SHOOT
-            } else {
-                PURSUE
-            };
-        } else {
-            tactic = PURSUE;
-        }
-        (mode, tactic)
+        let facts = TacticFacts {
+            race: (*an).race,
+            weapon: (*an).weapon,
+            vitality: (*an).vitality,
+            eggs_to_guard: turtle_eggs != 0,
+        };
+        pick_tactic(&facts, mode, xd, yd, || rand2() != 0)
     }
+}
+
+/// What `pick_tactic` needs to know about the enemy.
+struct TacticFacts {
+    race: u8,
+    weapon: i8,
+    vitality: i16,
+    /// The turtle's eggs are lying around.
+    eggs_to_guard: bool,
+}
+
+/// The tactic for an enemy in `mode`, `xd` and `yd` pixels (absolute) from the hero: seek the
+/// eggs, wander if unarmed (which also changes the mode), evade when weak (`coin` decides, and is
+/// only asked then), keep an archer at a distance and shoot, or just pursue.
+fn pick_tactic(
+    enemy: &TacticFacts,
+    mut mode: i16,
+    xd: i16,
+    yd: i16,
+    coin: impl FnOnce() -> bool,
+) -> (i16, i16) {
+    let tactic;
+    if enemy.race == SPIDER_EGGS_RACE && enemy.eggs_to_guard {
+        tactic = EGG_SEEK;
+    } else if enemy.weapon < 1 {
+        mode = CONFUSED;
+        tactic = RANDOM;
+    } else if enemy.vitality < WEAK && coin() {
+        tactic = EVADE;
+    } else if mode >= ARCHER1 {
+        tactic = if xd < ARCHER_TOO_CLOSE.0 && yd < ARCHER_TOO_CLOSE.1 {
+            BACKUP as i16
+        } else if xd < ARCHER_IN_RANGE && yd < ARCHER_IN_RANGE {
+            SHOOT
+        } else {
+            PURSUE
+        };
+    } else {
+        tactic = PURSUE;
+    }
+    (mode, tactic)
 }
 
 /// A hostile enemy strikes if close enough, otherwise acts on its tactic.
@@ -230,5 +257,90 @@ unsafe fn hostile_action(i: usize, an: *mut Shape, mode: i16, tactic: i16, xd: i
         } else {
             run_tactic(i as i32, tactic as i32);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The mode of an ordinary melee enemy (below the archers).
+    const ATTACK_MODE: i16 = 1;
+
+    fn enemy(weapon: i8, vitality: i16) -> TacticFacts {
+        TacticFacts {
+            race: 0,
+            weapon,
+            vitality,
+            eggs_to_guard: false,
+        }
+    }
+
+    #[test]
+    fn unarmed_enemy_wanders_aimlessly() {
+        assert_eq!(
+            pick_tactic(&enemy(0, 20), ATTACK_MODE, 0, 0, || false),
+            (CONFUSED, RANDOM)
+        );
+    }
+
+    #[test]
+    fn healthy_swordsman_pursues() {
+        assert_eq!(
+            pick_tactic(&enemy(1, 20), ATTACK_MODE, 0, 0, || true),
+            (ATTACK_MODE, PURSUE)
+        );
+    }
+
+    #[test]
+    fn weak_enemy_evades_only_when_the_coin_says_so() {
+        assert_eq!(
+            pick_tactic(&enemy(1, WEAK - 1), ATTACK_MODE, 0, 0, || true).1,
+            EVADE
+        );
+        assert_eq!(
+            pick_tactic(&enemy(1, WEAK - 1), ATTACK_MODE, 0, 0, || false).1,
+            PURSUE
+        );
+    }
+
+    #[test]
+    fn strong_enemy_never_flips_the_coin() {
+        pick_tactic(&enemy(1, WEAK), ATTACK_MODE, 0, 0, || {
+            panic!("coin flipped")
+        });
+    }
+
+    #[test]
+    fn archer_backs_off_when_close_shoots_in_range_and_otherwise_closes_in() {
+        let archer = enemy(BOW_BIT, 20);
+        let (close_x, close_y) = (ARCHER_TOO_CLOSE.0 - 1, ARCHER_TOO_CLOSE.1 - 1);
+        assert_eq!(
+            pick_tactic(&archer, ARCHER1, close_x, close_y, || false).1,
+            BACKUP as i16
+        );
+        let mid = ARCHER_IN_RANGE - 1;
+        assert_eq!(
+            pick_tactic(&archer, ARCHER1, ARCHER_TOO_CLOSE.0, mid, || false).1,
+            SHOOT
+        );
+        assert_eq!(
+            pick_tactic(&archer, ARCHER1, ARCHER_IN_RANGE, ARCHER_IN_RANGE, || false).1,
+            PURSUE
+        );
+    }
+
+    #[test]
+    fn spider_guards_the_eggs_while_the_turtle_has_them() {
+        let spider = TacticFacts {
+            race: SPIDER_EGGS_RACE,
+            weapon: 1,
+            vitality: 20,
+            eggs_to_guard: true,
+        };
+        assert_eq!(
+            pick_tactic(&spider, ATTACK_MODE, 0, 0, || false).1,
+            EGG_SEEK
+        );
     }
 }

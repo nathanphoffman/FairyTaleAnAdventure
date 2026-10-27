@@ -8,20 +8,16 @@ use super::asm_map::move_camera_to;
 use super::asm_text::{draw_placard_border, placard_text, queue_print, show_event};
 use super::display::reset_input;
 use super::game_tables::brother_stats;
-use super::globals::{
-    actors_loading, actors_on_screen, battle_flag, current_rastport, drawing_page, fiery_death,
-    good_fairy_timer, loaded_actor_file, loaded_setfig_file, panel_font, quit_requested, rp_map,
-    rp_text, safe_r, safe_x, safe_y, story_font, view_status, viewing_page,
-};
+use super::globals::{panel_font, story_font};
 use super::loading::load_start_sprites;
 use super::menus::update_menu_availability;
 use super::messages::print_cont;
 use super::mood::set_mood;
 use super::regions::load_region_now;
 use super::screen_fx::{fade_down, map_message, message_off};
-use super::state::{the_actors, the_hero, the_world};
+use super::state::{Hero, the_actors, the_hero, the_screen, the_ui, the_world};
 use super::tables::{ob_list8, ob_listg};
-use super::types::Shape;
+use super::types::{Bro, Shape};
 use crate::amiga::{RastPort, TextFont};
 
 unsafe extern "C" {
@@ -99,8 +95,8 @@ pub fn revive(new: i16) {
         (*hero).goal = USER; // yes, we can usurp control from the user
 
         reset_input();
-        battle_flag = 0;
-        good_fairy_timer = 0;
+        the_actors.battle_flag = 0;
+        the_hero.good_fairy_timer = 0;
         the_actors.next_missile = 0;
         if new != 0 {
             stopscore();
@@ -115,13 +111,13 @@ pub fn revive(new: i16) {
         put_hero_at_safe_spot(hero);
         restore_hero(hero);
         if the_hero.brother > 3 {
-            view_status = VIEW_GAME_OVER;
+            the_screen.view_status = VIEW_GAME_OVER;
         } else {
-            view_status = VIEW_FADE_IN;
+            the_screen.view_status = VIEW_FADE_IN;
             set_mood(1);
         }
         the_world.extent_type = 0;
-        fiery_death = 0;
+        the_actors.fiery_death = 0;
     }
 }
 
@@ -162,31 +158,41 @@ unsafe fn leave_fallen_brother() {
 /// safe spot.
 unsafe fn take_over_next_brother(hero: *mut Shape) {
     unsafe {
-        let next = &brother_stats[the_hero.brother as usize];
-        the_hero.brave = next.brave as i16;
-        the_hero.luck = next.luck as i16;
-        the_hero.kindness = next.kind as i16;
-        the_hero.wealth = next.wealth as i16;
-        the_hero.stuff = next.stuff;
-        the_hero.brother += 1;
-
-        for slot in 0..GOLDBASE {
-            *the_hero.stuff.add(slot) = 0; // has no stuff
-        }
-        *the_hero.stuff = 1; // okay, a dirk, then
-        (*hero).weapon = 1;
+        start_next_brother(
+            &mut *(&raw mut the_hero),
+            &mut *hero,
+            &brother_stats[the_hero.brother as usize],
+        );
 
         the_world.secret_timer = 0;
         the_world.light_timer = 0;
         the_world.freeze_timer = 0;
-        safe_x = FIRST_SAFE_SPOT.0;
-        safe_y = FIRST_SAFE_SPOT.1;
-        safe_r = FIRST_REGION;
+        the_hero.safe_x = FIRST_SAFE_SPOT.0;
+        the_hero.safe_y = FIRST_SAFE_SPOT.1;
+        the_hero.safe_r = FIRST_REGION;
         the_world.region = FIRST_REGION;
-        move_camera_to(safe_x as i32, safe_y as i32);
-        view_status = VIEW_REDRAW;
-        actors_on_screen = 1;
-        actors_loading = 0;
+        move_camera_to(the_hero.safe_x as i32, the_hero.safe_y as i32);
+        the_screen.view_status = VIEW_REDRAW;
+        the_actors.on_screen = 1;
+        the_actors.loading = 0;
+    }
+}
+
+/// The next brother takes over: his starting stats, an empty pack except for a dirk (inventory
+/// slot 0, which he also holds), and he counts as the next brother.
+unsafe fn start_next_brother(hero: &mut Hero, body: &mut Shape, next: &Bro) {
+    unsafe {
+        hero.brave = next.brave as i16;
+        hero.luck = next.luck as i16;
+        hero.kindness = next.kind as i16;
+        hero.wealth = next.wealth as i16;
+        hero.stuff = next.stuff;
+        hero.brother += 1;
+        for slot in 0..GOLDBASE {
+            *hero.stuff.add(slot) = 0; // has no stuff
+        }
+        *hero.stuff = 1; // okay, a dirk, then
+        body.weapon = 1;
     }
 }
 
@@ -194,12 +200,12 @@ unsafe fn take_over_next_brother(hero: *mut Shape) {
 unsafe fn show_brother_placards() {
     unsafe {
         map_message();
-        SetFont(current_rastport, story_font);
+        SetFont(the_screen.current_rastport, story_font);
         if the_hero.brother == 1 {
             placard_text(0);
-            rp_map.BitMap = (*(*drawing_page).ri_page).BitMap;
-            SetRast(&raw mut rp_map, PEN_BLACK);
-            rp_map.BitMap = (*(*viewing_page).ri_page).BitMap;
+            the_screen.rp_map.BitMap = (*(*the_screen.drawing_page).ri_page).BitMap;
+            SetRast(&raw mut the_screen.rp_map, PEN_BLACK);
+            the_screen.rp_map.BitMap = (*(*the_screen.viewing_page).ri_page).BitMap;
         } else if the_hero.brother == 2 {
             placard_text(1);
         } else if the_hero.brother == 3 {
@@ -212,14 +218,20 @@ unsafe fn show_brother_placards() {
         Delay(SHOW_PLACARD);
 
         if the_hero.brother > LAST_BROTHER {
-            quit_requested = 1;
+            the_ui.quit_requested = 1;
             Delay(GAME_OVER_PAUSE);
         } else if the_hero.brother > 1 {
             Delay(SHORT_PAUSE);
-            SetAPen(current_rastport, PEN_BLACK);
-            RectFill(current_rastport, PANEL.0, PANEL.1, PANEL.2, PANEL.3);
+            SetAPen(the_screen.current_rastport, PEN_BLACK);
+            RectFill(
+                the_screen.current_rastport,
+                PANEL.0,
+                PANEL.1,
+                PANEL.2,
+                PANEL.3,
+            );
             Delay(TINY_PAUSE);
-            SetAPen(current_rastport, PEN_TEXT);
+            SetAPen(the_screen.current_rastport, PEN_TEXT);
             placard_text(if the_hero.brother == 2 { 2 } else { 4 });
             Delay(SHOW_PLACARD);
         }
@@ -229,11 +241,11 @@ unsafe fn show_brother_placards() {
 /// Loads the brother's sprites and tells where the story starts.
 unsafe fn announce_brother() {
     unsafe {
-        SetFont(current_rastport, panel_font);
-        current_rastport = &raw mut rp_text;
+        SetFont(the_screen.current_rastport, panel_font);
+        the_screen.current_rastport = &raw mut the_screen.rp_text;
 
-        loaded_actor_file = HERO_SPRITE_FILE;
-        loaded_setfig_file = HERO_SET_FILE;
+        the_actors.loaded_actor_file = HERO_SPRITE_FILE;
+        the_actors.loaded_setfig_file = HERO_SET_FILE;
         load_start_sprites();
 
         if the_hero.brother < 4 {
@@ -254,13 +266,13 @@ unsafe fn announce_brother() {
 /// The hero (re)appears at the last safe spot, and the region there is loaded.
 unsafe fn put_hero_at_safe_spot(hero: *mut Shape) {
     unsafe {
-        the_hero.x = safe_x;
-        (*hero).abs_x = safe_x;
-        the_hero.y = safe_y;
-        (*hero).abs_y = safe_y;
+        the_hero.x = the_hero.safe_x;
+        (*hero).abs_x = the_hero.safe_x;
+        the_hero.y = the_hero.safe_y;
+        (*hero).abs_y = the_hero.safe_y;
         the_world.map_x = the_hero.x.wrapping_sub(CAMERA_OFFSET.0);
         the_world.map_y = the_hero.y.wrapping_sub(CAMERA_OFFSET.1);
-        the_world.new_region = safe_r;
+        the_world.new_region = the_hero.safe_r;
         load_region_now();
     }
 }
@@ -280,5 +292,35 @@ unsafe fn restore_hero(hero: *mut Shape) {
         update_menu_availability();
         queue_print(PRQ_VITALITY);
         queue_print(PRQ_STATS);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn next_brother_starts_with_his_own_stats_and_only_a_dirk() {
+        let mut pack = [7u8; 64];
+        let next = Bro {
+            brave: 20,
+            luck: 35,
+            kind: 15,
+            wealth: 15,
+            stuff: pack.as_mut_ptr(),
+        };
+        let mut hero: Hero = unsafe { std::mem::zeroed() };
+        hero.brother = 1;
+        let mut body: Shape = unsafe { std::mem::zeroed() };
+        unsafe { start_next_brother(&mut hero, &mut body, &next) };
+        assert_eq!(
+            (hero.brave, hero.luck, hero.kindness, hero.wealth),
+            (20, 35, 15, 15)
+        );
+        assert_eq!(hero.brother, 2);
+        assert_eq!(body.weapon, 1);
+        assert_eq!(pack[0], 1);
+        assert!(pack[1..GOLDBASE].iter().all(|&n| n == 0));
+        assert_eq!(pack[GOLDBASE], 7); // what is past the item slots is left alone
     }
 }

@@ -12,10 +12,6 @@
 use super::asm_blit::make_sprite_masks;
 use super::display::flip_pages;
 use super::game_tables::menus;
-use super::globals::{
-    drawing_page, loaded_actor_file, loaded_setfig_file, nextshape, pagea, pageb, sample,
-    sample_mem, sample_size, scoremem, seq_list, shape_mem, track,
-};
 use super::hdrive::{
     is_last_read_pending, last_read_finished, load_track_range, mark_read_unused, motor_off,
     wait_for_read,
@@ -23,7 +19,7 @@ use super::hdrive::{
 use super::iffsubs::load_picture;
 use super::input::next_key;
 use super::regions::{load_region_now, load_region_piece};
-use super::state::{the_hero, the_world};
+use super::state::{the_actors, the_hero, the_memory, the_screen, the_world};
 use super::types::SeqInfo;
 use crate::amiga::{BPTR, BitMap};
 use std::ffi::c_char;
@@ -140,17 +136,17 @@ const RAFT_FILE: i32 = 4;
 /// current monsters and set figures, then the region.
 pub fn load_start_sprites() {
     unsafe {
-        nextshape = shape_mem;
+        the_memory.nextshape = the_memory.shape_mem;
         load_sprite_file(OBJECTS_FILE);
         finish_sprite_load(OBJECTS as i16);
         load_sprite_file(the_hero.brother as i32 - 1);
         finish_sprite_load(PHIL as i16);
         load_sprite_file(RAFT_FILE);
         finish_sprite_load(RAFT as i16);
-        sequence(ENEMY).location = nextshape;
-        load_sprite_file(loaded_actor_file as i32);
-        finish_sprite_load(sprite_files[loaded_actor_file as usize].seq_num as i16);
-        load_sprite_file(loaded_setfig_file as i32);
+        sequence(ENEMY).location = the_memory.nextshape;
+        load_sprite_file(the_actors.loaded_actor_file as i32);
+        finish_sprite_load(sprite_files[the_actors.loaded_actor_file as usize].seq_num as i16);
+        load_sprite_file(the_actors.loaded_setfig_file as i32);
         finish_sprite_load(SETFIG as i16);
         the_world.new_region = the_world.region;
         load_region_now();
@@ -160,7 +156,11 @@ pub fn load_start_sprites() {
 
 /// The `seq_list` entry for a sprite slot (PHIL, OBJECTS, ENEMY ...).
 unsafe fn sequence(slot: u8) -> &'static mut SeqInfo {
-    unsafe { &mut *(&raw mut seq_list).cast::<SeqInfo>().add(slot as usize) }
+    unsafe {
+        &mut *(&raw mut the_memory.seq_list)
+            .cast::<SeqInfo>()
+            .add(slot as usize)
+    }
 }
 
 /// Starts loading sprite file `num` into the next free shape memory, if it fits.
@@ -173,20 +173,20 @@ pub fn load_sprite_file(num: i32) {
         let slot = sequence(file.seq_num);
         slot.bytes = file.height as i16 * file.width as i16 * 2;
         let size = slot.bytes as usize * file.count as usize;
-        slot.location = nextshape;
+        slot.location = the_memory.nextshape;
         slot.width = file.width as i16;
         slot.height = file.height as i16;
         slot.count = file.count as i16;
-        if nextshape.add(size * SIZE_WITH_MASK) <= shape_mem.add(SHAPE_SIZE) {
+        if the_memory.nextshape.add(size * SIZE_WITH_MASK) <= the_memory.shape_mem.add(SHAPE_SIZE) {
             load_track_range(
                 file.file_id as i16,
                 file.numblocks as i16,
-                nextshape.cast(),
+                the_memory.nextshape.cast(),
                 SPRITE_REQUEST,
             );
-            nextshape = nextshape.add(size * SIZE_WITHOUT_MASK);
-            slot.maskloc = nextshape;
-            nextshape = nextshape.add(size);
+            the_memory.nextshape = the_memory.nextshape.add(size * SIZE_WITHOUT_MASK);
+            slot.maskloc = the_memory.nextshape;
+            the_memory.nextshape = the_memory.nextshape.add(size);
         }
     }
 }
@@ -249,9 +249,13 @@ pub fn read_score() {
             if length * 2 + loaded > SCORE_MEMORY {
                 break;
             }
-            track[tracks] = scoremem.offset(loaded as isize);
+            the_memory.track[tracks] = the_memory.scoremem.offset(loaded as isize);
             tracks += 1;
-            Read(file as BPTR, scoremem.offset(loaded as isize), length * 2);
+            Read(
+                file as BPTR,
+                the_memory.scoremem.offset(loaded as isize),
+                length * 2,
+            );
             loaded += length * 2;
         }
         Close(file as BPTR);
@@ -289,10 +293,10 @@ pub fn show_story_page(br1: *const c_char, br2: *const c_char, x: i16, y: i16) {
         }
         Delay(PAGE_DELAY);
         BltBitMap(
-            &raw mut pageb,
+            &raw mut the_screen.pageb,
             0,
             0,
-            &raw mut pagea,
+            &raw mut the_screen.pagea,
             0,
             0,
             SCREEN_WIDTH,
@@ -301,8 +305,8 @@ pub fn show_story_page(br1: *const c_char, br2: *const c_char, x: i16, y: i16) {
             ALL_PLANES,
             std::ptr::null_mut(),
         );
-        load_picture(br1, &raw mut pageb, PICTURE_X, PICTURE_Y);
-        load_picture(br2, &raw mut pageb, x, y);
+        load_picture(br1, &raw mut the_screen.pageb, PICTURE_X, PICTURE_Y);
+        load_picture(br2, &raw mut the_screen.pageb, x, y);
         if intro_skipped() != 0 {
             return;
         }
@@ -362,9 +366,9 @@ unsafe fn copy_rect(
 /// the strip step, strip width and pause for each frame.
 pub fn turn_page() {
     unsafe {
-        let (a, b) = (&raw mut pagea, &raw mut pageb);
+        let (a, b) = (&raw mut the_screen.pagea, &raw mut the_screen.pageb);
         for frame in 0..FLIP_RATE.len() {
-            let temp = (*(*drawing_page).ri_page).BitMap;
+            let temp = (*(*the_screen.drawing_page).ri_page).BitMap;
             let rate = FLIP_RATE[frame];
             let wide = FLIP_WIDE[frame] as i32;
             if frame < FIRST_HALF {
@@ -507,18 +511,18 @@ pub fn read_sample() {
         load_track_range(
             SAMPLE_BLOCK,
             SAMPLE_BLOCKS,
-            sample_mem.cast(),
+            the_memory.sample_mem.cast(),
             SAMPLE_REQUEST,
         );
         wait_for_read(SAMPLE_REQUEST as i32);
         mark_read_unused(SAMPLE_REQUEST as i32);
 
-        let mut at = sample_mem;
+        let mut at = the_memory.sample_mem;
         for i in 0..SAMPLE_COUNT {
             let length = u32::from_be_bytes([*at, *at.add(1), *at.add(2), *at.add(3)]);
             at = at.add(4);
-            sample[i] = at;
-            sample_size[i] = length as u32;
+            the_memory.sample[i] = at;
+            the_memory.sample_size[i] = length as u32;
             at = at.add(length as usize);
         }
     }
@@ -529,7 +533,11 @@ pub fn play_effect(num: i16, speed: i32) {
     unsafe {
         if menus[GAME_MENU].enabled[SOUND_ENTRY] & 1 != 0 {
             let n = num as usize;
-            playsample(sample[n], (sample_size[n] / 2) as i32, speed);
+            playsample(
+                the_memory.sample[n],
+                (the_memory.sample_size[n] / 2) as i32,
+                speed,
+            );
         }
     }
 }

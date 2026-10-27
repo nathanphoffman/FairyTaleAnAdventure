@@ -9,18 +9,14 @@ use super::asm_text::{queue_print, show_event, speak};
 use super::encounters::load_enemy_sprites;
 use super::encounters::place_encounter;
 use super::game_tables::door_list;
-use super::globals::{
-    active_carrier, actors_loading, actors_on_screen, battle_flag, bm_draw, carrier_slot,
-    draw_order, drawing_page, nearest_person_distance, planes, raft_nearness, rp_map, safe_flag,
-    safe_r, safe_x, safe_y, shp, sleepwait, turtle_nearness, witch_on_screen,
-};
+use super::globals::{shp, sleepwait};
 use super::hdrive::{motor_off, read_finished};
 use super::loading::finish_sprite_load;
 use super::mood::set_mood;
 use super::places::{find_place, transfer_hero};
 use super::random::{fta_rand, rand4, rand64};
 use super::screen_fx::{day_fade, fade_page};
-use super::state::{the_actors, the_encounter, the_hero, the_world};
+use super::state::{Hero, the_actors, the_encounter, the_hero, the_screen, the_witch, the_world};
 use super::tables::{ob_list8, ob_listg, page_colors};
 use super::types::{Door, Shape};
 use super::witch::witch_fx;
@@ -56,22 +52,22 @@ const CARRIER_OFFSET: i32 = 4;
 /// bird sets the hero's environ.
 pub fn raft_proximity() {
     unsafe {
-        raft_nearness = 0;
-        turtle_nearness = 0;
-        carrier_slot = if active_carrier != 0 {
+        the_actors.raft_nearness = 0;
+        the_actors.turtle_nearness = 0;
+        the_actors.carrier_slot = if the_actors.active_carrier != 0 {
             CARRIER_SLOT
         } else {
             RAFT_SLOT
         };
-        let carrier = &raw const the_actors.list[carrier_slot as usize];
+        let carrier = &raw const the_actors.list[the_actors.carrier_slot as usize];
         let hero = &raw mut the_actors.list[0];
         let dx = ((*hero).abs_x as i32 - (*carrier).abs_x as i32 - CARRIER_OFFSET) as i16;
         let dy = ((*hero).abs_y as i32 - (*carrier).abs_y as i32 - CARRIER_OFFSET) as i16;
         if dx < NEAR && dx > -NEAR && dy < NEAR && dy > -NEAR {
-            raft_nearness = 1;
+            the_actors.raft_nearness = 1;
         }
         if dx < VERY_NEAR && dx > -VERY_NEAR && dy < VERY_NEAR && dy > -VERY_NEAR {
-            raft_nearness = 2;
+            the_actors.raft_nearness = 2;
         }
         if the_hero.riding == BIRD {
             (*hero).environ = TURTLE_ENVIRON;
@@ -268,20 +264,20 @@ unsafe fn leave_door(xtest: u16, ytest: u16) {
 /// Puts back the background under last frame's sprites, then undoes the witch effect on that page.
 pub fn undo_sprites() {
     unsafe {
-        bm_draw = (*(*drawing_page).ri_page).BitMap;
-        planes = (*bm_draw).Planes.as_mut_ptr();
+        the_screen.bm_draw = (*(*the_screen.drawing_page).ri_page).BitMap;
+        the_screen.planes = (*the_screen.bm_draw).Planes.as_mut_ptr();
 
         OwnBlitter();
-        let queue = (*drawing_page).shape_queue.cast::<SShape>();
-        for i in (1..=(*drawing_page).obcount as isize).rev() {
+        let queue = (*the_screen.drawing_page).shape_queue.cast::<SShape>();
+        for i in (1..=(*the_screen.drawing_page).obcount as isize).rev() {
             shp = queue.offset(i - 1);
             restore_background((*shp).backsave);
         }
         DisownBlitter();
 
-        rp_map.BitMap = (*(*drawing_page).ri_page).BitMap;
-        if (*drawing_page).wflag != 0 {
-            witch_fx(drawing_page);
+        the_screen.rp_map.BitMap = (*(*the_screen.drawing_page).ri_page).BitMap;
+        if (*the_screen.drawing_page).wflag != 0 {
+            witch_fx(the_screen.drawing_page);
         }
     }
 }
@@ -361,7 +357,7 @@ unsafe fn sleep_tick(hero: *mut Shape) {
             || (the_hero.fatigue < LITTLE_TIRED
                 && the_world.day_clock > DAWN.0
                 && the_world.day_clock < DAWN.1)
-            || (battle_flag != 0 && rand64() == 0)
+            || (the_actors.battle_flag != 0 && rand64() == 0)
         {
             (*hero).state = STILL;
             (*hero).abs_y &= WAKE_Y_MASK;
@@ -393,19 +389,19 @@ pub fn spawn_encounters() {
     unsafe {
         find_place(2);
 
-        if actors_loading == 1 && read_finished(DISK_REQUEST_ACTORS) != 0 {
+        if the_actors.loading == 1 && read_finished(DISK_REQUEST_ACTORS) != 0 {
             finish_sprite_load(ENEMY_SLOT);
             motor_off();
-            actors_loading = 0;
+            the_actors.loading = 0;
             the_actors.active = FIRST_ENEMY_ACTOR;
         }
-        if the_world.day_clock & 15 == 0 && the_encounter.number != 0 && actors_loading == 0 {
+        if the_world.day_clock & 15 == 0 && the_encounter.number != 0 && the_actors.loading == 0 {
             place_waiting_encounters();
         }
         if the_world.day_clock & 31 == 0
-            && actors_on_screen == 0
-            && actors_loading == 0
-            && active_carrier == 0
+            && the_actors.on_screen == 0
+            && the_actors.loading == 0
+            && the_actors.active_carrier == 0
             && the_world.extent_type < NO_RANDOM_XTYPE
         {
             the_encounter.danger_level = (if the_world.region > INDOOR_REGION {
@@ -520,23 +516,23 @@ pub fn survival_tick() {
     unsafe {
         let hero = &raw mut the_actors.list[0];
         if the_world.day_clock & SAFE_CHECK_MASK == 0
-            && actors_on_screen == 0
-            && actors_loading == 0
-            && witch_on_screen == 0
+            && the_actors.on_screen == 0
+            && the_actors.loading == 0
+            && the_witch.on_screen == 0
             && (*hero).environ == 0
-            && safe_flag == 0
+            && the_hero.safe_flag == 0
             && (*hero).state != DEAD
         {
-            safe_r = the_world.region;
-            safe_x = the_hero.x;
-            safe_y = the_hero.y;
+            the_hero.safe_r = the_world.region;
+            the_hero.safe_x = the_hero.x;
+            the_hero.safe_y = the_hero.y;
             if the_hero.hunger > 30 && *the_hero.stuff.add(FRUIT_SLOT) != 0 {
                 *the_hero.stuff.add(FRUIT_SLOT) -= 1;
                 the_hero.hunger -= FRUIT_FOOD;
                 show_event(EVENT_ATE_FRUIT);
             }
         }
-        if the_world.day_clock & 7 == 0 && battle_flag == 0 {
+        if the_world.day_clock & 7 == 0 && the_actors.battle_flag == 0 {
             set_mood(0);
         }
         if the_world.day_clock & SAFE_CHECK_MASK == 0
@@ -545,7 +541,13 @@ pub fn survival_tick() {
         {
             the_hero.hunger += 1;
             the_hero.fatigue += 1;
-            hunger_effects(hero);
+            let report = hunger_effects(&mut *(&raw mut the_hero), &mut *hero);
+            if report.redraw_stats {
+                queue_print(PRQ_STATS);
+            }
+            for event in report.events {
+                show_event(event);
+            }
             if the_hero.fatigue == TIRED_AT {
                 show_event(3);
             } else if the_hero.hunger == STARVING_AT {
@@ -555,32 +557,42 @@ pub fn survival_tick() {
     }
 }
 
-/// The messages and damage that come with hunger and fatigue.
-unsafe fn hunger_effects(hero: *mut Shape) {
-    unsafe {
-        if the_hero.hunger == HUNGRY {
-            show_event(0);
-        } else if the_hero.hunger == VERY_HUNGRY {
-            show_event(1);
-        } else if the_hero.hunger & 7 == 0 {
-            if (*hero).vitality > WEAK_VITALITY {
-                if the_hero.hunger > MUCH_HUNGER || the_hero.fatigue > MUCH_FATIGUE {
-                    (*hero).vitality -= 2;
-                    queue_print(PRQ_STATS);
-                }
-                if the_hero.hunger > STARVING_AT {
-                    show_event(2);
-                }
-            } else if the_hero.fatigue > COLLAPSE_FATIGUE {
-                show_event(12);
-                (*hero).state = SLEEP;
-            } else if the_hero.hunger > FAINT_HUNGER {
-                show_event(24);
-                the_hero.hunger = FAINT_RESET;
-                (*hero).state = SLEEP;
+/// What hunger and fatigue did this time: the event messages to show (in order) and whether the
+/// stats line needs redrawing.
+#[derive(Debug, Default, PartialEq)]
+struct HungerReport {
+    events: Vec<i32>,
+    redraw_stats: bool,
+}
+
+/// The messages and damage that come with hunger and fatigue. Every 8 points of hunger the hero
+/// loses vitality when very hungry or tired, and when weak either collapses from fatigue or faints
+/// from hunger (falling asleep).
+fn hunger_effects(hero: &mut Hero, body: &mut Shape) -> HungerReport {
+    let mut report = HungerReport::default();
+    if hero.hunger == HUNGRY {
+        report.events.push(0);
+    } else if hero.hunger == VERY_HUNGRY {
+        report.events.push(1);
+    } else if hero.hunger & 7 == 0 {
+        if body.vitality > WEAK_VITALITY {
+            if hero.hunger > MUCH_HUNGER || hero.fatigue > MUCH_FATIGUE {
+                body.vitality -= 2;
+                report.redraw_stats = true;
             }
+            if hero.hunger > STARVING_AT {
+                report.events.push(2);
+            }
+        } else if hero.fatigue > COLLAPSE_FATIGUE {
+            report.events.push(12);
+            body.state = SLEEP;
+        } else if hero.hunger > FAINT_HUNGER {
+            report.events.push(24);
+            hero.hunger = FAINT_RESET;
+            body.state = SLEEP;
         }
     }
+    report
 }
 
 // ---- sort_actors ----
@@ -596,16 +608,16 @@ const RAFT_ACTOR: u8 = 1;
 pub fn sort_actors() {
     unsafe {
         the_actors.nearest_person = 0;
-        nearest_person_distance = PERSON_RANGE;
+        the_actors.nearest_person_distance = PERSON_RANGE;
         for i in 0..the_actors.drawn as usize {
-            draw_order[i] = i as u8;
+            the_actors.draw_order[i] = i as u8;
         }
         for i in 0..the_actors.drawn as usize {
             let an = &raw const the_actors.list[i];
             if i != 0 && (*an).kind != OBJECTS && (*an).state != DEAD && the_hero.riding != BIRD {
                 let dist = actor_distance(i as i32, 0) as i16;
-                if dist < nearest_person_distance {
-                    nearest_person_distance = dist;
+                if dist < the_actors.nearest_person_distance {
+                    the_actors.nearest_person_distance = dist;
                     the_actors.nearest_person = i as i16;
                 }
             }
@@ -619,8 +631,8 @@ pub fn sort_actors() {
 /// One compare-and-swap of neighbours `j - 1` and `j` in the draw order.
 unsafe fn bubble_step(j: usize) {
     unsafe {
-        let k1 = draw_order[j - 1];
-        let k2 = draw_order[j];
+        let k1 = the_actors.draw_order[j - 1];
+        let k2 = the_actors.draw_order[j];
         let a = &raw const the_actors.list[k1 as usize];
         let b = &raw const the_actors.list[k2 as usize];
         let mut y1 = (*a).abs_y as i16;
@@ -638,8 +650,8 @@ unsafe fn bubble_step(j: usize) {
             y2 = y2.wrapping_add(DRAW_LOWER);
         }
         if y2 < y1 {
-            draw_order[j - 1] = k2;
-            draw_order[j] = k1;
+            the_actors.draw_order[j - 1] = k2;
+            the_actors.draw_order[j] = k1;
         }
     }
 }
@@ -647,6 +659,69 @@ unsafe fn bubble_step(j: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn hero_and_body(hunger: i16, fatigue: i16, vitality: i16) -> (Hero, Shape) {
+        let mut hero: Hero = unsafe { std::mem::zeroed() };
+        let mut body: Shape = unsafe { std::mem::zeroed() };
+        hero.hunger = hunger;
+        hero.fatigue = fatigue;
+        body.vitality = vitality;
+        (hero, body)
+    }
+
+    #[test]
+    fn hunger_messages_at_the_first_two_thresholds() {
+        let (mut hero, mut body) = hero_and_body(HUNGRY, 0, 50);
+        assert_eq!(hunger_effects(&mut hero, &mut body).events, vec![0]);
+        let (mut hero, mut body) = hero_and_body(VERY_HUNGRY, 0, 50);
+        assert_eq!(hunger_effects(&mut hero, &mut body).events, vec![1]);
+    }
+
+    #[test]
+    fn nothing_happens_between_eights_when_only_a_little_hungry() {
+        let (mut hero, mut body) = hero_and_body(41, 0, 50);
+        let report = hunger_effects(&mut hero, &mut body);
+        assert_eq!(report, HungerReport::default());
+        assert_eq!(body.vitality, 50);
+    }
+
+    #[test]
+    fn tired_hero_loses_vitality_without_a_message_until_starving() {
+        let (mut hero, mut body) = hero_and_body(88, MUCH_FATIGUE + 1, 50);
+        let report = hunger_effects(&mut hero, &mut body);
+        assert_eq!((body.vitality, report.redraw_stats), (48, true));
+        assert!(report.events.is_empty());
+        let (mut hero, mut body) = hero_and_body(96, MUCH_FATIGUE + 1, 50);
+        let report = hunger_effects(&mut hero, &mut body);
+        assert_eq!((body.vitality, report.events), (48, vec![2]));
+    }
+
+    #[test]
+    fn weak_and_exhausted_hero_collapses_asleep() {
+        let (mut hero, mut body) = hero_and_body(80, COLLAPSE_FATIGUE + 1, WEAK_VITALITY);
+        let report = hunger_effects(&mut hero, &mut body);
+        assert_eq!((report.events, body.state), (vec![12], SLEEP));
+    }
+
+    #[test]
+    fn weak_and_starving_hero_faints_and_hunger_resets() {
+        let (mut hero, mut body) =
+            hero_and_body(FAINT_HUNGER + 8 - FAINT_HUNGER % 8, 0, WEAK_VITALITY);
+        let report = hunger_effects(&mut hero, &mut body);
+        assert_eq!(
+            (report.events, body.state, hero.hunger),
+            (vec![24], SLEEP, FAINT_RESET)
+        );
+    }
+
+    #[test]
+    fn weak_hero_not_yet_faint_is_left_alone() {
+        let (mut hero, mut body) = hero_and_body(120, 0, WEAK_VITALITY);
+        assert_eq!(
+            hunger_effects(&mut hero, &mut body),
+            HungerReport::default()
+        );
+    }
 
     /// Doors whose entrance the binary search cannot reach, because a neighbouring door's x range
     /// (16 pixels) overlaps theirs. This is how the original data behaves; they are listed so a

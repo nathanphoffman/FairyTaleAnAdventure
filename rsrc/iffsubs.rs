@@ -11,8 +11,8 @@
 use crate::amiga::{BPTR, BitMap};
 use std::ffi::c_char;
 
-use super::globals::shape_mem;
 use super::iff_helpers::{read_chunk_id, read_chunk_length, unpack_line};
+use super::state::the_memory;
 
 unsafe extern "C" {
     fn Open(name: *const c_char, mode: i32) -> BPTR;
@@ -99,10 +99,14 @@ unsafe fn read_bitmap_header() -> BitMapHeader {
 /// unpacked once per bitplane (up to 5, fewer if the bitmap is shallower).
 unsafe fn read_body(bmhd: &BitMapHeader, bitmap: &BitMap, offset: usize) {
     unsafe {
-        pack_cursor = shape_mem.cast();
+        pack_cursor = the_memory.shape_mem.cast();
         row_byte_count = ((bmhd.width as i32 + 15) / 8) & 0xfffe;
         read_chunk_length();
-        Read(picture_file as BPTR, shape_mem.cast(), chunk_length);
+        Read(
+            picture_file as BPTR,
+            the_memory.shape_mem.cast(),
+            chunk_length,
+        );
         compression_type = bmhd.compression as i8;
         let mut planes: [*mut u8; BRUSH_PLANES] =
             std::array::from_fn(|p| bitmap.Planes[p].wrapping_add(offset));

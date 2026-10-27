@@ -7,9 +7,6 @@ use super::asm_map::{step_x, step_y};
 use super::asm_text::{queue_print, show_event, speak};
 use super::doors::{bumped_locked_door, open_door_near};
 use super::game_tables::{item_list, setfig_table};
-use super::globals::{
-    active_carrier, current_menu, menu_hit_enabled, quit_requested, witch_on_screen,
-};
 use super::items_menu::items_option;
 use super::magic::magic_option;
 use super::menus::go_to_menu;
@@ -19,7 +16,7 @@ use super::mood::set_mood;
 use super::objects::{SetFigEntry, leave_item};
 use super::random::rand64;
 use super::savegame::{is_saving, savegame};
-use super::state::{the_actors, the_hero, the_world};
+use super::state::{the_actors, the_hero, the_ui, the_witch, the_world};
 use super::tables::{jtrans, ob_list8, ob_listg};
 use super::types::{InvItem, Shape};
 
@@ -139,7 +136,7 @@ const SPECTRE_BONE_DROP: i16 = 140;
 /// Does what menu entry `chosen_entry` of the current menu `current_menu` says.
 pub fn choose_menu_entry(chosen_entry: i16) {
     unsafe {
-        let refresh = match current_menu as i32 {
+        let refresh = match the_ui.current_menu as i32 {
             ITEMS => {
                 items_option(chosen_entry);
                 true
@@ -203,7 +200,7 @@ unsafe fn talk_option(chosen_entry: i16) -> bool {
                 (*an).tactic = TACTIC_TALK;
             }
             person_speaks(person, an);
-        } else if (*an).kind == CARRIER && active_carrier == CARRIER_TURTLE {
+        } else if (*an).kind == CARRIER && the_actors.active_carrier == CARRIER_TURTLE {
             if *the_hero.stuff.add(SHELL) != 0 {
                 speak(57);
             } else {
@@ -359,7 +356,7 @@ unsafe fn game_option(chosen_entry: i16) -> bool {
 unsafe fn use_option(chosen_entry: i16) -> bool {
     unsafe {
         if chosen_entry == KEY_ENTRY {
-            if menu_hit_enabled != 0 {
+            if the_ui.menu_hit_enabled != 0 {
                 go_to_menu(KEYS as i16);
             } else {
                 print_wrapped(c"% has no keys!".as_ptr());
@@ -367,13 +364,13 @@ unsafe fn use_option(chosen_entry: i16) -> bool {
             return false;
         }
         if chosen_entry < WEAPONS {
-            if menu_hit_enabled != 0 {
+            if the_ui.menu_hit_enabled != 0 {
                 the_actors.list[0].weapon = (chosen_entry + 1) as i8;
             } else {
                 print_wrapped(c"% doesn't have one.".as_ptr());
             }
         }
-        if chosen_entry == SHELL_ENTRY && menu_hit_enabled != 0 {
+        if chosen_entry == SHELL_ENTRY && the_ui.menu_hit_enabled != 0 {
             let (x_low, x_high, y_low, y_high) = NO_TURTLE_AREA;
             if the_hero.x < x_high
                 && the_hero.x > x_low
@@ -384,7 +381,7 @@ unsafe fn use_option(chosen_entry: i16) -> bool {
             }
             summon_turtle();
         }
-        if chosen_entry == SUNSTONE_ENTRY && witch_on_screen != 0 {
+        if chosen_entry == SUNSTONE_ENTRY && the_witch.on_screen != 0 {
             speak(SUNSTONE_SPEECH);
         }
         go_to_menu(ITEMS as i16);
@@ -396,7 +393,7 @@ unsafe fn use_option(chosen_entry: i16) -> bool {
 unsafe fn save_exit_option(chosen_entry: i16) -> bool {
     unsafe {
         if chosen_entry == EXIT {
-            quit_requested = 1;
+            the_ui.quit_requested = 1;
         }
         if chosen_entry == SAVE {
             is_saving = 1;

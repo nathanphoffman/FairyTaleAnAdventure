@@ -58,30 +58,54 @@ pub fn resolve_melee() {
     }
 }
 
+/// The weapon an actor swings in melee, or `None` for a bow (archers shoot instead). Anything
+/// past the hand weapons (8 and up: bites, claws) counts as a touch.
+fn melee_weapon(weapon: i16) -> Option<i16> {
+    if weapon & BOW_BIT != 0 {
+        None
+    } else if weapon >= 8 {
+        Some(TOUCH_WEAPON)
+    } else {
+        Some(weapon)
+    }
+}
+
+/// How close the weapon tip has to get to hit. Reach beyond the maximum drops to the limit.
+fn limited_reach(reach: i16) -> i16 {
+    if reach > MAX_REACH {
+        REACH_LIMIT
+    } else {
+        reach
+    }
+}
+
+/// The hero's reach grows with bravery.
+fn hero_reach(brave: i16) -> i16 {
+    limited_reach(brave / BRAVE_PER_REACH + HERO_BASE_REACH)
+}
+
+/// An enemy's reach is a fixed base plus a random `bonus`.
+fn enemy_reach(bonus: i16) -> i16 {
+    limited_reach(ENEMY_BASE_REACH + bonus)
+}
+
 /// One actor's swing.
 unsafe fn swing(i: usize) {
     unsafe {
         let attacker = &raw const the_actors.list[i];
-        let mut wt = (*attacker).weapon as i16;
         let fc = (*attacker).facing as i32;
-        if wt & BOW_BIT != 0 {
+        let Some(base) = melee_weapon((*attacker).weapon as i16) else {
             return;
-        }
-        if wt >= 8 {
-            wt = TOUCH_WEAPON;
-        }
-        wt += bitrand(2) as i16;
+        };
+        let wt = base + bitrand(2) as i16;
         let reach = (wt + wt) as i32;
         let xs = (step_x((*attacker).abs_x as i32, fc, reach) + rand8() - TIP_NOISE) as i16;
         let ys = (step_y((*attacker).abs_y as i32, fc, reach) + rand8() - TIP_NOISE) as i16;
-        let mut bv = if i == 0 {
-            the_hero.brave / BRAVE_PER_REACH + HERO_BASE_REACH
+        let bv = if i == 0 {
+            hero_reach(the_hero.brave)
         } else {
-            ENEMY_BASE_REACH + rand4() as i16
+            enemy_reach(rand4() as i16)
         };
-        if bv > MAX_REACH {
-            bv = REACH_LIMIT;
-        }
         let mut j = 0;
         while j < the_actors.active as usize {
             let target = &raw const the_actors.list[j];
@@ -285,6 +309,30 @@ mod tests {
         assert_eq!(chebyshev(3, -5), 5);
         assert_eq!(chebyshev(-7, 2), 7);
         assert_eq!(chebyshev(0, 0), 0);
+    }
+
+    #[test]
+    fn bows_are_not_swung() {
+        assert_eq!(melee_weapon(BOW_BIT), None);
+        assert_eq!(melee_weapon(1), Some(1));
+    }
+
+    #[test]
+    fn natural_weapons_all_count_as_a_touch() {
+        assert_eq!(melee_weapon(8), Some(TOUCH_WEAPON));
+        assert_eq!(melee_weapon(10), Some(TOUCH_WEAPON));
+    }
+
+    #[test]
+    fn reach_is_limited() {
+        assert_eq!(limited_reach(MAX_REACH), MAX_REACH);
+        assert_eq!(limited_reach(MAX_REACH + 1), REACH_LIMIT);
+    }
+
+    #[test]
+    fn braver_heroes_reach_further_up_to_the_limit() {
+        assert!(hero_reach(100) >= hero_reach(0));
+        assert_eq!(hero_reach(i16::MAX / 2), REACH_LIMIT);
     }
 
     fn missile(kind: i8, speed: i8, time_of_flight: i8) -> Missile {

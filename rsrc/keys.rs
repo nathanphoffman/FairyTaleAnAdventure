@@ -6,18 +6,13 @@ use super::actors::{blocked_at, center_extent_on, rescue_princess};
 use super::asm_text::{queue_print, show_event};
 use super::encounters::load_carrier;
 use super::game_tables::{compass_lit_direction, menu_shortcuts, menus};
-use super::globals::{
-    active_carrier, actors_on_screen, battle_flag, cheat_enabled, chosen_entry as menu_hit,
-    current_menu, fiery_death, fight_key_held, good_fairy_timer, held_direction, menu_hit_enabled,
-    slot_entries, view_status,
-};
 use super::input::{forget_last_menu, fta_pia, mouse_buttons};
 use super::menus::print_options;
 use super::menus::{go_to_menu, print_menu_entry, update_menu_availability};
 use super::options::choose_menu_entry;
 use super::random::{fta_rand, rand4, rnd};
 use super::revive::revive;
-use super::state::{the_actors, the_hero, the_world};
+use super::state::{the_actors, the_hero, the_screen, the_ui, the_world};
 use super::types::Letter;
 
 // Menu numbers (`enum cmodes`).
@@ -92,27 +87,27 @@ pub fn handle_key(key: i32, notpause: i32) {
     unsafe {
         let key = key as i8;
         let notpause = notpause as i16 != 0;
-        if view_status != 0 && notpause {
+        if the_screen.view_status != 0 && notpause {
             if key & RELEASED == 0 {
-                view_status = VIEW_REDRAW;
+                the_screen.view_status = VIEW_REDRAW;
             }
         } else if the_actors.list[0].state == DEAD {
             // ignored while dead
         } else if (FIRST_DIRECTION_KEY..=LAST_DIRECTION_KEY).contains(&key) {
-            held_direction = key as i16;
-        } else if (key & CODE_MASK) as i16 == held_direction {
-            held_direction = 0;
+            the_ui.held_direction = key as i16;
+        } else if (key & CODE_MASK) as i16 == the_ui.held_direction {
+            the_ui.held_direction = 0;
         } else if key == FIGHT_KEY {
-            fight_key_held = 1;
+            the_ui.fight_key_held = 1;
         } else if key & CODE_MASK == FIGHT_KEY {
-            fight_key_held = 0;
+            the_ui.fight_key_held = 0;
         } else if cheat_items(key) {
             // handled
         } else if key & CODE_MASK >= FIRST_MENU_CLICK {
             menu_click(key, notpause);
         } else if cheat_move(key) {
             // handled
-        } else if current_menu == KEYS && key & RELEASED == 0 {
+        } else if the_ui.current_menu == KEYS && key & RELEASED == 0 {
             if (b'1' as i8..=b'6' as i8).contains(&key) {
                 choose_menu_entry((key - b'1' as i8 + 5) as i16);
             } else {
@@ -127,11 +122,11 @@ pub fn handle_key(key: i32, notpause: i32) {
 /// Debug keys that give the hero a carrier or items. Returns true if the key was one.
 unsafe fn cheat_items(key: i8) -> bool {
     unsafe {
-        if cheat_enabled == 0 {
+        if the_ui.cheat_enabled == 0 {
             return false;
         }
         if key == CHEAT_CARRIER {
-            if active_carrier == CARRIER_BIRD {
+            if the_actors.active_carrier == CARRIER_BIRD {
                 *the_hero.stuff.add(RAFT_STONE_SLOT) = 1;
             }
             center_extent_on(
@@ -156,7 +151,7 @@ unsafe fn cheat_items(key: i8) -> bool {
 /// Debug keys that rescue, redraw or move the hero about. Returns true if the key was one.
 unsafe fn cheat_move(key: i8) -> bool {
     unsafe {
-        if cheat_enabled == 0 {
+        if the_ui.cheat_enabled == 0 {
             return false;
         }
         let hero = &raw mut the_actors.list[0];
@@ -192,9 +187,11 @@ unsafe fn cheat_move(key: i8) -> bool {
 unsafe fn menu_click(key: i8, notpause: bool) {
     unsafe {
         let slot = ((key & CODE_MASK) - FIRST_MENU_CLICK) as i16;
-        menu_hit = *(&raw const slot_entries).cast::<i8>().offset(slot as isize);
-        let chosen_entry = menu_hit as i16;
-        let menu = &raw mut menus[current_menu as usize];
+        the_ui.chosen_entry = *(&raw const the_ui.slot_entries)
+            .cast::<i8>()
+            .offset(slot as isize);
+        let chosen_entry = the_ui.chosen_entry as i16;
+        let menu = &raw mut menus[the_ui.current_menu as usize];
         let valid = chosen_entry >= 0 && chosen_entry < (*menu).num as i16;
         if key & RELEASED != 0 {
             if valid {
@@ -202,7 +199,7 @@ unsafe fn menu_click(key: i8, notpause: bool) {
             }
             return;
         }
-        menu_hit_enabled = 1;
+        the_ui.menu_hit_enabled = 1;
         if !valid {
             return;
         }
@@ -225,7 +222,7 @@ unsafe fn menu_click(key: i8, notpause: bool) {
         } else if !notpause {
             // paused: only the menu types above work
         } else if kind == 0 && chosen_entry < 5 {
-            current_menu = chosen_entry;
+            the_ui.current_menu = chosen_entry;
             queue_print(5);
         } else {
             print_menu_entry(slot, (*entry & SELECTED) as i16);
@@ -241,17 +238,18 @@ unsafe fn menu_letter(key: i8) {
             if shortcut.letter != key {
                 continue;
             }
-            if shortcut.menu as i16 == SAVEX && current_menu != SAVEX {
+            if shortcut.menu as i16 == SAVEX && the_ui.current_menu != SAVEX {
                 break;
             }
-            current_menu = shortcut.menu as i16;
-            menu_hit = shortcut.choice;
-            let entry = &raw mut menus[current_menu as usize].enabled[menu_hit as usize];
-            menu_hit_enabled = *entry & DISPLAYED;
+            the_ui.current_menu = shortcut.menu as i16;
+            the_ui.chosen_entry = shortcut.choice;
+            let entry =
+                &raw mut menus[the_ui.current_menu as usize].enabled[the_ui.chosen_entry as usize];
+            the_ui.menu_hit_enabled = *entry & DISPLAYED;
             if *entry as i32 & TYPE_MASK == TYPE_TOGGLE {
                 *entry ^= SELECTED;
             }
-            choose_menu_entry(menu_hit as i16);
+            choose_menu_entry(the_ui.chosen_entry as i16);
             print_options();
             break;
         }
@@ -299,7 +297,7 @@ pub fn update_hero(cycle: i16) {
         count_down(&raw mut the_world.secret_timer);
         count_down(&raw mut the_world.freeze_timer);
 
-        fiery_death = (the_world.map_x > LAVA_X.0
+        the_actors.fiery_death = (the_world.map_x > LAVA_X.0
             && the_world.map_x < LAVA_X.1
             && the_world.map_y > LAVA_Y.0
             && the_world.map_y < LAVA_Y.1) as i8;
@@ -310,7 +308,7 @@ pub fn update_hero(cycle: i16) {
         } else if state == DYING || state == SINK || state == SLEEP {
             // nothing to do
         } else if mouse_buttons() & RIGHT_BUTTON != 0
-            || fight_key_held != 0
+            || the_ui.fight_key_held != 0
             || (fta_pia & FIRE_BUTTON) == 0
         {
             state = fighting_state(state);
@@ -335,38 +333,78 @@ unsafe fn count_down(timer: *mut i16) {
 /// the next brother takes over). Returns the hero's new state.
 unsafe fn fairy_or_revive(state: i8, cycle: i16) -> i8 {
     unsafe {
-        if good_fairy_timer == 1 {
-            revive(0);
-            return STILL;
-        }
-        good_fairy_timer = good_fairy_timer.wrapping_sub(1);
-        if good_fairy_timer < FAIRY_RESURRECT {
-            // the resurrection glow
-        } else if the_hero.luck < 1 && good_fairy_timer < FAIRY_GIVES_UP {
-            revive(1);
-            return STILL;
-        } else if the_actors.list[0].state == FALL && good_fairy_timer < FAIRY_GIVES_UP {
-            revive(0);
-            return STILL;
-        } else if good_fairy_timer < FAIRY_ARRIVES {
-            let fairy = &raw mut the_actors.list[FAIRY_SLOT];
-            the_actors.active = NO_ACTORS_LOADED;
-            (*fairy).abs_x = the_hero
-                .x
-                .wrapping_add(good_fairy_timer as u16 * FAIRY_SPEED)
-                .wrapping_sub(FAIRY_X_OFFSET);
-            (*fairy).abs_y = the_hero.y;
-            (*fairy).kind = OBJECTS;
-            (*fairy).index = FAIRY_IMAGE + (cycle & 1) as i8;
-            (*fairy).state = STILL;
-            (*fairy).weapon = 0;
-            (*fairy).environ = 0;
-            (*fairy).race = FAIRY_RACE;
-            actors_on_screen = 1;
-            battle_flag = 0;
+        let (timer, action) = fairy_step(
+            the_hero.good_fairy_timer,
+            the_hero.luck,
+            the_actors.list[0].state == FALL,
+        );
+        the_hero.good_fairy_timer = timer;
+        match action {
+            FairyAction::Revive => {
+                revive(0);
+                return STILL;
+            }
+            FairyAction::NextBrother => {
+                revive(1);
+                return STILL;
+            }
+            FairyAction::Wait => {}
+            FairyAction::FlyIn => {
+                let fairy = &raw mut the_actors.list[FAIRY_SLOT];
+                the_actors.active = NO_ACTORS_LOADED;
+                (*fairy).abs_x = the_hero
+                    .x
+                    .wrapping_add(the_hero.good_fairy_timer as u16 * FAIRY_SPEED)
+                    .wrapping_sub(FAIRY_X_OFFSET);
+                (*fairy).abs_y = the_hero.y;
+                (*fairy).kind = OBJECTS;
+                (*fairy).index = FAIRY_IMAGE + (cycle & 1) as i8;
+                (*fairy).state = STILL;
+                (*fairy).weapon = 0;
+                (*fairy).environ = 0;
+                (*fairy).race = FAIRY_RACE;
+                the_actors.on_screen = 1;
+                the_actors.battle_flag = 0;
+            }
         }
         state
     }
+}
+
+/// What the good fairy does this frame.
+#[derive(Debug, PartialEq)]
+enum FairyAction {
+    /// The hero gets up where they are.
+    Revive,
+    /// No luck is left: the next brother takes over.
+    NextBrother,
+    /// The fairy flies in toward the hero.
+    FlyIn,
+    /// Nothing yet (or the resurrection glow).
+    Wait,
+}
+
+/// One step of the fairy countdown for a dead or fallen hero: returns the new timer value and
+/// what to do. At timer 1 the hero is revived; below `FAIRY_RESURRECT` it is just the glow;
+/// below `FAIRY_GIVES_UP` the hero is revived (a fallen one) or replaced (no luck); below
+/// `FAIRY_ARRIVES` the fairy flies in.
+fn fairy_step(timer: u8, luck: i16, falling: bool) -> (u8, FairyAction) {
+    if timer == 1 {
+        return (timer, FairyAction::Revive);
+    }
+    let timer = timer.wrapping_sub(1);
+    let action = if timer < FAIRY_RESURRECT {
+        FairyAction::Wait
+    } else if luck < 1 && timer < FAIRY_GIVES_UP {
+        FairyAction::NextBrother
+    } else if falling && timer < FAIRY_GIVES_UP {
+        FairyAction::Revive
+    } else if timer < FAIRY_ARRIVES {
+        FairyAction::FlyIn
+    } else {
+        FairyAction::Wait
+    };
+    (timer, action)
 }
 
 /// The fight button is down: shoot in a shooting zone, dismount, or fight with the weapon held.
@@ -384,7 +422,7 @@ unsafe fn fighting_state(state: i8) -> i8 {
             return SHOOT1;
         }
         if the_hero.riding == BIRD {
-            if fiery_death != 0 {
+            if the_actors.fiery_death != 0 {
                 show_event(EVENT_LAVA);
             } else if dif_x > -DISMOUNT_SPEED
                 && dif_x < DISMOUNT_SPEED
@@ -411,13 +449,19 @@ unsafe fn fighting_state(state: i8) -> i8 {
             (*hero).facing = compass_lit_direction as i8;
         }
         if state >= WALKING {
-            return match (*hero).weapon {
-                WEAPON_BOW => SHOOT1,
-                WEAPON_WAND => state.max(SHOOT1),
-                _ => FIGHTING,
-            };
+            return fighting_state_for(state, (*hero).weapon);
         }
         state
+    }
+}
+
+/// The state when the fight button is down and the hero is not already fighting: a bow shoots, a
+/// wand keeps shooting, anything else fights.
+fn fighting_state_for(state: i8, weapon: i8) -> i8 {
+    match weapon {
+        WEAPON_BOW => SHOOT1,
+        WEAPON_WAND => state.max(SHOOT1),
+        _ => FIGHTING,
     }
 }
 
@@ -435,9 +479,59 @@ unsafe fn walking_state(state: i8) -> i8 {
             };
         }
         the_actors.list[0].facing = compass_lit_direction as i8;
-        if mouse_buttons() & LEFT_BUTTON != 0 || held_direction != 0 {
+        if mouse_buttons() & LEFT_BUTTON != 0 || the_ui.held_direction != 0 {
             return WALKING;
         }
         state
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_hero_revives_when_the_countdown_reaches_one() {
+        assert_eq!(fairy_step(1, 50, false), (1, FairyAction::Revive));
+    }
+
+    #[test]
+    fn the_fairy_flies_in_once_the_timer_is_low_enough() {
+        assert_eq!(
+            fairy_step(FAIRY_ARRIVES + 5, 50, false).1,
+            FairyAction::Wait
+        );
+        assert_eq!(
+            fairy_step(FAIRY_ARRIVES, 50, false),
+            (FAIRY_ARRIVES - 1, FairyAction::FlyIn)
+        );
+    }
+
+    #[test]
+    fn a_fallen_hero_is_revived_before_the_fairy_arrives() {
+        assert_eq!(fairy_step(FAIRY_GIVES_UP, 50, true).1, FairyAction::Revive);
+    }
+
+    #[test]
+    fn with_no_luck_the_next_brother_takes_over() {
+        assert_eq!(
+            fairy_step(FAIRY_GIVES_UP, 0, false).1,
+            FairyAction::NextBrother
+        );
+        // having luck left, a dead hero waits for the fairy instead
+        assert_eq!(fairy_step(FAIRY_GIVES_UP, 1, false).1, FairyAction::Wait);
+    }
+
+    #[test]
+    fn the_last_moments_are_only_a_glow() {
+        assert_eq!(fairy_step(FAIRY_RESURRECT, 0, true).1, FairyAction::Wait);
+    }
+
+    #[test]
+    fn weapons_decide_how_the_hero_fights() {
+        assert_eq!(fighting_state_for(WALKING, WEAPON_BOW), SHOOT1);
+        assert_eq!(fighting_state_for(WALKING, WEAPON_WAND), SHOOT1);
+        assert_eq!(fighting_state_for(SHOOT1 + 3, WEAPON_WAND), SHOOT1 + 3);
+        assert_eq!(fighting_state_for(WALKING, 1), FIGHTING);
     }
 }

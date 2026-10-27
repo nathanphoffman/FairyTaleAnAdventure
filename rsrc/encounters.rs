@@ -4,12 +4,11 @@ use super::actors::blocked_at;
 use super::asm_map::terrain_at;
 use super::asm_text::{queue_print, show_event, speak};
 use super::game_tables::{encounter_chart, extent_list};
-use super::globals::{active_carrier, actors_loading, loaded_actor_file, nextshape, seq_list};
 use super::hdrive::motor_off;
 use super::loading::{finish_sprite_load, load_sprite_file};
 use super::mood::set_mood;
 use super::random::{bitrand, rand2, rand4, rnd};
-use super::state::{the_actors, the_encounter, the_hero, the_world};
+use super::state::{Hero, the_actors, the_encounter, the_hero, the_memory, the_world};
 use super::tables::weapon_probs;
 use super::types::{Extent, SeqInfo, Shape};
 
@@ -146,25 +145,13 @@ unsafe fn encounter_race() -> i32 {
 pub extern "C" fn check_death(i: i32, dtype: i32) {
     unsafe {
         let an = (&raw mut the_actors.list).cast::<Shape>().add(i as usize);
-        if (*an).vitality < 1 && (*an).state != DYING && (*an).state != DEAD {
-            (*an).vitality = 0;
-            (*an).tactic = DYING_COUNTDOWN;
-            (*an).goal = DEATH;
-            (*an).state = DYING;
-            if (*an).race == RACE_DARK_KNIGHT {
+        if let Some(death) = start_dying(i, &mut *an, &mut *(&raw mut the_hero)) {
+            if death.dark_knight {
                 speak(SPEAK_DARK_KNIGHT_DIES);
-            } else if (*an).kind == SETFIG && (*an).race != RACE_LASSO_KEEPER {
-                the_hero.kindness -= KINDNESS_LOSS;
             }
-            if i != 0 {
-                the_hero.brave += 1;
-            } else {
+            if i == 0 {
                 show_event(dtype);
-                the_hero.luck -= LUCK_LOSS;
                 set_mood(1);
-            }
-            if the_hero.kindness < 0 {
-                the_hero.kindness = 0;
             }
             queue_print(PRQ_VITALITY);
         }
@@ -172,6 +159,39 @@ pub extern "C" fn check_death(i: i32, dtype: i32) {
             queue_print(PRQ_STATS);
         }
     }
+}
+
+/// What a new death needs shown or said.
+#[derive(Debug, PartialEq)]
+struct Death {
+    dark_knight: bool,
+}
+
+/// Starts actor `i` (`actor`) dying if it is out of vitality and not already dying or dead: it
+/// goes into the dying state with a countdown. Killing a person (except the lasso keeper) costs
+/// the hero kindness; killing anything else gives bravery; the hero's own death costs luck.
+/// Returns `None` if nothing happened.
+fn start_dying(i: i32, actor: &mut Shape, hero: &mut Hero) -> Option<Death> {
+    if actor.vitality >= 1 || actor.state == DYING || actor.state == DEAD {
+        return None;
+    }
+    actor.vitality = 0;
+    actor.tactic = DYING_COUNTDOWN;
+    actor.goal = DEATH;
+    actor.state = DYING;
+    let dark_knight = actor.race == RACE_DARK_KNIGHT;
+    if !dark_knight && actor.kind == SETFIG && actor.race != RACE_LASSO_KEEPER {
+        hero.kindness -= KINDNESS_LOSS;
+    }
+    if i != 0 {
+        hero.brave += 1;
+    } else {
+        hero.luck -= LUCK_LOSS;
+    }
+    if hero.kindness < 0 {
+        hero.kindness = 0;
+    }
+    Some(Death { dark_knight })
 }
 
 /// Puts carrier `n` (5 turtle, 10 dragon, otherwise the swan) in actor slot 3, loading its sprites
@@ -189,8 +209,11 @@ pub fn load_carrier(n: i16) {
         } else {
             0
         };
-        if loaded_actor_file != n {
-            nextshape = (*(&raw mut seq_list).cast::<SeqInfo>().add(SEQ_ENEMY)).location;
+        if the_actors.loaded_actor_file != n {
+            the_memory.nextshape = (*(&raw mut the_memory.seq_list)
+                .cast::<SeqInfo>()
+                .add(SEQ_ENEMY))
+            .location;
             load_sprite_file(n as i32);
             finish_sprite_load((*an).kind as i16);
             motor_off();
@@ -204,8 +227,8 @@ pub fn load_carrier(n: i16) {
         (*an).state = STILL;
         (*an).vitality = VITALITY_CARRIER;
         the_actors.active = 4;
-        active_carrier = n;
-        loaded_actor_file = n;
+        the_actors.active_carrier = n;
+        the_actors.loaded_actor_file = n;
         (*an).race = n as u8;
     }
 }
@@ -218,13 +241,108 @@ pub fn load_enemy_sprites() {
         the_encounter.number =
             ((*the_world.extent).v1 as i32 + rnd((*the_world.extent).v2 as i32)) as u8;
         let file = encounter_chart[the_encounter.kind as usize].file_id as i16;
-        if loaded_actor_file != file {
-            loaded_actor_file = file;
+        if the_actors.loaded_actor_file != file {
+            the_actors.loaded_actor_file = file;
             the_actors.active = FIRST_ENEMY_SLOT;
-            nextshape = (*(&raw const seq_list).cast::<SeqInfo>().add(ENEMY as usize)).location;
-            load_sprite_file(loaded_actor_file as i32);
-            actors_loading = 1;
-            active_carrier = 0;
+            the_memory.nextshape = (*(&raw const the_memory.seq_list)
+                .cast::<SeqInfo>()
+                .add(ENEMY as usize))
+            .location;
+            load_sprite_file(the_actors.loaded_actor_file as i32);
+            the_actors.loading = 1;
+            the_actors.active_carrier = 0;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn actor(vitality: i16, state: i8) -> Shape {
+        let mut a: Shape = unsafe { std::mem::zeroed() };
+        a.vitality = vitality;
+        a.state = state;
+        a
+    }
+
+    fn hero(brave: i16, luck: i16, kindness: i16) -> Hero {
+        let mut h: Hero = unsafe { std::mem::zeroed() };
+        h.brave = brave;
+        h.luck = luck;
+        h.kindness = kindness;
+        h
+    }
+
+    #[test]
+    fn a_living_actor_does_not_die() {
+        let (mut a, mut h) = (actor(1, 0), hero(10, 10, 10));
+        assert_eq!(start_dying(5, &mut a, &mut h), None);
+        assert_eq!(a.state, 0);
+    }
+
+    #[test]
+    fn dying_and_dead_actors_are_not_killed_twice() {
+        let mut h = hero(10, 10, 10);
+        assert_eq!(start_dying(5, &mut actor(0, DYING), &mut h), None);
+        assert_eq!(start_dying(5, &mut actor(0, DEAD), &mut h), None);
+        assert_eq!(h.brave, 10);
+    }
+
+    #[test]
+    fn killing_an_enemy_starts_the_death_and_gives_bravery() {
+        let (mut a, mut h) = (actor(-4, 0), hero(10, 10, 10));
+        assert_eq!(
+            start_dying(5, &mut a, &mut h),
+            Some(Death { dark_knight: false })
+        );
+        assert_eq!(
+            (a.vitality, a.state, a.goal, a.tactic),
+            (0, DYING, DEATH, DYING_COUNTDOWN)
+        );
+        assert_eq!((h.brave, h.luck, h.kindness), (11, 10, 10));
+    }
+
+    #[test]
+    fn killing_a_person_costs_kindness_but_not_below_zero() {
+        let mut a = actor(0, 0);
+        a.kind = SETFIG;
+        let mut h = hero(10, 10, 5);
+        start_dying(5, &mut a, &mut h);
+        assert_eq!(h.kindness, 2);
+        let mut a = actor(0, 0);
+        a.kind = SETFIG;
+        start_dying(5, &mut a, &mut h);
+        assert_eq!(h.kindness, 0);
+    }
+
+    #[test]
+    fn the_lasso_keeper_is_not_a_murder() {
+        let mut a = actor(0, 0);
+        a.kind = SETFIG;
+        a.race = RACE_LASSO_KEEPER;
+        let mut h = hero(10, 10, 5);
+        start_dying(5, &mut a, &mut h);
+        assert_eq!(h.kindness, 5);
+    }
+
+    #[test]
+    fn the_dark_knight_speaks_and_costs_no_kindness() {
+        let mut a = actor(0, 0);
+        a.kind = SETFIG;
+        a.race = RACE_DARK_KNIGHT;
+        let mut h = hero(10, 10, 5);
+        assert_eq!(
+            start_dying(5, &mut a, &mut h),
+            Some(Death { dark_knight: true })
+        );
+        assert_eq!(h.kindness, 5);
+    }
+
+    #[test]
+    fn the_heros_own_death_costs_luck_not_bravery() {
+        let (mut a, mut h) = (actor(0, 0), hero(10, 20, 10));
+        start_dying(0, &mut a, &mut h);
+        assert_eq!((h.brave, h.luck), (10, 15));
     }
 }

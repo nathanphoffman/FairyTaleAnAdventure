@@ -10,14 +10,12 @@ use super::asm_text::show_message;
 use super::encounters::load_enemy_sprites;
 use super::encounters::{load_carrier, place_encounter};
 use super::game_tables::extent_list;
-use super::globals::{
-    active_carrier, actors_loading, held_direction, j as c_j, loaded_actor_file, view_status,
-};
+use super::globals::j as c_j;
 use super::hdrive::motor_off;
 use super::loading::finish_sprite_load;
 use super::mood::set_mood;
 use super::regions::{load_region_now, refresh_minimap};
-use super::state::{the_actors, the_encounter, the_hero, the_world};
+use super::state::{the_actors, the_encounter, the_hero, the_screen, the_ui, the_world};
 use super::tables::ob_list8;
 use super::types::Extent;
 use std::ffi::c_char;
@@ -81,10 +79,10 @@ pub extern "C" fn transfer_hero(xtest: u16, ytest: u16, flag: u16) -> i32 {
             let row = (sector_y >> 5) & 7; // 32 sectors down
             the_world.new_region = (column + row + row) as u16;
         }
-        held_direction = 0;
+        the_ui.held_direction = 0;
         load_region_now();
         refresh_minimap(); // to set region_origin_x and region_origin_y
-        view_status = 99;
+        the_screen.view_status = 99;
         set_mood(1);
         while blocked_at(the_hero.x as i16, the_hero.y as i16, 0) != 0 {
             the_hero.y = the_hero.y.wrapping_add(1);
@@ -103,7 +101,7 @@ unsafe fn start_forced_encounter() {
         load_enemy_sprites();
         finish_sprite_load(ENEMY_SLOT);
         motor_off();
-        actors_loading = 0;
+        the_actors.loading = 0;
         the_encounter.number = (*the_world.extent).v1;
         the_actors.active = FIRST_MONSTER;
         while the_encounter.number != 0 && the_actors.active < MONSTER_SLOTS_END {
@@ -239,7 +237,7 @@ unsafe fn enter_extent(flag: i16) -> bool {
             load_enemy_sprites();
             finish_sprite_load(ENEMY_SLOT);
             motor_off();
-            actors_loading = 0;
+            the_actors.loading = 0;
         } else if the_world.extent_type >= XT_MONSTER_ZONE_MIN && flag == 1 {
             the_encounter.x = the_hero.x;
             the_encounter.y = the_hero.y;
@@ -257,10 +255,11 @@ unsafe fn enter_extent(flag: i16) -> bool {
 unsafe fn update_carrier() {
     unsafe {
         if the_world.extent_type < XT_CARRIER_MIN {
-            active_carrier = 0;
+            the_actors.active_carrier = 0;
         } else if the_world.extent_type == XT_CARRIER
-            && (active_carrier == 0
-                || (the_hero.riding == 0 && loaded_actor_file != (*the_world.extent).v3 as i16))
+            && (the_actors.active_carrier == 0
+                || (the_hero.riding == 0
+                    && the_actors.loaded_actor_file != (*the_world.extent).v3 as i16))
         {
             load_carrier((*the_world.extent).v3 as i16);
         }

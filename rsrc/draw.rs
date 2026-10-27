@@ -9,13 +9,9 @@ use super::asm_blit::{
 };
 use super::asm_map::{draw_map_column, draw_map_row};
 use super::game_tables::animation_frames;
-use super::globals::{
-    aoff, bmask_mem, bmod, boff, draw_order, drawing_page, fiery_death, loaded_actor_file,
-    mask_buffer, planes, planesize, seq_list, shapedata, shift, shp, terrain_mem, witch_angle,
-    witch_direction, witch_on_screen, wmask,
-};
+use super::globals::{aoff, bmod, boff, shift, shp, wmask};
 use super::random::{rand2, rand4};
-use super::state::{the_actors, the_hero, the_world};
+use super::state::{the_actors, the_hero, the_memory, the_screen, the_witch, the_world};
 use super::tables::{bow_x, bow_y, minimap};
 use super::types::{SeqInfo, Shape, StateEntry};
 use super::witch::witch_fx;
@@ -65,16 +61,16 @@ pub fn repair_map_and_witch(dif_x: i16, dif_y: i16) {
         }
 
         let witch = &raw const the_actors.list[WITCH_SLOT];
-        let page = drawing_page;
+        let page = the_screen.drawing_page;
         (*page).witchx = ((*witch).abs_x as i32 - (the_world.map_x & 0xfff0) as i32) as i16;
         (*page).witchy = (((*witch).abs_y as i32 - 15) - (the_world.map_y & 0xffe0) as i32) as i16;
         if rand4() == 0 {
-            witch_direction = if s1 > 0 { 1 } else { -1 };
+            the_witch.direction = if s1 > 0 { 1 } else { -1 };
         }
-        witch_angle = witch_angle.wrapping_add(witch_direction as u8);
-        (*page).witchdir = witch_angle as i16;
-        (*page).wflag = witch_on_screen as i16;
-        if witch_on_screen != 0 {
+        the_witch.angle = the_witch.angle.wrapping_add(the_witch.direction as u8);
+        (*page).witchdir = the_witch.angle as i16;
+        (*page).wflag = the_witch.on_screen as i16;
+        if the_witch.on_screen != 0 {
             witch_fx(page);
             if s1 > 0 && s2 < 0 && actor_distance(WITCH_SLOT as i32, 0) < WITCH_REACH {
                 hit_actor(-1, 0, (*witch).facing as i32, (rand2() + 1) as i16);
@@ -159,7 +155,7 @@ fn byte_of(table: &[i8; 32], inum: i16) -> i16 {
 /// (`backsave`) so it can be undone next frame. `cycle` is the frame counter.
 pub fn draw_sprites(cycle: i16) {
     unsafe {
-        let page = drawing_page;
+        let page = the_screen.drawing_page;
         (*page).obcount = 0;
         (*page).saveused = 0;
         let mut frame = Frame {
@@ -167,7 +163,7 @@ pub fn draw_sprites(cycle: i16) {
             backalloc: (*page).backsave,
         };
         for j in 0..the_actors.drawn {
-            let i = draw_order[j as usize] as i32;
+            let i = the_actors.draw_order[j as usize] as i32;
             let an = &raw mut the_actors.list[i as usize];
             (*an).visible = 0;
             let mut pass: u8 = 0;
@@ -291,7 +287,7 @@ unsafe fn draw_one(frame: &mut Frame, an: *mut Shape, i: i32, cycle: i16, passmo
         draw_shape();
         (*an).visible = 1;
         DisownBlitter();
-        (*drawing_page).obcount += 1;
+        (*the_screen.drawing_page).obcount += 1;
         Drawn::Done
     }
 }
@@ -332,20 +328,20 @@ unsafe fn set_up_blit(
         // The sheet is looked up again: a sunk actor is drawn from the objects sheet, but is as wide
         // and high as its own.
         let seq = sprite_sheet(sprite.atype);
-        shp = (*drawing_page)
+        shp = (*the_screen.drawing_page)
             .shape_queue
             .cast::<SShape>()
-            .offset((*drawing_page).obcount as isize);
-        planesize = seq.bytes;
+            .offset((*the_screen.drawing_page).obcount as isize);
+        the_screen.planesize = seq.bytes;
         (*shp).savesize = (blitwide as i32 * blithigh as i32 * 2) as i16;
         (*shp).blitsize = (((blithigh as i32) << 6) + blitwide as i32) as i16;
 
-        shapedata = seq
+        the_memory.shapedata = seq
             .location
-            .offset(planesize as isize * PLANES as isize * sprite.inum as isize);
-        mask_buffer = seq
+            .offset(the_screen.planesize as isize * PLANES as isize * sprite.inum as isize);
+        the_memory.mask_buffer = seq
             .maskloc
-            .offset(planesize as isize * sprite.inum as isize);
+            .offset(the_screen.planesize as isize * sprite.inum as isize);
         if !assign_background_save(frame) {
             return false;
         }
@@ -369,7 +365,7 @@ unsafe fn set_up_blit(
 /// Where the images of one kind of sprite are (`seq_list` entry `atype`).
 unsafe fn sprite_sheet(atype: i16) -> &'static SeqInfo {
     unsafe {
-        &*(&raw const seq_list)
+        &*(&raw const the_memory.seq_list)
             .cast::<SeqInfo>()
             .offset(atype as isize)
     }
@@ -380,7 +376,7 @@ unsafe fn clear_scenery_mask() {
     unsafe {
         OwnBlitter();
         WaitBlit();
-        clear_memory(bmask_mem, MASK_CLEAR_SIZE);
+        clear_memory(the_memory.bmask_mem, MASK_CLEAR_SIZE);
         DisownBlitter();
     }
 }
@@ -460,7 +456,7 @@ unsafe fn body_image(an: *const Shape, i: i32, mut inum: i16) -> Option<(i16, i1
     unsafe {
         let mut atype = (*an).kind as i16;
         if (atype == ENEMY && (*an).race != RACE_SPECTRE) || atype == PHIL {
-            if fiery_death != 0 && (*an).environ > 0 {
+            if the_actors.fiery_death != 0 && (*an).environ > 0 {
                 if (*an).state == DEAD {
                     return None;
                 } else if (*an).state == DYING {
@@ -487,7 +483,7 @@ unsafe fn body_image(an: *const Shape, i: i32, mut inum: i16) -> Option<(i16, i1
         if atype == OBJECTS && (*an).race == 0 {
             return None;
         }
-        if atype == CARRIER && the_hero.riding == 0 && loaded_actor_file == 11 {
+        if atype == CARRIER && the_hero.riding == 0 && the_actors.loaded_actor_file == 11 {
             atype = RAFT;
             inum = 1;
         }
@@ -562,9 +558,10 @@ unsafe fn adjust_for_depth(
 /// small sprites), otherwise the page's save buffer. Returns false when the buffer is full.
 unsafe fn assign_background_save(frame: &mut Frame) -> bool {
     unsafe {
-        let page = drawing_page;
+        let page = the_screen.drawing_page;
         if (*shp).savesize < SMALL_SAVE && frame.crack < SPARE_SAVES {
-            (*shp).backsave = (*planes.add(frame.crack as usize)).add(SPARE_PLANE_OFFSET);
+            (*shp).backsave =
+                (*the_screen.planes.add(frame.crack as usize)).add(SPARE_PLANE_OFFSET);
             frame.crack += 1;
             return true;
         }
@@ -651,7 +648,7 @@ unsafe fn mask_against_scenery(
                 let ystop = ground - (((ym + ym1 as i32) << 5) as i16);
                 let mut cm = ((xm + xbw as i32) * 6 + ym + ym1 as i32) as i16;
                 cm = (minimap[cm as usize] as i32 * 4) as i16;
-                let mut k = (*terrain_mem.offset(cm as isize + 1) & 15) as i16;
+                let mut k = (*the_memory.terrain_mem.offset(cm as isize + 1) & 15) as i16;
                 if (*an).state == FALL {
                     if cm <= FALL_TILE_LIMIT {
                         continue;
@@ -668,7 +665,7 @@ unsafe fn mask_against_scenery(
                     xm,
                     ym,
                     blitwide as i32,
-                    *terrain_mem.offset(cm as isize) as i32,
+                    *the_memory.terrain_mem.offset(cm as isize) as i32,
                 );
             }
         }

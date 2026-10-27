@@ -15,8 +15,8 @@
 //! 6 SW, 7 W. The value 9 means "not walking".
 
 use super::game_tables::compass_lit_direction;
-use super::globals::{handler_data, held_direction};
 use super::screen_fx::draw_compass;
+use super::state::the_ui;
 use std::ffi::c_void;
 
 /// Mirror of `struct in_work` in csrc/ftale.h, the input handler's data area.
@@ -88,7 +88,7 @@ const DIRECTION_COUNT: i16 = 10;
 /// position (one slot is always left empty, which is how a full buffer is told from an empty one).
 fn push_key(code: i32) {
     unsafe {
-        let data = &mut *(&raw mut handler_data);
+        let data = &mut *(&raw mut the_ui.handler_data);
         let slot = data.laydown;
         data.keybuf[slot as usize] = code as u8;
         let next = (slot + 1) & KEY_BUFFER_MASK;
@@ -107,7 +107,7 @@ pub extern "C" fn fta_key(code: i32) {
 /// Empties the key buffer (used when the input handler is installed).
 pub fn reset_key_buffer() {
     unsafe {
-        let data = &mut *(&raw mut handler_data);
+        let data = &mut *(&raw mut the_ui.handler_data);
         data.laydown = 0;
         data.pickup = 0;
     }
@@ -115,20 +115,20 @@ pub fn reset_key_buffer() {
 
 /// The mouse buttons held (bit 0x4000 left, 0x2000 right).
 pub fn mouse_buttons() -> i16 {
-    unsafe { (*(&raw const handler_data)).qualifier }
+    unsafe { (*(&raw const the_ui.handler_data)).qualifier }
 }
 
 /// Forgets the last menu key sent, so its release is not sent (used when a menu is switched).
 pub fn forget_last_menu() {
     unsafe {
-        (*(&raw mut handler_data)).lastmenu = 0;
+        (*(&raw mut the_ui.handler_data)).lastmenu = 0;
     }
 }
 
 /// Pops the next key code from the ring buffer, or 0 if there is none.
 pub fn next_key() -> i32 {
     unsafe {
-        let data = &mut *(&raw mut handler_data);
+        let data = &mut *(&raw mut the_ui.handler_data);
         if data.pickup == data.laydown {
             return 0;
         }
@@ -144,7 +144,7 @@ pub fn next_key() -> i32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn fta_mouse_move(x: i32, y: i32) {
     unsafe {
-        let data = &mut *(&raw mut handler_data);
+        let data = &mut *(&raw mut the_ui.handler_data);
         data.xsprite = x.clamp(POINTER_MIN_X, POINTER_MAX_X) as i16;
         data.ysprite = y.clamp(POINTER_MIN_Y, POINTER_MAX_Y) as i16;
     }
@@ -169,7 +169,7 @@ pub extern "C" fn fta_mouse_button(left: i32, right: i32) {
     let new_qualifier =
         (if left != 0 { LEFT_BUTTON } else { 0 }) | (if right != 0 { RIGHT_BUTTON } else { 0 });
     unsafe {
-        let data = &mut *(&raw mut handler_data);
+        let data = &mut *(&raw mut the_ui.handler_data);
         if (new_qualifier ^ data.qualifier) & LEFT_BUTTON != 0 {
             let key = if new_qualifier & LEFT_BUTTON != 0 {
                 menu_key_at(data.xsprite as i32, data.ysprite as i32)
@@ -217,7 +217,7 @@ fn compass_direction(x: i32, y: i32) -> i16 {
 /// True (once) if a new disk was inserted since the last call.
 pub fn take_new_disk() -> bool {
     unsafe {
-        let data = &mut *(&raw mut handler_data);
+        let data = &mut *(&raw mut the_ui.handler_data);
         std::mem::replace(&mut data.newdisk, 0) != 0
     }
 }
@@ -229,15 +229,15 @@ pub fn take_new_disk() -> bool {
 /// (numbered from 20, the keypad digits) does. Anything outside 20-29 means no direction.
 pub fn read_walk_direction() {
     unsafe {
-        let data = &*(&raw const handler_data);
+        let data = &*(&raw const the_ui.handler_data);
         let dir = if data.qualifier & (LEFT_BUTTON | RIGHT_BUTTON) != 0 {
             compass_direction(data.xsprite as i32, data.ysprite as i32)
         } else {
-            let dir = held_direction.wrapping_sub(KEYDIR_BASE);
+            let dir = the_ui.held_direction.wrapping_sub(KEYDIR_BASE);
             if (0..DIRECTION_COUNT).contains(&dir) {
                 dir
             } else {
-                held_direction = 0;
+                the_ui.held_direction = 0;
                 DIR_NONE
             }
         };

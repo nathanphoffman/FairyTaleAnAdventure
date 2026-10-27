@@ -5,16 +5,13 @@ use super::actors::{actor_distance, eat_food, find_nearest_figure};
 use super::asm_text::{print_number, queue_print, show_event};
 use super::encounters::Encounter;
 use super::game_tables::{encounter_chart, item_list};
-use super::globals::{
-    current_rastport, drawing_page, julstuff, pagea, philstuff, quit_requested, rp_map, seq_list,
-    story_font, view_status, vp_page,
-};
+use super::globals::story_font;
 use super::menus::go_to_menu;
 use super::messages::{announce_container, announce_treasure, print, print_cont, print_wrapped};
 use super::objects::change_object;
 use super::random::{rand4, rand8};
 use super::screen_fx::{map_message, show_still_screen, win_colors};
-use super::state::{the_actors, the_hero, the_world};
+use super::state::{the_actors, the_hero, the_memory, the_screen, the_ui, the_world};
 use super::tables::{itrans, ob_listg, page_colors, treasure_probs};
 use super::types::{InvItem, SeqInfo, Shape};
 use crate::amiga::{BitMap, RastPort, TextFont, ViewPort};
@@ -146,31 +143,34 @@ pub unsafe fn items_option(chosen_entry: i16) {
 /// Draws every item the hero has, stacked, on a black page and shows it.
 unsafe fn show_item_list() {
     unsafe {
-        let bm = (*(*drawing_page).ri_page).BitMap;
-        rp_map.BitMap = bm;
-        SetRast(&raw mut rp_map, 0);
+        let bm = (*(*the_screen.drawing_page).ri_page).BitMap;
+        the_screen.rp_map.BitMap = bm;
+        SetRast(&raw mut the_screen.rp_map, 0);
 
         InitBitMap(
-            &raw mut pagea,
+            &raw mut the_screen.pagea,
             ITEM_IMAGE_PLANES,
             ITEM_IMAGE_WIDTH,
             ITEM_IMAGE_ROWS,
         );
-        let data = (*(&raw mut seq_list).cast::<SeqInfo>().add(OBJECTS as usize)).location;
+        let data = (*(&raw mut the_memory.seq_list)
+            .cast::<SeqInfo>()
+            .add(OBJECTS as usize))
+        .location;
         for plane in 0..ITEM_IMAGE_PLANES as usize {
-            pagea.Planes[plane] = data.add(plane * ITEM_IMAGE_BYTES);
+            the_screen.pagea.Planes[plane] = data.add(plane * ITEM_IMAGE_BYTES);
         }
 
         draw_item_icons(bm);
 
-        SetRGB4(&raw mut vp_page, BACKGROUND_PEN as i32, 0, 0, 0);
+        SetRGB4(&raw mut the_screen.vp_page, BACKGROUND_PEN as i32, 0, 0, 0);
         show_still_screen();
         LoadRGB4(
-            &raw mut vp_page,
+            &raw mut the_screen.vp_page,
             (&raw const page_colors).cast(),
             COLOURS_SHOWN,
         );
-        view_status = VIEW_ITEMS;
+        the_screen.view_status = VIEW_ITEMS;
         queue_print(PRQ_LIST);
     }
 }
@@ -187,7 +187,7 @@ unsafe fn draw_item_icons(bm: *mut BitMap) {
             let source_row = it.image_number as i32 * ITEM_ROW_HEIGHT + it.img_off as i32;
             for _ in 0..shown {
                 BltBitMap(
-                    &raw mut pagea,
+                    &raw mut the_screen.pagea,
                     0,
                     source_row,
                     bm,
@@ -237,10 +237,10 @@ unsafe fn finish_pickup() {
         change_object(the_actors.nearest_object as i32, 2);
         add_stuff(ARROWS, (*the_hero.stuff.add(ARROWBASE) as u32 * 10) as u8);
         if *the_hero.stuff.add(TALISMAN) != 0 {
-            quit_requested = 1;
-            view_status = VIEW_GAME_OVER;
+            the_ui.quit_requested = 1;
+            the_screen.view_status = VIEW_GAME_OVER;
             map_message();
-            SetFont(current_rastport, story_font);
+            SetFont(the_screen.current_rastport, story_font);
             win_colors();
         }
     }
@@ -283,9 +283,9 @@ unsafe fn take_object() -> bool {
                 ob_listg[BONES.1].ob_stat = 0;
                 for slot in 0..GOLDBASE {
                     let other = if owner == 1 {
-                        julstuff[slot]
+                        the_hero.julstuff[slot]
                     } else {
-                        philstuff[slot]
+                        the_hero.philstuff[slot]
                     };
                     add_stuff(slot, other);
                 }

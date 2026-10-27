@@ -13,12 +13,11 @@
 use super::actors::turtle_eggs;
 use super::asm_map::terrain_at;
 use super::game_tables::setfig_table;
-use super::globals::{loaded_setfig_file, nextshape, seq_list, witch_on_screen};
 use super::hdrive::motor_off;
 use super::loading::sprite_files;
 use super::loading::{finish_sprite_load, load_sprite_file};
 use super::random::bitrand;
-use super::state::{the_actors, the_world};
+use super::state::{the_actors, the_memory, the_witch, the_world};
 use super::tables::{CHEST, TURTLE, dstobs, glbobs, mapobs, ob_listg, ob_table, rand_treasure};
 use super::types::{SeqInfo, Shape, WorldObject};
 /// Mirror of the `setfig_table` entries in csrc/fmain.c: for each kind of person (wizard, priest,
@@ -167,10 +166,14 @@ unsafe fn load_set_figure(id: i8) {
             .cast::<SetFigEntry>()
             .add(id as usize))
         .cfile_entry;
-        if sprite_files[entry as usize].file_id != sprite_files[loaded_setfig_file as usize].file_id
+        if sprite_files[entry as usize].file_id
+            != sprite_files[the_actors.loaded_setfig_file as usize].file_id
         {
-            loaded_setfig_file = entry as i16;
-            nextshape = (*(&raw mut seq_list).cast::<SeqInfo>().add(SETFIG as usize)).location;
+            the_actors.loaded_setfig_file = entry as i16;
+            the_memory.nextshape = (*(&raw mut the_memory.seq_list)
+                .cast::<SeqInfo>()
+                .add(SETFIG as usize))
+            .location;
             load_sprite_file(entry as i32);
             finish_sprite_load(SETFIG as i16);
             motor_off();
@@ -188,7 +191,7 @@ unsafe fn load_set_figure(id: i8) {
 pub fn add_objects_near(mut list: *mut WorldObject, mut length: i16, f: i32) {
     unsafe {
         turtle_eggs = 0;
-        witch_on_screen = 0;
+        the_witch.on_screen = 0;
         if dstobs[the_world.region as usize] == 0 && the_world.new_region >= NO_REGION {
             distribute_treasure();
         }
@@ -221,7 +224,7 @@ unsafe fn add_object(object: &mut WorldObject, index: i16, f: i32) {
             }
             load_set_figure(id);
             if object.ob_id == WITCH && object.ob_stat == STAT_PERSON {
-                witch_on_screen = 1;
+                the_witch.on_screen = 1;
             }
         }
         if object.ob_stat == STAT_TAKEN || object.ob_stat == STAT_HIDDEN {

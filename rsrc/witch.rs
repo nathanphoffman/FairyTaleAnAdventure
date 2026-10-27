@@ -6,8 +6,8 @@
 //! second time erases it. It also records, in `s1` and `s2`, on which side of each edge the hero
 //! stands, which csrc/fmain.c uses to decide whether the beam hits the hero.
 
-use super::globals::{li, rp_map};
-use super::state::{the_hero, the_world};
+use super::globals::li;
+use super::state::{the_hero, the_screen, the_world};
 use super::tables::witchpoints;
 use super::types::FPage;
 use crate::amiga::{AreaInfo, BitMap, Layer, RastPort, TmpRas};
@@ -111,7 +111,7 @@ pub fn witch_fx(fp: *mut FPage) {
 
         LAYER = CreateUpfrontLayer(
             li,
-            rp_map.BitMap,
+            the_screen.rp_map.BitMap,
             0,
             0,
             LAYER_WIDTH,
@@ -119,7 +119,7 @@ pub fn witch_fx(fp: *mut FPage) {
             LAYER_SIMPLE,
             std::ptr::null_mut(),
         );
-        let r = &raw mut rp_map;
+        let r = &raw mut the_screen.rp_map;
         OLD_LAYER = (*r).Layer;
         (*r).Layer = LAYER;
 

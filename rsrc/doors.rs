@@ -6,8 +6,8 @@
 
 use super::asm_map::{terrain_at, tile_address};
 use super::game_tables::loaded_blocks;
-use super::globals::{held_direction, view_status};
 use super::messages::print;
+use super::state::{the_screen, the_ui};
 
 /// Set after a locked door was bumped, so "It's locked." is only said once until the hero moves on.
 pub static mut bumped_locked_door: i8 = 0;
@@ -97,8 +97,8 @@ pub fn open_door_near(x: u16, y: u16, keytype: u32) -> i32 {
             }
             if open.keytype == NOKEY || open.keytype as u32 == keytype {
                 swap_in_open_door_tiles(open, x, y);
-                view_status = REDRAW_MAP;
-                held_direction = 0;
+                the_screen.view_status = REDRAW_MAP;
+                the_ui.held_direction = 0;
                 print(c"It opened.".as_ptr());
                 return 1;
             }

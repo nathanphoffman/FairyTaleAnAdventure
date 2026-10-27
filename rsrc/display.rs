@@ -3,8 +3,9 @@
 //! The game draws on one of two pages while the other is on screen (`drawing_page`, `viewing_page`),
 //! then swaps them. The Amiga calls here are mostly stand-ins in the platform layer.
 
-use super::globals::{drawing_page, v, viewing_page, vp_page, vp_text};
+use super::globals::v;
 use super::input::reset_key_buffer;
+use super::state::the_screen;
 use crate::amiga::{View, ViewPort};
 use std::ffi::{c_char, c_void};
 
@@ -36,18 +37,18 @@ static mut INPUT_REQUEST: *mut c_void = std::ptr::null_mut();
 /// Swaps the page being drawn with the one being shown, and shows the one just finished.
 pub fn flip_pages() {
     unsafe {
-        let finished = drawing_page;
-        drawing_page = viewing_page;
-        viewing_page = finished;
-        vp_page.RasInfo = (*finished).ri_page;
+        let finished = the_screen.drawing_page;
+        the_screen.drawing_page = the_screen.viewing_page;
+        the_screen.viewing_page = finished;
+        the_screen.vp_page.RasInfo = (*finished).ri_page;
         v.LOFCprList = (*finished).savecop;
 
-        MakeVPort(&raw mut v, &raw mut vp_page);
+        MakeVPort(&raw mut v, &raw mut the_screen.vp_page);
         MrgCop(&raw mut v);
         LoadView(&raw mut v);
         (*finished).savecop = v.LOFCprList;
 
-        WaitBOVP(&raw mut vp_text);
+        WaitBOVP(&raw mut the_screen.vp_text);
     }
 }
 

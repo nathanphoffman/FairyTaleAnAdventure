@@ -7,11 +7,10 @@
 
 use super::asm_map::fill_minimap;
 use super::game_tables::{loaded_blocks, region_disk_blocks};
-use super::globals::{image_mem, map_mem, sector_mem, terrain_mem};
 use super::hdrive::{
     is_read_pending, load_track_range, mark_read_unused, motor_off, read_finished, wait_for_read,
 };
-use super::state::{the_hero, the_world};
+use super::state::{the_hero, the_memory, the_world};
 use super::types::Need;
 use std::ffi::c_void;
 
@@ -111,7 +110,7 @@ pub fn load_region_piece() {
             load_track_range(
                 need.sector as i16,
                 SECTOR_BLOCKS,
-                sector_mem.cast::<c_void>(),
+                the_memory.sector_mem.cast::<c_void>(),
                 REQ_SECTOR,
             );
             loaded_blocks.sector = need.sector;
@@ -120,7 +119,7 @@ pub fn load_region_piece() {
             load_track_range(
                 need.region as i16,
                 REGION_MAP_BLOCKS,
-                map_mem.cast::<c_void>(),
+                the_memory.map_mem.cast::<c_void>(),
                 REQ_MAP,
             );
             loaded_blocks.region = need.region;
@@ -129,13 +128,16 @@ pub fn load_region_piece() {
             load_track_range(
                 TERRA_BLOCK + need.terra1 as i16,
                 1,
-                terrain_mem.cast::<c_void>(),
+                the_memory.terrain_mem.cast::<c_void>(),
                 REQ_TERRA1,
             );
             loaded_blocks.terra1 = need.terra1;
         }
         if need.terra2 != loaded_blocks.terra2 {
-            let dest = terrain_mem.add(TERRA_TABLE_SIZE).cast::<c_void>();
+            let dest = the_memory
+                .terrain_mem
+                .add(TERRA_TABLE_SIZE)
+                .cast::<c_void>();
             load_track_range(TERRA_BLOCK + need.terra2 as i16, 1, dest, REQ_TERRA2);
             loaded_blocks.terra2 = need.terra2;
         }
@@ -154,7 +156,7 @@ pub fn load_region_piece() {
 /// loaded one (only one bank per call, so the game keeps running), false if all are up to date.
 unsafe fn load_next_image_bank(need: &Need) -> bool {
     unsafe {
-        let mut bank_mem = image_mem;
+        let mut bank_mem = the_memory.image_mem;
         for bank in 0..4 {
             if need.image[bank] != loaded_blocks.image[bank] {
                 let first = need.image[bank] as i16;
@@ -184,7 +186,7 @@ unsafe fn block_desert_door_without_statues() {
             && *the_hero.stuff.add(STATUE_SLOT) < STATUES_NEEDED
         {
             for offset in [0, 1, 128, 129] {
-                *map_mem.add(DESERT_DOOR_TILE + offset) = BLOCKED_TILE;
+                *the_memory.map_mem.add(DESERT_DOOR_TILE + offset) = BLOCKED_TILE;
             }
         }
     }

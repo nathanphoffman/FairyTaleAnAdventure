@@ -9,8 +9,8 @@ use super::objects::SetFigEntry;
 use super::types::{Bro, Door, Extent, InvItem, Letter, Menu, Need, StateEntry};
 use crate::amiga::{SimpleSprite, TextAttr};
 use std::ffi::c_char;
+use super::state::{the_hero};
 
-use super::globals::{julstuff, kevstuff, philstuff};
 
 /// The kinds of people (setfigs): which sprite file, the first image, and whether they can talk.
 pub static mut setfig_table: [SetFigEntry; 14] = [
@@ -437,11 +437,13 @@ pub static mut compass_lit_direction: i16 = 9;
 pub static mut facing_frame_offsets: [i8; 16] = [16, 16, 24, 24, 0, 0, 8, 8, 56, 56, 68, 68, 32, 32, 44, 44];
 
 /// The brothers' starting stats and their item lists.
-pub static mut brother_stats: [Bro; 3] = [
-    Bro { brave: 35, luck: 20, kind: 15, wealth: 20, stuff: &raw mut julstuff as *mut u8 },
-    Bro { brave: 20, luck: 35, kind: 15, wealth: 15, stuff: &raw mut philstuff as *mut u8 },
-    Bro { brave: 15, luck: 20, kind: 35, wealth: 10, stuff: &raw mut kevstuff as *mut u8 },
-];
+pub static mut brother_stats: [Bro; 3] = unsafe {
+    [
+    Bro { brave: 35, luck: 20, kind: 15, wealth: 20, stuff: &raw mut the_hero.julstuff as *mut u8 },
+    Bro { brave: 20, luck: 35, kind: 15, wealth: 15, stuff: &raw mut the_hero.philstuff as *mut u8 },
+    Bro { brave: 15, luck: 20, kind: 35, wealth: 10, stuff: &raw mut the_hero.kevstuff as *mut u8 },
+    ]
+};
 
 #[cfg(test)]
 mod tests {

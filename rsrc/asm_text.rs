@@ -11,10 +11,9 @@
 //! skipping `n` zero bytes.
 
 use super::game_tables::number_buffer;
-use super::globals::{current_rastport, rp_map};
 use super::messages::print_wrapped;
 use super::random::fta_rand;
-use super::state::{the_actors, the_hero};
+use super::state::{the_actors, the_hero, the_screen};
 use super::tables::{pplay, prec, print_que};
 use crate::amiga::RastPort;
 use std::ffi::c_char;
@@ -65,7 +64,7 @@ pub fn print_number(value: i32, len: i32) {
     format_number(value as u32);
     unsafe {
         Text(
-            current_rastport,
+            the_screen.current_rastport,
             (&raw const number_buffer)
                 .cast::<c_char>()
                 .add(NUMBER_DIGITS)
@@ -78,12 +77,12 @@ pub fn print_number(value: i32, len: i32) {
 // `move` is a Rust keyword, so this one is exported under the C name.
 /// Moves the text position (the C name is `move`, a keyword in Rust).
 pub extern "C" fn move_to(x: i32, y: i32) {
-    unsafe { Move(current_rastport, x, y) };
+    unsafe { Move(the_screen.current_rastport, x, y) };
 }
 
 /// Prints `len` characters at the text position.
 pub fn draw_text(s: *const c_char, len: i32) {
-    unsafe { Text(current_rastport, s, len) };
+    unsafe { Text(the_screen.current_rastport, s, len) };
 }
 
 /// Prints a string that may hold XY escapes (128, x/2, y) to move the text position. A string
@@ -93,14 +92,18 @@ pub fn print_positioned(mut s: *const u8) {
     unsafe {
         while *s != 0 {
             if *s == XY {
-                Move(current_rastport, *s.add(1) as i32 * 2, *s.add(2) as i32);
+                Move(
+                    the_screen.current_rastport,
+                    *s.add(1) as i32 * 2,
+                    *s.add(2) as i32,
+                );
                 s = s.add(3);
             } else {
                 let mut n = 0;
                 while *s.add(n) != 0 && *s.add(n) < XY {
                     n += 1;
                 }
-                Text(current_rastport, s.cast(), n as i32);
+                Text(the_screen.current_rastport, s.cast(), n as i32);
                 s = s.add(n);
                 if n == 0 {
                     s = s.add(1); // stray byte >= 128 that is not XY
@@ -189,7 +192,7 @@ unsafe fn line(r: *mut RastPort, x0: i32, y0: i32, x1: i32, y1: i32) {
 /// a highlight colour, winding around the four edges. The first passes also draw the top and bottom.
 pub fn draw_placard_border() {
     unsafe {
-        let r = &raw mut rp_map;
+        let r = &raw mut the_screen.rp_map;
         let (mut xorg, mut yorg) = (BORDER_START_X, 0);
         for pass in (0..BORDER_PASSES).rev() {
             for step in 0..16 {

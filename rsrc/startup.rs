@@ -25,14 +25,8 @@ use super::game_tables::{
     topaz_attr,
 };
 use super::globals::{
-    GfxBase as gfx_base, LayersBase as layers_base, audio_open, audioport, bm_lim, bm_page1,
-    bm_page2, bm_scroll, bm_source, bm_text, bmask_mem, cheat_enabled, current_menu,
-    current_rastport, current_viewport, drawing_page, flasher, font, fp_page1, fp_page2,
-    handler_data, image_mem, ioaudio, li, map_mem, nhinor, nhivar, oldview, openflags, origDir,
-    pagea, pageb, panel_font, queue_mem, quit_requested, ri_page1, ri_page2, ri_text, rp_map,
-    rp_text, rp_text2, sample_mem, scoremem, sector_mem, seg, shadow_mem, shape_mem, sprite_data,
-    story_font, terrain_mem, thistask, track, v, view_status, viewing_page, volmem, vp_page,
-    vp_text, wavmem, wb_bmap, work_bm,
+    GfxBase as gfx_base, LayersBase as layers_base, audio_open, audioport, font, ioaudio, li,
+    openflags, origDir, panel_font, seg, story_font, thistask, v,
 };
 use super::hdrive::{
     close_disk, load_track_range, mark_last_read_unused, open_disk, wait_for_last_read,
@@ -49,7 +43,7 @@ use super::objects::spawn_object_actors;
 use super::regions::refresh_minimap;
 use super::revive::revive;
 use super::screen_fx::{fade_normal, handle_print_request, set_intro_zoom, show_still_screen};
-use super::state::{the_actors, the_hero, the_world};
+use super::state::{the_actors, the_hero, the_memory, the_screen, the_ui, the_world};
 use super::world::{
     check_bed, check_door, day_night_tick, raft_proximity, sort_actors, spawn_encounters,
     speak_nearby, survival_tick, undo_sprites,
@@ -245,23 +239,23 @@ unsafe fn open_libraries_and_text_screen() -> Result<(), i32> {
             return Err(2);
         }
         set_flag(AL_GBASE);
-        oldview = (*gfx_base).ActiView;
+        the_screen.old_view = (*gfx_base).ActiView;
 
-        if MakeBitMap(&raw mut work_bm, 2, 640, 200) == 0 {
+        if MakeBitMap(&raw mut the_screen.work_bm, 2, 640, 200) == 0 {
             return Err(2);
         }
 
         li = NewLayerInfo();
-        InitRastPort(&raw mut rp_map);
-        InitRastPort(&raw mut rp_text);
-        InitRastPort(&raw mut rp_text2);
-        current_rastport = &raw mut rp_text;
+        InitRastPort(&raw mut the_screen.rp_map);
+        InitRastPort(&raw mut the_screen.rp_text);
+        InitRastPort(&raw mut the_screen.rp_text2);
+        the_screen.current_rastport = &raw mut the_screen.rp_text;
 
-        wb_bmap = &raw mut work_bm;
-        rp_text.BitMap = wb_bmap; // the "workbench screen" (not)
-        SetBPen(current_rastport, 0);
-        SetDrMd(current_rastport, JAM2 as u32);
-        SetRast(current_rastport, 0);
+        the_screen.wb_bmap = &raw mut the_screen.work_bm;
+        the_screen.rp_text.BitMap = the_screen.wb_bmap; // the "workbench screen" (not)
+        SetBPen(the_screen.current_rastport, 0);
+        SetDrMd(the_screen.current_rastport, JAM2 as u32);
+        SetRast(the_screen.current_rastport, 0);
         Ok(())
     }
 }
@@ -269,12 +263,12 @@ unsafe fn open_libraries_and_text_screen() -> Result<(), i32> {
 /// Allocates the five bitmap headers (two pages, text, source, limit) in one block.
 unsafe fn allocate_bitmap_headers() -> Result<(), i32> {
     unsafe {
-        bm_page1 = AllocMem(
+        the_screen.bm_page1 = AllocMem(
             BITMAP_COUNT * size_of::<BitMap>() as u32,
             MEMF_CHIP | MEMF_CLEAR,
         )
         .cast();
-        if bm_page1.is_null() {
+        if the_screen.bm_page1.is_null() {
             return Err(1);
         }
         set_flag(AL_BMAP);
@@ -294,9 +288,9 @@ unsafe fn open_fonts() -> Result<(), i32> {
         set_flag(AL_FONT);
 
         panel_font = OpenFont(&raw mut topaz_attr);
-        SetFont(&raw mut rp_text, panel_font);
-        SetFont(&raw mut rp_text2, panel_font);
-        SetFont(&raw mut rp_map, panel_font);
+        SetFont(&raw mut the_screen.rp_text, panel_font);
+        SetFont(&raw mut the_screen.rp_text2, panel_font);
+        SetFont(&raw mut the_screen.rp_map, panel_font);
         story_font = &raw mut (*font).dfh_TF;
         Ok(())
     }
@@ -305,10 +299,10 @@ unsafe fn open_fonts() -> Result<(), i32> {
 /// Installs the keyboard and mouse handler, and takes over the pointer sprite.
 unsafe fn install_input() -> Result<(), i32> {
     unsafe {
-        handler_data.xsprite = 320;
-        handler_data.ysprite = 320;
-        handler_data.gbase = gfx_base.cast();
-        handler_data.pbase = std::ptr::null_mut();
+        the_ui.handler_data.xsprite = 320;
+        the_ui.handler_data.ysprite = 320;
+        the_ui.handler_data.gbase = gfx_base.cast();
+        the_ui.handler_data.pbase = std::ptr::null_mut();
         if install_input_handler() == 0 {
             return Err(4);
         }
@@ -328,69 +322,69 @@ unsafe fn install_input() -> Result<(), i32> {
 unsafe fn set_up_view_ports() {
     unsafe {
         InitView(&raw mut v);
-        InitVPort(&raw mut vp_page);
-        InitVPort(&raw mut vp_text);
+        InitVPort(&raw mut the_screen.vp_page);
+        InitVPort(&raw mut the_screen.vp_text);
 
-        v.ViewPort = &raw mut vp_text;
-        vp_text.Next = &raw mut vp_page;
-        vp_page.Next = std::ptr::null_mut();
+        v.ViewPort = &raw mut the_screen.vp_text;
+        the_screen.vp_text.Next = &raw mut the_screen.vp_page;
+        the_screen.vp_page.Next = std::ptr::null_mut();
 
-        vp_page.DWidth = LOWRES_WIDTH;
-        vp_text.DWidth = HIRES_WIDTH;
+        the_screen.vp_page.DWidth = LOWRES_WIDTH;
+        the_screen.vp_text.DWidth = HIRES_WIDTH;
 
-        vp_page.DxOffset = PAGE_VIEW_X;
-        vp_page.DyOffset = 0;
-        vp_text.DxOffset = 0;
-        vp_page.DHeight = PAGE_VIEW_HEIGHT;
+        the_screen.vp_page.DxOffset = PAGE_VIEW_X;
+        the_screen.vp_page.DyOffset = 0;
+        the_screen.vp_text.DxOffset = 0;
+        the_screen.vp_page.DHeight = PAGE_VIEW_HEIGHT;
 
-        vp_text.DyOffset = PAGE_HEIGHT;
-        vp_text.DHeight = TEXT_HEIGHT as i16;
+        the_screen.vp_text.DyOffset = PAGE_HEIGHT;
+        the_screen.vp_text.DHeight = TEXT_HEIGHT as i16;
 
-        vp_text.Modes = HIRES | SPRITES | VP_HIDE;
+        the_screen.vp_text.Modes = HIRES | SPRITES | VP_HIDE;
     }
 }
 
 /// Splits the bitmap block into its five bitmaps, and sets up the rast infos and the two pages.
 unsafe fn set_up_bitmaps_and_rasinfos() {
     unsafe {
-        bm_page2 = bm_page1.add(1);
-        bm_text = bm_page1.add(2);
-        bm_source = bm_page1.add(3);
-        bm_lim = bm_page1.add(4);
-        InitBitMap(bm_page1, PAGE_DEPTH, PHANTA_WIDTH, RAST_HEIGHT);
-        InitBitMap(bm_page2, PAGE_DEPTH, PHANTA_WIDTH, RAST_HEIGHT);
-        InitBitMap(bm_text, TEXT_DEPTH, 640, TEXT_HEIGHT);
-        InitBitMap(bm_lim, 1, 320, 200);
-        InitBitMap(&raw mut pagea, 5, 320, 200);
-        InitBitMap(&raw mut pageb, 5, 320, 200);
-        InitBitMap(&raw mut bm_scroll, 1, 640, TEXT_HEIGHT);
-        InitBitMap(bm_source, 3, 64, 24);
+        the_screen.bm_page2 = the_screen.bm_page1.add(1);
+        the_screen.bm_text = the_screen.bm_page1.add(2);
+        the_screen.bm_source = the_screen.bm_page1.add(3);
+        the_screen.bm_lim = the_screen.bm_page1.add(4);
+        InitBitMap(the_screen.bm_page1, PAGE_DEPTH, PHANTA_WIDTH, RAST_HEIGHT);
+        InitBitMap(the_screen.bm_page2, PAGE_DEPTH, PHANTA_WIDTH, RAST_HEIGHT);
+        InitBitMap(the_screen.bm_text, TEXT_DEPTH, 640, TEXT_HEIGHT);
+        InitBitMap(the_screen.bm_lim, 1, 320, 200);
+        InitBitMap(&raw mut the_screen.pagea, 5, 320, 200);
+        InitBitMap(&raw mut the_screen.pageb, 5, 320, 200);
+        InitBitMap(&raw mut the_screen.bm_scroll, 1, 640, TEXT_HEIGHT);
+        InitBitMap(the_screen.bm_source, 3, 64, 24);
 
-        rp_text2.BitMap = bm_text;
+        the_screen.rp_text2.BitMap = the_screen.bm_text;
 
-        ri_page1.BitMap = bm_page1;
-        ri_page2.BitMap = bm_page2;
-        ri_page1.RxOffset = 0;
-        ri_page2.RxOffset = 0;
-        ri_page1.RyOffset = 0;
-        ri_page2.RyOffset = 0;
-        ri_page1.Next = std::ptr::null_mut();
-        ri_page2.Next = std::ptr::null_mut();
+        the_screen.ri_page1.BitMap = the_screen.bm_page1;
+        the_screen.ri_page2.BitMap = the_screen.bm_page2;
+        the_screen.ri_page1.RxOffset = 0;
+        the_screen.ri_page2.RxOffset = 0;
+        the_screen.ri_page1.RyOffset = 0;
+        the_screen.ri_page2.RyOffset = 0;
+        the_screen.ri_page1.Next = std::ptr::null_mut();
+        the_screen.ri_page2.Next = std::ptr::null_mut();
 
-        ri_text.BitMap = bm_text;
-        ri_text.RxOffset = 0;
-        ri_text.RyOffset = 0;
-        ri_text.Next = std::ptr::null_mut();
+        the_screen.ri_text.BitMap = the_screen.bm_text;
+        the_screen.ri_text.RxOffset = 0;
+        the_screen.ri_text.RyOffset = 0;
+        the_screen.ri_text.Next = std::ptr::null_mut();
 
-        fp_page1.savecop = std::ptr::null_mut();
-        fp_page2.savecop = std::ptr::null_mut();
-        fp_page1.ri_page = &raw mut ri_page1;
-        fp_page2.ri_page = &raw mut ri_page1;
-        drawing_page = &raw mut fp_page1;
-        viewing_page = &raw mut fp_page2;
+        the_screen.fp_page1.savecop = std::ptr::null_mut();
+        the_screen.fp_page2.savecop = std::ptr::null_mut();
+        the_screen.fp_page1.ri_page = &raw mut the_screen.ri_page1;
+        the_screen.fp_page2.ri_page = &raw mut the_screen.ri_page1;
+        the_screen.drawing_page = &raw mut the_screen.fp_page1;
+        the_screen.viewing_page = &raw mut the_screen.fp_page2;
 
-        vp_page.ColorMap = GetColorMap(32);
-        vp_text.ColorMap = GetColorMap(20);
+        the_screen.vp_page.ColorMap = GetColorMap(32);
+        the_screen.vp_text.ColorMap = GetColorMap(20);
     }
 }
 
@@ -398,16 +392,16 @@ unsafe fn set_up_bitmaps_and_rasinfos() {
 unsafe fn allocate_page_planes() -> Result<(), i32> {
     unsafe {
         for i in 0..PAGE_DEPTH as usize {
-            (*bm_page1).Planes[i] = std::ptr::null_mut();
-            (*bm_page2).Planes[i] = std::ptr::null_mut();
+            (*the_screen.bm_page1).Planes[i] = std::ptr::null_mut();
+            (*the_screen.bm_page2).Planes[i] = std::ptr::null_mut();
         }
         for i in 0..PAGE_DEPTH as usize {
-            (*bm_page1).Planes[i] = AllocRaster(PHANTA_WIDTH as u32, RAST_HEIGHT as u32);
-            if (*bm_page1).Planes[i].is_null() {
+            (*the_screen.bm_page1).Planes[i] = AllocRaster(PHANTA_WIDTH as u32, RAST_HEIGHT as u32);
+            if (*the_screen.bm_page1).Planes[i].is_null() {
                 return Err(4);
             }
-            (*bm_page2).Planes[i] = AllocRaster(PHANTA_WIDTH as u32, RAST_HEIGHT as u32);
-            if (*bm_page2).Planes[i].is_null() {
+            (*the_screen.bm_page2).Planes[i] = AllocRaster(PHANTA_WIDTH as u32, RAST_HEIGHT as u32);
+            if (*the_screen.bm_page2).Planes[i].is_null() {
                 return Err(5);
             }
         }
@@ -420,38 +414,45 @@ unsafe fn allocate_page_planes() -> Result<(), i32> {
 unsafe fn share_text_bitmap_memory() {
     unsafe {
         let text_plane_bytes = TEXT_HEIGHT as usize * TEXT_ROW_BYTES;
-        (*bm_text).Planes[0] = (*wb_bmap).Planes[0];
-        (*bm_text).Planes[1] = (*wb_bmap).Planes[1];
-        (*bm_text).Planes[2] = (*bm_text).Planes[0].add(text_plane_bytes);
-        (*bm_text).Planes[3] = (*bm_text).Planes[1].add(text_plane_bytes);
+        (*the_screen.bm_text).Planes[0] = (*the_screen.wb_bmap).Planes[0];
+        (*the_screen.bm_text).Planes[1] = (*the_screen.wb_bmap).Planes[1];
+        (*the_screen.bm_text).Planes[2] = (*the_screen.bm_text).Planes[0].add(text_plane_bytes);
+        (*the_screen.bm_text).Planes[3] = (*the_screen.bm_text).Planes[1].add(text_plane_bytes);
 
-        queue_mem = (*bm_text).Planes[2].add(text_plane_bytes);
-        bmask_mem = (*bm_text).Planes[3].add(text_plane_bytes);
+        the_memory.queue_mem = (*the_screen.bm_text).Planes[2].add(text_plane_bytes);
+        the_memory.bmask_mem = (*the_screen.bm_text).Planes[3].add(text_plane_bytes);
 
-        fp_page1.backsave = queue_mem.add(BACKSAVE_OFFSET);
-        fp_page2.backsave = bmask_mem.add(BACKSAVE_OFFSET);
+        the_screen.fp_page1.backsave = the_memory.queue_mem.add(BACKSAVE_OFFSET);
+        the_screen.fp_page2.backsave = the_memory.bmask_mem.add(BACKSAVE_OFFSET);
 
-        fp_page1.shape_queue = queue_mem.cast();
-        fp_page2.shape_queue = queue_mem.add(size_of::<SShape>() * MAXSHAPES).cast();
+        the_screen.fp_page1.shape_queue = the_memory.queue_mem.cast();
+        the_screen.fp_page2.shape_queue = the_memory
+            .queue_mem
+            .add(size_of::<SShape>() * MAXSHAPES)
+            .cast();
 
-        vp_text.RasInfo = &raw mut ri_text;
-        MakeVPort(&raw mut v, &raw mut vp_text);
+        the_screen.vp_text.RasInfo = &raw mut the_screen.ri_text;
+        MakeVPort(&raw mut v, &raw mut the_screen.vp_text);
     }
 }
 
 /// Allocates the waveform/volume buffers and the score memory, and starts the music player.
 unsafe fn allocate_music_memory() -> Result<(), i32> {
     unsafe {
-        wavmem = AllocMem(VOICE_SZ, MEMF_CHIP);
-        if wavmem.is_null() {
+        the_memory.wavmem = AllocMem(VOICE_SZ, MEMF_CHIP);
+        if the_memory.wavmem.is_null() {
             return Err(16);
         }
-        scoremem = AllocMem(SCORE_SZ, 0);
-        if scoremem.is_null() {
+        the_memory.scoremem = AllocMem(SCORE_SZ, 0);
+        if the_memory.scoremem.is_null() {
             return Err(17);
         }
-        volmem = wavmem.add(S_WAVBUF as usize);
-        init_music((&raw const instrument_waves).cast(), wavmem, volmem);
+        the_memory.volmem = the_memory.wavmem.add(S_WAVBUF as usize);
+        init_music(
+            (&raw const instrument_waves).cast(),
+            the_memory.wavmem,
+            the_memory.volmem,
+        );
         set_flag(AL_MUSIC);
         Ok(())
     }
@@ -468,18 +469,18 @@ unsafe fn allocate_chip_area(size: u32, error: i32) -> Result<*mut u8, i32> {
 /// Allocates the picture, sector, shape, shadow-mask, sample and terrain areas.
 unsafe fn allocate_game_memory() -> Result<(), i32> {
     unsafe {
-        image_mem = allocate_chip_area(IMAGE_SZ, 6)?;
+        the_memory.image_mem = allocate_chip_area(IMAGE_SZ, 6)?;
         set_flag(AL_IMAGE);
-        sector_mem = allocate_chip_area(SECTOR_SZ, 7)?;
-        map_mem = sector_mem.add(SECTOR_OFF);
+        the_memory.sector_mem = allocate_chip_area(SECTOR_SZ, 7)?;
+        the_memory.map_mem = the_memory.sector_mem.add(SECTOR_OFF);
         set_flag(AL_SECTOR);
-        shape_mem = allocate_chip_area(SHAPE_SZ, 8)?;
+        the_memory.shape_mem = allocate_chip_area(SHAPE_SZ, 8)?;
         set_flag(AL_SHAPE);
-        shadow_mem = allocate_chip_area(SHADOW_SZ, 10)?;
+        the_memory.shadow_mem = allocate_chip_area(SHADOW_SZ, 10)?;
         set_flag(AL_SHADOW);
-        sample_mem = allocate_chip_area(SAMPLE_SZ, 11)?;
+        the_memory.sample_mem = allocate_chip_area(SAMPLE_SZ, 11)?;
         set_flag(AL_SAMPLE);
-        terrain_mem = allocate_chip_area(TERRA_SZ, 34)?;
+        the_memory.terrain_mem = allocate_chip_area(TERRA_SZ, 34)?;
         set_flag(AL_TERR);
         Ok(())
     }
@@ -490,9 +491,9 @@ unsafe fn load_music_waveforms() {
     unsafe {
         let file = Open(c"v6".as_ptr(), MODE_OLDFILE);
         if file != 0 {
-            Read(file, wavmem, S_WAVBUF);
+            Read(file, the_memory.wavmem, S_WAVBUF);
             Seek(file, S_WAVBUF, 0);
-            Read(file, volmem, S_VOLBUF);
+            Read(file, the_memory.volmem, S_VOLBUF);
             Close(file);
         }
     }
@@ -502,15 +503,19 @@ unsafe fn load_music_waveforms() {
 /// the two high-bit font tables are copied to chip memory.
 unsafe fn set_up_pointer_sprite_and_fonts_data() {
     unsafe {
-        bm_scroll.Planes[0] = (*bm_text).Planes[0];
+        the_screen.bm_scroll.Planes[0] = (*the_screen.bm_text).Planes[0];
 
-        sprite_data = into_chip((&raw mut pointer_sprite_data).cast(), SPRITE_DATA_SZ);
+        the_memory.sprite_data = into_chip((&raw mut pointer_sprite_data).cast(), SPRITE_DATA_SZ);
 
-        ChangeSprite(&raw mut vp_text, &raw mut pointer_sprite, sprite_data);
-        handler_data.vbase = (&raw mut vp_text).cast();
+        ChangeSprite(
+            &raw mut the_screen.vp_text,
+            &raw mut pointer_sprite,
+            the_memory.sprite_data,
+        );
+        the_ui.handler_data.vbase = (&raw mut the_screen.vp_text).cast();
 
-        nhinor = into_chip((&raw mut hinor).cast(), NORM_HIGH_SZ);
-        nhivar = into_chip((&raw mut hivar).cast(), NORM_HIGH_SZ);
+        the_memory.nhinor = into_chip((&raw mut hinor).cast(), NORM_HIGH_SZ);
+        the_memory.nhivar = into_chip((&raw mut hivar).cast(), NORM_HIGH_SZ);
     }
 }
 
@@ -566,12 +571,12 @@ pub fn close_all() {
 unsafe fn free_game_memory() {
     unsafe {
         let areas = [
-            (AL_TERR, terrain_mem, TERRA_SZ),
-            (AL_SAMPLE, sample_mem, SAMPLE_SZ),
-            (AL_SHADOW, shadow_mem, SHADOW_SZ),
-            (AL_SHAPE, shape_mem, SHAPE_SZ),
-            (AL_SECTOR, sector_mem, SECTOR_SZ),
-            (AL_IMAGE, image_mem, IMAGE_SZ),
+            (AL_TERR, the_memory.terrain_mem, TERRA_SZ),
+            (AL_SAMPLE, the_memory.sample_mem, SAMPLE_SZ),
+            (AL_SHADOW, the_memory.shadow_mem, SHADOW_SZ),
+            (AL_SHAPE, the_memory.shape_mem, SHAPE_SZ),
+            (AL_SECTOR, the_memory.sector_mem, SECTOR_SZ),
+            (AL_IMAGE, the_memory.image_mem, IMAGE_SZ),
         ];
         for (flag, area, size) in areas {
             if has_flag(flag) {
@@ -580,8 +585,8 @@ unsafe fn free_game_memory() {
         }
         if has_flag(AL_MUSIC) {
             wrap_music();
-            FreeMem(wavmem.cast(), VOICE_SZ);
-            FreeMem(scoremem.cast(), SCORE_SZ);
+            FreeMem(the_memory.wavmem.cast(), VOICE_SZ);
+            FreeMem(the_memory.scoremem.cast(), SCORE_SZ);
         }
     }
 }
@@ -590,30 +595,38 @@ unsafe fn free_game_memory() {
 unsafe fn free_pointer_and_font_data() {
     unsafe {
         free_chip(
-            sprite_data,
+            the_memory.sprite_data,
             (&raw mut pointer_sprite_data).cast(),
             SPRITE_DATA_SZ as u32,
         );
-        free_chip(nhinor, (&raw mut hinor).cast(), NORM_HIGH_SZ as u32);
-        free_chip(nhivar, (&raw mut hivar).cast(), NORM_HIGH_SZ as u32);
+        free_chip(
+            the_memory.nhinor,
+            (&raw mut hinor).cast(),
+            NORM_HIGH_SZ as u32,
+        );
+        free_chip(
+            the_memory.nhivar,
+            (&raw mut hivar).cast(),
+            NORM_HIGH_SZ as u32,
+        );
     }
 }
 
 /// Puts the old view back and frees the view ports' copper lists and colour maps.
 unsafe fn free_view_resources() {
     unsafe {
-        LoadView(oldview);
-        FreeVPortCopLists(&raw mut vp_page);
-        FreeVPortCopLists(&raw mut vp_text);
-        FreeCprList(fp_page1.savecop);
-        FreeCprList(fp_page2.savecop);
+        LoadView(the_screen.old_view);
+        FreeVPortCopLists(&raw mut the_screen.vp_page);
+        FreeVPortCopLists(&raw mut the_screen.vp_text);
+        FreeCprList(the_screen.fp_page1.savecop);
+        FreeCprList(the_screen.fp_page2.savecop);
         FreeCprList(v.SHFCprList);
 
-        if !vp_page.ColorMap.is_null() {
-            FreeColorMap(vp_page.ColorMap);
+        if !the_screen.vp_page.ColorMap.is_null() {
+            FreeColorMap(the_screen.vp_page.ColorMap);
         }
-        if !vp_text.ColorMap.is_null() {
-            FreeColorMap(vp_text.ColorMap);
+        if !the_screen.vp_text.ColorMap.is_null() {
+            FreeColorMap(the_screen.vp_text.ColorMap);
         }
     }
 }
@@ -621,7 +634,7 @@ unsafe fn free_view_resources() {
 /// Frees the bit planes of both pages.
 unsafe fn free_page_planes() {
     unsafe {
-        for bm in [bm_page1, bm_page2] {
+        for bm in [the_screen.bm_page1, the_screen.bm_page2] {
             for i in 0..PAGE_DEPTH as usize {
                 if !(*bm).Planes[i].is_null() {
                     FreeRaster((*bm).Planes[i], PHANTA_WIDTH as u32, RAST_HEIGHT as u32);
@@ -667,8 +680,11 @@ unsafe fn close_libraries_and_bitmaps() {
             CloseLibrary(layers_base);
         }
         if has_flag(AL_BMAP) {
-            FreeMem(bm_page1.cast(), BITMAP_COUNT * size_of::<BitMap>() as u32);
-            UnMakeBitMap(&raw mut work_bm);
+            FreeMem(
+                the_screen.bm_page1.cast(),
+                BITMAP_COUNT * size_of::<BitMap>() as u32,
+            );
+            UnMakeBitMap(&raw mut the_screen.work_bm);
         }
         DisposeLayerInfo(li);
         FreeSprite(0);
@@ -768,8 +784,8 @@ pub extern "C" fn fta_main(argc: i32, _argv: *mut c_char) {
 /// The end of the program (the `quit_all` label): back to the plain text screen, then `close_all`.
 unsafe fn quit_all() {
     unsafe {
-        rp_text.BitMap = wb_bmap;
-        SetRast(&raw mut rp_text, 0);
+        the_screen.rp_text.BitMap = the_screen.wb_bmap;
+        SetRast(&raw mut the_screen.rp_text, 0);
         close_all();
     }
 }
@@ -800,36 +816,36 @@ unsafe fn start_up() -> bool {
 /// Blanks both pages.
 unsafe fn clear_both_pages() {
     unsafe {
-        rp_map.BitMap = (*(*viewing_page).ri_page).BitMap;
-        SetRast(&raw mut rp_map, 0);
-        rp_map.BitMap = (*(*drawing_page).ri_page).BitMap;
-        SetRast(&raw mut rp_map, 0);
+        the_screen.rp_map.BitMap = (*(*the_screen.viewing_page).ri_page).BitMap;
+        SetRast(&raw mut the_screen.rp_map, 0);
+        the_screen.rp_map.BitMap = (*(*the_screen.drawing_page).ri_page).BitMap;
+        SetRast(&raw mut the_screen.rp_map, 0);
     }
 }
 
 /// The legal title text on a blue page, then the music and the sound effects are read in.
 unsafe fn show_title_screen() {
     unsafe {
-        vp_page.RasInfo = &raw mut ri_page1;
-        fp_page2.ri_page = &raw mut ri_page2;
+        the_screen.vp_page.RasInfo = &raw mut the_screen.ri_page1;
+        the_screen.fp_page2.ri_page = &raw mut the_screen.ri_page2;
         clear_both_pages();
-        current_rastport = &raw mut rp_map;
+        the_screen.current_rastport = &raw mut the_screen.rp_map;
         set_intro_zoom(ZOOM_NORMAL);
-        SetRGB4(&raw mut vp_page, 0, 0, 0, 6);
-        SetRGB4(&raw mut vp_page, 1, 15, 15, 15);
+        SetRGB4(&raw mut the_screen.vp_page, 0, 0, 0, 6);
+        SetRGB4(&raw mut the_screen.vp_page, 1, 15, 15, 15);
 
-        let pen = (*current_rastport).FgPen as u32;
-        SetAPen(current_rastport, TITLE_PEN);
+        let pen = (*the_screen.current_rastport).FgPen as u32;
+        SetAPen(the_screen.current_rastport, TITLE_PEN);
         print_positioned(titletext.as_ptr());
-        SetAPen(current_rastport, pen);
+        SetAPen(the_screen.current_rastport, pen);
 
         Delay(TITLE_WAIT);
 
-        current_rastport = &raw mut rp_text;
-        rp_text.BitMap = &raw mut bm_scroll;
-        SetFont(current_rastport, story_font);
-        SetAPen(current_rastport, 10);
-        SetBPen(current_rastport, 11);
+        the_screen.current_rastport = &raw mut the_screen.rp_text;
+        the_screen.rp_text.BitMap = &raw mut the_screen.bm_scroll;
+        SetFont(the_screen.current_rastport, story_font);
+        SetAPen(the_screen.current_rastport, 10);
+        SetBPen(the_screen.current_rastport, 11);
 
         read_score();
         read_sample();
@@ -842,24 +858,29 @@ unsafe fn show_title_screen() {
 /// so both show the same thing.
 unsafe fn prepare_intro_pages_and_music() {
     unsafe {
-        current_viewport = &raw mut vp_page; // so that the IFF routines can communicate
-        vp_page.RasInfo = &raw mut ri_page1;
+        the_screen.current_viewport = &raw mut the_screen.vp_page; // so that the IFF routines can communicate
+        the_screen.vp_page.RasInfo = &raw mut the_screen.ri_page1;
 
         for i in 0..5 {
-            pageb.Planes[i] = image_mem.add(i * IMAGE_PLANE_BYTES);
-            pagea.Planes[i] = pageb.Planes[i].add(PAGE_HALF_BYTES);
+            the_screen.pageb.Planes[i] = the_memory.image_mem.add(i * IMAGE_PLANE_BYTES);
+            the_screen.pagea.Planes[i] = the_screen.pageb.Planes[i].add(PAGE_HALF_BYTES);
         }
-        (*bm_lim).Planes[0] = sector_mem;
+        (*the_screen.bm_lim).Planes[0] = the_memory.sector_mem;
 
-        playscore(track[12], track[13], track[14], track[15]);
+        playscore(
+            the_memory.track[12],
+            the_memory.track[13],
+            the_memory.track[14],
+            the_memory.track[15],
+        );
 
         LoadRGB4(
-            &raw mut vp_text,
+            &raw mut the_screen.vp_text,
             (&raw const black_colors).cast(),
             PAGE_COLORS,
         );
 
-        fp_page2.ri_page = &raw mut ri_page2;
+        the_screen.fp_page2.ri_page = &raw mut the_screen.ri_page2;
         set_intro_zoom(0);
 
         flip_pages(); // "prime the pump"
@@ -871,69 +892,74 @@ unsafe fn prepare_intro_pages_and_music() {
 /// the copyright placard.
 unsafe fn show_play_screen_background() {
     unsafe {
-        fp_page2.ri_page = &raw mut ri_page2;
+        the_screen.fp_page2.ri_page = &raw mut the_screen.ri_page2;
         clear_both_pages();
 
         LoadRGB4(
-            &raw mut vp_text,
+            &raw mut the_screen.vp_text,
             (&raw const black_colors).cast(),
             PAGE_COLORS,
         );
         set_intro_zoom(ZOOM_NORMAL);
-        SetRGB4(&raw mut vp_page, 0, 0, 0, 3);
-        load_track_range(SHADOW_BLOCK.0, SHADOW_BLOCK.1, shadow_mem.cast(), 0);
+        SetRGB4(&raw mut the_screen.vp_page, 0, 0, 0, 3);
+        load_track_range(
+            SHADOW_BLOCK.0,
+            SHADOW_BLOCK.1,
+            the_memory.shadow_mem.cast(),
+            0,
+        );
         wait_for_last_read();
         mark_last_read_unused();
 
-        SetRGB4(&raw mut vp_page, 0, 0, 0, 6);
-        load_picture(c"hiscreen".as_ptr(), bm_text, 0, 0);
+        SetRGB4(&raw mut the_screen.vp_page, 0, 0, 0, 6);
+        load_picture(c"hiscreen".as_ptr(), the_screen.bm_text, 0, 0);
 
-        SetRGB4(&raw mut vp_page, 1, 15, 15, 15);
+        SetRGB4(&raw mut the_screen.vp_page, 1, 15, 15, 15);
 
-        current_rastport = &raw mut rp_map;
-        rp_map.BitMap = (*(*drawing_page).ri_page).BitMap;
+        the_screen.current_rastport = &raw mut the_screen.rp_map;
+        the_screen.rp_map.BitMap = (*(*the_screen.drawing_page).ri_page).BitMap;
         show_still_screen();
-        SetAPen(current_rastport, TITLE_PEN);
+        SetAPen(the_screen.current_rastport, TITLE_PEN);
         placard_text(PLACARD_COPYRIGHT);
-        handler_data.laydown = 0;
-        handler_data.pickup = 0;
+        the_ui.handler_data.laydown = 0;
+        the_ui.handler_data.pickup = 0;
     }
 }
 
 /// Starts the first brother and sets up the text page and the colours for play.
 unsafe fn start_first_brother() {
     unsafe {
-        ri_page1.RxOffset = 0;
-        ri_page2.RxOffset = 0;
-        ri_page1.RyOffset = 0;
-        ri_page2.RyOffset = 0;
+        the_screen.ri_page1.RxOffset = 0;
+        the_screen.ri_page2.RxOffset = 0;
+        the_screen.ri_page1.RyOffset = 0;
+        the_screen.ri_page2.RyOffset = 0;
 
         stopscore();
         revive(1);
-        rp_map.BitMap = (*(*drawing_page).ri_page).BitMap;
+        the_screen.rp_map.BitMap = (*(*the_screen.drawing_page).ri_page).BitMap;
 
-        vp_text.DyOffset = PAGE_HEIGHT;
-        vp_text.DHeight = TEXT_HEIGHT as i16;
-        vp_page.DHeight = PAGE_VIEW_HEIGHT;
-        vp_page.DxOffset = PAGE_VIEW_X;
-        vp_page.DWidth = LOWRES_WIDTH;
-        vp_page.DyOffset = 0;
-        MakeVPort(&raw mut v, &raw mut vp_text);
+        the_screen.vp_text.DyOffset = PAGE_HEIGHT;
+        the_screen.vp_text.DHeight = TEXT_HEIGHT as i16;
+        the_screen.vp_page.DHeight = PAGE_VIEW_HEIGHT;
+        the_screen.vp_page.DxOffset = PAGE_VIEW_X;
+        the_screen.vp_page.DWidth = LOWRES_WIDTH;
+        the_screen.vp_page.DyOffset = 0;
+        MakeVPort(&raw mut v, &raw mut the_screen.vp_text);
         LoadRGB4(
-            &raw mut vp_text,
+            &raw mut the_screen.vp_text,
             (&raw const text_colors).cast(),
             TEXT_COLORS,
         );
-        handler_data.pbase = (&raw mut pointer_sprite).cast();
+        the_ui.handler_data.pbase = (&raw mut pointer_sprite).cast();
 
-        fp_page1.obcount = 0;
-        fp_page2.obcount = 0;
-        fp_page1.wflag = 0;
-        fp_page2.wflag = 0;
+        the_screen.fp_page1.obcount = 0;
+        the_screen.fp_page2.obcount = 0;
+        the_screen.fp_page1.wflag = 0;
+        the_screen.fp_page2.wflag = 0;
 
-        view_status = VIEW_REDRAW;
+        the_screen.view_status = VIEW_REDRAW;
 
-        current_menu = 0;
+        the_ui.current_menu = 0;
         print_options();
     }
 }
@@ -941,15 +967,15 @@ unsafe fn start_first_brother() {
 /// The story pictures with the zoom in and out (skipped if the player presses Space).
 unsafe fn play_intro() {
     unsafe {
-        load_picture(c"page0".as_ptr(), &raw mut pageb, 0, 0);
-        copy_title_picture_to(bm_page1);
-        copy_title_picture_to(bm_page2);
+        load_picture(c"page0".as_ptr(), &raw mut the_screen.pageb, 0, 0);
+        copy_title_picture_to(the_screen.bm_page1);
+        copy_title_picture_to(the_screen.bm_page2);
 
-        fp_page2.ri_page = &raw mut ri_page1;
+        the_screen.fp_page2.ri_page = &raw mut the_screen.ri_page1;
         for x in (0..=ZOOM_FULL).step_by(ZOOM_STEP) {
             set_intro_zoom(x);
         }
-        fp_page2.ri_page = &raw mut ri_page2;
+        the_screen.fp_page2.ri_page = &raw mut the_screen.ri_page2;
 
         if intro_skipped() == 0 {
             show_story_page(c"p1a".as_ptr(), c"p1b".as_ptr(), 21, 29);
@@ -959,7 +985,7 @@ unsafe fn play_intro() {
                 Delay(INTRO_PAGES_WAIT);
             }
         }
-        fp_page2.ri_page = &raw mut ri_page1;
+        the_screen.fp_page2.ri_page = &raw mut the_screen.ri_page1;
         for x in (0..=ZOOM_NORMAL).rev().step_by(ZOOM_STEP) {
             set_intro_zoom(x);
         }
@@ -970,7 +996,7 @@ unsafe fn play_intro() {
 unsafe fn copy_title_picture_to(bitmap: *mut BitMap) {
     unsafe {
         BltBitMap(
-            &raw mut pageb,
+            &raw mut the_screen.pageb,
             0,
             0,
             bitmap,
@@ -990,8 +1016,8 @@ unsafe fn scroll_step() -> (i16, i16) {
     unsafe {
         the_world.tile_x = the_world.map_x >> 4;
         the_world.tile_y = the_world.map_y >> 5;
-        let dif_x = (the_world.tile_x as i32 - (*drawing_page).isv_x) as i16;
-        let dif_y = (the_world.tile_y as i32 - (*drawing_page).isv_y) as i16;
+        let dif_x = (the_world.tile_x as i32 - (*the_screen.drawing_page).isv_x) as i16;
+        let dif_y = (the_world.tile_y as i32 - (*the_screen.drawing_page).isv_y) as i16;
         (wrap_scroll_difference(dif_x), dif_y)
     }
 }
@@ -1021,9 +1047,9 @@ unsafe fn main_loop() {
             cycle: 0,
             last_terrain: 0,
         };
-        cheat_enabled = 0;
-        quit_requested = 0;
-        while quit_requested == 0 {
+        the_ui.cheat_enabled = 0;
+        the_ui.quit_requested = 0;
+        while the_ui.quit_requested == 0 {
             run_frame(&mut state);
         }
     }
@@ -1033,7 +1059,7 @@ unsafe fn main_loop() {
 unsafe fn run_frame(state: &mut FrameState) {
     unsafe {
         state.cycle = state.cycle.wrapping_add(1);
-        flasher = flasher.wrapping_add(1);
+        the_screen.flasher = the_screen.flasher.wrapping_add(1);
         super::statedump::run_pending_command(); // test commands, does nothing normally
 
         read_keyboard();
@@ -1079,14 +1105,20 @@ unsafe fn read_keyboard() {
 /// and the like only flash the pointer and handle the print queue).
 unsafe fn handle_view_status() -> bool {
     unsafe {
-        if view_status == VIEW_PAUSED {
+        if the_screen.view_status == VIEW_PAUSED {
             Delay(PAUSE_WAIT);
-            view_status = VIEW_REDRAW;
-        } else if view_status == VIEW_BIG || view_status == VIEW_BIG_STILL {
-            if flasher & 16 != 0 && view_status == VIEW_BIG {
-                SetRGB4(&raw mut vp_page, 31, FLASH_COLOR, FLASH_COLOR, FLASH_COLOR);
+            the_screen.view_status = VIEW_REDRAW;
+        } else if the_screen.view_status == VIEW_BIG || the_screen.view_status == VIEW_BIG_STILL {
+            if the_screen.flasher & 16 != 0 && the_screen.view_status == VIEW_BIG {
+                SetRGB4(
+                    &raw mut the_screen.vp_page,
+                    31,
+                    FLASH_COLOR,
+                    FLASH_COLOR,
+                    FLASH_COLOR,
+                );
             } else {
-                SetRGB4(&raw mut vp_page, 31, 0, 0, 0);
+                SetRGB4(&raw mut the_screen.vp_page, 31, 0, 0, 0);
             }
             handle_print_request();
             return true;
@@ -1134,14 +1166,16 @@ unsafe fn update_map_view() -> (i16, i16, bool) {
             load_pending_region();
         }
 
-        if view_status == VIEW_REDRAW || view_status == VIEW_REDRAW_2 || view_status == VIEW_CHANGED
+        if the_screen.view_status == VIEW_REDRAW
+            || the_screen.view_status == VIEW_REDRAW_2
+            || the_screen.view_status == VIEW_CHANGED
         {
             refresh_minimap();
             draw_map();
-            if view_status == VIEW_REDRAW {
-                view_status = VIEW_REDRAW_2;
-            } else if view_status == VIEW_REDRAW_2 {
-                view_status = VIEW_NORMAL;
+            if the_screen.view_status == VIEW_REDRAW {
+                the_screen.view_status = VIEW_REDRAW_2;
+            } else if the_screen.view_status == VIEW_REDRAW_2 {
+                the_screen.view_status = VIEW_NORMAL;
             }
             return (0, 0, true);
         }
@@ -1183,10 +1217,10 @@ unsafe fn run_world_update() {
 /// Fights, missiles and drawing, then shows the page that was just drawn.
 unsafe fn draw_frame(state: &mut FrameState, scroll_x: i16, scroll_y: i16) {
     unsafe {
-        (*drawing_page).isv_x = the_world.tile_x as i32;
-        (*drawing_page).isv_y = the_world.tile_y as i32;
+        (*the_screen.drawing_page).isv_x = the_world.tile_x as i32;
+        (*the_screen.drawing_page).isv_y = the_world.tile_y as i32;
 
-        SetAPen(&raw mut rp_map, SPRITE_PEN);
+        SetAPen(&raw mut the_screen.rp_map, SPRITE_PEN);
 
         resolve_melee();
         advance_missiles();
@@ -1205,12 +1239,12 @@ unsafe fn draw_frame(state: &mut FrameState, scroll_x: i16, scroll_y: i16) {
         // The drawing loop used to leave `j` here; the next frame's actor loop reads it.
         state.last_terrain = the_actors.drawn;
         WaitBlit();
-        (*(*drawing_page).ri_page).RxOffset = (the_world.map_x & 15) as i16; // modulus 16
-        (*(*drawing_page).ri_page).RyOffset = (the_world.map_y & 31) as i16; // modulus 32
+        (*(*the_screen.drawing_page).ri_page).RxOffset = (the_world.map_x & 15) as i16; // modulus 16
+        (*(*the_screen.drawing_page).ri_page).RyOffset = (the_world.map_y & 31) as i16; // modulus 32
         flip_pages();
-        if view_status == VIEW_CHANGED {
+        if the_screen.view_status == VIEW_CHANGED {
             fade_normal();
-            view_status = VIEW_NORMAL;
+            the_screen.view_status = VIEW_NORMAL;
         }
     }
 }

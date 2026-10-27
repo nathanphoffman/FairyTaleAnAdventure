@@ -16,10 +16,8 @@
 //! 5. Next frame `restore_background` puts the saved background back, which erases the sprite.
 //! `make_sprite_masks` builds each frame's own mask once, when the sprite sheet is loaded.
 
-use super::globals::{
-    aoff, bmask_mem, bmod, boff, mask_buffer, planes, planesize, shadow_mem, shapedata, shift, shp,
-    wmask,
-};
+use super::globals::{aoff, bmod, boff, shift, shp, wmask};
+use super::state::{the_memory, the_screen};
 /// Mirror of `struct sshape` in csrc/ftale.h: how one sprite is drawn this frame and where its
 /// background is saved. `coff` is the byte offset of the sprite in a bitplane and `cmod` the bytes
 /// to skip to the next line; `blitsize` is the blitter size word (height * 64 + width in words).
@@ -216,7 +214,7 @@ unsafe fn skip_row_modulos(t: &mut Blit) {
 
 /// Where plane `p` of the play field starts for the current sprite.
 unsafe fn plane_at_sprite(p: i32) -> *mut u8 {
-    unsafe { (*planes.offset(p as isize)).offset((*shp).coff as isize) }
+    unsafe { (*the_screen.planes.offset(p as isize)).offset((*shp).coff as isize) }
 }
 
 /// Zeroes a rectangle of memory, sized like a BLTSIZE value.
@@ -256,10 +254,10 @@ pub fn restore_background(savemem: *mut u8) {
 pub fn combine_masks() {
     unsafe {
         let mut t = Blit::new(USE_A | USE_C | USE_D, D_EQUALS_A_AND_NOT_C, (*shp).blitsize);
-        t.a = mask_buffer.offset(boff as isize);
+        t.a = the_memory.mask_buffer.offset(boff as isize);
         t.amod = bmod as i32;
         t.ashift = (shift & SHIFT_MASK) as u32;
-        t.c = bmask_mem.add(MASK_START).offset(aoff as isize);
+        t.c = the_memory.bmask_mem.add(MASK_START).offset(aoff as isize);
         t.d = t.c;
         blit(&mut t);
     }
@@ -284,8 +282,10 @@ pub fn draw_shape() {
             t.bshift = bit_shift;
             t.afwm = first & wmask as u16 as u32;
             t.alwm = last;
-            t.a = bmask_mem.add(MASK_START).offset(aoff as isize);
-            t.b = shapedata.offset(boff as isize + planesize as isize * p as isize);
+            t.a = the_memory.bmask_mem.add(MASK_START).offset(aoff as isize);
+            t.b = the_memory
+                .shapedata
+                .offset(boff as isize + the_screen.planesize as isize * p as isize);
             t.bmod = bmod as i32;
             t.c = plane_at_sprite(p);
             t.d = t.c;
@@ -301,10 +301,13 @@ pub fn draw_shape() {
 pub fn add_scenery_mask(x: i32, y: i32, mod_words: i32, tile: i32) {
     let row_bytes = mod_words as isize * 2;
     unsafe {
-        let mut dst = bmask_mem
+        let mut dst = the_memory
+            .bmask_mem
             .add(MASK_START)
             .offset(y as isize * row_bytes * TILE_LINES as isize + x as isize * 2);
-        let mut src = shadow_mem.offset(tile as isize * TILE_MASK_BYTES as isize);
+        let mut src = the_memory
+            .shadow_mem
+            .offset(tile as isize * TILE_MASK_BYTES as isize);
         for _ in 0..TILE_LINES {
             *dst = *src;
             *dst.add(1) = *src.add(1);

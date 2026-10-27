@@ -6,9 +6,9 @@
 
 use super::asm_text::item_menu_state;
 use super::game_tables::{key_colors, label1, menus};
-use super::globals::{current_menu, rp_text2, slot_entries};
 use super::input::forget_last_menu;
 use super::state::the_hero;
+use super::state::{the_screen, the_ui};
 use crate::amiga::RastPort;
 use std::ffi::c_char;
 
@@ -81,21 +81,21 @@ const SHOWN: i8 = 2;
 /// and blanks over the slots that are left. `slot_entries` remembers which entry each slot is.
 pub fn print_options() {
     unsafe {
-        let menu = &menus[current_menu as usize];
+        let menu = &menus[the_ui.current_menu as usize];
         let mut slot = 0usize;
         for entry in 0..menu.num as usize {
             let enabled = menu.enabled[entry];
             if enabled & SHOWN == 0 {
                 continue;
             }
-            slot_entries[slot] = entry as i8;
+            the_ui.slot_entries[slot] = entry as i8;
             print_menu_entry(slot as i16, (enabled & 1) as i16);
             slot += 1;
             if slot > SLOTS - 1 {
                 break;
             }
         }
-        SetBPen(&raw mut rp_text2, 0);
+        SetBPen(&raw mut the_screen.rp_text2, 0);
         while slot < SLOTS {
             let x = if slot & 1 != 0 {
                 RIGHT_COLUMN_X
@@ -103,9 +103,9 @@ pub fn print_options() {
                 LEFT_COLUMN_X
             };
             let y = (slot / 2) as i32 * ROW_HEIGHT + FIRST_ROW_Y;
-            Move(&raw mut rp_text2, x, y);
-            Text(&raw mut rp_text2, c"      ".as_ptr(), 6);
-            slot_entries[slot] = -1;
+            Move(&raw mut the_screen.rp_text2, x, y);
+            Text(&raw mut the_screen.rp_text2, c"      ".as_ptr(), 6);
+            the_ui.slot_entries[slot] = -1;
             slot += 1;
         }
     }
@@ -117,7 +117,7 @@ pub fn go_to_menu(mode: i16) {
         if menus[GAME].enabled[PAUSE_ENTRY] & 1 != 0 {
             return;
         }
-        current_menu = mode;
+        the_ui.current_menu = mode;
         forget_last_menu();
         print_options();
     }
@@ -143,20 +143,20 @@ const MAIN_PEN: u32 = 4;
 /// 1 for a selected entry, 0 for a plain one. The box colour depends on the menu.
 pub fn print_menu_entry(j: i16, pena: i16) {
     unsafe {
-        let r = &raw mut rp_text2;
-        let entry = slot_entries[j as usize] as i32;
-        let box_pen = if current_menu as usize == USE {
+        let r = &raw mut the_screen.rp_text2;
+        let entry = the_ui.slot_entries[j as usize] as i32;
+        let box_pen = if the_ui.current_menu as usize == USE {
             USE_PEN
-        } else if current_menu as usize == FILE {
+        } else if the_ui.current_menu as usize == FILE {
             FILE_PEN
         } else if entry < MAIN_ENTRIES {
             MAIN_PEN
-        } else if current_menu as usize == KEYS {
+        } else if the_ui.current_menu as usize == KEYS {
             key_colors[(entry - MAIN_ENTRIES) as usize] as u32
-        } else if current_menu as usize == SAVEX {
+        } else if the_ui.current_menu as usize == SAVEX {
             entry as u32
         } else {
-            menus[current_menu as usize].color as u32
+            menus[the_ui.current_menu as usize].color as u32
         };
         SetAPen(r, pena as u32);
         SetBPen(r, box_pen);
@@ -171,10 +171,10 @@ pub fn print_menu_entry(j: i16, pena: i16) {
         Move(r, x, y);
         Text(r, BOX.as_ptr().cast(), BOX.len() as i32);
         Move(r, x + TEXT_INSET, y);
-        let labels = menus[current_menu as usize].label_list;
+        let labels = menus[the_ui.current_menu as usize].label_list;
         // The main names come from `label1`; the other menus have their own list, which for the
         // first 5 slots is skipped over.
-        let label = if current_menu as usize >= USE {
+        let label = if the_ui.current_menu as usize >= USE {
             labels.offset(offset as isize)
         } else if offset < MAIN_ENTRIES * LABEL_LEN {
             (&raw const label1).cast::<c_char>().offset(offset as isize)

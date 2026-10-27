@@ -12,17 +12,13 @@ use super::asm_text::steer_actor;
 use super::doors::{bumped_locked_door, open_door_near};
 use super::encounters::check_death;
 use super::game_tables::{facing_frame_offsets, setfig_table, swing_transitions};
-use super::globals::{
-    carrier_slot, fiery_death, frustration, loaded_actor_file, raft_nearness, safe_flag,
-    witch_on_screen,
-};
 use super::loading::play_effect;
 use super::messages::print;
 use super::mood::set_mood;
 use super::objects::{SetFigEntry, leave_item};
 use super::places::{find_place, transfer_hero};
 use super::random::{rand2, rand4, rand256};
-use super::state::{the_actors, the_hero, the_world};
+use super::state::{the_actors, the_hero, the_witch, the_world};
 use super::tables::{bowshotx, bowshoty, fallstates, gunshoty};
 use super::types::{Missile, Shape};
 
@@ -252,7 +248,7 @@ impl Ctx {
                 if (*an).vitality > 0 {
                     self.dex = FRAME_SINK;
                 }
-                frustration = 0;
+                the_actors.frustration = 0;
                 Pc::Cpx
             } else if self.s == WALKING {
                 self.walking()
@@ -299,9 +295,9 @@ impl Ctx {
             self.k = 0;
             self.j = 0;
             let hero = &raw const the_actors.list[0];
-            if loaded_actor_file == SWAN_FILE {
-                if raft_nearness != 0
-                    && carrier_slot == CARRIER_SLOT as i16
+            if the_actors.loaded_actor_file == SWAN_FILE {
+                if the_actors.raft_nearness != 0
+                    && the_actors.carrier_slot == CARRIER_SLOT as i16
                     && *the_hero.stuff.add(STUFF_SWAN_ITEM) != 0
                 {
                     self.d = (*hero).facing as i16;
@@ -317,7 +313,7 @@ impl Ctx {
                 self.dex = self.d;
                 self.e = 0;
             } else {
-                if raft_nearness != 0 && carrier_slot == CARRIER_SLOT as i16 {
+                if the_actors.raft_nearness != 0 && the_actors.carrier_slot == CARRIER_SLOT as i16 {
                     self.d = (*hero).facing as i16;
                     XTEST = (*hero).abs_x;
                     YTEST = (*hero).abs_y;
@@ -392,7 +388,7 @@ impl Ctx {
             } else if witch {
                 steer_actor(self.i as i32, the_hero.x as i32, the_hero.y as i32, 0);
                 self.dex = ((*an).facing / 2) as i16;
-                witch_on_screen = 1;
+                the_witch.on_screen = 1;
             } else if self.s == TALKING {
                 self.dex += rand2() as i16;
                 (*an).tactic = (*an).tactic.wrapping_sub(1);
@@ -413,7 +409,7 @@ impl Ctx {
         unsafe {
             let an = self.an;
             the_hero.riding = 0;
-            if carrier_slot != RIDING_RAFT || raft_nearness != 2 {
+            if the_actors.carrier_slot != RIDING_RAFT || the_actors.raft_nearness != 2 {
                 return Pc::Statc;
             }
             XTEST = the_actors.list[0].abs_x;
@@ -573,7 +569,7 @@ impl Ctx {
             (*an).vel_y = ((YTEST.wrapping_sub((*an).abs_y) as i16 as i32) * 4) as i8;
             (*an).abs_x = XTEST;
             (*an).abs_y = YTEST;
-            frustration = 0;
+            the_actors.frustration = 0;
             Pc::Tail
         }
     }
@@ -583,10 +579,10 @@ impl Ctx {
     unsafe fn blocked(&mut self) -> Pc {
         unsafe {
             if self.i == 0 {
-                frustration = frustration.wrapping_add(1);
-                if frustration > 40 {
+                the_actors.frustration = the_actors.frustration.wrapping_add(1);
+                if the_actors.frustration > 40 {
                     self.dex = FRAME_FRUSTRATED;
-                } else if frustration > 20 {
+                } else if the_actors.frustration > 20 {
                     self.dex = FRAME_OSCIL + ((self.cycle >> 1) & 1);
                 }
                 return Pc::Cpx;
@@ -675,7 +671,7 @@ impl Ctx {
             if the_actors.next_missile > MAX_MISSILE {
                 the_actors.next_missile = 0;
             }
-            frustration = 0;
+            the_actors.frustration = 0;
             Pc::Cpx
         }
     }
@@ -692,7 +688,7 @@ impl Ctx {
                 self.s = 8;
             }
             self.dex = self.s + self.inum;
-            frustration = 0;
+            the_actors.frustration = 0;
             Pc::Cpx
         }
     }
@@ -712,7 +708,7 @@ impl Ctx {
                     (*an).state = DEAD as i8;
                     self.dex = FRAME_FLAT;
                 }
-                frustration = 0;
+                the_actors.frustration = 0;
             } else if s == DEAD || s == FROZEN {
                 self.dex = FRAME_FLAT;
             } else if s == OSCIL {
@@ -768,7 +764,7 @@ impl Ctx {
                 }
             }
             let j = self.j;
-            if i == 0 && raft_nearness != 0 {
+            if i == 0 && the_actors.raft_nearness != 0 {
                 self.k = 0; // can't drown on the raft
             } else if j == 0 {
                 self.k = 0;
@@ -856,12 +852,12 @@ impl Ctx {
                 the_hero.x = (*an).abs_x;
                 the_hero.y = (*an).abs_y;
                 move_camera_to(the_hero.x as i32, the_hero.y as i32);
-                safe_flag = self.j as i8;
+                the_hero.safe_flag = self.j as i8;
             }
             if (*an).vitality == 0 {
                 return Pc::Statc;
             }
-            if fiery_death != 0 {
+            if the_actors.fiery_death != 0 {
                 if i == 0 && *the_hero.stuff.add(STUFF_FIREPROOF) != 0 {
                     (*an).environ = 0;
                 } else if (*an).environ > ENVIRON_SINKING {

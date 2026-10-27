@@ -9,15 +9,12 @@
 use super::asm_text::{draw_placard_border, draw_text, move_to, placard_text, print_number};
 use super::display::flip_pages;
 use super::game_tables::{black_colors, intro_colors};
-use super::globals::{
-    bm_draw, bm_source, bm_text, current_rastport, drawing_page, nhinor, nhivar, ri_page1,
-    ri_page2, rp_map, rp_text, v, view_status, vp_page, vp_text,
-};
+use super::globals::v;
 use super::iffsubs::load_picture;
 use super::menus::print_options;
 use super::messages::{name, print};
 use super::random::bitrand;
-use super::state::{the_actors, the_hero, the_world};
+use super::state::{the_actors, the_hero, the_memory, the_screen, the_world};
 use super::tables::{comptable, fader, page_colors, pplay, prec, print_que, sun_colors};
 use crate::amiga::{BitMap, RastPort, View, ViewPort};
 
@@ -61,12 +58,12 @@ pub fn draw_compass(dir: i16) {
     unsafe {
         let part = &comptable[dir as usize];
         let (xr, yr) = (part.xrect as i32, part.yrect as i32);
-        (*bm_source).Planes[COMPASS_PLANE] = nhinor;
+        (*the_screen.bm_source).Planes[COMPASS_PLANE] = the_memory.nhinor;
         BltBitMap(
-            bm_source,
+            the_screen.bm_source,
             0,
             0,
-            bm_text,
+            the_screen.bm_text,
             COMPASS_X,
             COMPASS_Y,
             COMPASS_WIDTH,
@@ -76,12 +73,12 @@ pub fn draw_compass(dir: i16) {
             std::ptr::null_mut(),
         );
         if dir < COMPASS_DIRECTIONS {
-            (*bm_source).Planes[COMPASS_PLANE] = nhivar;
+            (*the_screen.bm_source).Planes[COMPASS_PLANE] = the_memory.nhivar;
             BltBitMap(
-                bm_source,
+                the_screen.bm_source,
                 xr,
                 yr,
-                bm_text,
+                the_screen.bm_text,
                 COMPASS_X + xr,
                 COMPASS_Y + yr,
                 part.xsize as i32,
@@ -149,7 +146,7 @@ pub fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: *const u16) {
             );
         }
         LoadRGB4(
-            &raw mut vp_page,
+            &raw mut the_screen.vp_page,
             (&raw const fader).cast(),
             COLOR_COUNT as i32,
         );
@@ -198,7 +195,7 @@ pub fn flicker_colors() {
                 fader[i] = bitrand(0xfff) as u16;
             }
             LoadRGB4(
-                &raw mut vp_page,
+                &raw mut the_screen.vp_page,
                 (&raw const fader).cast(),
                 COLOR_COUNT as i32,
             );
@@ -323,7 +320,7 @@ pub fn fade_normal() {
 /// Shows the page without scrolling.
 pub fn show_still_screen() {
     unsafe {
-        let page = (*drawing_page).ri_page;
+        let page = (*the_screen.drawing_page).ri_page;
         (*page).RxOffset = 0;
         (*page).RyOffset = 0;
         flip_pages();
@@ -334,20 +331,20 @@ pub fn show_still_screen() {
 pub fn map_message() {
     unsafe {
         fade_down();
-        current_rastport = &raw mut rp_map;
-        rp_map.BitMap = (*(*drawing_page).ri_page).BitMap;
-        SetDrMd(current_rastport, JAM1);
-        SetAPen(current_rastport, MAP_PEN);
-        SetRast(current_rastport, 0);
+        the_screen.current_rastport = &raw mut the_screen.rp_map;
+        the_screen.rp_map.BitMap = (*(*the_screen.drawing_page).ri_page).BitMap;
+        SetDrMd(the_screen.current_rastport, JAM1);
+        SetAPen(the_screen.current_rastport, MAP_PEN);
+        SetRast(the_screen.current_rastport, 0);
 
-        vp_text.Modes = HIRES | SPRITES | VP_HIDE;
+        the_screen.vp_text.Modes = HIRES | SPRITES | VP_HIDE;
         show_still_screen();
         LoadRGB4(
-            &raw mut vp_page,
+            &raw mut the_screen.vp_page,
             (&raw const page_colors).cast(),
             COLOR_COUNT as i32,
         );
-        view_status = VIEW_MESSAGE;
+        the_screen.view_status = VIEW_MESSAGE;
     }
 }
 
@@ -355,10 +352,10 @@ pub fn map_message() {
 pub fn message_off() {
     unsafe {
         fade_down();
-        current_rastport = &raw mut rp_text;
-        vp_text.Modes = HIRES | SPRITES;
+        the_screen.current_rastport = &raw mut the_screen.rp_text;
+        the_screen.vp_text.Modes = HIRES | SPRITES;
         flip_pages();
-        view_status = VIEW_NORMAL_AGAIN;
+        the_screen.view_status = VIEW_NORMAL_AGAIN;
     }
 }
 
@@ -380,24 +377,24 @@ pub fn win_colors() {
         placard_text(WIN_MESSAGE_SECOND);
         draw_placard_border();
         Delay(80);
-        bm_draw = (*(*drawing_page).ri_page).BitMap;
-        load_picture(c"winpic".as_ptr(), bm_draw, 0, 0);
+        the_screen.bm_draw = (*(*the_screen.drawing_page).ri_page).BitMap;
+        load_picture(c"winpic".as_ptr(), the_screen.bm_draw, 0, 0);
         LoadRGB4(
-            &raw mut vp_page,
+            &raw mut the_screen.vp_page,
             (&raw const black_colors).cast::<u16>(),
             COLOR_COUNT as i32,
         );
         LoadRGB4(
-            &raw mut vp_text,
+            &raw mut the_screen.vp_text,
             (&raw const black_colors).cast::<u16>(),
             COLOR_COUNT as i32,
         );
-        vp_text.Modes = HIRES | SPRITES | VP_HIDE;
+        the_screen.vp_text.Modes = HIRES | SPRITES | VP_HIDE;
         set_intro_zoom(WIN_SCREEN_SIZE);
         for i in (SUNRISE_END + 1..=SUNRISE_START).rev() {
             fader = sunrise_palette(i);
             LoadRGB4(
-                &raw mut vp_page,
+                &raw mut the_screen.vp_page,
                 (&raw const fader).cast(),
                 COLOR_COUNT as i32,
             );
@@ -408,7 +405,7 @@ pub fn win_colors() {
         }
         Delay(30);
         LoadRGB4(
-            &raw mut vp_page,
+            &raw mut the_screen.vp_page,
             (&raw const black_colors).cast::<u16>(),
             COLOR_COUNT as i32,
         );
@@ -458,7 +455,7 @@ pub fn day_fade() {
         } else {
             0
         };
-        if the_world.day_clock & 3 == 0 || view_status > VIEW_REBUILD {
+        if the_world.day_clock & 3 == 0 || the_screen.view_status > VIEW_REBUILD {
             let colors = (&raw const page_colors).cast();
             if the_world.region < FIRST_INDOOR_REGION {
                 let level = the_world.light_level as i32;
@@ -547,20 +544,20 @@ pub fn set_intro_zoom(x: i32) {
         Delay(2);
 
         let left = (160 - x) as i16;
-        ri_page2.RxOffset = left;
-        ri_page1.RxOffset = left;
-        vp_page.DxOffset = left;
-        vp_page.DWidth = (x + x) as i16;
+        the_screen.ri_page2.RxOffset = left;
+        the_screen.ri_page1.RxOffset = left;
+        the_screen.vp_page.DxOffset = left;
+        the_screen.vp_page.DWidth = (x + x) as i16;
 
         let top = (100 - y) as i16;
-        ri_page2.RyOffset = top;
-        ri_page1.RyOffset = top;
-        vp_page.DyOffset = top;
-        vp_page.DHeight = (y + y) as i16;
+        the_screen.ri_page2.RyOffset = top;
+        the_screen.ri_page1.RyOffset = top;
+        the_screen.vp_page.DyOffset = top;
+        the_screen.vp_page.DHeight = (y + y) as i16;
 
-        vp_text.DxOffset = 0;
-        vp_text.DyOffset = 0;
-        vp_text.DHeight = (95 - y) as i16;
+        the_screen.vp_text.DxOffset = 0;
+        the_screen.vp_text.DyOffset = 0;
+        the_screen.vp_text.DHeight = (95 - y) as i16;
 
         let colors = (&raw const intro_colors).cast::<u16>();
         fade_page(
@@ -571,7 +568,7 @@ pub fn set_intro_zoom(x: i32) {
             colors,
         );
 
-        MakeVPort(&raw mut v, &raw mut vp_text);
+        MakeVPort(&raw mut v, &raw mut the_screen.vp_text);
         flip_pages();
     }
 }
