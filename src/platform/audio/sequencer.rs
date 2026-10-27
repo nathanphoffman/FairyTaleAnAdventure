@@ -190,6 +190,7 @@ impl Sound {
             CMD_INSTRUMENT => {
                 // Masks with INSTRUMENT_MASK, keeping only the bits that matter here.
                 let word = unsafe { *self.ins.add((value & INSTRUMENT_MASK) as usize) };
+
                 // An instrument word holds the waveform number in its high byte and the volume envelope in the low one.
                 self.voices[v].wave_num = (word >> 8) as u8;
                 self.voices[v].vol_num = word as u8;

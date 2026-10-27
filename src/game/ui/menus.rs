@@ -122,6 +122,7 @@ pub fn print_options() {
             }
 
             the_ui.slot_entries[slot] = entry as i8;
+
             // Masks off the low bits (a cheap remainder or a flag test).
             print_menu_entry(slot as i16, (enabled & 1) as i16);
             slot += 1;
@@ -155,6 +156,7 @@ unsafe fn blank_slots_from(first: usize) {
                 c"      ".as_ptr(),
                 ENTRY_WIDTH,
             );
+
             the_ui.slot_entries[slot] = -1;
         }
     }
@@ -203,6 +205,7 @@ pub fn print_menu_entry(j: i16, pena: i16) {
         SetBPen(r, entry_box_pen(entry));
 
         let offset = entry * LABEL_LEN;
+
         // Masks off the low bits (a cheap remainder or a flag test).
         let x = if j & 1 != 0 {
             RIGHT_COLUMN_X

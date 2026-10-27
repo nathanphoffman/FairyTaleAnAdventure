@@ -22,6 +22,7 @@ use crate::game::ui::text::show_message;
 use crate::game::world::regions::{
     REGION_HEIGHT_SHIFT, REGION_WIDTH_SHIFT, center_sector, load_region_now, refresh_minimap,
 };
+
 use std::ffi::c_char;
 
 unsafe extern "C" {
@@ -109,8 +110,10 @@ pub extern "C" fn transfer_hero(xtest: u16, ytest: u16, flag: u16) -> i32 {
 
         if flag != 0 {
             let (sector_x, sector_y) = center_sector();
+
             // Shifts by REGION_WIDTH_SHIFT, converting between pixels, tiles, sectors or bytes.
             let column = (sector_x >> REGION_WIDTH_SHIFT) & 1;
+
             // Shifts by REGION_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
             let row = (sector_y >> REGION_HEIGHT_SHIFT) & TRANSFER_ROW_MASK;
             the_world.new_region = (column + row + row) as u16;
@@ -240,6 +243,7 @@ unsafe fn hero_on_loaded_edge() -> bool {
     unsafe {
         // The hero's sector column and row: 256 pixels to a sector.
         let hero_column = (the_hero.x >> SECTOR_SHIFT).wrapping_sub(the_world.origin_x);
+
         // Shifts by SECTOR_SHIFT, converting between pixels, tiles, sectors or bytes.
         let hero_row = (the_hero.y >> SECTOR_SHIFT).wrapping_sub(the_world.origin_y);
 
@@ -307,10 +311,7 @@ unsafe fn enter_extent(flag: i16) -> bool {
             return false;
         } else if the_world.extent_type >= XT_SPECIAL_MIN {
             // birds, turtles, special
-            if (the_world.extent_type == XT_NECROMANCER || the_world.extent_type == XT_TURTLE_EGGS)
-                && (the_actors.list[FIRST_MONSTER as usize].race != (*the_world.extent).v3
-                    || the_actors.active < MIN_BOSS_ACTORS)
-            {
+            if boss_is_missing() {
                 the_encounter.x =
                     (((*the_world.extent).x1 as u32 + (*the_world.extent).x2 as u32) / 2) as u16;
                 the_encounter.y =
@@ -334,6 +335,16 @@ unsafe fn enter_extent(flag: i16) -> bool {
         }
 
         true
+    }
+}
+
+/// The necromancer's and the turtle eggs' extents call up their monsters when those are not there
+/// (yet, or any more).
+unsafe fn boss_is_missing() -> bool {
+    unsafe {
+        (the_world.extent_type == XT_NECROMANCER || the_world.extent_type == XT_TURTLE_EGGS)
+            && (the_actors.list[FIRST_MONSTER as usize].race != (*the_world.extent).v3
+                || the_actors.active < MIN_BOSS_ACTORS)
     }
 }
 

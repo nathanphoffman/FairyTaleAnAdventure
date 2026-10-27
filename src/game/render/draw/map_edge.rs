@@ -6,7 +6,7 @@ use crate::game::data::state::{the_actors, the_screen, the_witch, the_world};
 use crate::game::render::witch::{SIDE_1 as s1, SIDE_2 as s2, witch_fx};
 use crate::game::world::map::{draw_map_column, draw_map_row};
 
-// ---- repair_map_and_witch ----
+// ---- repair_edges ----
 /// The map strip to redraw after a scroll: the right edge (36) or the left (0), and the bottom row
 /// (10) or the top (0).
 const STRIP_RIGHT: i32 = 36;
@@ -26,7 +26,7 @@ const WITCH_SLOT: usize = 2;
 
 /// Finishes the scrolled map edge (`dif_x`, `dif_y` = scroll step) and runs the witch's beam and her
 /// damage.
-pub fn repair_map_and_witch(dif_x: i16, dif_y: i16) {
+pub fn repair_edges(dif_x: i16, dif_y: i16) {
     unsafe {
         if dif_x == 1 {
             draw_map_column(STRIP_RIGHT);
@@ -42,6 +42,7 @@ pub fn repair_map_and_witch(dif_x: i16, dif_y: i16) {
 
         let witch = &raw const the_actors.list[WITCH_SLOT];
         let page = the_screen.drawing_page;
+
         // Masks with TILE_X_MASK, keeping only the bits that matter here.
         (*page).witchx = ((*witch).abs_x as i32 - (the_world.map_x & TILE_X_MASK) as i32) as i16;
         (*page).witchy = (((*witch).abs_y as i32 - WITCH_ANCHOR_Y)

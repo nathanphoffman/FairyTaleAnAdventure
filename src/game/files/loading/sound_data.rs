@@ -53,13 +53,17 @@ pub fn read_score() {
 
 /// A length in the score and sample files is a 4 byte big-endian number.
 const LENGTH_BYTES: i32 = 4;
+
 /// Where the sound effects are on the disk (block) and how many blocks they take.
 const SAMPLE_BLOCK: i16 = 920;
 const SAMPLE_BLOCKS: i16 = 11;
+
 /// The disk request number used for sound samples.
 const SAMPLE_REQUEST: i16 = 8;
+
 /// There are 6 sound effects.
 const SAMPLE_COUNT: usize = 6;
+
 /// The game menu entry that switches sound effects on and off.
 const GAME_MENU: usize = 4;
 const SOUND_ENTRY: usize = 7;

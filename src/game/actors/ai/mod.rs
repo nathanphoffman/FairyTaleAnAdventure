@@ -3,11 +3,13 @@
 //! battle music.
 
 mod goals;
+
 mod tactics;
 
 pub use self::goals::update_enemy_goals;
 
 const STILL: i8 = 13;
 const BACKUP: i32 = 5;
+
 /// Weapon bit for a bow.
 const BOW_BIT: i8 = 4;

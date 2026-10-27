@@ -7,6 +7,7 @@ use crate::game::files::disk::{
     is_last_read_pending, last_read_finished, load_track_range, mark_read_unused, motor_off,
     wait_for_read,
 };
+
 use crate::game::render::blit::make_sprite_masks;
 use crate::game::world::regions::{load_region_now, load_region_piece};
 
@@ -16,11 +17,14 @@ const OBJECTS: u8 = 1;
 const ENEMY: u8 = 2;
 const RAFT: u8 = 3;
 const SETFIG: u8 = 4;
+
 /// Scratch memory for sprites: bytes available in `shape_mem`.
 pub const SHAPE_SIZE: usize = 78000;
+
 /// A sprite sequence is loaded with room for its mask and the shifted copies after it.
 const SIZE_WITH_MASK: usize = 6;
 const SIZE_WITHOUT_MASK: usize = 5;
+
 /// Drive request used when loading sprite files.
 const SPRITE_REQUEST: i16 = 8;
 

@@ -7,6 +7,7 @@ use crate::game::data::globals::current_sshape;
 use crate::game::data::globals::{
     last_word_mask, shadow_mask_offset, sprite_mask_modulo, sprite_mask_offset, sprite_x_shift,
 };
+
 use crate::game::data::state::{the_memory, the_screen};
 use crate::game::render::blit::SShape;
 
@@ -123,6 +124,7 @@ pub(super) unsafe fn set_up_blit(
             .offset((*the_screen.drawing_page).obcount as isize);
         the_screen.planesize = seq.bytes;
         (*current_sshape).savesize = (blitwide as i32 * blithigh as i32 * WORD_BYTES) as i16;
+
         // Blitter size word: height in the high bits, width in words in the low 6 bits.
         (*current_sshape).blitsize =
             // Shifts by BLIT_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
@@ -152,11 +154,13 @@ unsafe fn set_blitter_registers(sprite: &Sprite, clip: &Clip, cwide: i8, xbw: i8
         shadow_mask_offset =
             // Masks with SHADOW_LINES_MASK, keeping only the bits that matter here.
             ((clip.ystart & SHADOW_LINES_MASK) as i32 * blitwide as i32 * WORD_BYTES) as i16;
+
         // Where the visible part starts in the mask: whole words (2 bytes per 16 pixels) in, and whole rows down.
         sprite_mask_offset = ((clip.xoff >> WORD_PIXELS_SHIFT) as i32 * WORD_BYTES
             + cwide as i32 * clip.yoff as i32) as i16;
         (*current_sshape).coff =
             (xbw as i32 * WORD_BYTES + clip.ystart as i32 * PAGE_ROW_BYTES) as i16;
+
         // Masks with WORD_PIXELS_MASK, keeping only the bits that matter here.
         sprite_x_shift = sprite.xstart & WORD_PIXELS_MASK;
 

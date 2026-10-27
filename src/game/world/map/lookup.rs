@@ -168,6 +168,7 @@ pub fn tile_address(imx: i32, imy: i32) -> *const u8 {
     unsafe {
         // Pixel column to sector column: 16 pixels to a tile, 16 tiles to a sector.
         let col = wrap_secx((ux >> TILE_WIDTH_SHIFT).wrapping_sub(the_world.origin_x));
+
         // Pixel row to sector row: 8 tiles to a sector, so 8 times 32 divided by 32.
         let mut row = (uy >> SECTOR_HEIGHT_SHIFT).wrapping_sub(the_world.origin_y);
 
@@ -222,6 +223,7 @@ unsafe fn tile_number(x: u16, y: u16) -> u8 {
         // Tile column to sector column: 16 tiles to a sector.
         let col = wrap_secx((x >> SECTOR_WIDTH_SHIFT).wrapping_sub(the_world.origin_x))
             .wrapping_add(the_world.origin_x);
+
         // Tile row to sector row: 8 tiles to a sector.
         let row = clamp_secy((y >> SECTOR_HEIGHT_SHIFT).wrapping_sub(the_world.origin_y) as i16);
         let sec = *the_memory
@@ -245,6 +247,7 @@ unsafe fn hero_sector() -> i16 {
     unsafe {
         // the assembly read the high byte of hero_x and hero_y (68000 is big-endian)
         let hx = (the_hero.x >> SECTOR_POSITION_SHIFT) as i32;
+
         // The hero's sector row: 256 pixels to a sector.
         let hy =
             // Shifts by SECTOR_POSITION_SHIFT, converting between pixels, tiles, sectors or bytes.

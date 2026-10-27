@@ -44,6 +44,7 @@ pub fn handle_print_request() {
         }
 
         let request = (*(&raw const print_que))[pplay as usize] as i32;
+
         // Masks with QUEUE_MASK, keeping only the bits that matter here.
         pplay = (pplay + 1) & QUEUE_MASK;
 

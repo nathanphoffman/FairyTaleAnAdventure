@@ -88,7 +88,7 @@ pub fn open_all() -> i32 {
 pub(super) unsafe fn open_everything() -> Result<(), i32> {
     unsafe {
         open_flags = 0;
-        open_libraries_and_text_screen()?;
+        open_text_screen()?;
         allocate_bitmap_headers()?;
 
         match open_disk() {
@@ -99,14 +99,14 @@ pub(super) unsafe fn open_everything() -> Result<(), i32> {
         open_fonts()?;
         install_input()?;
         set_up_view_ports();
-        set_up_bitmaps_and_rasinfos();
+        set_up_bitmaps();
         allocate_page_planes()?;
         share_text_bitmap_memory();
         open_audio();
         allocate_music_memory()?;
         allocate_game_memory()?;
         load_music_waveforms();
-        set_up_pointer_sprite_and_fonts_data();
+        set_up_pointer_data();
 
         Ok(())
     }
@@ -114,7 +114,7 @@ pub(super) unsafe fn open_everything() -> Result<(), i32> {
 
 /// Opens the graphics libraries and sets up the rast ports, with the text rast port as the current
 /// one.
-pub(super) unsafe fn open_libraries_and_text_screen() -> Result<(), i32> {
+pub(super) unsafe fn open_text_screen() -> Result<(), i32> {
     unsafe {
         gfx_base = OpenLibrary(c"graphics.library".as_ptr(), 0).cast();
 
@@ -142,6 +142,16 @@ pub(super) unsafe fn open_libraries_and_text_screen() -> Result<(), i32> {
         }
 
         layer_info = NewLayerInfo();
+        set_up_rast_ports();
+
+        Ok(())
+    }
+}
+
+/// Initialises the three rast ports; the text one is current and draws on the "workbench screen"
+/// bitmap, cleared to pen 0.
+unsafe fn set_up_rast_ports() {
+    unsafe {
         InitRastPort(&raw mut the_screen.rp_map);
         InitRastPort(&raw mut the_screen.rp_text);
         InitRastPort(&raw mut the_screen.rp_text2);
@@ -152,8 +162,6 @@ pub(super) unsafe fn open_libraries_and_text_screen() -> Result<(), i32> {
         SetBPen(the_screen.current_rastport, 0);
         SetDrMd(the_screen.current_rastport, JAM2 as u32);
         SetRast(the_screen.current_rastport, 0);
-
-        Ok(())
     }
 }
 
@@ -250,7 +258,7 @@ pub(super) unsafe fn set_up_view_ports() {
 }
 
 /// Splits the bitmap block into its five bitmaps, and sets up the rast infos and the two pages.
-pub(super) unsafe fn set_up_bitmaps_and_rasinfos() {
+pub(super) unsafe fn set_up_bitmaps() {
     unsafe {
         split_bitmap_block();
         init_bitmaps();
@@ -278,35 +286,47 @@ unsafe fn init_bitmaps() {
         InitBitMap(the_screen.bm_page1, PAGE_DEPTH, PHANTA_WIDTH, RAST_HEIGHT);
         InitBitMap(the_screen.bm_page2, PAGE_DEPTH, PHANTA_WIDTH, RAST_HEIGHT);
         InitBitMap(
-            the_screen.bm_text,
-            TEXT_DEPTH,
-            TEXT_BITMAP_WIDTH,
-            TEXT_HEIGHT,
-        );
-        InitBitMap(
-            the_screen.bm_lim,
-            LIMIT_BITMAP_DEPTH,
-            PLAY_WIDTH,
-            PLAY_HEIGHT,
-        );
-        InitBitMap(
             &raw mut the_screen.pagea,
             PLAY_DEPTH,
             PLAY_WIDTH,
             PLAY_HEIGHT,
         );
+
         InitBitMap(
             &raw mut the_screen.pageb,
             PLAY_DEPTH,
             PLAY_WIDTH,
             PLAY_HEIGHT,
         );
+
+        init_panel_bitmaps();
+    }
+}
+
+/// The bitmaps of the text panel and the helper bitmaps (limit, scroll, source).
+unsafe fn init_panel_bitmaps() {
+    unsafe {
+        InitBitMap(
+            the_screen.bm_text,
+            TEXT_DEPTH,
+            TEXT_BITMAP_WIDTH,
+            TEXT_HEIGHT,
+        );
+
+        InitBitMap(
+            the_screen.bm_lim,
+            LIMIT_BITMAP_DEPTH,
+            PLAY_WIDTH,
+            PLAY_HEIGHT,
+        );
+
         InitBitMap(
             &raw mut the_screen.bm_scroll,
             LIMIT_BITMAP_DEPTH,
             TEXT_BITMAP_WIDTH,
             TEXT_HEIGHT,
         );
+
         InitBitMap(
             the_screen.bm_source,
             SOURCE_BITMAP_DEPTH,
@@ -476,7 +496,7 @@ pub(super) unsafe fn load_music_waveforms() {
 
 /// Last set-up: the scrolling text uses the first text plane, the pointer sprite is installed, and
 /// the two high-bit font tables are copied to chip memory.
-pub(super) unsafe fn set_up_pointer_sprite_and_fonts_data() {
+pub(super) unsafe fn set_up_pointer_data() {
     unsafe {
         the_screen.bm_scroll.Planes[0] = (*the_screen.bm_text).Planes[0];
 

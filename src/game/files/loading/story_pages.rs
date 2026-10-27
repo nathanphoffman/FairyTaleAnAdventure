@@ -28,9 +28,11 @@ pub fn intro_skipped() -> i32 {
 
 const SCREEN_WIDTH: i32 = 320;
 const SCREEN_HEIGHT: i32 = 200;
+
 /// Where the first story picture goes on the page.
 const PICTURE_X: i16 = 4;
 const PICTURE_Y: i16 = 24;
+
 /// Ticks to show a page before turning it.
 const PAGE_DELAY: i32 = 350;
 
@@ -86,6 +88,7 @@ const FLIP_DELAY: [i32; 22] = [
 const FIRST_HALF: usize = 11;
 const PAGE_HALF_WIDTH: i32 = 135;
 const PAGE_STRIP_END: i16 = 136;
+
 /// The page turn is drawn around the book's spine at x = 160 (the right page starts one pixel
 /// later); the left page starts at x = 24 and the outer edge of the right page is at x = 296. The
 /// last strip is a pixel wide, 7 lines in from the top and bottom, which leaves 186 lines.

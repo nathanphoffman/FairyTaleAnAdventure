@@ -10,7 +10,7 @@ use crate::game::data::state::{the_actors, the_hero};
 
 /// The hero is dead or falling: the fairy flies in, then the hero revives (or, with no luck left,
 /// the next brother takes over). Returns the hero's new state.
-pub(super) unsafe fn fairy_or_revive(state: i8, cycle: i16) -> i8 {
+pub(super) unsafe fn fairy_revival(state: i8, cycle: i16) -> i8 {
     unsafe {
         let (timer, action) = fairy_step(
             the_hero.good_fairy_timer,
@@ -52,6 +52,7 @@ unsafe fn place_fairy(cycle: i16) {
             .wrapping_sub(FAIRY_X_OFFSET);
         (*fairy).abs_y = the_hero.y;
         (*fairy).kind = OBJECTS;
+
         // Masks with FAIRY_IMAGE, keeping only the bits that matter here.
         (*fairy).index = FAIRY_IMAGE + (cycle & 1) as i8;
         (*fairy).state = STILL;

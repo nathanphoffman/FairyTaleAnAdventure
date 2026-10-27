@@ -131,7 +131,7 @@ pub(super) unsafe fn start_up() -> bool {
     unsafe {
         stopscore();
         show_title_screen();
-        prepare_intro_pages_and_music();
+        prepare_intro();
 
         if let Some(dir) = std::env::var_os("FTA_MUSIC_EXPORT") {
             crate::game::ui::music::export_tunes(std::path::Path::new(&dir));
@@ -205,7 +205,7 @@ unsafe fn show_title_screen() {
 
 /// Points the picture loader at the page memory, starts the intro tune, and flips the pages twice
 /// so both show the same thing.
-unsafe fn prepare_intro_pages_and_music() {
+unsafe fn prepare_intro() {
     unsafe {
         the_screen.current_viewport = &raw mut the_screen.vp_page; // so that the IFF routines can communicate
         the_screen.vp_page.RasInfo = &raw mut the_screen.ri_page1;

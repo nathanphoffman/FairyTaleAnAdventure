@@ -159,6 +159,7 @@ pub(super) unsafe fn blit_row(t: &mut Blit) {
 
             // Shifting right across two words: the bits that fell off the previous word enter from the left.
             let shifted_a = ((a_prev << WORD_BITS | aw) >> t.ashift) & ALL_BITS;
+
             // Shifting right across two words: the bits that fell off the previous word enter from the left.
             let shifted_b = ((b_prev << WORD_BITS | bw) >> t.bshift) & ALL_BITS;
             a_prev = aw;
@@ -236,8 +237,10 @@ mod tests {
     /// The bit-at-a-time definition of a minterm, as the C original computed it.
     fn minterm_by_bits(mt: u32, a: u32, b: u32, c: u32) -> u32 {
         (0..16).fold(0, |r, bit| {
+            // The A, B and C bits of this position make the minterm's bit number (A * 4 + B * 2 + C).
             let index = ((a >> bit & 1) << 2) | ((b >> bit & 1) << 1) | (c >> bit & 1);
 
+            // The minterm's bit for that combination becomes this bit of the result.
             r | ((mt >> index & 1) << bit)
         })
     }
@@ -268,7 +271,7 @@ mod tests {
     fn copy_blit_copies_words() {
         let src = [1u8, 2, 3, 4, 5, 6, 7, 8];
         let mut dst = [0u8; 8];
-        let mut t = Blit::new(USE_B | USE_D, D_EQUALS_B, 2 << 6 | 2);
+        let mut t = Blit::new(USE_B | USE_D, D_EQUALS_B, 2 << 6 | 2); // size word: height 2 lines, width 2 words
         t.b = src.as_ptr();
         t.d = dst.as_mut_ptr();
 
@@ -280,7 +283,7 @@ mod tests {
     fn shifted_copy_moves_bits_right() {
         let src = [0xffu8, 0x00];
         let mut dst = [0u8; 2];
-        let mut t = Blit::new(USE_B | USE_D, D_EQUALS_B, 1 << 6 | 1);
+        let mut t = Blit::new(USE_B | USE_D, D_EQUALS_B, 1 << 6 | 1); // size word: height 1 line, width 1 word
         t.b = src.as_ptr();
         t.d = dst.as_mut_ptr();
         t.bshift = 4;

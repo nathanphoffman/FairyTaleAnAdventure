@@ -67,6 +67,7 @@ pub extern "C" fn RectFill(rp: *mut RastPort, x0: LONG, y0: LONG, x1: LONG, y1: 
     }
 
     let bm = unsafe { &*rp.BitMap };
+
     // Masks with COMPLEMENT, keeping only the bits that matter here.
     let complement = rp.DrawMode & COMPLEMENT != 0;
 
@@ -91,6 +92,7 @@ pub extern "C" fn Draw(rp: *mut RastPort, x: LONG, y: LONG) {
 
     if !rp.BitMap.is_null() {
         let bm = unsafe { &*rp.BitMap };
+
         // Masks with COMPLEMENT, keeping only the bits that matter here.
         let complement = rp.DrawMode & COMPLEMENT != 0;
         let (mut cx, mut cy) = (rp.cp_x as i32, rp.cp_y as i32);

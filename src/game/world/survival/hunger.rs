@@ -14,6 +14,7 @@ const COLLAPSE_FATIGUE: i16 = 170;
 const FAINT_HUNGER: i16 = 140;
 const FAINT_RESET: i16 = 130;
 const HUNGER_STEP_MASK: i16 = 7;
+
 /// Hungry enough to eat fruit at the safe spot.
 const EATS_FRUIT_AT: i16 = 30;
 
@@ -52,6 +53,7 @@ pub(super) fn hunger_effects(hero: &mut Hero, body: &mut Shape) -> HungerReport 
         report.events.push(EVENT_HUNGRY);
     } else if hero.hunger == VERY_HUNGRY {
         report.events.push(EVENT_VERY_HUNGRY);
+
     // Masks with HUNGER_STEP_MASK, keeping only the bits that matter here.
     } else if hero.hunger & HUNGER_STEP_MASK == 0 {
         if body.vitality > WEAK_VITALITY {
@@ -80,7 +82,7 @@ pub(super) fn hunger_effects(hero: &mut Hero, body: &mut Shape) -> HungerReport 
 mod tests {
     use super::*;
 
-    fn hero_and_body(hunger: i16, fatigue: i16, vitality: i16) -> (Hero, Shape) {
+    fn hero_with_body(hunger: i16, fatigue: i16, vitality: i16) -> (Hero, Shape) {
         let mut hero: Hero = unsafe { std::mem::zeroed() };
 
         let mut body: Shape = unsafe { std::mem::zeroed() };
@@ -93,15 +95,15 @@ mod tests {
 
     #[test]
     fn hunger_messages_at_the_first_two_thresholds() {
-        let (mut hero, mut body) = hero_and_body(HUNGRY, 0, 50);
+        let (mut hero, mut body) = hero_with_body(HUNGRY, 0, 50);
         assert_eq!(hunger_effects(&mut hero, &mut body).events, vec![0]);
-        let (mut hero, mut body) = hero_and_body(VERY_HUNGRY, 0, 50);
+        let (mut hero, mut body) = hero_with_body(VERY_HUNGRY, 0, 50);
         assert_eq!(hunger_effects(&mut hero, &mut body).events, vec![1]);
     }
 
     #[test]
     fn nothing_happens_between_eights_when_only_a_little_hungry() {
-        let (mut hero, mut body) = hero_and_body(41, 0, 50);
+        let (mut hero, mut body) = hero_with_body(41, 0, 50);
         let report = hunger_effects(&mut hero, &mut body);
         assert_eq!(report, HungerReport::default());
         assert_eq!(body.vitality, 50);
@@ -109,18 +111,18 @@ mod tests {
 
     #[test]
     fn tired_hero_loses_vitality_without_a_message_until_starving() {
-        let (mut hero, mut body) = hero_and_body(88, MUCH_FATIGUE + 1, 50);
+        let (mut hero, mut body) = hero_with_body(88, MUCH_FATIGUE + 1, 50);
         let report = hunger_effects(&mut hero, &mut body);
         assert_eq!((body.vitality, report.redraw_stats), (48, true));
         assert!(report.events.is_empty());
-        let (mut hero, mut body) = hero_and_body(96, MUCH_FATIGUE + 1, 50);
+        let (mut hero, mut body) = hero_with_body(96, MUCH_FATIGUE + 1, 50);
         let report = hunger_effects(&mut hero, &mut body);
         assert_eq!((body.vitality, report.events), (48, vec![2]));
     }
 
     #[test]
     fn weak_and_exhausted_hero_collapses_asleep() {
-        let (mut hero, mut body) = hero_and_body(80, COLLAPSE_FATIGUE + 1, WEAK_VITALITY);
+        let (mut hero, mut body) = hero_with_body(80, COLLAPSE_FATIGUE + 1, WEAK_VITALITY);
         let report = hunger_effects(&mut hero, &mut body);
         assert_eq!((report.events, body.state), (vec![12], SLEEP));
     }
@@ -128,7 +130,7 @@ mod tests {
     #[test]
     fn weak_and_starving_hero_faints_and_hunger_resets() {
         let (mut hero, mut body) =
-            hero_and_body(FAINT_HUNGER + 8 - FAINT_HUNGER % 8, 0, WEAK_VITALITY);
+            hero_with_body(FAINT_HUNGER + 8 - FAINT_HUNGER % 8, 0, WEAK_VITALITY);
         let report = hunger_effects(&mut hero, &mut body);
         assert_eq!(
             (report.events, body.state, hero.hunger),
@@ -138,7 +140,7 @@ mod tests {
 
     #[test]
     fn weak_hero_not_yet_faint_is_left_alone() {
-        let (mut hero, mut body) = hero_and_body(120, 0, WEAK_VITALITY);
+        let (mut hero, mut body) = hero_with_body(120, 0, WEAK_VITALITY);
         assert_eq!(
             hunger_effects(&mut hero, &mut body),
             HungerReport::default()

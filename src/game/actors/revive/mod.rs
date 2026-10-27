@@ -5,12 +5,14 @@
 //! over, with the first one's bones and goods left where they fell, until the third has died.
 
 mod brothers;
+
 mod safe_spot;
 
 use self::brothers::{
-    LAST_BROTHER, announce_brother, leave_fallen_brother, place_raft_and_setfig,
-    show_brother_placards, take_over_next_brother,
+    LAST_BROTHER, announce_brother, leave_fallen_brother, reset_raft_setfig, show_brother_placards,
+    take_over_next_brother,
 };
+
 use self::safe_spot::{put_hero_at_safe_spot, restore_hero};
 
 use crate::amiga::{RastPort, TextFont};
@@ -37,6 +39,7 @@ unsafe extern "C" {
 // Actor kinds and goals.
 const PHIL: i8 = 0;
 const USER: i8 = 0;
+
 /// Value of `view_status` for "fade in" (3) and "game over screen" (2).
 const VIEW_FADE_IN: i8 = 3;
 const VIEW_GAME_OVER: i8 = 2;
@@ -51,7 +54,7 @@ const VIEW_GAME_OVER: i8 = 2;
 pub fn revive(new: i16) {
     unsafe {
         let list = (&raw mut the_actors.list).cast::<Shape>();
-        place_raft_and_setfig(list);
+        reset_raft_setfig(list);
 
         let hero = list;
         (*hero).kind = PHIL;
@@ -92,9 +95,11 @@ mod tests {
     use super::brothers::{
         FIRST_REGION, FIRST_SAFE_SPOT, GOLDBASE, reset_for_next_brother, start_next_brother,
     };
+
     use super::safe_spot::{
         CAMERA_OFFSET, START_DAYNIGHT, START_LIGHT, STILL, move_to_safe_spot, restore_stats,
     };
+
     use super::*;
     use crate::game::data::state::{Hero, World};
     use crate::game::data::types::Bro;

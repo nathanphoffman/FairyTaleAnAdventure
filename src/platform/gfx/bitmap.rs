@@ -85,6 +85,7 @@ pub extern "C" fn FreeRaster(p: PLANEPTR, _w: ULONG, _h: ULONG) {
 pub(in crate::platform::gfx) unsafe fn get_bit(bm: &BitMap, plane: usize, x: i32, y: i32) -> bool {
     unsafe {
         let base = bm.Planes[plane];
+
         // Byte holding the pixel: 8 pixels to a byte.
         let off = y as usize * bm.BytesPerRow as usize + (x >> BYTE_PIXELS_SHIFT) as usize;
 
@@ -102,8 +103,10 @@ pub(in crate::platform::gfx) unsafe fn set_bit(
 ) {
     unsafe {
         let base = bm.Planes[plane];
+
         // Byte holding the pixel: 8 pixels to a byte.
         let off = y as usize * bm.BytesPerRow as usize + (x >> BYTE_PIXELS_SHIFT) as usize;
+
         // The leftmost pixel of a byte is its top bit.
         let mask = LEFTMOST_PIXEL >> (x & BYTE_PIXELS_MASK);
 

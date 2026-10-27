@@ -24,6 +24,7 @@ pub(super) const MAX_DIRECTION: i32 = 7;
 pub(super) fn step(v: i32, dir: i32, speed: i32, table: &[i16; 10]) -> i32 {
     // Masks with DIRECTION_MASK, keeping only the bits that matter here.
     let product = table[(dir & DIRECTION_MASK) as usize] as i32 * speed as i16 as i32;
+
     // Half the table step times the speed: speed 2 moves the table's amount.
     let half = (product as u16 >> 1) as i32;
 
@@ -82,6 +83,7 @@ mod tests {
 
     #[test]
     fn newy_keeps_bit_15() {
+        // Bit 15 of y is a flag, and stepping must leave it set.
         assert_eq!(step_y(0x8000 | 100, 4, 2) & 0x8000, 0x8000);
     }
 

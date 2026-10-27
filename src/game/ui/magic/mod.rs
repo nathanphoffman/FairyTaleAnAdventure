@@ -33,12 +33,15 @@ const SPELL_SLOT_BASE: usize = 4;
 const LIGHT_TIME: i16 = 760;
 const SECRET_TIME: i16 = 360;
 const FREEZE_TIME: i16 = 100;
+
 /// Where the spells cannot be used: the extent type with this `v3` (a quiet place).
 const NO_MAGIC_ZONE: u8 = 9;
 const NO_MAGIC_SPEECH: i32 = 59;
 const NO_SPELL_EVENT: i32 = 21;
+
 /// Regions above this are indoors (no overview map there).
 const LAST_OUTDOOR_REGION: u16 = 7;
+
 /// Riding something bigger than the raft stops the freeze spell.
 const RIDING_BIG: i16 = 1;
 

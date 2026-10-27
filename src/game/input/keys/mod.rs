@@ -113,11 +113,13 @@ pub fn handle_key(key: i32, notpause: i32) {
             // ignored while dead
         } else if (FIRST_DIRECTION_KEY..=LAST_DIRECTION_KEY).contains(&key) {
             the_ui.held_direction = key as i16;
+
         // Masks with CODE_MASK, keeping only the bits that matter here.
         } else if (key & CODE_MASK) as i16 == the_ui.held_direction {
             the_ui.held_direction = 0;
         } else if key == FIGHT_KEY {
             the_ui.fight_key_held = 1;
+
         // Masks with CODE_MASK, keeping only the bits that matter here.
         } else if key & CODE_MASK == FIGHT_KEY {
             the_ui.fight_key_held = 0;

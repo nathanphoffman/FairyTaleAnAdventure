@@ -2,6 +2,7 @@
 //! the messages and damage that come with being hungry or tired.
 
 mod hunger;
+
 mod schedule;
 
 pub use self::schedule::survival_tick;

@@ -2,6 +2,7 @@
 //! csrc/fmain.c). Doors that need a key are in `key_doors`.
 
 mod entering;
+
 mod leaving;
 
 use self::entering::enter_door;
@@ -12,10 +13,12 @@ use crate::game::data::state::{the_hero, the_world};
 const DOORCOUNT: i32 = 86;
 const CAVE: i8 = 18;
 const FIRST_INSIDE_REGION: u16 = 8;
+
 /// The hero is lined up with a door when these bits of the position are in range: a tile is 16
 /// pixels wide and 32 high, so bit 4 of y says which half of the tile row.
 const LOWER_HALF_BIT: u16 = 0x10;
 const TILE_COLUMN_MASK: u16 = 15;
+
 /// Snaps the hero's position to a tile (16 wide, 32 high).
 const TILE_X_MASK: u16 = 0xfff0;
 const TILE_Y_MASK: u16 = 0xffe0;
@@ -32,6 +35,7 @@ pub fn check_door() {
 
         // Masks with TILE_X_MASK, keeping only the bits that matter here.
         let xtest = the_hero.x & TILE_X_MASK;
+
         // Masks with TILE_Y_MASK, keeping only the bits that matter here.
         let ytest = the_hero.y & TILE_Y_MASK;
 

@@ -75,7 +75,7 @@ enum SurvivalStep {
 fn survival_step(facts: &SurvivalFacts, hero: &mut Hero, body: &mut Shape) -> Vec<SurvivalStep> {
     let mut steps = Vec::new();
 
-    if safe_check_due(facts.clock) && is_calm_and_safe(facts, hero, body) {
+    if safe_check_due(facts.clock) && is_safe_place(facts, hero, body) {
         note_safe_spot(facts, hero, &mut steps);
     }
 
@@ -91,7 +91,7 @@ fn survival_step(facts: &SurvivalFacts, hero: &mut Hero, body: &mut Shape) -> Ve
 }
 
 /// A safe spot can be noted when nothing is around, the hero is on dry land and alive.
-fn is_calm_and_safe(facts: &SurvivalFacts, hero: &Hero, body: &Shape) -> bool {
+fn is_safe_place(facts: &SurvivalFacts, hero: &Hero, body: &Shape) -> bool {
     !facts.actors_on_screen
         && !facts.actors_loading
         && !facts.witch_on_screen

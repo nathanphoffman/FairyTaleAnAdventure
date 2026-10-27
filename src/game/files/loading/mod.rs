@@ -10,13 +10,16 @@
 //! (`show_story_page`, `turn_page`).
 
 mod sound_data;
+
 mod sprites;
+
 mod story_pages;
 
 pub use self::sound_data::{play_effect, read_sample, read_score};
 pub use self::sprites::{
     finish_sprite_load, load_pending_region, load_sprite_file, load_start_sprites, sprite_files,
 };
+
 pub use self::story_pages::{intro_skip_requested, intro_skipped, show_story_page};
 
 use crate::amiga::{BPTR, BitMap};

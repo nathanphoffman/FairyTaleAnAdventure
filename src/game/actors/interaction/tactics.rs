@@ -56,7 +56,7 @@ pub fn run_tactic(i: i32, tactic: i32) {
 
         match tactic {
             PURSUE => steer_if(acts_now, i, hx, hy, COURSE_TOWARD),
-            SHOOT => shoot_or_approach(i, actor, hx, hy),
+            SHOOT => engage_target(i, actor, hx, hy),
             RANDOM => wander(actor, acts_now),
             BUMBLE_SEEK => steer_if(acts_now, i, hx, hy, COURSE_STRAIGHT),
             BACKUP => steer_if(acts_now, i, hx, hy, COURSE_AWAY),
@@ -80,7 +80,7 @@ fn steer_if(acts_now: bool, i: i32, x: i32, y: i32, mode: i32) {
 }
 
 /// An archer lines up with the hero (same row, column or diagonal) and aims, otherwise approaches.
-unsafe fn shoot_or_approach(i: i32, actor: *mut Shape, hx: i32, hy: i32) {
+unsafe fn engage_target(i: i32, actor: *mut Shape, hx: i32, hy: i32) {
     unsafe {
         let hero = actor_at(HERO as i32);
         let xd = ((*actor).abs_x as i32 - (*hero).abs_x as i32) as i16;

@@ -1,12 +1,13 @@
 //! Saving to and loading from a disk slot: finding it, waiting for the disk and the transfer loop.
 
 use super::records::{
-    save_variables, transfer_actor, transfer_brothers_and_missiles, transfer_extent,
-    transfer_object, transfer_u16,
+    save_variables, transfer_actor, transfer_extent, transfer_object, transfer_party, transfer_u16,
 };
+
 use super::{
     Close, Delay, FLOCK, IoErr, Lock, Open, SAVENAME, SVERR, SVFILE, SetFont, UnLock, is_saving,
 };
+
 use crate::amiga::BPTR;
 use crate::game::data::globals::{panel_font, story_font};
 use crate::game::data::object_tables::{dstobs, glbobs, mapobs, ob_listg, ob_table};
@@ -24,18 +25,23 @@ const ACCESS_READ: i32 = -2;
 const ACCESS_WRITE: i32 = -1;
 const MODE_OLDFILE: i32 = 1005;
 const MODE_NEWFILE: i32 = 1006;
+
 /// How many 1/50 s ticks `wait_for_disk` waits between checks, and how many checks it makes.
 const DISK_POLL_TICKS: i32 = 5;
 const DISK_POLL_COUNT: i32 = 300;
+
 /// Offset of the file name in "df1:A.faery", the drive prefix being 4 characters.
 const NAME_AFTER_DRIVE: usize = 4;
 const DRIVE_DIGIT_INDEX: usize = 2;
 const SLOT_LETTER_INDEX: usize = 4;
+
 /// Entries of `extent_list` that are saved, and entries in the per-region object tables.
 const SAVED_EXTENTS: usize = 2;
 const OBJECT_REGIONS: usize = 10;
+
 /// Value of `view_status` meaning the screen must be redrawn from scratch.
 const VIEW_CORRUPT: i8 = 99;
+
 /// Print queue requests that redraw the vitality line and the stats line.
 const PRINT_VITALITY: i32 = 4;
 const PRINT_STATS: i32 = 7;
@@ -109,7 +115,7 @@ pub(super) unsafe fn save_all() {
             transfer_actor(&raw mut the_actors.list[i]);
         }
 
-        transfer_brothers_and_missiles();
+        transfer_party();
 
         for i in 0..SAVED_EXTENTS {
             transfer_extent((&raw mut extent_list).cast::<Extent>().add(i));

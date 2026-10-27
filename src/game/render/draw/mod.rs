@@ -1,5 +1,5 @@
 //! Drawing the actors each frame (from the main loop in csrc/fmain.c): finishing the scrolled map edge
-//! and the witch's beam (`repair_map_and_witch`), and drawing every actor and its weapon into the page
+//! and the witch's beam (`repair_edges`), and drawing every actor and its weapon into the page
 //! (`draw_sprites`): clipping to the screen, hiding parts behind scenery, and saving the background
 //! under each sprite so it can be put back next frame.
 
@@ -16,7 +16,7 @@ mod weapons;
 use self::blit_setup::set_up_blit;
 use self::scenery::mask_against_scenery;
 
-pub use self::map_edge::repair_map_and_witch;
+pub use self::map_edge::repair_edges;
 
 use self::blit_setup::{Clip, SCREEN_BOTTOM, SCREEN_RIGHT, clip_to_screen};
 
@@ -160,12 +160,15 @@ unsafe fn place_on_screen(sprite: &mut Sprite) -> i8 {
     unsafe {
         // Masks with TILE_X_MASK, keeping only the bits that matter here.
         sprite.xstart += (the_world.map_x as i32 & TILE_X_MASK) as i16;
+
         // Masks with TILE_Y_MASK, keeping only the bits that matter here.
         sprite.ystart += (the_world.map_y as i32 & TILE_Y_MASK) as i16;
+
         // Masks with TILE_Y_MASK, keeping only the bits that matter here.
         sprite.ground += (the_world.map_y as i32 & TILE_Y_MASK) as i16;
 
         let seq = sprite_sheet(sprite.atype);
+
         // Sprite width in pixels: 16 pixels to each word.
         let xsize = (seq.width << WORD_SHIFT) as i8;
         let ysize = image_height(sprite.atype, sprite.inum, seq.height as i8);
@@ -189,6 +192,7 @@ fn is_off_screen(sprite: &Sprite) -> bool {
 fn blit_extent(clip: &Clip) -> (i8, i8, i8) {
     // Pixel columns to word columns (16 pixels to a word).
     let xbw = (clip.xstart >> WORD_SHIFT) as i8;
+
     // Shifts by WORD_SHIFT, converting between pixels, tiles, sectors or bytes.
     let xew = (clip.xstop >> WORD_SHIFT) as i8;
     let mut blitwide = (xew as i16 - xbw as i16 + 1) as i8;

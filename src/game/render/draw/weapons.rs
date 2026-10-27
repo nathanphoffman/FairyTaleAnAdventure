@@ -47,8 +47,10 @@ pub(super) unsafe fn weapon_passmode(actor: *const Shape, pass: &mut u8) -> bool
             && (!(DEAD..SHOOT1).contains(&state) || the_world.extent_type > PEACEFUL_XTYPE)
         {
             let facing = (*actor).facing as i32;
+
             // The other of the two passes (0 becomes 1, 1 becomes 0).
             let flipped = *pass ^ 1;
+
             // Masks with FACING_PICK_OFFSET, keeping only the bits that matter here.
             let mut pick = if ((facing - FACING_PICK_OFFSET) & FACING_LEFT_BIT) != 0 {
                 flipped

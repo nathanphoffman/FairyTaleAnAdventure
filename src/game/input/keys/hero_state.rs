@@ -1,6 +1,6 @@
 //! What the hero is doing each frame: walking, fighting or standing, and the timers that run down.
 
-use super::fairy::fairy_or_revive;
+use super::fairy::fairy_revival;
 use super::{
     BIRD, DEAD, DISMOUNT_CHECK, DISMOUNT_SPEED, DISMOUNT_STEP, DYING, EVENT_LAVA, EVENT_TOO_FAST,
     EVENT_ZONE_81, EVENT_ZONE_82, FACING_MASK, FALL, FIGHTING, FIRE_BUTTON, LAVA_X, LAVA_Y,
@@ -32,10 +32,11 @@ pub fn update_hero(cycle: i16) {
         let mut state = the_actors.list[0].state;
 
         if state == DEAD || state == FALL {
-            state = fairy_or_revive(state, cycle);
+            state = fairy_revival(state, cycle);
         } else if state == DYING || state == SINK || state == SLEEP {
             // nothing to do
         } else if mouse_buttons() & RIGHT_BUTTON != 0
+
             || the_ui.fight_key_held != 0
             // Masks with FIRE_BUTTON, keeping only the bits that matter here.
             || (fta_pia & FIRE_BUTTON) == 0

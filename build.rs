@@ -53,7 +53,7 @@ fn main() {
     let mut build = Build::new();
 
     add_c_files(&mut build);
-    set_c_dialect_and_warnings(&mut build);
+    configure_c_build(&mut build);
 
     for part in PORTED_PARTS {
         build.define(part, None);
@@ -75,7 +75,7 @@ fn add_c_files(build: &mut Build) {
 }
 
 /// The old C needs the old dialect; it is built with warnings on, minus the noisy categories.
-fn set_c_dialect_and_warnings(build: &mut Build) {
+fn configure_c_build(build: &mut Build) {
     build
         .include("csrc")
         .include("csrc/stubs")

@@ -86,6 +86,7 @@ pub fn hit_actor(i: i32, j: i32, fc: i32, wt: i16) {
             HitSound::HeroHurt => {
                 play_effect(EFFECT_HERO_HURT, PITCH_HERO_HURT + bitrand(PITCH_SPREAD))
             }
+
             HitSound::FoeHurt => play_effect(EFFECT_FOE_HURT, PITCH_FOE_HURT + rand256()),
         }
 
@@ -167,7 +168,7 @@ fn vitality_after_hit(vitality: i16, wt: i16) -> i16 {
 /// nearly dead. Then, if turtle eggs are around, the turtle story event is checked.
 pub fn report_battle_result() {
     unsafe {
-        let (dead, fled) = count_dead_and_fled();
+        let (dead, fled) = count_casualties();
         let vitality = (*actor_at(HERO as i32)).vitality;
 
         match battle_report(vitality, dead, fled, the_world.extent_type) {
@@ -196,7 +197,7 @@ pub fn report_battle_result() {
 }
 
 /// How many of the enemies are dead and how many have fled.
-unsafe fn count_dead_and_fled() -> (i32, i32) {
+unsafe fn count_casualties() -> (i32, i32) {
     unsafe {
         let (mut dead, mut fled) = (0, 0);
 

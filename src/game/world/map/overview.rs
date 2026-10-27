@@ -97,6 +97,7 @@ unsafe fn draw_overview_sector(tiles: *const u8, offset: usize) {
 
             for (p, word) in words.iter().enumerate() {
                 let d = (*the_screen.planes.add(p)).add(offset + line * OVERVIEW_LINE_BYTES);
+
                 // A 16 pixel row is two bytes, high byte first.
                 *d = (word >> BYTE_SHIFT) as u8;
                 // The second copy is for the other page.

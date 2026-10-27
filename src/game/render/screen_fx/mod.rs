@@ -7,10 +7,15 @@
 //! `LoadRGB4`. Night is a darker, bluer scaling; indoors it is always full brightness.
 
 mod compass;
+
 mod fading;
+
 mod message_page;
+
 mod print_queue;
+
 mod win;
+
 mod zoom;
 
 pub use self::compass::draw_compass;

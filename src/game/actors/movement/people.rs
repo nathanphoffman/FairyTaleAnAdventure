@@ -4,17 +4,24 @@ use super::{
     Ctx, DEAD, DYING, PERSON_DEAD_OFFSET, PERSON_DYING_OFFSET, PERSON_MASK, Pc, SETFIG_WITCH,
     STILL, TALKING, WITCH_EXTRA_OFFSET,
 };
+
 use crate::game::actors::steering::steer_actor;
 use crate::game::data::random::rand2;
 use crate::game::data::state::{the_hero, the_witch};
 use crate::game::data::tables::setfig_table;
 use crate::game::world::objects::SetFigEntry;
 
+/// The witch's dying and dead frames come two further on than other people's.
+fn witch_extra(witch: bool) -> i16 {
+    if witch { WITCH_EXTRA_OFFSET } else { 0 }
+}
+
 impl Ctx {
     /// People standing about: images from the setfig table, talking, and the witch watching the hero.
     pub(super) unsafe fn setfig(&mut self) -> Pc {
         unsafe {
             let actor = self.actor;
+
             // Masks with PERSON_MASK, keeping only the bits that matter here.
             self.terrain = ((*actor).race & PERSON_MASK) as i16;
             let entry = &*(&raw const setfig_table)
@@ -24,17 +31,9 @@ impl Ctx {
             let witch = self.terrain == SETFIG_WITCH;
 
             if self.state == DYING {
-                self.image += PERSON_DYING_OFFSET;
-
-                if witch {
-                    self.image += WITCH_EXTRA_OFFSET;
-                }
+                self.image += PERSON_DYING_OFFSET + witch_extra(witch);
             } else if self.state == DEAD {
-                self.image += PERSON_DEAD_OFFSET;
-
-                if witch {
-                    self.image += WITCH_EXTRA_OFFSET;
-                }
+                self.image += PERSON_DEAD_OFFSET + witch_extra(witch);
             } else if witch {
                 steer_actor(self.slot, the_hero.x as i32, the_hero.y as i32, 0);
                 self.image = ((*actor).facing / 2) as i16;

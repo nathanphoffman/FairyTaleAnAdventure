@@ -101,6 +101,7 @@ unsafe fn follow_outdoor_region() {
         if the_world.new_region < NO_REGION {
             // Masks with MAP_X_WRAP, keeping only the bits that matter here.
             let xs = the_world.map_x as u32 & MAP_X_WRAP;
+
             // Masks with MAP_Y_WRAP, keeping only the bits that matter here.
             let ys = the_world.map_y as u32 & MAP_Y_WRAP;
 
@@ -110,8 +111,10 @@ unsafe fn follow_outdoor_region() {
         }
 
         let (xs, ys) = center_sector();
+
         // The map is two regions wide (64 sectors each).
         let xr = (xs >> REGION_WIDTH_SHIFT) & 1;
+
         // The map is four regions high (32 sectors each).
         let yr = (ys >> REGION_HEIGHT_SHIFT) & REGION_ROW_MASK;
         the_world.target_region = (xr + yr + yr) as u16;
@@ -137,6 +140,7 @@ unsafe fn update_region_origin() {
 
         // Shifts by REGION_WIDTH_SHIFT, converting between pixels, tiles, sectors or bytes.
         the_world.origin_x = xr << REGION_WIDTH_SHIFT;
+
         // Shifts by REGION_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
         the_world.origin_y = yr << REGION_HEIGHT_SHIFT;
     }
@@ -193,13 +197,13 @@ pub fn load_region_piece() {
 /// Loads the sector data, region map and two terrain tables that differ from the loaded ones.
 unsafe fn load_changed_tables(need: &Need) {
     unsafe {
-        load_changed_sectors_and_map(need);
+        load_changed_map_tables(need);
         load_changed_terrain(need);
     }
 }
 
 /// Loads the sector table and the region map if they changed.
-unsafe fn load_changed_sectors_and_map(need: &Need) {
+unsafe fn load_changed_map_tables(need: &Need) {
     unsafe {
         if need.sector != loaded_blocks.sector {
             load_track_range(

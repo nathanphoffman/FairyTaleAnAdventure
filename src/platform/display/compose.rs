@@ -28,8 +28,10 @@ const LORES_SCALE: i32 = 2;
 fn rgb4(c: u16) -> u32 {
     // Takes the 4 bit colour component out of the 12 bit colour.
     let r = (c >> RED_NIBBLE_SHIFT & NIBBLE_MASK) as u32;
+
     // Takes the 4 bit colour component out of the 12 bit colour.
     let g = (c >> GREEN_NIBBLE_SHIFT & NIBBLE_MASK) as u32;
+
     // Masks with NIBBLE_MASK, keeping only the bits that matter here.
     let b = (c & NIBBLE_MASK) as u32;
 
@@ -54,6 +56,7 @@ fn draw_pointer_line(frame: &mut [u32], colors: &ColorMap, word: u32, origin: (i
 
     for bit in 0..POINTER_WIDTH {
         let shift = POINTER_WIDTH - 1 - bit;
+
         // One pixel of the two interleaved planes: plane a is the low bit, plane b the high bit.
         let v = (a >> shift & 1) | (b >> shift & 1) << 1;
         let idx = POINTER_FIRST_COLOR + v as usize;
@@ -122,6 +125,7 @@ fn draw_viewport(v: &ViewPort, ri: &RasInfo, frame: &mut [u32]) {
     let bm = unsafe { &*ri.BitMap };
 
     let cm = unsafe { &*v.ColorMap };
+
     // Masks with HIRES, keeping only the bits that matter here.
     let hires = v.Modes & HIRES != 0;
 

@@ -145,8 +145,10 @@ pub fn leave_item(i: i16, object: i16) {
 pub fn change_object(id: i32, flag: i32) {
     unsafe {
         let vitality = (*(&raw const the_actors.list))[id as usize].vitality;
+
         // Masks with OBJECT_INDEX_MASK, keeping only the bits that matter here.
         let index = (vitality & OBJECT_INDEX_MASK) as usize;
+
         // Masks with GLOBAL_LIST_BIT, keeping only the bits that matter here.
         let object = if vitality & GLOBAL_LIST_BIT != 0 {
             (&raw mut ob_listg).cast::<WorldObject>().add(index)
@@ -177,6 +179,7 @@ unsafe fn distribute_treasure() {
                 // Masks with REGION_WIDTH, keeping only the bits that matter here.
                 x = (bitrand(REGION_WIDTH - 1) + ((the_world.region & 1) as i32 * REGION_WIDTH))
                     as i16;
+
                 // Masks with REGION_HEIGHT, keeping only the bits that matter here.
                 y = (bitrand(REGION_HEIGHT - 1) + ((the_world.region & 6) as i32 * REGION_ROW_STEP))
                     as i16;
@@ -265,18 +268,9 @@ unsafe fn add_object(object: &mut WorldObject, index: i16, f: i32) {
 
         // States 3 and 4 are people; everything else is an item.
         let is_person = object.ob_stat == STAT_PERSON || object.ob_stat == STAT_DEAD_PERSON;
-        let id = object.ob_id;
 
-        if is_person {
-            if !(inside(xstart, PERSON_LOAD_X) && inside(ystart, PERSON_LOAD_Y)) {
-                return;
-            }
-
-            load_set_figure(id);
-
-            if object.ob_id == WITCH && object.ob_stat == STAT_PERSON {
-                the_witch.on_screen = 1;
-            }
+        if is_person && !load_person_if_near(object, xstart, ystart) {
+            return;
         }
 
         if object.ob_stat == STAT_TAKEN || object.ob_stat == STAT_HIDDEN {
@@ -300,6 +294,24 @@ unsafe fn add_object(object: &mut WorldObject, index: i16, f: i32) {
         actor.abs_y = object.yc;
         actor.rel_x = xstart as u16;
         actor.rel_y = ystart as u16;
+    }
+}
+
+/// A person close enough to the screen gets their pictures loaded (the witch also marks herself as
+/// on screen). Returns false if the person is too far away.
+unsafe fn load_person_if_near(object: &WorldObject, xstart: i16, ystart: i16) -> bool {
+    unsafe {
+        if !(inside(xstart, PERSON_LOAD_X) && inside(ystart, PERSON_LOAD_Y)) {
+            return false;
+        }
+
+        load_set_figure(object.ob_id);
+
+        if object.ob_id == WITCH && object.ob_stat == STAT_PERSON {
+            the_witch.on_screen = 1;
+        }
+
+        true
     }
 }
 

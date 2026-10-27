@@ -36,7 +36,7 @@ impl Ctx {
             let early_exit = if self.state == SHOOT3 {
                 self.release_shot()
             } else if self.state == SHOOT1 {
-                self.draw_bow_or_fireball()
+                self.start_shot()
             } else {
                 None
             };
@@ -85,7 +85,7 @@ impl Ctx {
 
     /// The actor starts to shoot: a fireball is fired at once, a bow needs arrows (for the hero).
     /// `Some` means nothing is fired.
-    unsafe fn draw_bow_or_fireball(&mut self) -> Option<Pc> {
+    unsafe fn start_shot(&mut self) -> Option<Pc> {
         unsafe {
             let actor = self.actor;
             let d8 = self.facing + SHOOTING_FACING_OFFSET;

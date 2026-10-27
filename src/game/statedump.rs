@@ -97,7 +97,7 @@ unsafe fn slay_enemies() {
 /// inventory.
 pub fn state_text() -> String {
     unsafe {
-        let mut out = hero_and_world_lines();
+        let mut out = hero_world_lines();
         out.push_str(&format!("seed {} {}\n", { seed1 }, { seed2 }));
 
         for i in 0..20 {
@@ -117,7 +117,7 @@ pub fn state_text() -> String {
 }
 
 /// The first lines of the dump: where the hero is, his stats, and the clock and light.
-unsafe fn hero_and_world_lines() -> String {
+unsafe fn hero_world_lines() -> String {
     unsafe {
         let mut out = String::new();
         out.push_str(&format!(

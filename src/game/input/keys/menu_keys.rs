@@ -101,6 +101,7 @@ pub(super) unsafe fn menu_letter(key: i8) {
             the_ui.chosen_entry = shortcut.choice;
             let entry =
                 &raw mut menus[the_ui.current_menu as usize].enabled[the_ui.chosen_entry as usize];
+
             // Masks with DISPLAYED, keeping only the bits that matter here.
             the_ui.menu_hit_enabled = *entry & DISPLAYED;
 

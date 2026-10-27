@@ -191,7 +191,7 @@ pub(super) unsafe fn adjust_for_depth(
         if !passmode && sprite.atype != OBJECTS {
             sink_body(actor, i, cycle, depth, sprite)
         } else {
-            sink_weapon_or_object(depth, sprite)
+            sink_item(depth, sprite)
         }
     }
 }
@@ -219,6 +219,7 @@ unsafe fn sink_body(
             sprite.ystart += BUBBLES_DROP;
             sprite.ystop = sprite.ystart + BUBBLES_HEIGHT;
             sprite.atype = OBJECTS;
+
             // Masks with OBJ_SUNK, keeping only the bits that matter here.
             sprite.inum = OBJ_SUNK + ((cycle as i32 + i) & 1) as i16;
         } else if depth > SHALLOW_DEPTH {
@@ -230,7 +231,7 @@ unsafe fn sink_body(
 }
 
 /// A weapon or object in water goes down with the water; under the surface it is not drawn at all.
-fn sink_weapon_or_object(depth: i16, sprite: &mut Sprite) -> bool {
+fn sink_item(depth: i16, sprite: &mut Sprite) -> bool {
     if depth > UNDER_SURFACE_DEPTH {
         return false; // no weapon
     }

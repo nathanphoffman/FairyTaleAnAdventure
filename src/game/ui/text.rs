@@ -272,6 +272,7 @@ unsafe fn draw_border_stroke(
             SHORT_EDGE_NEAR.0 + dy,
             SHORT_EDGE_NEAR.1 - dx,
         );
+
         line(
             r,
             SHORT_EDGE_FAR.0 - yorg,

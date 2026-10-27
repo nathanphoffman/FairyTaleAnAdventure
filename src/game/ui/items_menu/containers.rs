@@ -106,39 +106,42 @@ enum Contents {
     ThreeOf(usize),
 }
 
+/// Two different things: the first may be 100 gold pieces (a roll of 0), the second is rolled again
+/// until it differs and may be arrows (a roll of 0).
+fn roll_two_things(pick8: &mut impl FnMut() -> i32) -> Contents {
+    let mut first = pick8() + FIRST_CONTAINER_ITEM;
+
+    if first == ROLL_ARROWS_OR_GOLD {
+        first = HUNDRED_GOLD;
+    }
+
+    let mut second;
+
+    loop {
+        second = pick8() + FIRST_CONTAINER_ITEM;
+
+        if second != first {
+            break;
+        }
+    }
+
+    if second == ROLL_ARROWS_OR_GOLD {
+        second = ARROWBASE as i32;
+    }
+
+    Contents::Two {
+        first: first as usize,
+        second: second as usize,
+    }
+}
+
 /// Rolls the contents with the game's random draws (`pick4` 0-3, `pick8` 0-7), in the same order
 /// as the original: the kind first, then the item rolls.
 fn roll_contents(mut pick4: impl FnMut() -> i32, mut pick8: impl FnMut() -> i32) -> Contents {
     match pick4() {
         0 => Contents::Nothing,
         1 => Contents::One(container_item(pick8())),
-        2 => {
-            let mut first = pick8() + FIRST_CONTAINER_ITEM;
-
-            if first == ROLL_ARROWS_OR_GOLD {
-                first = HUNDRED_GOLD;
-            }
-
-            let mut second;
-
-            loop {
-                second = pick8() + FIRST_CONTAINER_ITEM;
-
-                if second != first {
-                    break;
-                }
-            }
-
-            if second == ROLL_ARROWS_OR_GOLD {
-                second = ARROWBASE as i32;
-            }
-
-            Contents::Two {
-                first: first as usize,
-                second: second as usize,
-            }
-        }
-
+        2 => roll_two_things(&mut pick8),
         _ => {
             let i = pick8() + FIRST_CONTAINER_ITEM;
 

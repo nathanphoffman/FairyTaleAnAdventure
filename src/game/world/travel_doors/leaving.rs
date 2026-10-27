@@ -18,6 +18,7 @@ fn outside_spot(d: &Door) -> (u16, u16) {
             d.xc1.wrapping_sub(CAVE_OUT.0),
             d.yc1.wrapping_add(CAVE_OUT.1),
         )
+
     // Masks off the low bits (a cheap remainder or a flag test).
     } else if d.kind & 1 != 0 {
         (

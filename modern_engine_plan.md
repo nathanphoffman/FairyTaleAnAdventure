@@ -69,7 +69,7 @@ games/  original  improved  remastered  reimagined
 - [x] World update (once per tick): `day_night_tick`, `spawn_encounters`, `speak_nearby`, `actor_ai`,
       `survival_tick`.
 - [x] Combat and drawing: `melee_hits`, `move_missiles`, `queue_missiles`, `sort_actors`,
-      `repair_map_and_witch`, `draw_sprites`.
+      `repair_edges`, `draw_sprites`.
 - Start-up (before the loop) and shutdown (`quit_all:`) stay in `main()`.
 Things the cuts turned up (all handled, keep them in mind for the Rust versions):
 - `cycle` (frame counter) was never initialised, so it started as stack garbage; now `short cycle = 0`.
@@ -183,7 +183,7 @@ order; all six are done. Sizes are the C line counts.
       (step 2). Quirks kept: the dragon's image is always 0, the `an->state == STILL` no-op for race 7.
       Scenarios added: `swan_ride`, `swan_no_lasso`, `turtle_shell`, `door_locked`, `door_wood`; their
       state hashes were identical on a worktree build of the C `move_actor`.
-- [x] **D. Drawing (~260).** Done: `draw.rs` (`repair_map_and_witch`, `draw_sprites`; guard `RSRC_DRAW`,
+- [x] **D. Drawing (~260).** Done: `draw.rs` (`repair_edges`, `draw_sprites`; guard `RSRC_DRAW`,
       prototypes in the C `#else`). `draw_sprites` is split into `weapon_passmode`, `draw_one`,
       `drawn_in_front` and `mask_against_scenery`; an actor with a weapon is drawn in two passes as
       before. It still writes the C globals the blitter reads (`shp`, `shapedata`, `mask_buffer`,

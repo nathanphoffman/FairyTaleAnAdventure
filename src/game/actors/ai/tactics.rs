@@ -18,9 +18,11 @@ const RANDOM: i16 = 4;
 const EVADE: i16 = 6;
 const SHOOT: i16 = 8;
 const EGG_SEEK: i16 = 10;
+
 /// Archers back off when closer than this, shoot inside the second pair, else close in.
 const ARCHER_TOO_CLOSE: (i16, i16) = (40, 30);
 const ARCHER_IN_RANGE: i16 = 70;
+
 /// Distance at which a fighter closes to strike, minus its goal number (the dark knight: this).
 const STRIKE_BASE: i16 = 14;
 const DKNIGHT: u8 = 7;

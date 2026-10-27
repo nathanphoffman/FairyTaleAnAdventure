@@ -35,6 +35,23 @@ pub extern "C" fn AreaDraw(_rp: *mut RastPort, x: LONG, y: LONG) -> LONG {
     0
 }
 
+/// The x positions, sorted, where the polygon's edges cross the pixel row `y`.
+fn crossings(pts: &[(i32, i32)], y: i32) -> Vec<i32> {
+    let mut xs = Vec::new();
+
+    for i in 0..pts.len() {
+        let (a, b) = (pts[i], pts[(i + 1) % pts.len()]);
+
+        if (a.1 <= y && b.1 > y) || (b.1 <= y && a.1 > y) {
+            xs.push(a.0 + (y - a.1) * (b.0 - a.0) / (b.1 - a.1));
+        }
+    }
+
+    xs.sort();
+
+    xs
+}
+
 /// Fills the polygon collected so far (even-odd rule).
 #[unsafe(no_mangle)]
 pub extern "C" fn AreaEnd(rp: *mut RastPort) -> LONG {
@@ -46,6 +63,7 @@ pub extern "C" fn AreaEnd(rp: *mut RastPort) -> LONG {
     }
 
     let bm = unsafe { &*rp.BitMap };
+
     // Masks with COMPLEMENT, keeping only the bits that matter here.
     let complement = rp.DrawMode & COMPLEMENT != 0;
 
@@ -62,19 +80,7 @@ pub extern "C" fn AreaEnd(rp: *mut RastPort) -> LONG {
     let (ymin, ymax) = (ymin.max(cy0), ymax.min(cy1));
 
     for y in ymin..=ymax {
-        let mut xs = Vec::new();
-
-        for i in 0..pts.len() {
-            let (a, b) = (pts[i], pts[(i + 1) % pts.len()]);
-
-            if (a.1 <= y && b.1 > y) || (b.1 <= y && a.1 > y) {
-                xs.push(a.0 + (y - a.1) * (b.0 - a.0) / (b.1 - a.1));
-            }
-        }
-
-        xs.sort();
-
-        for pair in xs.chunks(2) {
+        for pair in crossings(&pts, y).chunks(2) {
             if let [x0, x1] = pair {
                 for x in (*x0).max(cx0)..=(*x1).min(cx1) {
                     unsafe { plot(bm, x, y, rp.FgPen, complement) };

@@ -24,13 +24,13 @@ use crate::game::render::display::remove_input_handler;
 pub fn close_all() {
     unsafe {
         free_game_memory();
-        free_pointer_and_font_data();
+        free_panel_data();
         free_view_resources();
         free_page_planes();
         close_audio();
-        close_input_and_fonts();
+        close_input_fonts();
         close_disk();
-        close_libraries_and_bitmaps();
+        close_graphics();
         open_flags = 0;
 
         if original_dir != 0 {
@@ -68,7 +68,7 @@ pub(super) unsafe fn free_game_memory() {
 }
 
 /// Memory that `into_chip` copied is freed; if it handed back the original, nothing is.
-pub(super) unsafe fn free_pointer_and_font_data() {
+pub(super) unsafe fn free_panel_data() {
     unsafe {
         free_chip(
             the_memory.sprite_data,
@@ -141,7 +141,7 @@ pub(super) unsafe fn close_audio() {
 }
 
 /// Takes the input handler down and closes the fonts.
-pub(super) unsafe fn close_input_and_fonts() {
+pub(super) unsafe fn close_input_fonts() {
     unsafe {
         if has_flag(AL_HANDLE) {
             remove_input_handler();
@@ -155,7 +155,7 @@ pub(super) unsafe fn close_input_and_fonts() {
 }
 
 /// Closes the graphics libraries and frees the bitmap headers, the layer info and the sprite.
-pub(super) unsafe fn close_libraries_and_bitmaps() {
+pub(super) unsafe fn close_graphics() {
     unsafe {
         if has_flag(AL_GBASE) {
             CloseLibrary(gfx_base.cast());

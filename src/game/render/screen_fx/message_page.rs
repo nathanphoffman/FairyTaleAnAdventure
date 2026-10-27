@@ -8,6 +8,7 @@ use crate::game::render::display::flip_pages;
 
 const MAP_PEN: u32 = 24;
 const JAM1: u32 = 0;
+
 /// `view_status` values: showing a map message, and showing the normal view again.
 const VIEW_MESSAGE: i8 = 2;
 const VIEW_NORMAL_AGAIN: i8 = 3;

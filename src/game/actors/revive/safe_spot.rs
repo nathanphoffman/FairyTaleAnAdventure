@@ -7,18 +7,24 @@ use crate::game::ui::text::queue_print;
 use crate::game::world::regions::load_region_now;
 
 pub(super) const STILL: i8 = 13;
+
 /// Where the hero is on the screen: the map is centred on the hero.
 pub(super) const CAMERA_OFFSET: (u16, u16) = (144, 90);
+
 /// Vitality of a brother who sets out: 15 plus a quarter of the bravery.
 const BASE_VITALITY: i16 = 15;
 const BRAVERY_DIVISOR: i16 = 4;
+
 /// The hero's body is marked with this race.
 const HERO_RACE: u8 = 255;
+
 /// Actors active when a brother starts: the hero, the raft and the first person.
 const START_ACTORS: i16 = 3;
+
 /// Time of day when a brother starts or revives, and the light then.
 pub(super) const START_DAYNIGHT: u16 = 8000;
 pub(super) const START_LIGHT: u16 = 300;
+
 /// Print queue entries: vitality and stats.
 const PRQ_STATS: i32 = 4;
 const PRQ_VITALITY: i32 = 7;

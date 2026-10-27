@@ -136,6 +136,7 @@ impl Ctx {
             XTEST = pos_x(ax, self.facing, TURTLE_STEP);
             YTEST = pos_y(ay, self.facing, TURTLE_STEP);
             the_hero.riding = 0;
+
             // Masks off the low bits (a cheap remainder or a flag test).
             self.image = self.facing + self.facing + (self.cycle & 1);
         }

@@ -25,6 +25,15 @@ const NO_TURTLE_AREA: (u16, u16, u16, u16) = (11194, 21373, 10205, 16208);
 const DIRECTIONS: i32 = 9;
 const DOOR_REACH: i32 = 16;
 
+/// Whether the hero is in the box where the turtle cannot be called.
+unsafe fn in_no_turtle_area() -> bool {
+    unsafe {
+        let (x_low, x_high, y_low, y_high) = NO_TURTLE_AREA;
+
+        the_hero.x < x_high && the_hero.x > x_low && the_hero.y < y_high && the_hero.y > y_low
+    }
+}
+
 /// Picks a weapon, the key menu, the turtle shell, or the sunstone.
 pub(super) unsafe fn use_option(chosen_entry: i16) -> bool {
     unsafe {
@@ -47,13 +56,7 @@ pub(super) unsafe fn use_option(chosen_entry: i16) -> bool {
         }
 
         if chosen_entry == SHELL_ENTRY && the_ui.menu_hit_enabled != 0 {
-            let (x_low, x_high, y_low, y_high) = NO_TURTLE_AREA;
-
-            if the_hero.x < x_high
-                && the_hero.x > x_low
-                && the_hero.y < y_high
-                && the_hero.y > y_low
-            {
+            if in_no_turtle_area() {
                 return true;
             }
 

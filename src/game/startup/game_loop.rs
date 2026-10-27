@@ -2,7 +2,7 @@
 //! the world and drawing.
 
 use crate::amiga::{RastPort, ViewPort};
-use crate::game::render::draw::{draw_sprites, repair_map_and_witch};
+use crate::game::render::draw::{draw_sprites, repair_edges};
 
 use crate::game::actors::ai::update_enemy_goals;
 use crate::game::actors::carriers::raft_proximity;
@@ -95,6 +95,7 @@ unsafe fn scroll_step() -> (i16, i16) {
     unsafe {
         // Shifts by TILE_WIDTH_SHIFT, converting between pixels, tiles, sectors or bytes.
         the_world.tile_x = the_world.map_x >> TILE_WIDTH_SHIFT;
+
         // Shifts by TILE_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
         the_world.tile_y = the_world.map_y >> TILE_HEIGHT_SHIFT;
         let dif_x = (the_world.tile_x as i32 - (*the_screen.drawing_page).isv_x) as i16;
@@ -186,6 +187,7 @@ unsafe fn run_frame(state: &mut FrameState) {
 unsafe fn read_keyboard() {
     unsafe {
         let key = next_key() as i8;
+
         // Masks with GAME_MENU, keeping only the bits that matter here.
         let notpause = menus[GAME_MENU].enabled[PAUSE_ENTRY] & 1 == 0;
 
@@ -353,7 +355,7 @@ unsafe fn draw_frame(state: &mut FrameState, scroll_x: i16, scroll_y: i16) {
         sort_actors();
 
         // now that the scroll blit is done, finish repairing the map
-        repair_map_and_witch(scroll_x, scroll_y);
+        repair_edges(scroll_x, scroll_y);
 
         draw_sprites(state.cycle);
 

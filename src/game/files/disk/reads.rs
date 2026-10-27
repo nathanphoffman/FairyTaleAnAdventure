@@ -4,12 +4,14 @@ use super::{
     CheckIO, DISKREQ1, DISKREQS, DoIO, FROM_FILE, IMAGE, IoExtTd, LASTREQ, Read, Seek, SendIO,
     WaitIO,
 };
+
 use std::ffi::c_void;
 
 const OFFSET_BEGINNING: i32 = -1;
 const CMD_INVALID: u16 = 0;
 const CMD_READ: u16 = 2;
 const TD_MOTOR: u16 = 9;
+
 /// Bytes in a disk block.
 const BLOCK_SIZE: i32 = 512;
 const MOTOR_REQUEST: usize = 9;

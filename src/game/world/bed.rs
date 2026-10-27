@@ -43,6 +43,7 @@ pub fn check_bed() {
                 // Shifts by TILE_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
                 (the_hero.y >> TILE_HEIGHT_SHIFT) as i32,
             );
+
             let (wait, action) = bed_step(
                 the_world.bed_wait,
                 BED_TILES.contains(&tile),

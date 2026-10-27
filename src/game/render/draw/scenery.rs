@@ -148,6 +148,7 @@ pub(super) unsafe fn mask_against_scenery(
     unsafe {
         // Shifts by TILE_ROW_SHIFT, converting between pixels, tiles, sectors or bytes.
         let ym1 = (ystart1 >> TILE_ROW_SHIFT) as u8;
+
         // Shifts by TILE_ROW_SHIFT, converting between pixels, tiles, sectors or bytes.
         let ym2 = ((ystop1 >> TILE_ROW_SHIFT) as u8).wrapping_sub(ym1);
         let tiles = SpriteTiles {

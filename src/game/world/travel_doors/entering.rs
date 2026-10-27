@@ -9,6 +9,7 @@ use crate::game::render::screen_fx::fade_page;
 use crate::game::world::places::{find_place, transfer_hero};
 
 const DESERT: i8 = 17;
+
 /// Inventory slot of the gold statues, five are needed to enter the desert.
 const STATBASE: usize = 25;
 const STATUES_NEEDED: u8 = 5;
@@ -109,6 +110,7 @@ unsafe fn find_outdoor_door(xtest: u16, ytest: u16) -> Option<i32> {
                 high = j - 1;
             } else if d.xc1 as i32 + TILE_WIDTH < xtest as i32 {
                 low = j + 1;
+
             // Masks off the low bits (a cheap remainder or a flag test).
             } else if d.xc1 < xtest && d.kind & 1 == 0 {
                 low = j + 1; // vertical door: its x must match exactly

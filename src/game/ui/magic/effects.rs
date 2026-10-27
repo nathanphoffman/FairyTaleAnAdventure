@@ -17,6 +17,7 @@ use crate::game::world::places::transfer_hero;
 const SECTOR_SHIFT: u32 = 8;
 const SECTOR_MASK: u16 = 255;
 const TILE_SHIFT: u32 = 4;
+
 /// The heal cap grows by a quarter of the bravery.
 const BRAVERY_DIVISOR: i16 = 4;
 const BATTLE_EVENT: i32 = 34;
@@ -36,9 +37,11 @@ const MARK_MAX: (u32, u32) = (320, 143);
 const VIEW_MAP: i8 = 1;
 const PRQ_STATS: i32 = 4;
 const PRQ_MAP: i32 = 5;
+
 /// Healing is capped at this plus a quarter of bravery.
 const HEAL_CAP_BASE: i16 = 15;
 const HEAL_MIN: i32 = 4;
+
 /// The fear spell only hits enemies of races below this.
 const FEAR_RACE_LIMIT: u8 = 7;
 const ENEMY: i8 = 2;
@@ -55,6 +58,7 @@ pub(super) unsafe fn show_map() {
             // Shifts by TILE_SHIFT, converting between pixels, tiles, sectors or bytes.
             - ((the_world.sector_x as i64 + the_world.origin_x as i64) << TILE_SHIFT)
             - MARK_X_OFFSET) as u32;
+
         // The hero on the overview map: his position in 16 pixel steps minus the top edge of the shown sectors.
         let y = ((the_hero.y >> TILE_SHIFT) as i64
             // Shifts by TILE_SHIFT, converting between pixels, tiles, sectors or bytes.
@@ -143,6 +147,7 @@ fn stone_target(sector: i16, px: u16, py: u16, facing: i8, list: &[u8]) -> Stone
 
             // Back to pixels: the target sector, then the same spot inside it.
             let x = ((list[target * 2] as u16) << SECTOR_SHIFT) + (px & SECTOR_MASK);
+
             // Shifts by SECTOR_SHIFT, converting between pixels, tiles, sectors or bytes.
             let y = ((list[target * 2 + 1] as u16) << SECTOR_SHIFT) + (py & SECTOR_MASK);
 
@@ -216,6 +221,7 @@ mod tests {
     const LIST: [u8; 22] = [
         54, 43, 71, 77, 78, 102, 66, 121, 12, 85, 79, 40, 107, 38, 73, 21, 12, 26, 26, 53, 84, 60,
     ];
+
     use crate::game::data::types::Shape;
 
     #[test]
@@ -233,6 +239,7 @@ mod tests {
         // Facing 0 goes one circle on, same offset inside the sector.
         assert_eq!(
             stone_target(144, x, y, 0, &LIST),
+            // Target sector times 256, plus the same spot inside it.
             StoneJump::To((71 << 8) + 100, (77 << 8) + 70)
         );
 
@@ -240,6 +247,7 @@ mod tests {
         let (x, y) = ((84 << 8) + 90, (60 << 8) + 65);
         assert_eq!(
             stone_target(144, x, y, 7, &LIST),
+            // Target sector times 256, plus the same spot inside it.
             StoneJump::To((73 << 8) + 90, (21 << 8) + 65)
         );
 
@@ -247,6 +255,7 @@ mod tests {
         let (x, y) = ((54 << 8) + 90, (43 << 8) + 65);
         assert_eq!(
             stone_target(144, x, y, 9, &LIST),
+            // Target sector times 256, plus the same spot inside it.
             StoneJump::To((84 << 8) + 90, (60 << 8) + 65)
         );
     }

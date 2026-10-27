@@ -5,6 +5,7 @@ use crate::game::data::object_tables::comptable;
 use crate::game::data::state::{the_memory, the_screen};
 
 const BLIT_COPY: u32 = 0xC0;
+
 /// The compass only touches the plane the highlight is in.
 const COMPASS_PLANE_MASK: u32 = 4;
 const COMPASS_PLANE: usize = 2;
@@ -12,6 +13,7 @@ const COMPASS_X: i32 = 567;
 const COMPASS_Y: i32 = 15;
 const COMPASS_WIDTH: i32 = 48;
 const COMPASS_HEIGHT: i32 = 24;
+
 /// Compass directions below this are lit; the rest mean "not walking".
 const COMPASS_DIRECTIONS: i16 = 9;
 

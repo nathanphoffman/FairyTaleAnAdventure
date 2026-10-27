@@ -25,21 +25,28 @@ const FOLLOWER: i16 = 9;
 
 // Tactics.
 const FRUST: i16 = 0;
+
 /// A new tactic is rolled one frame in 16.
 const NEW_TACTIC_ODDS: i32 = 16;
+
 /// After being frustrated, archers pick one of tactics 2 to 5 and the others 3 or 4.
 const ARCHER_FRUSTRATION_TACTIC: i32 = 2;
 const MELEE_FRUSTRATION_TACTIC: i32 = 3;
 const FOLLOW: i32 = 2;
 const SHOOTFRUST: i16 = 9;
+
 /// The first actors are the hero and the raft.
 const FIRST_AI_ACTOR: usize = 2;
+
 /// The good fairy is on screen below this countdown; nobody acts then.
 const FAIRY_ARRIVES: u8 = 120;
+
 /// An actor within this many pixels (in x and y) of the hero counts as on screen.
 const SCREEN_RANGE: i16 = 300;
+
 /// Special encounters (extent_type above this) only fight if they are the encounter's race.
 const SPECIAL_XTYPE: u16 = 59;
+
 /// Carriers (the turtle) re-aim every 16 ticks, steering mode 5.
 const CARRIER_AIM_MASK: u16 = 15;
 const CARRIER_AIM_MODE: i32 = 5;
@@ -155,6 +162,18 @@ unsafe fn notice_actor(actor: *const Shape, xd: i16, yd: i16, battle2: i8) -> bo
     }
 }
 
+/// A stuck actor picks a new tactic: archers one of the ranged ones, the others a melee one.
+unsafe fn try_something_else(i: usize, actor: *mut Shape) {
+    unsafe {
+        // Masks with BOW_BIT, keeping only the bits that matter here.
+        if (*actor).weapon & BOW_BIT != 0 {
+            run_tactic(i as i32, rand4() + ARCHER_FRUSTRATION_TACTIC);
+        } else {
+            run_tactic(i as i32, rand2() + MELEE_FRUSTRATION_TACTIC);
+        }
+    }
+}
+
 /// Carries out the actor's goal for this frame: a stuck actor tries something else, a hostile one
 /// picks a tactic now and then and acts on it, the others flee, follow, stand or wait. Returns the
 /// goal for next frame, which a hostile actor may change.
@@ -168,12 +187,7 @@ unsafe fn act_on_goal(
 ) -> i16 {
     unsafe {
         if tactic == FRUST || tactic == SHOOTFRUST {
-            // Masks with BOW_BIT, keeping only the bits that matter here.
-            if (*actor).weapon & BOW_BIT != 0 {
-                run_tactic(i as i32, rand4() + ARCHER_FRUSTRATION_TACTIC);
-            } else {
-                run_tactic(i as i32, rand2() + MELEE_FRUSTRATION_TACTIC);
-            }
+            try_something_else(i, actor);
         } else if (*actor).state == SHOOT1 {
             (*actor).state = SHOOT3;
         } else if mode <= ARCHER2 {

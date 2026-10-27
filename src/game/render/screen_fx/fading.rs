@@ -18,12 +18,15 @@ const DEFAULT_COLOR_31: u16 = 0x0bdf;
 const NIGHT_MIN: (i32, i32, i32) = (10, 25, 60);
 const FULL_LEVEL: i32 = 100;
 const MAX_COMPONENT: i32 = 15;
+
 /// Night blue lift: one third of the green that is missing from full light.
 const NIGHT_BLUE_SHARE: i32 = 3;
+
 /// A component in its nibble position (up to 0xf0) times a level in percent: dividing by 1600 gives
 /// back a 4 bit component.
 const SCALE_DIVISOR: i32 = 1600;
 const PERCENT: i32 = 100;
+
 /// The lake colours get a moonlight tint at night while green stays above these levels.
 const LAKE_COLORS: std::ops::RangeInclusive<usize> = 16..=24;
 const MOONLIGHT_MIN_GREEN: i32 = 20;
@@ -104,10 +107,13 @@ fn faded_color(
     lit: bool,
 ) -> u16 {
     let color = color as i32;
+
     // Colours are 12 bit 0RGB. Red is moved down a nibble so all three work on the same scale.
     let mut r1 = (color & RED_MASK) >> NIBBLE_BITS;
+
     // Masks with GREEN_MASK, keeping only the bits that matter here.
     let mut g1 = color & GREEN_MASK;
+
     // Masks with BLUE_MASK, keeping only the bits that matter here.
     let mut b1 = color & BLUE_MASK;
 
@@ -190,10 +196,13 @@ pub fn fade_normal() {
 // Daylight: the page colours follow the time of day.
 const DAY_DARKEN: (i32, i32, i32) = (80, 61, 62);
 const LIGHT_SPELL_BONUS: i32 = 200;
+
 /// The daylight fade runs every fourth tick.
 const FADE_TICK_MASK: u16 = 3;
+
 /// Inside buildings (regions from here on) it is never night.
 const FIRST_INDOOR_REGION: u16 = 8;
+
 /// `view_status` above this means the screen has to be rebuilt.
 const VIEW_REBUILD: i8 = 97;
 

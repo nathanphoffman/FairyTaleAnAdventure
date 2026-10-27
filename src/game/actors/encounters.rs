@@ -108,7 +108,25 @@ pub fn place_encounter(i: u16, spread: u16) -> i32 {
         (*actor).kind = ENEMY;
         let race = encounter_race();
         (*actor).race = race as u8;
+        arm_enemy(actor, race);
 
+        (*actor).rel_x = (*actor)
+            .abs_x
+            .wrapping_sub(the_world.map_x)
+            .wrapping_sub(ENEMY_ANCHOR.0);
+        (*actor).rel_y = (*actor)
+            .abs_y
+            .wrapping_sub(the_world.map_y)
+            .wrapping_sub(ENEMY_ANCHOR.1);
+
+        1
+    }
+}
+
+/// Gives the new enemy its weapon (picked from the race's chart, at random for a mixed group),
+/// its goal (archers shoot, the rest attack, both as clever as the race is) and its hit points.
+unsafe fn arm_enemy(actor: *mut Shape, race: i32) {
+    unsafe {
         // Masks with MIX_RANDOM_WEAPON, keeping only the bits that matter here.
         if the_encounter.mix_flag & MIX_RANDOM_WEAPON != 0 {
             the_encounter.weapon_type = rand4() as i16;
@@ -129,16 +147,6 @@ pub fn place_encounter(i: u16, spread: u16) -> i32 {
         }
 
         (*actor).vitality = chart.hitpoints as i16;
-        (*actor).rel_x = (*actor)
-            .abs_x
-            .wrapping_sub(the_world.map_x)
-            .wrapping_sub(ENEMY_ANCHOR.0);
-        (*actor).rel_y = (*actor)
-            .abs_y
-            .wrapping_sub(the_world.map_y)
-            .wrapping_sub(ENEMY_ANCHOR.1);
-
-        1
     }
 }
 

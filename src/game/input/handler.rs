@@ -93,6 +93,7 @@ fn push_key(code: i32) {
         let data = &mut *(&raw mut the_ui.handler_data);
         let slot = data.laydown;
         data.keybuf[slot as usize] = code as u8;
+
         // Masks with KEY_BUFFER_MASK, keeping only the bits that matter here.
         let next = (slot + 1) & KEY_BUFFER_MASK;
 
@@ -139,6 +140,7 @@ pub fn next_key() -> i32 {
         }
 
         let code = data.keybuf[data.pickup as usize];
+
         // Masks with KEY_BUFFER_MASK, keeping only the bits that matter here.
         data.pickup = (data.pickup + 1) & KEY_BUFFER_MASK;
 

@@ -11,6 +11,7 @@
 //! choice) and the platform layer puts the files in the `saves/` folder.
 
 mod records;
+
 mod slots;
 
 pub use self::slots::savegame;

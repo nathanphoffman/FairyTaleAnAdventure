@@ -5,6 +5,7 @@ use crate::amiga::BPTR;
 use crate::game::data::globals::{
     princesses_rescued, save_padding_1, save_padding_2, save_padding_3,
 };
+
 use crate::game::data::state::{the_actors, the_encounter, the_hero, the_ui, the_world};
 use crate::game::data::tables::brother_stats;
 use crate::game::data::types::{Extent, Missile, Shape, WorldObject};
@@ -158,7 +159,7 @@ pub fn transfer_object(o: *mut WorldObject) {
     }
 }
 
-/// Saves or loads one missile (arrow, rock, fireball). Called from `transfer_brothers_and_missiles` in csrc/fmain.c.
+/// Saves or loads one missile (arrow, rock, fireball). Called from `transfer_party` in csrc/fmain.c.
 pub fn transfer_missile(m: *mut Missile) {
     unsafe {
         let m = &mut *m;
@@ -182,7 +183,7 @@ const STUFF_SIZE: i32 = 35;
 
 /// Saves or loads the three brothers' item lists and the 6 missiles (the count `next_missile` is saved
 /// elsewhere). After loading, `stuff` points at the current brother's list.
-pub fn transfer_brothers_and_missiles() {
+pub fn transfer_party() {
     unsafe {
         transfer_bytes((&raw mut the_hero.julstuff).cast(), STUFF_SIZE);
         transfer_bytes((&raw mut the_hero.philstuff).cast(), STUFF_SIZE);

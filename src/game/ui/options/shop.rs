@@ -107,29 +107,36 @@ pub(super) unsafe fn buy_option(chosen_entry: i16) -> bool {
             Purchase::Bought { wealth_left, what } => {
                 the_hero.wealth = wealth_left;
                 queue_print(PRQ_VITALITY);
-
-                match what {
-                    Bought::Food => {
-                        show_event(BOUGHT_FOOD_EVENT);
-                        eat_food(FOOD_HUNGER);
-                    }
-
-                    Bought::Arrows => {
-                        add_stuff(item, ARROWS_BOUGHT);
-                        show_event(BOUGHT_ARROWS_EVENT);
-                    }
-
-                    Bought::Item => {
-                        add_stuff(item, 1);
-                        print_wrapped(c"% bought a ".as_ptr());
-                        print_cont(item_name(item));
-                        print_cont(c".".as_ptr());
-                    }
-                }
+                receive_purchase(item, what);
             }
         }
 
         true
+    }
+}
+
+/// Hands over what was bought: food is eaten at once, arrows come in a bundle, anything else is
+/// added to the pack with a message.
+unsafe fn receive_purchase(item: usize, what: Bought) {
+    unsafe {
+        match what {
+            Bought::Food => {
+                show_event(BOUGHT_FOOD_EVENT);
+                eat_food(FOOD_HUNGER);
+            }
+
+            Bought::Arrows => {
+                add_stuff(item, ARROWS_BOUGHT);
+                show_event(BOUGHT_ARROWS_EVENT);
+            }
+
+            Bought::Item => {
+                add_stuff(item, 1);
+                print_wrapped(c"% bought a ".as_ptr());
+                print_cont(item_name(item));
+                print_cont(c".".as_ptr());
+            }
+        }
     }
 }
 

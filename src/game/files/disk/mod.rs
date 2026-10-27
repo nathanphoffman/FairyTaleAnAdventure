@@ -97,6 +97,7 @@ const ACCESS_READ: i32 = -2;
 const MODE_OLDFILE: i32 = 1005;
 const TD_NAME: &[u8] = b"trackdisk.device\0";
 const IMAGE_FILE: &[u8] = b"image\0";
+
 /// Requests 0-8 are for loading (5 landscape, 2 terrain, 1 map/sector/monster); 9 is the motor.
 const LOADING_REQUESTS: usize = 9;
 
