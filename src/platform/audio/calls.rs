@@ -1,42 +1,54 @@
 //! The calls the game makes (formerly gdriver.asm).
 
+use super::sequencer::Track;
 use super::tables::*;
 use super::with_sound;
 
-/// `ins` is the game's instrument table, `wav` 8 waveforms of 128 bytes, `vol` 10 volume
-/// envelopes of 256 bytes. The game fills `wav` and `vol` from the file v6 after this call.
-pub fn init_music(ins: *const u16, wav: *const u8, vol: *const u8) {
+/// Gives the music driver its data: `instruments` is the table of instrument words (waveform
+/// number in the high byte, volume envelope in the low one), `waves` 8 waveforms of 128 bytes and
+/// `volumes` 10 volume envelopes of 256 bytes.
+pub fn init_music(instruments: Vec<u16>, waves: Vec<u8>, volumes: Vec<u8>) {
     with_sound(|s| {
-        s.ins = ins;
-        s.wav = wav;
-        s.vol = vol;
+        s.ins = instruments;
+        s.wav = waves;
+        s.vol = volumes;
         s.tempo = DEFAULT_TEMPO;
         s.nosound = true;
+    });
+}
+
+/// Changes one entry of the instrument table (the game does this to give caves and houses their
+/// own sound).
+pub fn set_instrument(slot: usize, word: u16) {
+    with_sound(|s| {
+        if let Some(entry) = s.ins.get_mut(slot) {
+            *entry = word;
+        }
     });
 }
 
 pub fn wrap_music() {
     stopscore();
     with_sound(|s| {
-        s.ins = std::ptr::null();
-        s.wav = std::ptr::null();
-        s.vol = std::ptr::null();
+        s.ins.clear();
+        s.wav.clear();
+        s.vol.clear();
     });
 }
 
 /// Sets the tracks to switch to when the current ones loop.
-pub fn setscore(t1: *const u8, t2: *const u8, t3: *const u8, t4: *const u8) {
+pub fn setscore(tracks: [Track; VOICE_COUNT]) {
     with_sound(|s| {
-        for (v, t) in [t1, t2, t3, t4].into_iter().enumerate() {
-            s.voices[v].trak_beg = t;
+        for (v, t) in tracks.into_iter().enumerate() {
+            s.voices[v].trak_beg = Some(t);
         }
     });
 }
 
 /// Starts playing four tracks from the beginning.
-pub fn playscore(t1: *const u8, t2: *const u8, t3: *const u8, t4: *const u8) {
+pub fn playscore(tracks: [Track; VOICE_COUNT]) {
     with_sound(|s| {
-        s.play([t1, t2, t3, t4]);
+        s.play(tracks);
     });
 }
 
@@ -53,13 +65,15 @@ pub fn stopscore() {
     });
 }
 
-/// One-shot sound effect on voice 2: `len` words of signed 8 bit data at `period`.
-pub fn playsample(data: *const i8, len: i32, period: i32) {
-    if data.is_null() || len <= 0 {
+/// One-shot sound effect on voice 2: signed 8 bit data (a whole number of 16 bit words) played at
+/// `period`.
+pub fn playsample(data: &[i8], period: i32) {
+    let bytes = data[..data.len() & !1].to_vec();
+
+    if bytes.is_empty() {
         return;
     }
 
-    let bytes: Vec<i8> = unsafe { std::slice::from_raw_parts(data, len as usize * 2) }.to_vec();
     with_sound(|s| {
         let ch = &mut s.chans[EFFECT_VOICE];
         ch.data = bytes;

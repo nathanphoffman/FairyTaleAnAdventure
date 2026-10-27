@@ -11,8 +11,6 @@ pub use self::open::open_all;
 // Sizes of the memory areas the game loads its data into.
 const S_WAVBUF: usize = 128 * 8;
 const S_VOLBUF: usize = 10 * 256;
-const VOICE_SZ: usize = S_WAVBUF + S_VOLBUF;
-const SCORE_SZ: usize = 5900;
 const IPLAN_SZ: usize = 16384; // one plane of 256 chars
 const IMAGE_SZ: usize = IPLAN_SZ * 5;
 const SHAPE_SZ: usize = 78000;

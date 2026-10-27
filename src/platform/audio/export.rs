@@ -1,7 +1,7 @@
 //! Renders the game's tunes to WAV files without playing them (set FTA_MUSIC_EXPORT=dir).
 
 use super::dump::wav_header;
-use super::sequencer::Sound;
+use super::sequencer::{Sound, Track};
 use super::tables::{DEFAULT_TEMPO, OUTPUT_CHANNELS, SAMPLE_RATE, VOICE_COUNT};
 use super::with_sound;
 use std::path::Path;
@@ -20,18 +20,17 @@ const FULL_SCALE: f32 = 32767.0;
 /// ended or looped once. `before` runs before each tune (the game changes the instrument for some).
 pub fn export_tunes(
     dir: &Path,
-    tunes: &[(&str, [*const u8; VOICE_COUNT])],
+    tunes: &[(&str, [Track; VOICE_COUNT])],
     mut before: impl FnMut(&str),
 ) {
-    let (mut ins, mut wav, mut vol) = (std::ptr::null(), std::ptr::null(), std::ptr::null());
-    with_sound(|s| (ins, wav, vol) = (s.ins, s.wav, s.vol));
-
     for (name, tracks) in tunes {
         before(name);
         let mut sound = Sound::new(SAMPLE_RATE as f64);
-        (sound.ins, sound.wav, sound.vol) = (ins, wav, vol);
+        with_sound(|s| {
+            (sound.ins, sound.wav, sound.vol) = (s.ins.clone(), s.wav.clone(), s.vol.clone())
+        });
         sound.tempo = DEFAULT_TEMPO;
-        sound.play(*tracks);
+        sound.play(tracks.clone());
         let samples = render(&mut sound);
         let path = dir.join(format!("{name}.wav"));
         let mut out = wav_header((samples.len() * 2) as u32);

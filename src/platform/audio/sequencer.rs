@@ -2,11 +2,18 @@
 
 use super::channel::Channel;
 use super::tables::*;
+use std::sync::Arc;
 
-#[derive(Clone, Copy)]
+/// One voice of a tune: pairs of (command, value) bytes.
+pub type Track = Arc<[u8]>;
+
+#[derive(Clone)]
 pub(super) struct Voice {
-    pub(super) trak_ptr: *const u8,
-    pub(super) trak_beg: *const u8,
+    /// The track being played, and where in it the next event is. None when the voice is stopped.
+    pub(super) trak: Option<Track>,
+    pub(super) pos: usize,
+    /// Where the track starts again when it loops.
+    pub(super) trak_beg: Option<Track>,
     pub(super) wave_num: u8,
     pub(super) vol_num: u8,
     pub(super) vol_delay: i8,
@@ -14,7 +21,8 @@ pub(super) struct Voice {
     pub(super) stat: u8,
     pub(super) event_start: i32,
     pub(super) event_stop: i32,
-    pub(super) vol_list: *const u8,
+    /// Where the next level of the volume envelope is in the envelope table.
+    pub(super) vol_list: Option<usize>,
     /// how many times the track has looped back to its start
     pub(super) loops: u32,
 }
@@ -22,15 +30,16 @@ pub(super) struct Voice {
 impl Voice {
     pub(super) const fn new() -> Voice {
         Voice {
-            trak_ptr: std::ptr::null(),
-            trak_beg: std::ptr::null(),
+            trak: None,
+            pos: 0,
+            trak_beg: None,
             wave_num: 0,
             vol_num: 0,
             vol_delay: 0,
             stat: 0,
             event_start: 0,
             event_stop: 0,
-            vol_list: std::ptr::null(),
+            vol_list: None,
             loops: 0,
         }
     }
@@ -43,20 +52,17 @@ pub(super) struct Sound {
     pub(super) timeclock: i32,
     pub(super) nosound: bool,
     /// instrument table (the game's `new_wave`): high byte = waveform, low byte = envelope
-    pub(super) ins: *const u16,
-    pub(super) wav: *const u8,
-    pub(super) vol: *const u8,
+    pub(super) ins: Vec<u16>,
+    pub(super) wav: Vec<u8>,
+    pub(super) vol: Vec<u8>,
     rate: f64,
     tick_acc: f64,
 }
 
-// The raw pointers refer to game memory that outlives the audio device.
-unsafe impl Send for Sound {}
-
 impl Sound {
     pub(super) fn new(rate: f64) -> Sound {
         Sound {
-            voices: [Voice::new(); VOICE_COUNT],
+            voices: [Voice::new(), Voice::new(), Voice::new(), Voice::new()],
             chans: [
                 Channel::new(),
                 Channel::new(),
@@ -66,28 +72,29 @@ impl Sound {
             tempo: DEFAULT_TEMPO,
             timeclock: 0,
             nosound: true,
-            ins: std::ptr::null(),
-            wav: std::ptr::null(),
-            vol: std::ptr::null(),
+            ins: Vec::new(),
+            wav: Vec::new(),
+            vol: Vec::new(),
             rate,
             tick_acc: 0.0,
         }
     }
 
     /// Starts playing four tracks from the beginning.
-    pub(super) fn play(&mut self, tracks: [*const u8; VOICE_COUNT]) {
-        if self.ins.is_null() || self.wav.is_null() || self.vol.is_null() {
+    pub(super) fn play(&mut self, tracks: [Track; VOICE_COUNT]) {
+        if self.ins.is_empty() || self.wav.is_empty() || self.vol.is_empty() {
             return;
         }
 
         for (v, t) in tracks.into_iter().enumerate() {
-            let word = unsafe { *self.ins.add(v) };
+            let word = self.ins.get(v).copied().unwrap_or(0);
             let ch = &mut self.chans[v];
             ch.volume = 0;
             ch.active = false;
             self.voices[v] = Voice {
-                trak_ptr: t,
-                trak_beg: t,
+                trak: Some(t.clone()),
+                pos: 0,
+                trak_beg: Some(t),
                 // An instrument word holds the waveform number in its high byte and the volume envelope in the low one.
                 wave_num: (word >> 8) as u8,
                 vol_num: word as u8,
@@ -102,9 +109,7 @@ impl Sound {
 
     /// True once every voice has either ended or played its track through once.
     pub(super) fn played_through(&self) -> bool {
-        self.voices
-            .iter()
-            .all(|v| v.trak_ptr.is_null() || v.loops >= 1)
+        self.voices.iter().all(|v| v.trak.is_none() || v.loops >= 1)
     }
 
     pub(super) fn set_period(&mut self, ch: usize, period: u32) {
@@ -126,18 +131,22 @@ impl Sound {
     }
 
     fn do_voice(&mut self, v: usize) {
-        if self.voices[v].trak_ptr.is_null() {
+        if self.voices[v].trak.is_none() {
             return;
         }
 
         let now = self.timeclock;
-        let vc = self.voices[v];
+        let (event_start, event_stop, stat) = {
+            let vc = &self.voices[v];
 
-        if now.wrapping_sub(vc.event_start) >= 0 {
+            (vc.event_start, vc.event_stop, vc.stat)
+        };
+
+        if now.wrapping_sub(event_start) >= 0 {
             self.new_note(v);
-        } else if vc.stat != 0 {
+        } else if stat != 0 {
             // a sound effect is playing on this channel
-        } else if now.wrapping_sub(vc.event_stop) >= 0 {
+        } else if now.wrapping_sub(event_stop) >= 0 {
             self.chans[v].volume = 0; // gap before the next note
         } else {
             self.follow_envelope(v);
@@ -146,30 +155,25 @@ impl Sound {
 
     /// Steps the volume envelope of a sounding note.
     fn follow_envelope(&mut self, v: usize) {
-        let vc = self.voices[v];
+        let vc = &self.voices[v];
 
-        if vc.vol_delay != 0 || vc.vol_list.is_null() {
+        let Some(at) = vc.vol_list.filter(|_| vc.vol_delay == 0) else {
             return;
-        }
+        };
 
-        let level = unsafe { *vc.vol_list } as i8;
+        let level = self.vol.get(at).copied().unwrap_or(0xff) as i8;
 
         if level >= 0 {
             self.chans[v].volume = level as u8;
 
-            self.voices[v].vol_list = unsafe { vc.vol_list.add(1) };
+            self.voices[v].vol_list = Some(at + 1);
         }
     }
 
     /// Reads events until one makes a sound (or the track ends).
     fn new_note(&mut self, v: usize) {
         loop {
-            let (cmd, value) = unsafe {
-                let p = self.voices[v].trak_ptr;
-                self.voices[v].trak_ptr = p.add(2);
-
-                (*p, *p.add(1))
-            };
+            let (cmd, value) = self.next_event(v);
 
             // Masks with CMD_NOTE_FLAG, keeping only the bits that matter here.
             if cmd & CMD_NOTE_FLAG == 0 || cmd == CMD_REST {
@@ -184,12 +188,29 @@ impl Sound {
         }
     }
 
+    /// The next (command, value) pair of the voice's track. Past the end of the data it is the
+    /// end-of-track command.
+    fn next_event(&mut self, v: usize) -> (u8, u8) {
+        let voice = &mut self.voices[v];
+        let at = voice.pos;
+        voice.pos += 2;
+
+        match voice.trak.as_deref().and_then(|t| t.get(at..at + 2)) {
+            Some(pair) => (pair[0], pair[1]),
+            None => (CMD_END, 0),
+        }
+    }
+
     /// Runs a non-note event. Returns false when the track ended.
     fn run_command(&mut self, v: usize, cmd: u8, value: u8) -> bool {
         match cmd {
             CMD_INSTRUMENT => {
                 // Masks with INSTRUMENT_MASK, keeping only the bits that matter here.
-                let word = unsafe { *self.ins.add((value & INSTRUMENT_MASK) as usize) };
+                let word = self
+                    .ins
+                    .get((value & INSTRUMENT_MASK) as usize)
+                    .copied()
+                    .unwrap_or(0);
 
                 // An instrument word holds the waveform number in its high byte and the volume envelope in the low one.
                 self.voices[v].wave_num = (word >> 8) as u8;
@@ -206,14 +227,16 @@ impl Sound {
 
     /// Loops back to the start when asked to, otherwise stops the voice. False when stopped.
     fn end_of_track(&mut self, v: usize, looping: bool) -> bool {
-        if looping && !self.voices[v].trak_beg.is_null() {
-            self.voices[v].loops += 1;
-            self.voices[v].trak_ptr = self.voices[v].trak_beg;
+        if looping && self.voices[v].trak_beg.is_some() {
+            let voice = &mut self.voices[v];
+            voice.loops += 1;
+            voice.trak = voice.trak_beg.clone();
+            voice.pos = 0;
 
             return true;
         }
 
-        self.voices[v].trak_ptr = std::ptr::null();
+        self.voices[v].trak = None;
         self.voices[v].vol_delay = -1;
         self.chans[v].volume = 0;
 
@@ -237,11 +260,10 @@ impl Sound {
             return; // sound effect has the channel
         }
 
-        let env = unsafe { self.vol.add(vc.vol_num as usize * ENVELOPE_BYTES) };
+        let env = vc.vol_num as usize * ENVELOPE_BYTES;
+        let start_vol = self.vol.get(env).copied().unwrap_or(0);
 
-        let start_vol = unsafe { *env };
-
-        vc.vol_list = unsafe { env.add(1) };
+        vc.vol_list = Some(env + 1);
         vc.vol_delay = 0;
 
         if cmd == CMD_REST {
@@ -260,11 +282,10 @@ impl Sound {
         let wave_start =
             self.voices[v].wave_num as usize * WAVE_BYTES + offset as usize * OFFSET_UNIT;
 
-        let wave = unsafe { self.wav.add(wave_start) };
         let words = WAVE_WORDS - offset as usize;
         let ch = &mut self.chans[v];
         ch.data = (0..words * 2)
-            .map(|i| unsafe { *wave.add(i) } as i8)
+            .map(|i| self.wav.get(wave_start + i).copied().unwrap_or(0) as i8)
             .collect();
         ch.looping = true;
         ch.phase = 0.0;
@@ -330,15 +351,18 @@ mod tests {
     fn end_of_track_without_loop_stops_the_voice() {
         let mut sound = Sound::new(44100.0);
         assert!(!sound.end_of_track(0, false));
-        assert!(sound.voices[0].trak_ptr.is_null());
+        assert!(sound.voices[0].trak.is_none());
     }
 
     #[test]
     fn end_of_track_with_loop_returns_to_the_start() {
-        let track = [0u8; 2];
+        let track: Track = Arc::from(vec![0u8; 2]);
         let mut sound = Sound::new(44100.0);
-        sound.voices[0].trak_beg = track.as_ptr();
+        sound.voices[0].trak_beg = Some(track.clone());
+        sound.voices[0].pos = 6;
+
         assert!(sound.end_of_track(0, true));
-        assert_eq!(sound.voices[0].trak_ptr, track.as_ptr());
+        assert_eq!(sound.voices[0].pos, 0);
+        assert!(sound.voices[0].trak.is_some());
     }
 }

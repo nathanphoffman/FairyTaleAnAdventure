@@ -1,8 +1,8 @@
 //! Opening everything the game needs: the screen, fonts, memory, music and the disk image.
 
 use super::{
-    BACKSAVE_OFFSET, IMAGE_SZ, MAXSHAPES, S_VOLBUF, S_WAVBUF, SAMPLE_SZ, SCORE_SZ, SECTOR_OFF,
-    SECTOR_SZ, SHADOW_SZ, SHAPE_SZ, TERRA_SZ, VOICE_SZ,
+    BACKSAVE_OFFSET, IMAGE_SZ, MAXSHAPES, S_VOLBUF, S_WAVBUF, SAMPLE_SZ, SECTOR_OFF, SECTOR_SZ,
+    SHADOW_SZ, SHAPE_SZ, TERRA_SZ,
 };
 use crate::game::data::state::{the_memory, the_screen};
 use crate::game::data::story_text::{HINOR, HIVAR};
@@ -49,7 +49,6 @@ fn open_everything() -> Result<(), i32> {
     open_fonts()?;
     unsafe {
         set_up_blitter_memory();
-        allocate_music_memory();
         allocate_game_memory();
     }
 
@@ -94,21 +93,6 @@ unsafe fn set_up_blitter_memory() {
     }
 }
 
-/// Makes the waveform/volume buffers and the score memory, and gives the music player the
-/// instruments.
-unsafe fn allocate_music_memory() {
-    unsafe {
-        the_memory.wavmem = static_area(VOICE_SZ);
-        the_memory.scoremem = static_area(SCORE_SZ);
-        the_memory.volmem = the_memory.wavmem.add(S_WAVBUF);
-        init_music(
-            (&raw const instrument_waves).cast(),
-            the_memory.wavmem,
-            the_memory.volmem,
-        );
-    }
-}
-
 /// Makes the picture, sector, shape, shadow-mask, sample and terrain areas.
 unsafe fn allocate_game_memory() {
     unsafe {
@@ -122,19 +106,25 @@ unsafe fn allocate_game_memory() {
     }
 }
 
-/// Reads the waveforms and volume envelopes for the music from the file `v6`: the waveforms, then
-/// as many bytes that are skipped, then the envelopes.
+/// Reads the waveforms and volume envelopes for the music from the file `v6` (the waveforms, then as
+/// many bytes that are skipped, then the envelopes) and gives them to the music driver with the
+/// instrument table.
 fn load_music_waveforms() {
-    let Some(data) = resolve(WAVEFORM_FILE, false).and_then(|path| std::fs::read(path).ok()) else {
-        return;
-    };
+    let data = resolve(WAVEFORM_FILE, false)
+        .and_then(|path| std::fs::read(path).ok())
+        .unwrap_or_default();
 
-    let waves = data.get(..S_WAVBUF).unwrap_or(&data);
-    let volumes = data.get(2 * S_WAVBUF..).unwrap_or(&[]);
-    let volumes = &volumes[..volumes.len().min(S_VOLBUF)];
+    let mut waves = vec![0u8; S_WAVBUF];
+    let mut volumes = vec![0u8; S_VOLBUF];
+    copy_prefix(&mut waves, &data);
+    copy_prefix(&mut volumes, data.get(2 * S_WAVBUF..).unwrap_or(&[]));
 
-    unsafe {
-        std::ptr::copy_nonoverlapping(waves.as_ptr(), the_memory.wavmem, waves.len());
-        std::ptr::copy_nonoverlapping(volumes.as_ptr(), the_memory.volmem, volumes.len());
-    }
+    let instruments = unsafe { (*(&raw const instrument_waves)).map(|word| word as u16) };
+    init_music(instruments.to_vec(), waves, volumes);
+}
+
+/// Copies as much of `from` as fits into `to`.
+fn copy_prefix(to: &mut [u8], from: &[u8]) {
+    let n = to.len().min(from.len());
+    to[..n].copy_from_slice(&from[..n]);
 }

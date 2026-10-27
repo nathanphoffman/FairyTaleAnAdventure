@@ -47,6 +47,44 @@ pub fn close_disk() {
     *image() = None;
 }
 
+/// Reads `count` blocks from block `first`. A read past the end of the image is padded with zeros.
+pub fn read_blocks(first: i16, count: i16) -> Vec<u8> {
+    let mut data = vec![0u8; count.max(0) as usize * BLOCK_SIZE as usize];
+    let mut guard = image();
+
+    if let Some(file) = guard.as_mut() {
+        read_into(file, first, &mut data);
+    }
+
+    data
+}
+
+/// Reads the bytes at block `first` of the image into `buffer`, as far as the image goes.
+fn read_into(file: &mut File, first: i16, buffer: &mut [u8]) {
+    if file
+        .seek(SeekFrom::Start(first as u64 * BLOCK_SIZE))
+        .is_err()
+    {
+        eprintln!("Could not find block {first} of the disk image");
+
+        return;
+    }
+
+    let mut done = 0;
+
+    while done < buffer.len() {
+        match file.read(&mut buffer[done..]) {
+            Ok(0) => break,
+            Ok(n) => done += n,
+            Err(e) => {
+                eprintln!("Could not read the disk image: {e}");
+
+                break;
+            }
+        }
+    }
+}
+
 /// Reads `count` blocks from block `first` into `buffer`. The game used a different request number
 /// for each kind of data so that several reads could be under way at once on a real disk.
 pub fn load_track_range(first: i16, count: i16, buffer: *mut c_void, _request: i16) {
@@ -58,29 +96,7 @@ pub fn load_track_range(first: i16, count: i16, buffer: *mut c_void, _request: i
     let bytes = count as usize * BLOCK_SIZE as usize;
     let buffer = unsafe { std::slice::from_raw_parts_mut(buffer.cast::<u8>(), bytes) };
 
-    if file
-        .seek(SeekFrom::Start(first as u64 * BLOCK_SIZE))
-        .is_err()
-    {
-        eprintln!("Could not find block {first} of the disk image");
-
-        return;
-    }
-
-    // A read past the end of the image leaves the rest of the buffer as it was.
-    let mut done = 0;
-
-    while done < bytes {
-        match file.read(&mut buffer[done..]) {
-            Ok(0) => break,
-            Ok(n) => done += n,
-            Err(e) => {
-                eprintln!("Could not read the disk image: {e}");
-
-                break;
-            }
-        }
-    }
+    read_into(file, first, buffer);
 }
 
 /// Waits for read request `num` to finish (it already has).

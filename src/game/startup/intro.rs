@@ -9,7 +9,7 @@ use crate::game::files::disk::load_track_range;
 use crate::game::files::iff_picture::load_picture;
 use crate::game::files::loading::{
     copy_protection_check, copy_protection_riddle, intro_skip_requested, intro_skipped,
-    read_sample, read_score, show_story_page,
+    read_sample, read_score, show_story_page, track,
 };
 use crate::game::render::display::{delay, flip_pages};
 use crate::game::render::screen::{BitmapId, FontKind, PortId, ViewPortId, screen};
@@ -81,7 +81,7 @@ pub(super) fn start_up() -> bool {
     prepare_intro();
 
     if let Some(dir) = std::env::var_os("FTA_MUSIC_EXPORT") {
-        unsafe { crate::game::ui::music::export_tunes(std::path::Path::new(&dir)) };
+        crate::game::ui::music::export_tunes(std::path::Path::new(&dir));
 
         return false;
     }
@@ -153,14 +153,7 @@ fn prepare_intro() {
     let screen = screen();
     screen.vp_page.ras = Some(0);
 
-    unsafe {
-        playscore(
-            the_memory.track[INTRO_TRACKS[0]],
-            the_memory.track[INTRO_TRACKS[1]],
-            the_memory.track[INTRO_TRACKS[2]],
-            the_memory.track[INTRO_TRACKS[3]],
-        );
-    }
+    playscore(INTRO_TRACKS.map(track));
 
     screen.load_colors(ViewPortId::Text, &black_colors);
     screen.pages[1].ras = 1;

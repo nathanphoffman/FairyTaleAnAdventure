@@ -14,10 +14,6 @@ pub const STUFF_SLOTS: usize = 35;
 pub const ACTOR_SLOTS: usize = 20;
 pub const MISSILE_SLOTS: usize = 6;
 
-/// Sound effects loaded from disk, and score tracks (4 voices each).
-pub const SAMPLE_SLOTS: usize = 6;
-pub const TRACK_SLOTS: usize = 32;
-
 /// Sprite sheets loaded at once (hero, objects, ... see `seq_list`).
 pub const SPRITE_SHEETS: usize = 7;
 
@@ -140,13 +136,7 @@ pub struct Memory {
     pub mask_buffer: *mut u8,
     pub bmask_mem: *mut u8,
     pub queue_mem: *mut u8,
-    pub scoremem: *mut u8,
     pub sample_mem: *mut u8,
-    pub wavmem: *mut u8,
-    pub volmem: *mut u8,
-    pub sample: [*mut u8; SAMPLE_SLOTS],
-    pub sample_size: [u32; SAMPLE_SLOTS],
-    pub track: [*mut u8; TRACK_SLOTS],
     pub nextshape: *mut u8,
     pub seq_list: [SeqInfo; SPRITE_SHEETS],
 }

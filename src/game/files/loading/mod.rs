@@ -15,7 +15,7 @@ mod sprites;
 
 mod story_pages;
 
-pub use self::sound_data::{play_effect, read_sample, read_score};
+pub use self::sound_data::{play_effect, read_sample, read_score, track, tune_tracks};
 pub use self::sprites::{
     finish_sprite_load, load_pending_region, load_sprite_file, load_start_sprites, sprite_files,
 };
