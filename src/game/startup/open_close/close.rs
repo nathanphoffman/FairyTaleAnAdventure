@@ -6,7 +6,7 @@ use super::{
     DeletePort, DisposeLayerInfo, FreeColorMap, FreeCprList, FreeMem, FreeRaster, FreeSprite,
     FreeVPortCopLists, IMAGE_SZ, LoadView, NORM_HIGH_SZ, PAGE_DEPTH, PHANTA_WIDTH, RAST_HEIGHT,
     SAMPLE_SZ, SCORE_SZ, SECTOR_SZ, SHADOW_SZ, SHAPE_SZ, SPRITE_DATA_SZ, TERRA_SZ, UnLoadSeg,
-    UnMakeBitMap, VOICE_SZ, exit, has_flag, hinor, hivar, wrap_music,
+    UnMakeBitMap, VOICE_SZ, exit, has_flag, wrap_music,
 };
 
 use crate::amiga::BitMap;
@@ -16,6 +16,7 @@ use crate::game::data::globals::{
 };
 
 use crate::game::data::state::{the_memory, the_screen};
+use crate::game::data::story_text::{HINOR, HIVAR};
 use crate::game::data::tables::pointer_sprite_data;
 use crate::game::files::disk::close_disk;
 use crate::game::render::display::remove_input_handler;
@@ -78,13 +79,13 @@ pub(super) unsafe fn free_panel_data() {
 
         free_chip(
             the_memory.nhinor,
-            (&raw mut hinor).cast(),
+            HINOR.as_ptr() as *mut u8,
             NORM_HIGH_SZ as u32,
         );
 
         free_chip(
             the_memory.nhivar,
-            (&raw mut hivar).cast(),
+            HIVAR.as_ptr() as *mut u8,
             NORM_HIGH_SZ as u32,
         );
     }

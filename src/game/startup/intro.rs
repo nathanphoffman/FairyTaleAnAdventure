@@ -9,6 +9,7 @@ use std::ffi::CStr;
 use crate::game::actors::revive::revive;
 use crate::game::data::globals::{main_view, story_font};
 use crate::game::data::state::{the_memory, the_screen, the_ui};
+use crate::game::data::story_text::TITLE_TEXT;
 use crate::game::data::tables::{black_colors, pointer_sprite, text_colors};
 use crate::game::files::disk::{load_track_range, mark_last_read_unused, wait_for_last_read};
 use crate::game::files::iff_picture::load_picture;
@@ -66,8 +67,6 @@ const PAGE_VIEW_HEIGHT: i16 = 140;
 const PAGE_VIEW_X: i16 = 16;
 
 unsafe extern "C" {
-    static titletext: [u8; 0];
-
     fn playscore(t1: *const u8, t2: *const u8, t3: *const u8, t4: *const u8);
 }
 
@@ -185,7 +184,7 @@ unsafe fn show_title_screen() {
 
         let pen = (*the_screen.current_rastport).FgPen as u32;
         SetAPen(the_screen.current_rastport, TITLE_PEN);
-        print_positioned(titletext.as_ptr());
+        print_positioned(TITLE_TEXT.as_ptr());
         SetAPen(the_screen.current_rastport, pen);
 
         Delay(TITLE_WAIT);

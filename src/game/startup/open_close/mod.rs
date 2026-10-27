@@ -17,9 +17,6 @@ use std::ffi::{c_char, c_void};
 use crate::game::data::globals::open_flags;
 
 unsafe extern "C" {
-    static mut hinor: [u8; 0];
-    static mut hivar: [u8; 0];
-
     // AmigaOS calls the platform layer provides.
     fn OpenLibrary(name: *const c_char, version: u32) -> *mut c_void;
 

@@ -13,3 +13,6 @@ pub mod tables;
 pub mod object_tables;
 
 pub mod random;
+
+#[rustfmt::skip]
+pub mod story_text;

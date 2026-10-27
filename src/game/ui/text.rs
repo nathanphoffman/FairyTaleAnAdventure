@@ -1,5 +1,5 @@
 //! Text and story routines that were 68000 assembly (fsubs.asm, narr.asm and inline #asm in
-//! fmain2.c; from csrc/asm_text.c). The story strings are in csrc/narr_data.c.
+//! fmain2.c; from csrc/asm_text.c). The story strings are in `data/story_text.rs`.
 //!
 //! Two groups of routines live here:
 //! - Printing: numbers (`format_number`, `print_number`), strings with position escapes (`print_positioned`), and the lists of
@@ -12,15 +12,12 @@
 use crate::amiga::RastPort;
 use crate::game::data::object_tables::{pplay, prec, print_que};
 use crate::game::data::state::{the_hero, the_screen};
+use crate::game::data::story_text::{EVENT_MSG, PLACARD_MSGS, SPEECHES};
 use crate::game::data::tables::number_buffer;
 use crate::game::ui::messages::print_wrapped;
 use std::ffi::c_char;
 
 unsafe extern "C" {
-    static event_msg: [c_char; 0];
-    static speeches: [c_char; 0];
-    static placard_msgs: [*const c_char; 0];
-
     fn Move(current_rastport: *mut RastPort, x: i32, y: i32);
 
     fn Draw(current_rastport: *mut RastPort, x: i32, y: i32);
@@ -128,45 +125,35 @@ pub fn print_positioned(mut s: *const u8) {
 
 /// Prints story page text number `n` (the strings use position escapes, see `print_positioned`).
 pub fn placard_text(n: i32) {
-    unsafe {
-        print_positioned(
-            (*(&raw const placard_msgs)
-                .cast::<*const c_char>()
-                .offset(n as isize))
-            .cast(),
-        )
-    };
+    print_positioned(PLACARD_MSGS[n as usize].as_ptr());
 }
 
-/// Skips `n` zero-terminated strings.
-unsafe fn skip_strings(mut p: *const c_char, mut n: i32) -> *const c_char {
-    unsafe {
-        while n > 0 {
-            while *p != 0 {
-                p = p.add(1);
-            }
+/// The `n`-th zero-terminated string of a list of messages (the first is number 0). A number past
+/// the end gives the final zero byte, an empty string.
+fn nth_string(list: &[u8], n: i32) -> *const c_char {
+    let mut at = 0;
 
-            p = p.add(1);
-            n -= 1;
-        }
+    for _ in 0..n {
+        let length = list[at..].iter().position(|&b| b == 0).unwrap_or(0);
+        at = (at + length + 1).min(list.len() - 1);
     }
 
-    p
+    list[at..].as_ptr().cast()
 }
 
 /// Shows the `num`-th string of a list of messages, word-wrapped (see `print_wrapped`).
-pub fn show_message(start: *const c_char, num: i32) {
-    unsafe { print_wrapped(skip_strings(start, num)) };
+pub fn show_message(list: &[u8], num: i32) {
+    print_wrapped(nth_string(list, num));
 }
 
 /// Shows event message `n` (things that happen to the hero, such as hunger).
 pub fn show_event(n: i32) {
-    show_message((&raw const event_msg).cast(), n);
+    show_message(EVENT_MSG, n);
 }
 
 /// Shows speech number `n` (what people say).
 pub fn speak(n: i32) {
-    show_message((&raw const speeches).cast(), n);
+    show_message(SPEECHES, n);
 }
 
 /// Adds a request to the print queue (ignored if the queue is full). `handle_print_request` handles them one

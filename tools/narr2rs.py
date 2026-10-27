@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""Converts the story text and tables in faery-tale-amiga/narr.asm into csrc/narr_data.c.
-Usage (from the repo root): tools/narr2c.py > csrc/narr_data.c
+"""Converts the story text and tables in faery-tale-amiga/narr.asm into src/game/data/story_text.rs.
+Usage (from the repo root): tools/narr2rs.py > src/game/data/story_text.rs
 
 Only `dc.b` / `dc.l` data lines are read. Each label becomes a C byte array holding exactly the
 bytes the assembler would have produced (strings are NUL separated, XY escapes are byte 128).
+Text comes out as byte strings with one more NUL at the end, like a C string.
 """
 
 import ast, operator, re, sys
 
 SRCS = ['faery-tale-amiga/narr.asm', 'faery-tale-amiga/fsubs.asm']
 ENCODING = 'latin-1'
+RUST_NAMES = {'titletext': 'title_text'}
 UNTERMINATED_MARK = '\0UNTERM'
 NAMES = {'ETX': 0, 'XY': 128}
 
@@ -94,16 +96,20 @@ def operand_bytes(tok):
 
     raise ValueError('cannot read operand: ' + tok)
 
-def c_string(data):
+def rust_bytes(data):
+    """A Rust byte string holding `data` plus a final NUL (the end of the last string). Long text is
+    wrapped with a backslash at the end of the line, which skips the next line's indent; a space at
+    the start of a wrapped line is written as \\x20 so that it is kept."""
     out, line = [], ''
 
-    for b in data:
+    for b in list(data) + [0]:
         ch = chr(b)
 
         if ch == '"': piece = '\\"'
         elif ch == '\\': piece = '\\\\'
+        elif ch == ' ' and not line and out: piece = '\\x20'
         elif 32 <= b < 127: piece = ch
-        else: piece = '\\%03o' % b
+        else: piece = '\\x%02x' % b
 
         line += piece
 
@@ -112,7 +118,12 @@ def c_string(data):
 
     out.append(line)
 
-    return '\n\t'.join('"%s"' % l for l in out)
+    return 'b"' + '\\\n        '.join(out) + '"'
+
+def rust_array(data, per_line):
+    rows = [', '.join(str(x) for x in data[i:i+per_line]) for i in range(0, len(data), per_line)]
+
+    return '[\n    ' + ',\n    '.join(rows) + ',\n]'
 
 def main():
     keep = lambda n: n in ('_event_msg', '_place_tbl', '_inside_tbl', '_place_msg', '_inside_msg', '_speeches', '_titletext', '_hinor', '_hivar') or re.fullmatch(r'(msg\d+[ab]?|q\d|mst|qq)', n)
@@ -154,7 +165,11 @@ def main():
             else:                                           # offset table: name-base, ...
                 tables.setdefault(label, []).extend(t.split('-')[0] for t in toks)
 
-    print('/* narr_data.c - story text and tables, generated from narr.asm by tools/narr2c.py. Do not edit. */\n')
+    print('//! Story text and tables, generated from narr.asm by tools/narr2rs.py. Do not edit.')
+    print('//!')
+    print('//! Messages are NUL separated, with one more NUL at the end. A byte of 128 in a placard or')
+    print('//! the title is a position escape (followed by x / 2 and y).\n')
+    placards = []
 
     for label in order:
         if label in ('mst', 'qq') or not keep(label) or not blocks[label]:
@@ -164,31 +179,21 @@ def main():
         data = blocks[label]
 
         if name in ('place_tbl', 'inside_tbl'):
-            print('unsigned char %s[] = {' % name)
-
-            for i in range(0, len(data), 3):
-                print('\t' + ', '.join(str(x) for x in data[i:i+3]) + ',')
-
-            print('};\n')
+            print('pub static %s: [u8; %d] = %s;\n' % (name.upper(), len(data), rust_array(data, 3)))
         elif name in ('hinor', 'hivar'):
             data = data + [0] * (256 - len(data))
-            print('unsigned char %s[256] = {' % name)
-
-            for i in range(0, len(data), 16):
-                print('\t' + ', '.join(str(x) for x in data[i:i+16]) + ',')
-
-            print('};\n')
+            print('pub static %s: [u8; 256] = %s;\n' % (name.upper(), rust_array(data, 16)))
         elif name in ('event_msg', 'place_msg', 'inside_msg', 'speeches', 'titletext'):
-            print('char %s[] =\n\t%s;\n' % (name, c_string(data)))
-        else:
-            print('static const char %s[] =\n\t%s;\n' % (name, c_string(data)))
+            print('pub static %s: &[u8] =\n    %s;\n' % (RUST_NAMES.get(name, name).upper(), rust_bytes(data)))
+        elif name.startswith('msg'):
+            print('const %s: &[u8] =\n    %s;\n' % (name.upper(), rust_bytes(data)))
 
-    for tname, cname in (('mst', 'placard_msgs'), ('qq', 'question_msgs')):
-        print('const char *const %s[] = {' % cname)
+    print('/// The story pages, in order.')
+    print('pub static PLACARD_MSGS: [&[u8]; %d] = [' % len(tables['mst']))
 
-        for n in tables[tname]:
-            print('\t%s,' % n)
+    for n in tables['mst']:
+        print('    %s,' % n.upper())
 
-        print('};\n')
+    print('];')
 
 main()

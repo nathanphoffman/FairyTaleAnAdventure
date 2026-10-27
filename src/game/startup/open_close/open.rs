@@ -10,7 +10,7 @@ use super::{
     PAGE_VIEW_HEIGHT, PAGE_VIEW_X, PHANTA_WIDTH, RAST_HEIGHT, Read, S_VOLBUF, S_WAVBUF, SAMPLE_SZ,
     SCORE_SZ, SECTOR_OFF, SECTOR_SZ, SHADOW_SZ, SHAPE_SZ, SPRITE_DATA_SZ, SPRITES, Seek, SetBPen,
     SetDrMd, SetFont, SetRast, TERRA_SZ, TEXT_DEPTH, TEXT_HEIGHT, TEXT_ROW_BYTES, VOICE_SZ,
-    VP_HIDE, WaitIO, hinor, hivar, init_music, set_flag,
+    VP_HIDE, WaitIO, init_music, set_flag,
 };
 
 use crate::amiga::{BitMap, DiskFontHeader, HIRES, JAM2, MEMF_CHIP};
@@ -21,6 +21,7 @@ use crate::game::data::globals::{
 };
 
 use crate::game::data::state::{the_memory, the_screen, the_ui};
+use crate::game::data::story_text::{HINOR, HIVAR};
 use crate::game::data::tables::{
     instrument_waves, pointer_sprite, pointer_sprite_data, topaz_attr,
 };
@@ -510,8 +511,8 @@ pub(super) unsafe fn set_up_pointer_data() {
 
         the_ui.handler_data.vbase = (&raw mut the_screen.vp_text).cast();
 
-        the_memory.nhinor = into_chip((&raw mut hinor).cast(), NORM_HIGH_SZ);
-        the_memory.nhivar = into_chip((&raw mut hivar).cast(), NORM_HIGH_SZ);
+        the_memory.nhinor = into_chip(HINOR.as_ptr() as *mut u8, NORM_HIGH_SZ);
+        the_memory.nhivar = into_chip(HIVAR.as_ptr() as *mut u8, NORM_HIGH_SZ);
     }
 }
 

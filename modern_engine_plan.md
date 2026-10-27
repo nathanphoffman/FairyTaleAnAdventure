@@ -276,3 +276,11 @@ of the remastered engine.
 - Shared C between engines means no engine-specific edits in it, so port the rules to Rust early.
 - Screenshots only test the classic engine; the modern one will look different on purpose, so
   state tests matter more.
+
+## No C left in the build
+
+`build.rs`, the `cc` build dependency, `csrc/layout.c` and `csrc/narr_data.c` are gone. The story text
+and tables are now `src/game/data/story_text.rs`, generated from `narr.asm` by `tools/narr2rs.py`
+(a unit test had compared the bytes with the old C data before it was deleted). The struct size check
+became a unit test in `src/amiga.rs`, and `main` calls `game::startup::run_game` directly. The rest of
+`csrc/` is reference only and is not compiled.

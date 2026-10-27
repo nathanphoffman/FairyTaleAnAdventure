@@ -1,5 +1,5 @@
 //! Rust mirrors of the stand-in Amiga structs in csrc/amiga.h.
-//! The sizes are checked against the C compiler's at startup (see `check_layout`).
+//! The sizes are checked against the original C compiler's in the unit tests at the end.
 #![allow(non_snake_case, non_camel_case_types, dead_code)]
 // These keep the Amiga's own type names (APTR, UWORD, ...), so the structs match the C headers.
 #![allow(clippy::upper_case_acronyms)]
@@ -162,40 +162,29 @@ pub struct Process {
     pub pr_WindowPtr: APTR,
 }
 
-unsafe extern "C" {
-    static fta_sizes: [u32; 15];
-    static fta_sizes_count: u32;
-}
-
-/// Panics if any Rust struct differs in size from its C twin.
-pub fn check_layout() {
+#[cfg(test)]
+mod tests {
+    use super::*;
     use std::mem::size_of;
-    let rust = [
-        ("BitMap", size_of::<BitMap>()),
-        ("RastPort", size_of::<RastPort>()),
-        ("RasInfo", size_of::<RasInfo>()),
-        ("ViewPort", size_of::<ViewPort>()),
-        ("View", size_of::<View>()),
-        ("ColorMap", size_of::<ColorMap>()),
-        ("TextFont", size_of::<TextFont>()),
-        ("TextAttr", size_of::<TextAttr>()),
-        ("SimpleSprite", size_of::<SimpleSprite>()),
-        ("GfxBase", size_of::<GfxBase>()),
-        ("Process", size_of::<Process>()),
-        ("Layer", size_of::<Layer>()),
-        ("AreaInfo", size_of::<AreaInfo>()),
-        ("TmpRas", size_of::<TmpRas>()),
-        ("DiskFontHeader", size_of::<DiskFontHeader>()),
-    ];
 
-    unsafe {
-        assert_eq!(fta_sizes_count as usize, rust.len());
-
-        for (i, (name, size)) in rust.iter().enumerate() {
-            assert_eq!(
-                fta_sizes[i] as usize, *size,
-                "struct {name} differs between C and Rust"
-            );
-        }
+    /// The sizes the original C compiler gave these structs; the game code reads them through raw
+    /// pointers, so the Rust copies must have the same layout.
+    #[test]
+    fn struct_sizes_are_those_of_the_original_c_structs() {
+        assert_eq!(size_of::<BitMap>(), 72);
+        assert_eq!(size_of::<RastPort>(), 48);
+        assert_eq!(size_of::<RasInfo>(), 24);
+        assert_eq!(size_of::<ViewPort>(), 64);
+        assert_eq!(size_of::<View>(), 32);
+        assert_eq!(size_of::<ColorMap>(), 16);
+        assert_eq!(size_of::<TextFont>(), 16);
+        assert_eq!(size_of::<TextAttr>(), 16);
+        assert_eq!(size_of::<SimpleSprite>(), 16);
+        assert_eq!(size_of::<GfxBase>(), 16);
+        assert_eq!(size_of::<Process>(), 24);
+        assert_eq!(size_of::<Layer>(), 24);
+        assert_eq!(size_of::<AreaInfo>(), 40);
+        assert_eq!(size_of::<TmpRas>(), 16);
+        assert_eq!(size_of::<DiskFontHeader>(), 16);
     }
 }

@@ -13,6 +13,7 @@ use crate::game::data::state::{
     the_actors, the_encounter, the_hero, the_screen, the_ui, the_world,
 };
 
+use crate::game::data::story_text::{INSIDE_MSG, INSIDE_TBL, PLACE_MSG, PLACE_TBL};
 use crate::game::data::tables::extent_list;
 use crate::game::data::types::Extent;
 use crate::game::files::disk::motor_off;
@@ -22,15 +23,6 @@ use crate::game::ui::text::show_message;
 use crate::game::world::regions::{
     REGION_HEIGHT_SHIFT, REGION_WIDTH_SHIFT, center_sector, load_region_now, refresh_minimap,
 };
-
-use std::ffi::c_char;
-
-unsafe extern "C" {
-    static place_tbl: [u8; 0];
-    static inside_tbl: [u8; 0];
-    static place_msg: [c_char; 0];
-    static inside_msg: [c_char; 0];
-}
 
 /// The first region number that is indoors.
 const FIRST_INDOOR_REGION: u16 = 8;
@@ -193,9 +185,9 @@ unsafe fn place_message_number() -> u8 {
         let table = if the_world.region >= FIRST_INDOOR_REGION {
             the_hero.sector += INSIDE_SECTOR_OFFSET;
 
-            inside_tbl.as_ptr()
+            INSIDE_TBL.as_ptr()
         } else {
-            place_tbl.as_ptr()
+            PLACE_TBL.as_ptr()
         };
 
         let message = mountain_name(find_table_message(table, sector));
@@ -265,9 +257,9 @@ unsafe fn announce_place(flag: i16) {
 
             if flag != 0 {
                 let messages = if the_world.region >= FIRST_INDOOR_REGION {
-                    inside_msg.as_ptr()
+                    INSIDE_MSG
                 } else {
-                    place_msg.as_ptr()
+                    PLACE_MSG
                 };
 
                 show_message(messages, message as i32);

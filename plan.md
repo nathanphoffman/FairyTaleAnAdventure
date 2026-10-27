@@ -50,7 +50,7 @@ Each phase should end with something that builds and runs.
 
 ### Phase 3 - Rust platform layer
 Rust implements the Amiga calls the C code makes, exported with `extern "C"` from `src/platform/`.
-The C code is built into the Rust binary by `build.rs`; `main()` in `fmain.c` is called from Rust.
+(History) The C code was first built into the Rust binary by `build.rs`. There is no C in the build any more; `csrc/` is only the reference.
 - [x] Memory: `AllocMem`/`FreeMem` (calloc/free), `AllocRaster`, `AvailMem`, `TypeOfMem`.
 - [x] Files: `Open`/`Read`/`Write`/`Seek`/`Close`/`Lock` on normal files, case-insensitive paths
       (data dir `FTA_DATA`, default `faery-tale-amiga/game`; `dfN:` names go to `saves/`).
@@ -99,7 +99,7 @@ the game. Routines still stubbed are in `csrc/asm_stubs.c` and print "STUB calle
 - [x] Text and story (`csrc/asm_text.c`): `ssp`, `prdec`, `text`, `move`, `placard`,
       `placard_text`, `question`, `msg`, `event`, `speak`, `prq`, `cursor`. The story strings and
       tables from `narr.asm` (plus the title text and compass graphics from `fsubs.asm`) are
-      converted to C data by `tools/narr2c.py` into `csrc/narr_data.c`. Milestone: messages
+      converted to Rust data by `tools/narr2rs.py` into `src/game/data/story_text.rs`. Milestone: messages
       and the status line show in the panel.
 - [x] `set_course` (enemy steering), `stuff_flag`, `bigdraw` (overview map), `do_error`.
 - [ ] Still stubbed in `csrc/asm_stubs.c`: the music and sound routines (`init_music`,
