@@ -33,6 +33,49 @@ use crate::game::render::display::install_input_handler;
 use crate::game::startup::amiga_leftovers::trapper;
 use std::ffi::c_void;
 
+// The error numbers `show_error` shows when a start-up step fails.
+const ERROR_NO_MEMORY_FOR_HEADERS: i32 = 1;
+const ERROR_NO_GRAPHICS: i32 = 2;
+const ERROR_NO_INPUT_HANDLER: i32 = 4;
+const ERROR_NO_PAGE1_PLANES: i32 = 4;
+const ERROR_NO_PAGE2_PLANES: i32 = 5;
+const ERROR_NO_FONT: i32 = 15;
+const ERROR_NO_WAVEFORM_MEMORY: i32 = 16;
+const ERROR_NO_SCORE_MEMORY: i32 = 17;
+const ERROR_NO_IMAGE_MEMORY: i32 = 6;
+const ERROR_NO_SECTOR_MEMORY: i32 = 7;
+const ERROR_NO_SHAPE_MEMORY: i32 = 8;
+const ERROR_NO_SHADOW_MEMORY: i32 = 10;
+const ERROR_NO_SAMPLE_MEMORY: i32 = 11;
+const ERROR_NO_TERRAIN_MEMORY: i32 = 34;
+
+// The "workbench" bitmap: the text panel's planes borrow its memory.
+const WORKBENCH_DEPTH: i32 = 2;
+const WORKBENCH_WIDTH: i32 = 640;
+const WORKBENCH_HEIGHT: i32 = 200;
+
+// Sizes passed to `InitBitMap` and the colour maps.
+const TEXT_BITMAP_WIDTH: i32 = 640;
+const LIMIT_BITMAP_DEPTH: i32 = 1;
+const PLAY_WIDTH: i32 = 320;
+const PLAY_HEIGHT: i32 = 200;
+const PLAY_DEPTH: i32 = 5;
+const SOURCE_BITMAP_DEPTH: i32 = 3;
+const SOURCE_BITMAP_WIDTH: i32 = 64;
+const SOURCE_BITMAP_HEIGHT: i32 = 24;
+const PAGE_COLOR_COUNT: i32 = 32;
+const TEXT_COLOR_COUNT: i32 = 20;
+
+/// Where the pointer sprite starts out (off screen).
+const POINTER_START: i16 = 320;
+
+/// The Amiga hands out a BPTR (address / 4); the font header sits 8 bytes into the segment.
+const BPTR_SHIFT: u32 = 2;
+const FONT_HEADER_OFFSET: isize = 8;
+
+/// The audio request asks for channels 0-3 (one bit each).
+const ALL_AUDIO_CHANNELS: u8 = 0x0f;
+
 /// Opens everything the game needs. Returns 0, or the error number `show_error` shows.
 pub fn open_all() -> i32 {
     match unsafe { open_everything() } {
@@ -76,20 +119,26 @@ pub(super) unsafe fn open_libraries_and_text_screen() -> Result<(), i32> {
         gfx_base = OpenLibrary(c"graphics.library".as_ptr(), 0).cast();
 
         if gfx_base.is_null() {
-            return Err(2);
+            return Err(ERROR_NO_GRAPHICS);
         }
 
         layers_base = OpenLibrary(c"layers.library".as_ptr(), 0);
 
         if layers_base.is_null() {
-            return Err(2);
+            return Err(ERROR_NO_GRAPHICS);
         }
 
         set_flag(AL_GBASE);
         the_screen.old_view = (*gfx_base).ActiView;
 
-        if MakeBitMap(&raw mut the_screen.work_bm, 2, 640, 200) == 0 {
-            return Err(2);
+        if MakeBitMap(
+            &raw mut the_screen.work_bm,
+            WORKBENCH_DEPTH,
+            WORKBENCH_WIDTH,
+            WORKBENCH_HEIGHT,
+        ) == 0
+        {
+            return Err(ERROR_NO_GRAPHICS);
         }
 
         layer_info = NewLayerInfo();
@@ -118,7 +167,7 @@ pub(super) unsafe fn allocate_bitmap_headers() -> Result<(), i32> {
         .cast();
 
         if the_screen.bm_page1.is_null() {
-            return Err(1);
+            return Err(ERROR_NO_MEMORY_FOR_HEADERS);
         }
 
         set_flag(AL_BMAP);
@@ -133,11 +182,10 @@ pub(super) unsafe fn open_fonts() -> Result<(), i32> {
         font_segment = LoadSeg(c"fonts/Amber/9".as_ptr());
 
         if font_segment == 0 {
-            return Err(15);
+            return Err(ERROR_NO_FONT);
         }
 
-        // The Amiga hands out a BPTR (address / 4); the font header sits 8 bytes in.
-        font_header = ((font_segment << 2) + 8) as *mut DiskFontHeader;
+        font_header = ((font_segment << BPTR_SHIFT) + FONT_HEADER_OFFSET) as *mut DiskFontHeader;
         set_flag(AL_FONT);
 
         panel_font = OpenFont(&raw mut topaz_attr);
@@ -153,13 +201,13 @@ pub(super) unsafe fn open_fonts() -> Result<(), i32> {
 /// Installs the keyboard and mouse handler, and takes over the pointer sprite.
 pub(super) unsafe fn install_input() -> Result<(), i32> {
     unsafe {
-        the_ui.handler_data.xsprite = 320;
-        the_ui.handler_data.ysprite = 320;
+        the_ui.handler_data.xsprite = POINTER_START;
+        the_ui.handler_data.ysprite = POINTER_START;
         the_ui.handler_data.gbase = gfx_base.cast();
         the_ui.handler_data.pbase = std::ptr::null_mut();
 
         if install_input_handler() == 0 {
-            return Err(4);
+            return Err(ERROR_NO_INPUT_HANDLER);
         }
 
         this_task = FindTask(std::ptr::null());
@@ -209,12 +257,42 @@ pub(super) unsafe fn set_up_bitmaps_and_rasinfos() {
         the_screen.bm_lim = the_screen.bm_page1.add(4);
         InitBitMap(the_screen.bm_page1, PAGE_DEPTH, PHANTA_WIDTH, RAST_HEIGHT);
         InitBitMap(the_screen.bm_page2, PAGE_DEPTH, PHANTA_WIDTH, RAST_HEIGHT);
-        InitBitMap(the_screen.bm_text, TEXT_DEPTH, 640, TEXT_HEIGHT);
-        InitBitMap(the_screen.bm_lim, 1, 320, 200);
-        InitBitMap(&raw mut the_screen.pagea, 5, 320, 200);
-        InitBitMap(&raw mut the_screen.pageb, 5, 320, 200);
-        InitBitMap(&raw mut the_screen.bm_scroll, 1, 640, TEXT_HEIGHT);
-        InitBitMap(the_screen.bm_source, 3, 64, 24);
+        InitBitMap(
+            the_screen.bm_text,
+            TEXT_DEPTH,
+            TEXT_BITMAP_WIDTH,
+            TEXT_HEIGHT,
+        );
+        InitBitMap(
+            the_screen.bm_lim,
+            LIMIT_BITMAP_DEPTH,
+            PLAY_WIDTH,
+            PLAY_HEIGHT,
+        );
+        InitBitMap(
+            &raw mut the_screen.pagea,
+            PLAY_DEPTH,
+            PLAY_WIDTH,
+            PLAY_HEIGHT,
+        );
+        InitBitMap(
+            &raw mut the_screen.pageb,
+            PLAY_DEPTH,
+            PLAY_WIDTH,
+            PLAY_HEIGHT,
+        );
+        InitBitMap(
+            &raw mut the_screen.bm_scroll,
+            LIMIT_BITMAP_DEPTH,
+            TEXT_BITMAP_WIDTH,
+            TEXT_HEIGHT,
+        );
+        InitBitMap(
+            the_screen.bm_source,
+            SOURCE_BITMAP_DEPTH,
+            SOURCE_BITMAP_WIDTH,
+            SOURCE_BITMAP_HEIGHT,
+        );
 
         the_screen.rp_text2.BitMap = the_screen.bm_text;
 
@@ -239,8 +317,8 @@ pub(super) unsafe fn set_up_bitmaps_and_rasinfos() {
         the_screen.drawing_page = &raw mut the_screen.fp_page1;
         the_screen.viewing_page = &raw mut the_screen.fp_page2;
 
-        the_screen.vp_page.ColorMap = GetColorMap(32);
-        the_screen.vp_text.ColorMap = GetColorMap(20);
+        the_screen.vp_page.ColorMap = GetColorMap(PAGE_COLOR_COUNT);
+        the_screen.vp_text.ColorMap = GetColorMap(TEXT_COLOR_COUNT);
     }
 }
 
@@ -256,13 +334,13 @@ pub(super) unsafe fn allocate_page_planes() -> Result<(), i32> {
             (*the_screen.bm_page1).Planes[i] = AllocRaster(PHANTA_WIDTH as u32, RAST_HEIGHT as u32);
 
             if (*the_screen.bm_page1).Planes[i].is_null() {
-                return Err(4);
+                return Err(ERROR_NO_PAGE1_PLANES);
             }
 
             (*the_screen.bm_page2).Planes[i] = AllocRaster(PHANTA_WIDTH as u32, RAST_HEIGHT as u32);
 
             if (*the_screen.bm_page2).Planes[i].is_null() {
-                return Err(5);
+                return Err(ERROR_NO_PAGE2_PLANES);
             }
         }
 
@@ -303,13 +381,13 @@ pub(super) unsafe fn allocate_music_memory() -> Result<(), i32> {
         the_memory.wavmem = AllocMem(VOICE_SZ, MEMF_CHIP);
 
         if the_memory.wavmem.is_null() {
-            return Err(16);
+            return Err(ERROR_NO_WAVEFORM_MEMORY);
         }
 
         the_memory.scoremem = AllocMem(SCORE_SZ, 0);
 
         if the_memory.scoremem.is_null() {
-            return Err(17);
+            return Err(ERROR_NO_SCORE_MEMORY);
         }
 
         the_memory.volmem = the_memory.wavmem.add(S_WAVBUF as usize);
@@ -337,18 +415,18 @@ pub(super) unsafe fn allocate_chip_area(size: u32, error: i32) -> Result<*mut u8
 /// Allocates the picture, sector, shape, shadow-mask, sample and terrain areas.
 pub(super) unsafe fn allocate_game_memory() -> Result<(), i32> {
     unsafe {
-        the_memory.image_mem = allocate_chip_area(IMAGE_SZ, 6)?;
+        the_memory.image_mem = allocate_chip_area(IMAGE_SZ, ERROR_NO_IMAGE_MEMORY)?;
         set_flag(AL_IMAGE);
-        the_memory.sector_mem = allocate_chip_area(SECTOR_SZ, 7)?;
+        the_memory.sector_mem = allocate_chip_area(SECTOR_SZ, ERROR_NO_SECTOR_MEMORY)?;
         the_memory.map_mem = the_memory.sector_mem.add(SECTOR_OFF);
         set_flag(AL_SECTOR);
-        the_memory.shape_mem = allocate_chip_area(SHAPE_SZ, 8)?;
+        the_memory.shape_mem = allocate_chip_area(SHAPE_SZ, ERROR_NO_SHAPE_MEMORY)?;
         set_flag(AL_SHAPE);
-        the_memory.shadow_mem = allocate_chip_area(SHADOW_SZ, 10)?;
+        the_memory.shadow_mem = allocate_chip_area(SHADOW_SZ, ERROR_NO_SHADOW_MEMORY)?;
         set_flag(AL_SHADOW);
-        the_memory.sample_mem = allocate_chip_area(SAMPLE_SZ, 11)?;
+        the_memory.sample_mem = allocate_chip_area(SAMPLE_SZ, ERROR_NO_SAMPLE_MEMORY)?;
         set_flag(AL_SAMPLE);
-        the_memory.terrain_mem = allocate_chip_area(TERRA_SZ, 34)?;
+        the_memory.terrain_mem = allocate_chip_area(TERRA_SZ, ERROR_NO_TERRAIN_MEMORY)?;
         set_flag(AL_TERR);
 
         Ok(())
@@ -405,7 +483,7 @@ pub(super) unsafe fn open_audio() {
             return;
         }
 
-        let mut data: u8 = 0x0f;
+        let mut data: u8 = ALL_AUDIO_CHANNELS;
         (*audio_request).ioa_data = &mut data;
         (*audio_request).ioa_length = 1;
         let request = &raw mut (*audio_request).ioa_request;

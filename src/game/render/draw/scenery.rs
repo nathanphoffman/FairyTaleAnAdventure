@@ -25,6 +25,35 @@ const RACE_NO_MASK_B: u8 = 0x87;
 /// The `extent_type` of the room where actors are drawn in front of everything.
 const NO_MASK_XTYPE: u16 = 84;
 
+/// The hero rides the swan when `riding` is this.
+const RIDING_SWAN: i16 = 11;
+
+/// The area (x and y bounds, exclusive) where the hero is always drawn in front: the bridge.
+const FRONT_AREA_X: (u16, u16) = (22833, 26428);
+const FRONT_AREA_Y: (u16, u16) = (26425, 26527);
+
+/// Objects with numbers from 100 to 101 (the two flying sparks) are drawn in front.
+const FRONT_OBJECTS: std::ops::RangeInclusive<i16> = 100..=101;
+
+/// Map tiles are 32 pixels high, and 6 tile numbers make up one minimap column.
+const TILE_ROW_SHIFT: u32 = 5;
+const MINIMAP_COLUMN_TILES: i32 = 6;
+const TERRAIN_ENTRY_BYTES: i32 = 4;
+const TERRAIN_TYPE_MASK: u8 = 15;
+
+/// Terrain masking types (the low nibble of terrain byte 1) and the heights, in pixels above the
+/// tile bottom, that matter to them.
+const TYPE_ALWAYS_SKIP: i16 = 0;
+const TYPE_LEFT_COLUMN: i16 = 1;
+const TYPE_TALL: i16 = 2;
+const TYPE_BRIDGE: i16 = 3;
+const TYPE_TALL_OR_LEFT: i16 = 4;
+const TYPE_TALL_AND_LEFT: i16 = 5;
+const TYPE_FULL_ABOVE: i16 = 6;
+const TYPE_LOW: i16 = 7;
+const TALL_HEIGHT: i16 = 35;
+const LOW_HEIGHT: i16 = 20;
+
 /// Zeroes the scenery mask buffer, ready for the next sprite.
 pub(super) unsafe fn clear_scenery_mask() {
     unsafe {
@@ -41,17 +70,17 @@ pub(super) unsafe fn drawn_in_front(actor: *const Shape, i: i32, atype: i16, inu
     unsafe {
         if atype == CARRIER
             || (i == 0
-                && (the_hero.riding == 11
+                && (the_hero.riding == RIDING_SWAN
                     || the_world.extent_type == NO_MASK_XTYPE
-                    || (the_hero.x > 22833
-                        && the_hero.x < 26428
-                        && the_hero.y > 26425
-                        && the_hero.y < 26527)))
+                    || (the_hero.x > FRONT_AREA_X.0
+                        && the_hero.x < FRONT_AREA_X.1
+                        && the_hero.y > FRONT_AREA_Y.0
+                        && the_hero.y < FRONT_AREA_Y.1)))
         {
             return true;
         }
 
-        if atype == OBJECTS && inum > 99 && inum < 102 {
+        if atype == OBJECTS && FRONT_OBJECTS.contains(&inum) {
             return true;
         }
 
@@ -75,19 +104,19 @@ pub(super) enum SceneryRule {
 /// tile bottom, and `on_bridge` is true when the sprite is on the bridge.
 pub(super) fn scenery_rule(k: i16, xm: i32, ym: i32, ystop: i16, on_bridge: bool) -> SceneryRule {
     let skip = match k {
-        0 => true,
-        1 => xm == 0,
-        2 => ystop > 35,
-        3 => on_bridge,
-        4 => xm == 0 || ystop > 35,
-        5 => xm == 0 && ystop > 35,
-        7 => ystop > 20,
+        TYPE_ALWAYS_SKIP => true,
+        TYPE_LEFT_COLUMN => xm == 0,
+        TYPE_TALL => ystop > TALL_HEIGHT,
+        TYPE_BRIDGE => on_bridge,
+        TYPE_TALL_OR_LEFT => xm == 0 || ystop > TALL_HEIGHT,
+        TYPE_TALL_AND_LEFT => xm == 0 && ystop > TALL_HEIGHT,
+        TYPE_LOW => ystop > LOW_HEIGHT,
         _ => false,
     };
 
     if skip {
         SceneryRule::Skip
-    } else if k == 6 && ym != 0 {
+    } else if k == TYPE_FULL_ABOVE && ym != 0 {
         SceneryRule::UseFullMask // full if above
     } else {
         SceneryRule::UseTileMask
@@ -107,25 +136,24 @@ pub(super) unsafe fn mask_against_scenery(
     blitwide: i8,
 ) {
     unsafe {
-        // Map tile rows are 32 pixels high.
-        let ym1 = (ystart1 >> 5) as u8;
-        // Map tile rows are 32 pixels high.
-        let ym2 = ((ystop1 >> 5) as u8).wrapping_sub(ym1);
+        let ym1 = (ystart1 >> TILE_ROW_SHIFT) as u8;
+        let ym2 = ((ystop1 >> TILE_ROW_SHIFT) as u8).wrapping_sub(ym1);
 
         for xm in 0..blitwide.max(0) as i32 {
             for ym in 0..=ym2 as i32 {
                 // Back from tile rows to pixels.
-                let ystop = ground - (((ym + ym1 as i32) << 5) as i16);
-                let mut cm = ((xm + xbw as i32) * 6 + ym + ym1 as i32) as i16;
-                cm = (minimap[cm as usize] as i32 * 4) as i16;
-                let mut k = (*the_memory.terrain_mem.offset(cm as isize + 1) & 15) as i16;
+                let ystop = ground - (((ym + ym1 as i32) << TILE_ROW_SHIFT) as i16);
+                let mut cm = ((xm + xbw as i32) * MINIMAP_COLUMN_TILES + ym + ym1 as i32) as i16;
+                cm = (minimap[cm as usize] as i32 * TERRAIN_ENTRY_BYTES) as i16;
+                let mut k =
+                    (*the_memory.terrain_mem.offset(cm as isize + 1) & TERRAIN_TYPE_MASK) as i16;
 
                 if (*actor).state == FALL {
                     if cm <= FALL_TILE_LIMIT {
                         continue;
                     }
 
-                    k = 3;
+                    k = TYPE_BRIDGE;
                 }
 
                 let on_bridge = the_hero.sector == BRIDGE_SECTOR && i != RAFT_SLOT;

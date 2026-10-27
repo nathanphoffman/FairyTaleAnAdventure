@@ -10,6 +10,37 @@ use crate::game::data::types::{SeqInfo, Shape, StateEntry};
 const RACE_SPECTRE: u8 = 8;
 const RACE_SNAKE: u8 = 4;
 
+/// A sprite is 32 pixels from the top of its box to the ground line.
+const SPRITE_GROUND_OFFSET: i16 = 32;
+
+/// A falling actor with fewer tactic steps than this still shows as an enemy figure.
+const FALL_AS_ENEMY_STEPS: i8 = 16;
+
+/// The first snake picture, and the pairing of left/right facing pictures.
+const SNAKE_FIRST_IMAGE: i16 = 0x24;
+const IMAGE_PAIR_BIT: i16 = 1;
+
+/// The swan's actor file number (it is drawn as the raft when nobody rides).
+const SWAN_FILE: i16 = 11;
+const RIDING_SWAN: i16 = 11;
+const RAFT_IMAGE: i16 = 1;
+
+/// Objects whose picture is only 8 lines high: 0x1b, 8 to 12, 25, 26, 0x11 to 0x17, and any with
+/// bit 7 set.
+const SMALL_OBJECT_LINES: i8 = 8;
+const SMALL_OBJECT_SINGLES: [i16; 3] = [0x1b, 25, 26];
+const SMALL_OBJECT_RANGES: [std::ops::RangeInclusive<i16>; 2] = [8..=12, 0x11..=0x17];
+const OBJECT_FLAG_SMALL: i16 = 128;
+
+// Sinking: the hero on the swan sits 16 lines higher; shallow water (depth 2) hides 10 lines;
+// beyond 29 the actor is under the surface and only bubbles show, drawn 27 lines down and 7 high.
+const SWAN_LIFT: i16 = 16;
+const SHALLOW_DEPTH: i16 = 2;
+const SHALLOW_HIDDEN_LINES: i16 = 10;
+const UNDER_SURFACE_DEPTH: i16 = 29;
+const BUBBLES_DROP: i16 = 27;
+const BUBBLES_HEIGHT: i16 = 7;
+
 /// Sprite numbers (object images).
 const OBJ_BURNING: i16 = 0x58;
 const OBJ_SUNK: i16 = 97;
@@ -43,7 +74,7 @@ pub(super) unsafe fn choose_image(actor: *const Shape, i: i32, passmode: bool) -
         let inum = (*actor).index as i16;
         let xstart = (*actor).rel_x as i16;
         let ystart = (*actor).rel_y as i16;
-        let ground = ystart.wrapping_add(32);
+        let ground = ystart.wrapping_add(SPRITE_GROUND_OFFSET);
         let blank = Sprite {
             atype: OBJECTS,
             inum,
@@ -83,20 +114,24 @@ unsafe fn body_image(actor: *const Shape, i: i32, mut inum: i16) -> Option<(i16,
                     return Some((OBJECTS, OBJ_BURNING));
                 }
             } else if (*actor).state == FALL {
-                atype = if (*actor).tactic < 16 { ENEMY } else { OBJECTS };
+                atype = if (*actor).tactic < FALL_AS_ENEMY_STEPS {
+                    ENEMY
+                } else {
+                    OBJECTS
+                };
             } else {
                 inum = state_entry(inum).figure as i16;
             }
 
             if (*actor).race == RACE_SNAKE {
                 if (*actor).state < DYING {
-                    inum += 0x24;
+                    inum += SNAKE_FIRST_IMAGE;
                 }
             } else if i > 0 {
                 if (*actor).race & 1 != 0 {
-                    inum |= 1;
+                    inum |= IMAGE_PAIR_BIT;
                 } else {
-                    inum &= 0xfffeu16 as i16;
+                    inum &= !IMAGE_PAIR_BIT;
                 }
             }
         }
@@ -105,9 +140,9 @@ unsafe fn body_image(actor: *const Shape, i: i32, mut inum: i16) -> Option<(i16,
             return None;
         }
 
-        if atype == CARRIER && the_hero.riding == 0 && the_actors.loaded_actor_file == 11 {
+        if atype == CARRIER && the_hero.riding == 0 && the_actors.loaded_actor_file == SWAN_FILE {
             atype = RAFT;
-            inum = 1;
+            inum = RAFT_IMAGE;
         }
 
         Some((atype, inum))
@@ -116,15 +151,14 @@ unsafe fn body_image(actor: *const Shape, i: i32, mut inum: i16) -> Option<(i16,
 
 /// The height of an image in lines: the sheet's, except for some small objects.
 pub(super) fn image_height(atype: i16, inum: i16, sheet_height: i8) -> i8 {
-    let small_object = inum == 0x1b
-        || (8..=12).contains(&inum)
-        || inum == 25
-        || inum == 26
-        || (inum > 0x10 && inum < 0x18)
-        || (inum & 128) != 0;
+    let small_object = SMALL_OBJECT_SINGLES.contains(&inum)
+        || SMALL_OBJECT_RANGES
+            .iter()
+            .any(|range| range.contains(&inum))
+        || (inum & OBJECT_FLAG_SMALL) != 0;
 
     if atype == OBJECTS && small_object {
-        8
+        SMALL_OBJECT_LINES
     } else {
         sheet_height
     }
@@ -160,21 +194,21 @@ unsafe fn sink_body(
     sprite: &mut Sprite,
 ) -> bool {
     unsafe {
-        if i == 0 && the_hero.riding == 11 {
-            sprite.ystop -= 16;
-        } else if depth == 2 {
-            sprite.ystop -= 10;
-        } else if depth > 29 {
+        if i == 0 && the_hero.riding == RIDING_SWAN {
+            sprite.ystop -= SWAN_LIFT;
+        } else if depth == SHALLOW_DEPTH {
+            sprite.ystop -= SHALLOW_HIDDEN_LINES;
+        } else if depth > UNDER_SURFACE_DEPTH {
             if (*actor).state == DEAD {
                 return false;
             }
 
             // under the surface: only the bubbles show
-            sprite.ystart += 27;
-            sprite.ystop = sprite.ystart + 7;
+            sprite.ystart += BUBBLES_DROP;
+            sprite.ystop = sprite.ystart + BUBBLES_HEIGHT;
             sprite.atype = OBJECTS;
             sprite.inum = OBJ_SUNK + ((cycle as i32 + i) & 1) as i16;
-        } else if depth > 2 {
+        } else if depth > SHALLOW_DEPTH {
             sprite.ystart += depth;
         }
 
@@ -184,11 +218,11 @@ unsafe fn sink_body(
 
 /// A weapon or object in water goes down with the water; under the surface it is not drawn at all.
 fn sink_weapon_or_object(depth: i16, sprite: &mut Sprite) -> bool {
-    if depth > 29 {
+    if depth > UNDER_SURFACE_DEPTH {
         return false; // no weapon
     }
 
-    if depth > 2 {
+    if depth > SHALLOW_DEPTH {
         sprite.ystart += depth;
         sprite.ystop += depth;
 

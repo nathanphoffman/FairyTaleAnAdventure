@@ -2,12 +2,17 @@
 //! frame, the environment, keeping the hero inside the world and working out where to draw.
 
 use super::{
-    CARRIER, CARRIER_SLOT, Ctx, DEAD, DEATH_DROWN, DEATH_LAVA, DRAGON, DYING, ENEMY,
-    ENVIRON_BACKWARDS, ENVIRON_DROWNED, ENVIRON_ICE, ENVIRON_SINKING, ENVIRON_SLOW, FALL,
-    FRAME_FLAT, FRAME_OSCIL, FRAME_SLEEP, FROZEN, LASSO, NO_REGION, OSCIL, OUTDOOR_REGIONS,
-    PIT_LUCK_COST, PIT_XTYPE, Pc, RACE_LASSO_CARRIER, RACE_WITCH, RACE_WITCH_BODY, RAFT,
-    RIDING_SWAN, SINK, SLEEP, STILL, STUFF_FIREPROOF, TALISMAN, TERRAIN_DEEP_WATER,
-    TERRAIN_SLOW_SINK, WALKING, WORLD_MAX, WORLD_MIN, diroff, terrain,
+    ANCHOR_LARGE, ANCHOR_PERSON, ANCHOR_SWAN, CARRIER, CARRIER_SLOT, Ctx, DEAD, DEATH_DROWN,
+    DEATH_LAVA, DRAGON, DROWN_IMMUNE_RACES, DROWN_PERIOD_MASK, DYING, DYING_FIRST_HALF, ENEMY,
+    ENVIRON_BACKWARDS, ENVIRON_DROWNED, ENVIRON_ICE, ENVIRON_SHALLOW, ENVIRON_SINKING,
+    ENVIRON_SLOW, ENVIRON_WADE, FALL, FALL_DRAG, FALL_FRAMES, FALL_STEPS, FALL_STEPS_PER_FRAME,
+    FRAME_DYING, FRAME_FLAT, FRAME_OSCIL, FRAME_SLEEP, FROZEN, LASSO, NO_REGION, OSCIL,
+    OUTDOOR_REGIONS, PIT_LUCK_COST, PIT_XTYPE, Pc, RACE_LASSO_CARRIER, RACE_SNAKE, RACE_SPECTRE,
+    RACE_SPECTRE_ALIVE, RACE_WITCH, RACE_WITCH_BODY, RAFT, RIDING_SWAN, SINK, SLEEP,
+    SPECTRE_BASE_FRAMES, SPECTRE_DEAD_FRAME, SPECTRE_FRAME_GROUPS, STILL, STUFF_FIREPROOF,
+    TALISMAN, TERRAIN_BACKWARDS, TERRAIN_DEEP_WATER, TERRAIN_ICE, TERRAIN_PIT, TERRAIN_SHALLOW,
+    TERRAIN_SLOW, TERRAIN_SLOW_SINK, TERRAIN_WADE, VELOCITY_QUARTER, WALKING, WITCH_BODY_VITALITY,
+    WORLD_MAX, WORLD_MIN, diroff, terrain,
 };
 
 use crate::game::actors::encounters::check_death;
@@ -27,10 +32,18 @@ impl Ctx {
             if s == DYING {
                 let d = self.facing;
 
-                if (*actor).tactic > 4 {
-                    self.image = if d == 0 || d > 4 { 80 } else { 81 };
+                if (*actor).tactic > DYING_FIRST_HALF {
+                    self.image = if d == 0 || d > 4 {
+                        FRAME_DYING.0
+                    } else {
+                        FRAME_DYING.1
+                    };
                 } else if (*actor).tactic > 0 {
-                    self.image = if d == 0 || d > 4 { 81 } else { 80 };
+                    self.image = if d == 0 || d > 4 {
+                        FRAME_DYING.1
+                    } else {
+                        FRAME_DYING.0
+                    };
                 } else {
                     (*actor).state = DEAD as i8;
                     self.image = FRAME_FLAT;
@@ -45,12 +58,13 @@ impl Ctx {
                 self.image = FRAME_OSCIL;
             } else if s == SLEEP {
                 self.image = FRAME_SLEEP;
-            } else if s == FALL && (*actor).tactic < 30 {
-                self.terrain = (*actor).tactic as i16 / 5 + the_hero.brother * 6;
+            } else if s == FALL && (*actor).tactic < FALL_STEPS {
+                self.terrain =
+                    (*actor).tactic as i16 / FALL_STEPS_PER_FRAME + the_hero.brother * FALL_FRAMES;
                 self.image = fallstates.get(self.terrain as usize).copied().unwrap_or(0) as i16;
                 (*actor).tactic += 1;
-                (*actor).vel_x = ((*actor).vel_x as i32 * 3 / 4) as i8;
-                (*actor).vel_y = ((*actor).vel_y as i32 * 3 / 4) as i8;
+                (*actor).vel_x = ((*actor).vel_x as i32 * FALL_DRAG.0 / FALL_DRAG.1) as i8;
+                (*actor).vel_y = ((*actor).vel_y as i32 * FALL_DRAG.0 / FALL_DRAG.1) as i8;
             }
 
             Pc::Cpx
@@ -64,8 +78,10 @@ impl Ctx {
             self.terrain = terrain((*actor).abs_x, (*actor).abs_y);
 
             if self.environ == ENVIRON_ICE {
-                (*actor).abs_x = ((*actor).abs_x as i32 + (*actor).vel_x as i32 / 4) as u16;
-                (*actor).abs_y = ((*actor).abs_y as i32 + (*actor).vel_y as i32 / 4) as u16;
+                (*actor).abs_x =
+                    ((*actor).abs_x as i32 + (*actor).vel_x as i32 / VELOCITY_QUARTER) as u16;
+                (*actor).abs_y =
+                    ((*actor).abs_y as i32 + (*actor).vel_y as i32 / VELOCITY_QUARTER) as u16;
             }
 
             Pc::Tail
@@ -104,7 +120,7 @@ impl Ctx {
 
                 if (*actor).race == RACE_WITCH {
                     (*actor).race = RACE_WITCH_BODY;
-                    (*actor).vitality = 10;
+                    (*actor).vitality = WITCH_BODY_VITALITY;
                     (*actor).state = STILL;
                     (*actor).weapon = 0;
                     leave_item(i as i16, TALISMAN);
@@ -129,13 +145,13 @@ impl Ctx {
                 self.environ = 0; // can't drown on the raft
             } else if j == 0 {
                 self.environ = 0;
-            } else if j == 6 {
+            } else if j == TERRAIN_SLOW {
                 self.environ = ENVIRON_SLOW;
-            } else if j == 7 {
+            } else if j == TERRAIN_ICE {
                 self.environ = ENVIRON_ICE;
-            } else if j == 8 {
+            } else if j == TERRAIN_BACKWARDS {
                 self.environ = ENVIRON_BACKWARDS;
-            } else if j == 9 && i == 0 && the_world.extent_type == PIT_XTYPE {
+            } else if j == TERRAIN_PIT && i == 0 && the_world.extent_type == PIT_XTYPE {
                 if (*actor).state as i16 != FALL {
                     self.image = fallstates[(the_hero.brother * 6) as usize] as i16;
                     (*actor).state = FALL as i8;
@@ -145,10 +161,10 @@ impl Ctx {
                 }
 
                 self.environ = ENVIRON_ICE;
-            } else if j == 2 {
-                self.environ = 2;
-            } else if j == 3 {
-                self.environ = 5;
+            } else if j == TERRAIN_SHALLOW {
+                self.environ = ENVIRON_SHALLOW;
+            } else if j == TERRAIN_WADE {
+                self.environ = ENVIRON_WADE;
             } else if j == TERRAIN_SLOW_SINK || j == TERRAIN_DEEP_WATER {
                 self.wade(j);
             }
@@ -205,7 +221,7 @@ impl Ctx {
                     (*actor).environ = 0;
                 } else if (*actor).environ > ENVIRON_SINKING {
                     (*actor).vitality = 0;
-                } else if (*actor).environ > 2 {
+                } else if (*actor).environ > ENVIRON_SHALLOW {
                     (*actor).vitality = (*actor).vitality.wrapping_sub(1);
                 }
 
@@ -223,7 +239,10 @@ impl Ctx {
             let cycle = self.cycle as i32;
             let race = (*actor).race as i8;
 
-            if (*actor).environ == ENVIRON_DROWNED && (cycle & 7) == 0 && race != 2 && race != 3 {
+            if (*actor).environ == ENVIRON_DROWNED
+                && (cycle & DROWN_PERIOD_MASK) == 0
+                && !DROWN_IMMUNE_RACES.contains(&race)
+            {
                 (*actor).vitality = (*actor).vitality.wrapping_sub(1);
                 check_death(i, DEATH_DROWN);
             }
@@ -237,15 +256,15 @@ impl Ctx {
             let cycle = self.cycle as i32;
             let state = (*actor).state as i16;
 
-            if race == 4 && state < WALKING {
+            if race == RACE_SNAKE as i8 && state < WALKING {
                 self.image = ((cycle & 1) + diroff(self.facing) as i32) as i16;
-            } else if race == 4 && state < DYING {
+            } else if race == RACE_SNAKE as i8 && state < DYING {
                 self.image = (((cycle / 2) & 1) + diroff(self.facing) as i32) as i16;
-            } else if race == 8 {
+            } else if race == RACE_SPECTRE {
                 if state == DEAD {
                     (*actor).abs_x = 0;
                 } else if state == DYING {
-                    self.image = 0x3f;
+                    self.image = SPECTRE_DEAD_FRAME;
                 } else {
                     self.image = ((cycle & 3) * 2) as i16;
 
@@ -253,13 +272,13 @@ impl Ctx {
                         self.image -= 1;
                     }
 
-                    match self.slot % 3 {
-                        0 => self.image = 0x25,
-                        1 => self.image += 0x28,
-                        _ => self.image += 0x30,
+                    match self.slot % SPECTRE_FRAME_GROUPS {
+                        0 => self.image = SPECTRE_BASE_FRAMES.0,
+                        1 => self.image += SPECTRE_BASE_FRAMES.1,
+                        _ => self.image += SPECTRE_BASE_FRAMES.2,
                     }
                 }
-            } else if race == 7 && (*actor).vitality == 0 {
+            } else if race == RACE_SPECTRE_ALIVE && (*actor).vitality == 0 {
                 // The original has `an->state == STILL` here: a comparison that does nothing (an
                 // assignment may have been meant). Kept as it was.
                 self.image = 1;
@@ -301,11 +320,11 @@ impl Ctx {
         unsafe {
             let actor = self.actor;
             let (ox, oy) = if (*actor).kind == CARRIER && the_hero.riding == RIDING_SWAN {
-                (32, 40)
+                ANCHOR_SWAN
             } else if (*actor).kind == RAFT || (*actor).kind == CARRIER || (*actor).kind == DRAGON {
-                (16, 16)
+                ANCHOR_LARGE
             } else {
-                (8, 26)
+                ANCHOR_PERSON
             };
 
             (*actor).rel_x =

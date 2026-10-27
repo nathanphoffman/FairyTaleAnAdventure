@@ -2,9 +2,9 @@
 
 use super::water::climbs_out_of_water;
 use super::{
-    BLOCK_DOOR, BLOCK_PASSABLE_WITH_KEY, Ctx, ENVIRON_BACKWARDS, ENVIRON_ICE, ENVIRON_SLOW,
-    FRAME_FRUSTRATED, FRAME_OSCIL, FRUST, PIT_SECTOR, Pc, RACE_SNAKE, RACE_WRAITH, RIDING_SWAN,
-    RIDING_TURTLE, STUFF_GOLD_KEY_SLOT, XTEST, YTEST, diroff, pos_x, pos_y, terrain,
+    BLOCK_DOOR, BLOCK_PASSABLE_WITH_KEY, Ctx, ENVIRON_BACKWARDS, ENVIRON_ICE, ENVIRON_SHALLOW,
+    ENVIRON_SLOW, FRAME_FRUSTRATED, FRAME_OSCIL, FRUST, PIT_SECTOR, Pc, RACE_SNAKE, RACE_WRAITH,
+    RIDING_SWAN, RIDING_TURTLE, STUFF_GOLD_KEY_SLOT, XTEST, YTEST, diroff, pos_x, pos_y, terrain,
 };
 
 use crate::game::actors::interaction::blocked_at;
@@ -15,11 +15,52 @@ use crate::game::data::tables::swing_transitions;
 use crate::game::world::key_doors::{bumped_locked_door, open_door_near};
 use crate::game::world::map::{step_x, step_y};
 
+/// Blocked for this many frames the hero oscillates; for this many more, he looks frustrated.
+const FRUSTRATION_OSCILLATE: i8 = 20;
+const FRUSTRATION_FRUSTRATED: i8 = 40;
+
+/// Step lengths in pixels per frame.
+const STEP_TURTLE: i16 = 3;
+const STEP_BACKWARDS: i16 = -2;
+const STEP_SLOW_GROUND: i16 = 4;
+const STEP_SHALLOW: i16 = 1;
+const STEP_NORMAL: i16 = 2;
+
+/// Water deeper than this (or exactly `ENVIRON_SHALLOW`) slows the walk.
+const ENVIRON_DEEP: i8 = 6;
+
+/// Sliding on ice: the top speed (while riding the swan, and not), and the offset used to read the
+/// direction's step from the step tables.
+const ICE_TOP_SPEED_SWAN: i16 = 40;
+const ICE_TOP_SPEED: i16 = 42;
+const ICE_STEP_ORIGIN: i32 = 20;
+const ICE_STEP_SPEED: i32 = 2;
+const ICE_X_MARGIN: i16 = 8;
+const SWAN_STEER_SPEED: i32 = 6;
+
+/// A walking frame cycles through 8 (flipping the low 3 bits plays them backwards).
+const WALK_FRAMES_MASK: i32 = 7;
+
+/// Snake pictures start here, two frames for each pair of facings.
+const SNAKE_FIRST_FRAME: i16 = 0x24;
+
+/// Velocity is kept as four times the movement of the last step.
+const VELOCITY_SCALE: i32 = 4;
+
+/// Facings are 0-7.
+const FACING_MASK: i16 = 7;
+
+/// The fighting states 6 and 7 are shown as state 8 (the follow-through).
+const SWING_STATE_FOLLOW_THROUGH: i16 = 8;
+const SWING_STATE_FIRST: i16 = 6;
+const SWING_STATE_SECOND: i16 = 7;
+const FIRST_NPC_SLOT: i32 = 2;
+
 /// The hero's frame once the way has been blocked for a while: oscillating, then a frustrated one.
 fn frustrated_frame(frustration: i8, cycle: i16) -> Option<i16> {
-    if frustration > 40 {
+    if frustration > FRUSTRATION_FRUSTRATED {
         Some(FRAME_FRUSTRATED)
-    } else if frustration > 20 {
+    } else if frustration > FRUSTRATION_OSCILLATE {
         // Swap between the two impatient frames every second tick.
         Some(FRAME_OSCIL + ((cycle >> 1) & 1))
     } else {
@@ -31,15 +72,15 @@ fn frustrated_frame(frustration: i8, cycle: i16) -> Option<i16> {
 /// through slow ground is slower, and a little water (environ 2 or deeper than 6) slows to 1.
 fn step_length(hero_on_turtle: bool, environ: i8) -> i16 {
     if hero_on_turtle {
-        3
+        STEP_TURTLE
     } else if environ == ENVIRON_BACKWARDS {
-        -2
+        STEP_BACKWARDS
     } else if environ == ENVIRON_SLOW {
-        4
-    } else if environ == 2 || environ > 6 {
-        1
+        STEP_SLOW_GROUND
+    } else if environ == ENVIRON_SHALLOW || environ > ENVIRON_DEEP {
+        STEP_SHALLOW
     } else {
-        2
+        STEP_NORMAL
     }
 }
 
@@ -99,15 +140,19 @@ impl Ctx {
         unsafe {
             let actor = self.actor;
             self.step = if the_hero.riding == RIDING_SWAN {
-                40
+                ICE_TOP_SPEED_SWAN
             } else {
-                42
+                ICE_TOP_SPEED
             };
 
-            let nvx = ((*actor).vel_x as i32 + step_x(20, self.facing as i32, 2) - 20) as i16;
-            let nvy = ((*actor).vel_y as i32 + step_y(20, self.facing as i32, 2) - 20) as i16;
+            let nvx = ((*actor).vel_x as i32
+                + step_x(ICE_STEP_ORIGIN, self.facing as i32, ICE_STEP_SPEED)
+                - ICE_STEP_ORIGIN) as i16;
+            let nvy = ((*actor).vel_y as i32
+                + step_y(ICE_STEP_ORIGIN, self.facing as i32, ICE_STEP_SPEED)
+                - ICE_STEP_ORIGIN) as i16;
 
-            if nvx.abs() < self.step - 8 {
+            if nvx.abs() < self.step - ICE_X_MARGIN {
                 (*actor).vel_x = nvx as i8;
             }
 
@@ -115,11 +160,11 @@ impl Ctx {
                 (*actor).vel_y = nvy as i8;
             }
 
-            XTEST = ((*actor).abs_x as i32 + (*actor).vel_x as i32 / 4) as u16;
-            YTEST = ((*actor).abs_y as i32 + (*actor).vel_y as i32 / 4) as u16;
+            XTEST = ((*actor).abs_x as i32 + (*actor).vel_x as i32 / VELOCITY_SCALE) as u16;
+            YTEST = ((*actor).abs_y as i32 + (*actor).vel_y as i32 / VELOCITY_SCALE) as u16;
 
             if the_hero.riding == RIDING_SWAN {
-                steer_actor(0, -(nvx as i32), -(nvy as i32), 6);
+                steer_actor(0, -(nvx as i32), -(nvy as i32), SWAN_STEER_SPEED);
                 self.facing = (*actor).facing as i16;
 
                 return Some(Pc::NewLoc);
@@ -137,7 +182,7 @@ impl Ctx {
     pub(super) unsafe fn check_dev1(&mut self) -> Pc {
         unsafe {
             let actor = self.actor;
-            self.facing = (self.facing + 1) & 7;
+            self.facing = (self.facing + 1) & FACING_MASK;
             XTEST = pos_x((*actor).abs_x as i32, self.facing, self.step);
             YTEST = pos_y((*actor).abs_y as i32, self.facing, self.step);
 
@@ -153,7 +198,7 @@ impl Ctx {
     pub(super) unsafe fn check_dev2(&mut self) -> Pc {
         unsafe {
             let actor = self.actor;
-            self.facing = (self.facing - 2) & 7;
+            self.facing = (self.facing - 2) & FACING_MASK;
             XTEST = pos_x((*actor).abs_x as i32, self.facing, self.step);
             YTEST = pos_y((*actor).abs_y as i32, self.facing, self.step);
 
@@ -175,7 +220,9 @@ impl Ctx {
             self.image = self.frame_base;
 
             if !(the_hero.riding != 0 && self.slot == 0) && (*actor).race != RACE_WRAITH {
-                self.image = (self.image as i32 + ((self.cycle as i32 + self.slot) & 7)) as i16;
+                self.image = (self.image as i32
+                    + ((self.cycle as i32 + self.slot) & WALK_FRAMES_MASK))
+                    as i16;
             }
 
             if self.environ == ENVIRON_ICE {
@@ -184,7 +231,7 @@ impl Ctx {
 
             if self.environ == ENVIRON_BACKWARDS {
                 // Walking backwards: flipping the three low bits plays the walk frames in reverse order.
-                self.image ^= 7;
+                self.image ^= WALK_FRAMES_MASK as i16;
             }
 
             self.terrain = terrain(XTEST, YTEST);
@@ -196,7 +243,7 @@ impl Ctx {
 
             if (*actor).race == RACE_SNAKE {
                 // Snake pictures: two frames (bit 1 of the cycle) for each pair of facings, starting at image 0x24.
-                self.image = (self.cycle & 2) + ((self.facing & 0xfe) << 2) + 0x24;
+                self.image = (self.cycle & 2) + ((self.facing & 0xfe) << 2) + SNAKE_FIRST_FRAME;
             }
 
             if climbs_out_of_water(self.environ, self.terrain) {
@@ -207,8 +254,10 @@ impl Ctx {
                 return Pc::Raise;
             }
 
-            (*actor).vel_x = ((XTEST.wrapping_sub((*actor).abs_x) as i16 as i32) * 4) as i8;
-            (*actor).vel_y = ((YTEST.wrapping_sub((*actor).abs_y) as i16 as i32) * 4) as i8;
+            (*actor).vel_x =
+                ((XTEST.wrapping_sub((*actor).abs_x) as i16 as i32) * VELOCITY_SCALE) as i8;
+            (*actor).vel_y =
+                ((YTEST.wrapping_sub((*actor).abs_y) as i16 as i32) * VELOCITY_SCALE) as i8;
             (*actor).abs_x = XTEST;
             (*actor).abs_y = YTEST;
             the_actors.frustration = 0;
@@ -261,8 +310,10 @@ impl Ctx {
             (*actor).state = next as i8;
             self.state = next;
 
-            if (self.slot > 2 && self.state == 6) || self.state == 7 {
-                self.state = 8;
+            if (self.slot > FIRST_NPC_SLOT && self.state == SWING_STATE_FIRST)
+                || self.state == SWING_STATE_SECOND
+            {
+                self.state = SWING_STATE_FOLLOW_THROUGH;
             }
 
             self.image = self.state + self.frame_base;

@@ -10,10 +10,68 @@ pub(super) const SECTOR_BYTES: usize = 128;
 pub(super) const MAP_ROW_BYTES: usize = 128;
 pub(super) const SECTOR_ROWS_IN_REGION: i16 = 32;
 
+/// Tiles are 16 pixels wide and 32 high; a sector is 16 tiles wide and 8 high. These are the shifts
+/// and masks that go between pixels, tiles and sectors.
+const TILE_WIDTH_SHIFT: u32 = 4;
+const TILE_HEIGHT_SHIFT: u32 = 5;
+const SECTOR_WIDTH_SHIFT: u32 = 4;
+const SECTOR_HEIGHT_SHIFT: u32 = 3;
+const TILE_COLUMN_MASK: usize = 15;
+const TILE_ROW_MASK: usize = 7;
+const SECTOR_ROW_TILES: usize = 16;
+
+/// A sector row of the region map is 128 bytes: the shift that multiplies by it.
+const MAP_ROW_SHIFT: u32 = 7;
+
+/// A sector column outside the map: bit 6 set means off the edge, and bit 5 says which edge.
+const COLUMN_OFF_MAP: u16 = 64;
+const COLUMN_OFF_LOW_SIDE: u16 = 32;
+const LAST_SECTOR_COLUMN: u16 = 63;
+const ROW_OFF_MAP: u16 = 32;
+const ROW_OFF_LOW_SIDE: u16 = 16;
+const LAST_SECTOR_ROW: u16 = 31;
+
+/// A terrain table entry is 4 bytes: the second holds the type in its high nibble, the third the
+/// mask of solid sub-areas, and the fourth the overview colour.
+const TERRAIN_ENTRY_BYTES: usize = 4;
+const TERRAIN_TYPE_BYTE: usize = 1;
+const TERRAIN_MASK_BYTE: usize = 2;
+const TERRAIN_TYPE_SHIFT: u32 = 4;
+
+/// The 8 sub-areas of a tile are picked by one bit of the mask, from the pixel position.
+const FIRST_SUBAREA_BIT: u8 = 0x80;
+const RIGHT_HALF_PIXEL: u16 = 8;
+const LOWER_ROW_PIXEL: u16 = 8;
+const LOWER_PAIR_PIXEL: u16 = 16;
+const RIGHT_HALF_SHIFT: u32 = 4;
+
+/// Collision probes: how far right/left and down from the actor's position, and which terrain types
+/// block on each side.
+const PROBE_SIDE: i32 = 4;
+const PROBE_DOWN: i32 = 2;
+const ALWAYS_BLOCKS: i32 = 1;
+const RIGHT_PROBE_BLOCKS_FROM: i32 = 10;
+const LEFT_PROBE_BLOCKS_FROM: i32 = 8;
+
+/// The minimap covers the world's 2048 tile columns, and 32768 tile rows.
+const TILE_COLUMN_WRAP: u16 = 0x07ff;
+const TILE_ROW_WRAP: u16 = 0x7fff;
+
+/// Regions above this number use the second half of the sector table.
+const LAST_FIRST_HALF_REGION: u16 = 7;
+const SECOND_HALF_OFFSET: i32 = 256;
+
+/// The high byte of the hero's position is the sector.
+const SECTOR_POSITION_SHIFT: u32 = 8;
+
 /// Sector column from an image column: values outside 0-63 wrap, as in the assembly.
 pub(super) fn wrap_secx(mut v: u16) -> u16 {
-    if v & 64 != 0 {
-        v = if v & 32 != 0 { 0 } else { 63 };
+    if v & COLUMN_OFF_MAP != 0 {
+        v = if v & COLUMN_OFF_LOW_SIDE != 0 {
+            0
+        } else {
+            LAST_SECTOR_COLUMN
+        };
     }
 
     v
@@ -41,41 +99,51 @@ pub(super) unsafe fn sector_at(col: u16, row: u16) -> u8 {
 /// a clearing, say). The bit is picked from pixel bits 3 (x), 3 and 4 (y).
 pub fn terrain_at(x: i32, y: i32) -> i32 {
     let (ux, uy) = (x as u16, y as u16);
-    let mut bit = 0x80u8;
+    let mut bit = FIRST_SUBAREA_BIT;
 
-    if ux & 8 != 0 {
+    if ux & RIGHT_HALF_PIXEL != 0 {
         // The right half of the tile: the second column of sub-areas.
-        bit >>= 4;
+        bit >>= RIGHT_HALF_SHIFT;
     }
 
-    if uy & 8 != 0 {
+    if uy & LOWER_ROW_PIXEL != 0 {
         // The lower half of a 16 pixel row of sub-areas.
         bit >>= 1;
     }
 
-    if uy & 16 != 0 {
+    if uy & LOWER_PAIR_PIXEL != 0 {
         // The lower two of the four rows of sub-areas.
         bit >>= 2;
     }
 
     // The tile column and row: tiles are 16 pixels wide and 32 high.
-    let (imx, imy) = (ux >> 4, uy >> 5);
+    let (imx, imy) = (ux >> TILE_WIDTH_SHIFT, uy >> TILE_HEIGHT_SHIFT);
     unsafe {
         // A sector is 16 tiles wide.
-        let col = wrap_secx((imx >> 4).wrapping_sub(the_world.origin_x));
+        let col = wrap_secx((imx >> SECTOR_WIDTH_SHIFT).wrapping_sub(the_world.origin_x));
         // A sector is 8 tiles high.
-        let row = clamp_secy((imy >> 3).wrapping_sub(the_world.origin_y) as i16);
+        let row = clamp_secy((imy >> SECTOR_HEIGHT_SHIFT).wrapping_sub(the_world.origin_y) as i16);
         let sec = sector_at(col, row) as usize;
         let tile = *the_memory.sector_mem.add(
-            (sec * SECTOR_BYTES + (imy as usize & 7) * 16 + (imx as usize & 15)) as u16 as usize,
+            (sec * SECTOR_BYTES
+                + (imy as usize & TILE_ROW_MASK) * SECTOR_ROW_TILES
+                + (imx as usize & TILE_COLUMN_MASK)) as u16 as usize,
         ) as usize;
 
-        if *the_memory.terrain_mem.add(tile * 4 + 2) & bit == 0 {
+        if *the_memory
+            .terrain_mem
+            .add(tile * TERRAIN_ENTRY_BYTES + TERRAIN_MASK_BYTE)
+            & bit
+            == 0
+        {
             return 0;
         }
 
         // The terrain type is the high nibble of the second byte of the tile's entry.
-        (*the_memory.terrain_mem.add(tile * 4 + 1) >> 4) as i32
+        (*the_memory
+            .terrain_mem
+            .add(tile * TERRAIN_ENTRY_BYTES + TERRAIN_TYPE_BYTE)
+            >> TERRAIN_TYPE_SHIFT) as i32
     }
 }
 
@@ -83,15 +151,15 @@ pub fn terrain_at(x: i32, y: i32) -> i32 {
 /// Returns the blocking terrain type, 0 if the way is clear. Type 1 always blocks; the right-hand
 /// probe is blocked by 10 and above, the left-hand one by 8 and above.
 pub fn probe_collision(x: i32, y: i32) -> i32 {
-    let t = terrain_at(x + 4, y + 2);
+    let t = terrain_at(x + PROBE_SIDE, y + PROBE_DOWN);
 
-    if t == 1 || t >= 10 {
+    if t == ALWAYS_BLOCKS || t >= RIGHT_PROBE_BLOCKS_FROM {
         return t;
     }
 
-    let t = terrain_at(x - 4, y + 2);
+    let t = terrain_at(x - PROBE_SIDE, y + PROBE_DOWN);
 
-    if t == 1 || t >= 8 {
+    if t == ALWAYS_BLOCKS || t >= LEFT_PROBE_BLOCKS_FROM {
         return t;
     }
 
@@ -103,19 +171,25 @@ pub fn tile_address(imx: i32, imy: i32) -> *const u8 {
     let (ux, uy) = (imx as u16, imy as u16);
     unsafe {
         // Pixel column to sector column: 16 pixels to a tile, 16 tiles to a sector.
-        let col = wrap_secx((ux >> 4).wrapping_sub(the_world.origin_x));
+        let col = wrap_secx((ux >> TILE_WIDTH_SHIFT).wrapping_sub(the_world.origin_x));
         // Pixel row to sector row: 8 tiles to a sector, so 8 times 32 divided by 32.
-        let mut row = (uy >> 3).wrapping_sub(the_world.origin_y);
+        let mut row = (uy >> SECTOR_HEIGHT_SHIFT).wrapping_sub(the_world.origin_y);
 
-        if row & 32 != 0 {
-            row = if row & 16 != 0 { 0 } else { 31 };
+        if row & ROW_OFF_MAP != 0 {
+            row = if row & ROW_OFF_LOW_SIDE != 0 {
+                0
+            } else {
+                LAST_SECTOR_ROW
+            };
         }
 
         let sec = sector_at(col, row) as usize;
 
-        the_memory
-            .sector_mem
-            .add((sec * SECTOR_BYTES + (uy as usize & 7) * 16 + (ux as usize & 15)) as u16 as usize)
+        the_memory.sector_mem.add(
+            (sec * SECTOR_BYTES
+                + (uy as usize & TILE_ROW_MASK) * SECTOR_ROW_TILES
+                + (ux as usize & TILE_COLUMN_MASK)) as u16 as usize,
+        )
     }
 }
 
@@ -127,23 +201,27 @@ pub fn fill_minimap(tile_x: i32, tile_y: i32) {
         let mut next = 0;
 
         for _ in 0..SCREEN_COLUMNS {
-            x &= 0x07ff;
+            x &= TILE_COLUMN_WRAP;
             // Tile column to sector column: 16 tiles to a sector.
-            let col = wrap_secx((x >> 4).wrapping_sub(the_world.origin_x))
+            let col = wrap_secx((x >> SECTOR_WIDTH_SHIFT).wrapping_sub(the_world.origin_x))
                 .wrapping_add(the_world.origin_x);
 
             for j in 0..SCREEN_ROWS as i32 {
-                let y = (tile_y + j) as u16 & 0x7fff;
+                let y = (tile_y + j) as u16 & TILE_ROW_WRAP;
                 // Tile row to sector row: 8 tiles to a sector.
-                let row = clamp_secy((y >> 3).wrapping_sub(the_world.origin_y) as i16);
+                let row =
+                    clamp_secy((y >> SECTOR_HEIGHT_SHIFT).wrapping_sub(the_world.origin_y) as i16);
                 let sec = *the_memory
                     .map_mem
                     // The region map has 128 sectors in each row.
-                    .add(((row as usize) << 7).wrapping_add(col as usize) as u16 as usize)
-                    as usize;
+                    .add(
+                        ((row as usize) << MAP_ROW_SHIFT).wrapping_add(col as usize) as u16
+                            as usize,
+                    ) as usize;
                 let tile = *the_memory.sector_mem.add(
-                    (sec * SECTOR_BYTES + (y as usize & 7) * 16 + (x as usize & 15)) as u16
-                        as usize,
+                    (sec * SECTOR_BYTES
+                        + (y as usize & TILE_ROW_MASK) * SECTOR_ROW_TILES
+                        + (x as usize & TILE_COLUMN_MASK)) as u16 as usize,
                 );
 
                 minimap[next] = tile as i16;
@@ -154,16 +232,18 @@ pub fn fill_minimap(tile_x: i32, tile_y: i32) {
         }
 
         // the assembly read the high byte of hero_x and hero_y (68000 is big-endian)
-        let hx = (the_hero.x >> 8) as i32;
+        let hx = (the_hero.x >> SECTOR_POSITION_SHIFT) as i32;
         // The hero's sector row: 256 pixels to a sector.
-        let hy = ((the_hero.y >> 8).wrapping_sub(the_world.origin_y)) as i16 as i32;
+        let hy =
+            ((the_hero.y >> SECTOR_POSITION_SHIFT).wrapping_sub(the_world.origin_y)) as i16 as i32;
         let mut sec = *the_memory
             .map_mem
             // The region map has 128 sectors in each row.
-            .add(((hy << 7).wrapping_add(hx)) as u16 as usize) as i32;
+            .add(((hy << MAP_ROW_SHIFT).wrapping_add(hx)) as u16 as usize)
+            as i32;
 
-        if the_world.region & 0xff > 7 {
-            sec += 256;
+        if the_world.region & 0xff > LAST_FIRST_HALF_REGION {
+            sec += SECOND_HALF_OFFSET;
         }
 
         the_hero.sector = sec as i16;

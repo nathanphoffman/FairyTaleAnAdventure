@@ -119,6 +119,28 @@ const FULL_LEVEL: i32 = 100;
 const COLOR_COUNT: usize = 32;
 const MAX_COMPONENT: i32 = 15;
 
+/// Night blue lift: one third of the green that is missing from full light.
+const NIGHT_BLUE_SHARE: i32 = 3;
+
+/// A component in its nibble position (up to 0xf0) times a level in percent: dividing by 1600 gives
+/// back a 4 bit component.
+const SCALE_DIVISOR: i32 = 1600;
+const PERCENT: i32 = 100;
+
+/// The lake colours get a moonlight tint at night while green stays above these levels.
+const LAKE_COLORS: std::ops::RangeInclusive<usize> = 16..=24;
+const MOONLIGHT_MIN_GREEN: i32 = 20;
+const MOONLIGHT_STRONG_BELOW: i32 = 50;
+const MOONLIGHT_WEAK_BELOW: i32 = 75;
+const MOONLIGHT_STRONG_BOOST: i32 = 2;
+const MOONLIGHT_WEAK_BOOST: i32 = 1;
+
+const RED_MASK: i32 = 0x0f00;
+const GREEN_MASK: i32 = 0x00f0;
+const BLUE_MASK: i32 = 0x000f;
+const NIBBLE_BITS: u32 = 4;
+const RANDOM_COLOR_MASK: i32 = 0xfff;
+
 /// Fades the page colours to the levels `r`, `g`, `b` (percent). With `limit` the night limits
 /// apply (red never below 10%, green 25%, blue 60%) and some blue is mixed in from green, which gives
 /// the bluish moonlight. The light spell (`light_timer`) makes reds as bright as greens.
@@ -142,7 +164,7 @@ pub fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: *const u16) {
             r = r.max(NIGHT_MIN.0);
             g = g.max(NIGHT_MIN.1);
             b = b.max(NIGHT_MIN.2);
-            g2 = (FULL_LEVEL - g) / 3;
+            g2 = (FULL_LEVEL - g) / NIGHT_BLUE_SHARE;
         } else {
             r = r.max(0);
             g = g.max(0);
@@ -182,24 +204,24 @@ fn faded_color(
 ) -> u16 {
     let color = color as i32;
     // Colours are 12 bit 0RGB. Red is moved down a nibble so all three work on the same scale.
-    let mut r1 = (color & 0x0f00) >> 4;
-    let mut g1 = color & 0x00f0;
-    let mut b1 = color & 0x000f;
+    let mut r1 = (color & RED_MASK) >> NIBBLE_BITS;
+    let mut g1 = color & GREEN_MASK;
+    let mut b1 = color & BLUE_MASK;
 
     if lit && r1 < g1 {
         r1 = g1;
     }
 
-    r1 = (r * r1) / 1600;
-    g1 = (g * g1) / 1600;
-    b1 = (b * b1 + g2 * g1) / 100;
+    r1 = (r * r1) / SCALE_DIVISOR;
+    g1 = (g * g1) / SCALE_DIVISOR;
+    b1 = (b * b1 + g2 * g1) / PERCENT;
 
     if night {
-        if (16..=24).contains(&i) && g > 20 {
-            if g < 50 {
-                b1 += 2;
-            } else if g < 75 {
-                b1 += 1;
+        if LAKE_COLORS.contains(&i) && g > MOONLIGHT_MIN_GREEN {
+            if g < MOONLIGHT_STRONG_BELOW {
+                b1 += MOONLIGHT_STRONG_BOOST;
+            } else if g < MOONLIGHT_WEAK_BELOW {
+                b1 += MOONLIGHT_WEAK_BOOST;
             }
         }
 
@@ -207,7 +229,7 @@ fn faded_color(
     }
 
     // Back to 0RGB.
-    ((r1 << 8) + (g1 << 4) + b1) as u16
+    ((r1 << (2 * NIBBLE_BITS)) + (g1 << NIBBLE_BITS) + b1) as u16
 }
 
 /// The teleport effect: random colours flicker for a moment (32 flashes).
@@ -215,7 +237,7 @@ pub fn flicker_colors() {
     unsafe {
         for _ in 0..COLOR_COUNT {
             for slot in (*(&raw mut fader)).iter_mut().take(COLOR_COUNT).skip(1) {
-                *slot = bitrand(0xfff) as u16;
+                *slot = bitrand(RANDOM_COLOR_MASK) as u16;
             }
 
             LoadRGB4(
@@ -229,6 +251,16 @@ pub fn flicker_colors() {
     }
 }
 
+// Field widths for printed numbers, and the map-coordinate shift (256 pixels to a sector).
+const COORD_DIGITS: i32 = 6;
+const SECTOR_DIGITS: i32 = 3;
+const EXTENT_DIGITS: i32 = 2;
+const VITALITY_DIGITS: i32 = 3;
+const STAT_DIGITS: i32 = 3;
+const SECTOR_PIXELS: i32 = 256;
+const EXTENT_LABEL_LEN: i32 = 10;
+const VITALITY_LABEL_LEN: i32 = 4;
+
 // The print queue requests.
 const REQUEST_DEBUG_COORDS: i32 = 2;
 const REQUEST_DEBUG_SECTOR: i32 = 3;
@@ -239,6 +271,10 @@ const REQUEST_TAKE_WHAT: i32 = 10;
 const QUEUE_MASK: i16 = 31;
 const VITALITY_POSITION: (i32, i32) = (245, 52);
 const STATS_Y: i32 = 52;
+const BRAVERY_X: i32 = 14;
+const LUCK_X: i32 = 90;
+const KINDNESS_X: i32 = 168;
+const WEALTH_X: i32 = 321;
 
 /// Handles one request from the print queue (or waits a tick if there is none).
 /// Requests: 2 and 3 debug information, 4 the vitality figure, 5 the menu, 7 the stats line
@@ -257,26 +293,26 @@ pub fn handle_print_request() {
         match request {
             REQUEST_DEBUG_COORDS => {
                 print(c"Coords = ".as_ptr());
-                print_number(the_hero.x as i32, 6);
-                print_number(the_hero.y as i32, 6);
+                print_number(the_hero.x as i32, COORD_DIGITS);
+                print_number(the_hero.y as i32, COORD_DIGITS);
                 print(c"Memory Available: ".as_ptr());
-                print_number(AvailMem(0) as i32, 6);
+                print_number(AvailMem(0) as i32, COORD_DIGITS);
             }
 
             REQUEST_DEBUG_SECTOR => {
                 print(c"You are at: ".as_ptr());
-                print_number(the_hero.x as i32 / 256, 3);
-                print_number(the_hero.y as i32 / 256, 3);
+                print_number(the_hero.x as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
+                print_number(the_hero.y as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
                 print(c"H/Sector = ".as_ptr());
-                print_number(the_hero.sector as i32, 3);
-                draw_text(c" Extent = ".as_ptr(), 10);
-                print_number(the_world.extent_type as i32, 2);
+                print_number(the_hero.sector as i32, SECTOR_DIGITS);
+                draw_text(c" Extent = ".as_ptr(), EXTENT_LABEL_LEN);
+                print_number(the_world.extent_type as i32, EXTENT_DIGITS);
             }
 
             REQUEST_VITALITY => {
                 move_to(VITALITY_POSITION.0, VITALITY_POSITION.1);
-                draw_text(c"Vit:".as_ptr(), 4);
-                print_number(the_actors.list[0].vitality as i32, 3);
+                draw_text(c"Vit:".as_ptr(), VITALITY_LABEL_LEN);
+                print_number(the_actors.list[0].vitality as i32, VITALITY_DIGITS);
             }
 
             REQUEST_OPTIONS => {
@@ -298,14 +334,14 @@ unsafe fn draw_stats() {
         }
 
         for (x, label, len, value) in [
-            (14, c"Brv:", 4, the_hero.brave),
-            (90, c"Lck:", 4, the_hero.luck),
-            (168, c"Knd:", 4, the_hero.kindness),
-            (321, c"Wlth:", 5, the_hero.wealth),
+            (BRAVERY_X, c"Brv:", 4, the_hero.brave),
+            (LUCK_X, c"Lck:", 4, the_hero.luck),
+            (KINDNESS_X, c"Knd:", 4, the_hero.kindness),
+            (WEALTH_X, c"Wlth:", 5, the_hero.wealth),
         ] {
             move_to(x, STATS_Y);
             draw_text(label.as_ptr(), len);
-            print_number(value as i32, 3);
+            print_number(value as i32, STAT_DIGITS);
         }
     }
 }
@@ -406,6 +442,21 @@ const SUNRISE_COLORS: std::ops::Range<usize> = 2..28;
 const SUN_GLOW_UNTIL: i32 = -14;
 const WIN_SCREEN_SIZE: i32 = 156;
 
+// Ticks to wait in the win sequence.
+const WIN_MESSAGE_PAUSE: i32 = 80;
+const SUNRISE_FIRST_PAUSE: i32 = 60;
+const SUNRISE_STEP_PAUSE: i32 = 9;
+const SUNRISE_END_PAUSE: i32 = 30;
+
+// Sunrise palette colours: the white ones and the orange glow.
+const WHITE: u16 = 0xfff;
+const GLOW_FIRST: usize = 29;
+const GLOW_SECOND: usize = 30;
+const WHITE_COLORS: [usize; 2] = [1, 28];
+const GLOW_BRIGHT: (u16, u16) = (0x800, 0x400);
+const GLOW_FADE_OFFSET: i32 = 30;
+const RED_STEP: i32 = 0x100;
+
 /// The win screen: shows the picture and brings the sun up behind it by cycling the sky colours
 /// through `sun_colors`, with two glowing colours that fade out near the end.
 pub fn win_colors() {
@@ -414,7 +465,7 @@ pub fn win_colors() {
         name();
         placard_text(WIN_MESSAGE_SECOND);
         draw_placard_border();
-        Delay(80);
+        Delay(WIN_MESSAGE_PAUSE);
         the_screen.bm_draw = (*(*the_screen.drawing_page).ri_page).BitMap;
         load_picture(c"winpic".as_ptr(), the_screen.bm_draw, 0, 0);
         LoadRGB4(
@@ -441,13 +492,13 @@ pub fn win_colors() {
             );
 
             if i == SUNRISE_START {
-                Delay(60);
+                Delay(SUNRISE_FIRST_PAUSE);
             }
 
-            Delay(9);
+            Delay(SUNRISE_STEP_PAUSE);
         }
 
-        Delay(30);
+        Delay(SUNRISE_END_PAUSE);
         LoadRGB4(
             &raw mut the_screen.vp_page,
             (&raw const black_colors).cast::<u16>(),
@@ -459,10 +510,12 @@ pub fn win_colors() {
 /// The palette for step `i` of the sunrise over the ending picture. Colours 1 and 28 are white,
 /// 0 and 31 black; the sky and sun colours come from `sun_colors` offset by `i`, and the glow
 /// (29, 30) is a fixed orange at first and then fades out.
-fn sunrise_palette(i: i32) -> [u16; 32] {
-    let mut colors = [0u16; 32];
-    colors[1] = 0xfff;
-    colors[28] = 0xfff;
+fn sunrise_palette(i: i32) -> [u16; COLOR_COUNT] {
+    let mut colors = [0u16; COLOR_COUNT];
+
+    for white in WHITE_COLORS {
+        colors[white] = WHITE;
+    }
 
     for j in SUNRISE_COLORS {
         let index = i + j as i32;
@@ -474,12 +527,12 @@ fn sunrise_palette(i: i32) -> [u16; 32] {
     }
 
     if i > SUN_GLOW_UNTIL {
-        colors[29] = 0x800;
-        colors[30] = 0x400;
+        colors[GLOW_FIRST] = GLOW_BRIGHT.0;
+        colors[GLOW_SECOND] = GLOW_BRIGHT.1;
     } else {
-        let j = (i + 30) / 2;
-        colors[29] = (0x100 * j) as u16;
-        colors[30] = (0x100 * (j / 2)) as u16;
+        let j = (i + GLOW_FADE_OFFSET) / 2;
+        colors[GLOW_FIRST] = (RED_STEP * j) as u16;
+        colors[GLOW_SECOND] = (RED_STEP * (j / 2)) as u16;
     }
 
     colors
@@ -488,6 +541,9 @@ fn sunrise_palette(i: i32) -> [u16; 32] {
 // Daylight: the page colours follow the time of day.
 const DAY_DARKEN: (i32, i32, i32) = (80, 61, 62);
 const LIGHT_SPELL_BONUS: i32 = 200;
+
+/// The daylight fade runs every fourth tick.
+const FADE_TICK_MASK: u16 = 3;
 
 /// Inside buildings (regions from here on) it is never night.
 const FIRST_INDOOR_REGION: u16 = 8;
@@ -505,7 +561,7 @@ pub fn day_fade() {
             0
         };
 
-        if the_world.day_clock & 3 == 0 || the_screen.view_status > VIEW_REBUILD {
+        if the_world.day_clock & FADE_TICK_MASK == 0 || the_screen.view_status > VIEW_REBUILD {
             let colors = (&raw const page_colors).cast();
 
             if the_world.region < FIRST_INDOOR_REGION {
@@ -518,28 +574,41 @@ pub fn day_fade() {
                     colors,
                 );
             } else {
-                fade_page(100, 100, 100, 1, colors);
+                fade_page(
+                    FULL_LEVEL as i16,
+                    FULL_LEVEL as i16,
+                    FULL_LEVEL as i16,
+                    1,
+                    colors,
+                );
             }
         }
     }
 }
+
+// The intro zoom: the picture is centred on a 320 x 200 screen and its shape is 8:5.
+const SCREEN_CENTER_X: i32 = 160;
+const SCREEN_CENTER_Y: i32 = 100;
+const ZOOM_ASPECT: (i32, i32) = (5, 8);
+const ZOOM_TEXT_HEIGHT: i32 = 95;
+const ZOOM_FADE_OFFSETS: (i32, i32, i32) = (40, 70, 100);
 
 /// The size of the picture during the intro's zoom: `x` is half the width in pixels (0 to 160),
 /// the height keeps the 8:5 shape. Moves the page and text view ports to match, fades the colours
 /// with the size (black when small), and shows the result.
 pub fn set_intro_zoom(x: i32) {
     unsafe {
-        let y = (x * 5) / 8;
+        let y = (x * ZOOM_ASPECT.0) / ZOOM_ASPECT.1;
 
         Delay(2);
 
-        let left = (160 - x) as i16;
+        let left = (SCREEN_CENTER_X - x) as i16;
         the_screen.ri_page2.RxOffset = left;
         the_screen.ri_page1.RxOffset = left;
         the_screen.vp_page.DxOffset = left;
         the_screen.vp_page.DWidth = (x + x) as i16;
 
-        let top = (100 - y) as i16;
+        let top = (SCREEN_CENTER_Y - y) as i16;
         the_screen.ri_page2.RyOffset = top;
         the_screen.ri_page1.RyOffset = top;
         the_screen.vp_page.DyOffset = top;
@@ -547,13 +616,13 @@ pub fn set_intro_zoom(x: i32) {
 
         the_screen.vp_text.DxOffset = 0;
         the_screen.vp_text.DyOffset = 0;
-        the_screen.vp_text.DHeight = (95 - y) as i16;
+        the_screen.vp_text.DHeight = (ZOOM_TEXT_HEIGHT - y) as i16;
 
         let colors = (&raw const intro_colors).cast::<u16>();
         fade_page(
-            (y * 2 - 40) as i16,
-            (y * 2 - 70) as i16,
-            (y * 2 - 100) as i16,
+            (y * 2 - ZOOM_FADE_OFFSETS.0) as i16,
+            (y * 2 - ZOOM_FADE_OFFSETS.1) as i16,
+            (y * 2 - ZOOM_FADE_OFFSETS.2) as i16,
             0,
             colors,
         );

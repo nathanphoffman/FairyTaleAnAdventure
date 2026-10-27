@@ -135,6 +135,50 @@ const DRAGON_BREATH_FACING: i8 = 5;
 /// Hitting the pit: the luck it costs.
 const PIT_LUCK_COST: i16 = 2;
 
+// More terrain types and the `environ` they give.
+const TERRAIN_SHALLOW: i16 = 2;
+const TERRAIN_WADE: i16 = 3;
+const TERRAIN_SLOW: i16 = 6;
+const TERRAIN_ICE: i16 = 7;
+const TERRAIN_BACKWARDS: i16 = 8;
+const TERRAIN_PIT: i16 = 9;
+const ENVIRON_SHALLOW: i8 = 2;
+const ENVIRON_WADE: i8 = 5;
+
+/// A falling hero is fallen after this many steps (the tactic counts them, 5 to a frame).
+const FALL_STEPS: i8 = 30;
+const FALL_STEPS_PER_FRAME: i16 = 5;
+const FALL_FRAMES: i16 = 6;
+
+/// A dying actor shows one of two frames, flipping at half the death time.
+const DYING_FIRST_HALF: i8 = 4;
+const FRAME_DYING: (i16, i16) = (80, 81);
+
+/// Slides on ice and in a fall keep a quarter of the velocity per frame (3/4 when falling).
+const VELOCITY_QUARTER: i32 = 4;
+const FALL_DRAG: (i32, i32) = (3, 4);
+
+/// What the witch leaves behind: her body keeps this much vitality.
+const WITCH_BODY_VITALITY: i16 = 10;
+
+/// Race numbers with special sprite frames.
+/// Races that cannot drown (the wraith and race 3).
+const DROWN_IMMUNE_RACES: [i8; 2] = [2, 3];
+const RACE_SPECTRE: i8 = 8;
+const RACE_SPECTRE_ALIVE: i8 = 7;
+const SPECTRE_DEAD_FRAME: i16 = 0x3f;
+const SPECTRE_BASE_FRAMES: (i16, i16, i16) = (0x25, 0x28, 0x30);
+const SPECTRE_FRAME_GROUPS: i32 = 3;
+
+/// An actor drowning loses vitality every eighth frame.
+const DROWN_PERIOD_MASK: i32 = 7;
+
+/// Where an actor is drawn relative to its position: (x, y) offsets for a swan rider, for the
+/// raft, carriers and dragon, and for everyone else.
+const ANCHOR_SWAN: (i32, i32) = (32, 40);
+const ANCHOR_LARGE: (i32, i32) = (16, 16);
+const ANCHOR_PERSON: (i32, i32) = (8, 26);
+
 /// Burning in lava, and running out of breath: dtype for `check_death`.
 const DEATH_LAVA: i32 = 27;
 const DEATH_DROWN: i32 = 6;
