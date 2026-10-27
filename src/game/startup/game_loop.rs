@@ -247,6 +247,30 @@ fn scroll_direction(scroll_x: i16, scroll_y: i16) -> Option<i32> {
     }
 }
 
+/// Redraws the whole map when the view asks for it (two frames in a row after a change, so both
+/// pages get it). Returns true if it did.
+unsafe fn redraw_whole_map() -> bool {
+    unsafe {
+        if the_screen.view_status != VIEW_REDRAW
+            && the_screen.view_status != VIEW_REDRAW_2
+            && the_screen.view_status != VIEW_CHANGED
+        {
+            return false;
+        }
+
+        refresh_minimap();
+        draw_map();
+
+        if the_screen.view_status == VIEW_REDRAW {
+            the_screen.view_status = VIEW_REDRAW_2;
+        } else if the_screen.view_status == VIEW_REDRAW_2 {
+            the_screen.view_status = VIEW_NORMAL;
+        }
+
+        true
+    }
+}
+
 /// Brings the map in line with the camera: loads a waiting region, then redraws the whole map or
 /// scrolls it by one tile. Returns the scroll step used and whether the world gets its turn this
 /// frame (it does when the map is redrawn from scratch, or did not move at all).
@@ -258,19 +282,7 @@ unsafe fn update_map_view() -> (i16, i16, bool) {
             load_pending_region();
         }
 
-        if the_screen.view_status == VIEW_REDRAW
-            || the_screen.view_status == VIEW_REDRAW_2
-            || the_screen.view_status == VIEW_CHANGED
-        {
-            refresh_minimap();
-            draw_map();
-
-            if the_screen.view_status == VIEW_REDRAW {
-                the_screen.view_status = VIEW_REDRAW_2;
-            } else if the_screen.view_status == VIEW_REDRAW_2 {
-                the_screen.view_status = VIEW_NORMAL;
-            }
-
+        if redraw_whole_map() {
             return (0, 0, true);
         }
 

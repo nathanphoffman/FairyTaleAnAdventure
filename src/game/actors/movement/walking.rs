@@ -211,16 +211,7 @@ impl Ctx {
     /// slows the actor to a halt).
     pub(super) unsafe fn new_loc(&mut self) -> Pc {
         unsafe {
-            let actor = self.actor;
-            (*actor).facing = self.facing as i8;
-            self.frame_base = diroff(self.facing);
-            self.image = self.frame_base;
-
-            if !(the_hero.riding != 0 && self.slot == 0) && (*actor).race != RACE_WRAITH {
-                self.image = (self.image as i32
-                    + ((self.cycle as i32 + self.slot) & WALK_FRAMES_MASK))
-                    as i16;
-            }
+            self.pick_walking_frame();
 
             if self.environ == ENVIRON_ICE {
                 return Pc::Cpx;
@@ -231,17 +222,7 @@ impl Ctx {
                 self.image ^= WALK_FRAMES_MASK as i16;
             }
 
-            self.terrain = terrain(XTEST, YTEST);
-
-            // wraiths and snakes are immune to water
-            if (*actor).race == RACE_WRAITH || (*actor).race == RACE_SNAKE {
-                self.terrain = 0;
-            }
-
-            if (*actor).race == RACE_SNAKE {
-                // Snake pictures: two frames (bit 1 of the cycle) for each pair of facings, starting at image 0x24.
-                self.image = (self.cycle & 2) + ((self.facing & 0xfe) << 2) + SNAKE_FIRST_FRAME;
-            }
+            self.look_at_new_terrain();
 
             if climbs_out_of_water(self.environ, self.terrain) {
                 if the_hero.sector != PIT_SECTOR {
@@ -251,6 +232,51 @@ impl Ctx {
                 return Pc::Raise;
             }
 
+            self.take_the_step();
+
+            Pc::Tail
+        }
+    }
+
+    /// Faces the actor the way it will step, and picks the walking frame for this tick (a rider and
+    /// the wraiths keep their one frame).
+    unsafe fn pick_walking_frame(&mut self) {
+        unsafe {
+            let actor = self.actor;
+            (*actor).facing = self.facing as i8;
+            self.frame_base = diroff(self.facing);
+            self.image = self.frame_base;
+
+            if !(the_hero.riding != 0 && self.slot == 0) && (*actor).race != RACE_WRAITH {
+                self.image = (self.image as i32
+                    + ((self.cycle as i32 + self.slot) & WALK_FRAMES_MASK))
+                    as i16;
+            }
+        }
+    }
+
+    /// The terrain at the new place; wraiths and snakes are immune to water, and snakes have their
+    /// own pictures.
+    unsafe fn look_at_new_terrain(&mut self) {
+        unsafe {
+            let actor = self.actor;
+            self.terrain = terrain(XTEST, YTEST);
+
+            if (*actor).race == RACE_WRAITH || (*actor).race == RACE_SNAKE {
+                self.terrain = 0;
+            }
+
+            if (*actor).race == RACE_SNAKE {
+                // Snake pictures: two frames (bit 1 of the cycle) for each pair of facings, starting at image 0x24.
+                self.image = (self.cycle & 2) + ((self.facing & 0xfe) << 2) + SNAKE_FIRST_FRAME;
+            }
+        }
+    }
+
+    /// Moves to the new place, remembering the step as the velocity (for sliding on ice).
+    unsafe fn take_the_step(&mut self) {
+        unsafe {
+            let actor = self.actor;
             (*actor).vel_x =
                 ((XTEST.wrapping_sub((*actor).abs_x) as i16 as i32) * VELOCITY_SCALE) as i8;
             (*actor).vel_y =
@@ -258,8 +284,6 @@ impl Ctx {
             (*actor).abs_x = XTEST;
             (*actor).abs_y = YTEST;
             the_actors.frustration = 0;
-
-            Pc::Tail
         }
     }
 

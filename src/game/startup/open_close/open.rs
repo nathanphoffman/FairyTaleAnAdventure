@@ -251,10 +251,29 @@ pub(super) unsafe fn set_up_view_ports() {
 /// Splits the bitmap block into its five bitmaps, and sets up the rast infos and the two pages.
 pub(super) unsafe fn set_up_bitmaps_and_rasinfos() {
     unsafe {
+        split_bitmap_block();
+        init_bitmaps();
+        set_up_rast_infos();
+        set_up_pages();
+
+        the_screen.vp_page.ColorMap = GetColorMap(PAGE_COLOR_COUNT);
+        the_screen.vp_text.ColorMap = GetColorMap(TEXT_COLOR_COUNT);
+    }
+}
+
+/// The five bitmap headers sit one after the other in the block `bm_page1` points to.
+unsafe fn split_bitmap_block() {
+    unsafe {
         the_screen.bm_page2 = the_screen.bm_page1.add(1);
         the_screen.bm_text = the_screen.bm_page1.add(2);
         the_screen.bm_source = the_screen.bm_page1.add(3);
         the_screen.bm_lim = the_screen.bm_page1.add(4);
+    }
+}
+
+/// Gives every bitmap its depth and size (the planes are filled in later).
+unsafe fn init_bitmaps() {
+    unsafe {
         InitBitMap(the_screen.bm_page1, PAGE_DEPTH, PHANTA_WIDTH, RAST_HEIGHT);
         InitBitMap(the_screen.bm_page2, PAGE_DEPTH, PHANTA_WIDTH, RAST_HEIGHT);
         InitBitMap(
@@ -293,7 +312,12 @@ pub(super) unsafe fn set_up_bitmaps_and_rasinfos() {
             SOURCE_BITMAP_WIDTH,
             SOURCE_BITMAP_HEIGHT,
         );
+    }
+}
 
+/// Points each rast info at its bitmap, unscrolled and with nothing after it.
+unsafe fn set_up_rast_infos() {
+    unsafe {
         the_screen.rp_text2.BitMap = the_screen.bm_text;
 
         the_screen.ri_page1.BitMap = the_screen.bm_page1;
@@ -309,16 +333,18 @@ pub(super) unsafe fn set_up_bitmaps_and_rasinfos() {
         the_screen.ri_text.RxOffset = 0;
         the_screen.ri_text.RyOffset = 0;
         the_screen.ri_text.Next = std::ptr::null_mut();
+    }
+}
 
+/// The two pages the game draws on and shows in turn (both start on the first rast info).
+unsafe fn set_up_pages() {
+    unsafe {
         the_screen.fp_page1.savecop = std::ptr::null_mut();
         the_screen.fp_page2.savecop = std::ptr::null_mut();
         the_screen.fp_page1.ri_page = &raw mut the_screen.ri_page1;
         the_screen.fp_page2.ri_page = &raw mut the_screen.ri_page1;
         the_screen.drawing_page = &raw mut the_screen.fp_page1;
         the_screen.viewing_page = &raw mut the_screen.fp_page2;
-
-        the_screen.vp_page.ColorMap = GetColorMap(PAGE_COLOR_COUNT);
-        the_screen.vp_text.ColorMap = GetColorMap(TEXT_COLOR_COUNT);
     }
 }
 

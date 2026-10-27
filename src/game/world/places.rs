@@ -193,7 +193,16 @@ unsafe fn place_message_number() -> u8 {
             place_tbl.as_ptr()
         };
 
-        // find the table row (three bytes: first sector, last sector, message) that holds this sector
+        let message = mountain_name(find_table_message(table, sector));
+
+        if hero_on_loaded_edge() { 0 } else { message }
+    }
+}
+
+/// The message of the table row (three bytes: first sector, last sector, message) that holds
+/// `sector`.
+unsafe fn find_table_message(table: *const u8, sector: u8) -> u8 {
+    unsafe {
         let mut row = table;
 
         for _ in 0..PLACE_TABLE_ROWS {
@@ -204,30 +213,35 @@ unsafe fn place_message_number() -> u8 {
             row = row.add(PLACE_ROW_BYTES);
         }
 
-        let mut message = *row.add(2);
+        *row.add(2)
+    }
+}
 
-        if message == MOUNTAINS_MESSAGE {
-            if the_world.region >= FIRST_INDOOR_REGION {
-            } else if the_world.region & 1 != 0 {
-                message = NORTHERN_MOUNTAINS_MESSAGE;
-            } else if the_world.region > LAST_NORTHERN_REGION {
-                message = SOUTHERN_MOUNTAINS_MESSAGE;
-            }
+/// Mountains are named after the part of the map they are in (outdoors only).
+unsafe fn mountain_name(message: u8) -> u8 {
+    unsafe {
+        if message != MOUNTAINS_MESSAGE || the_world.region >= FIRST_INDOOR_REGION {
+            message
+        } else if the_world.region & 1 != 0 {
+            NORTHERN_MOUNTAINS_MESSAGE
+        } else if the_world.region > LAST_NORTHERN_REGION {
+            SOUTHERN_MOUNTAINS_MESSAGE
+        } else {
+            message
         }
+    }
+}
 
-        // The hero's sector column: 256 pixels to a sector.
+/// True while the next region is still loading, or when the hero is outside the loaded one.
+unsafe fn hero_on_loaded_edge() -> bool {
+    unsafe {
+        // The hero's sector column and row: 256 pixels to a sector.
         let hero_column = (the_hero.x >> SECTOR_SHIFT).wrapping_sub(the_world.origin_x);
-        // The hero's sector row: 256 pixels to a sector.
         let hero_row = (the_hero.y >> SECTOR_SHIFT).wrapping_sub(the_world.origin_y);
 
-        if the_world.new_region < NO_REGION
+        the_world.new_region < NO_REGION
             || hero_column & OUTSIDE_COLUMN_BIT != 0
             || hero_row & OUTSIDE_ROW_BIT != 0
-        {
-            message = 0;
-        }
-
-        message
     }
 }
 

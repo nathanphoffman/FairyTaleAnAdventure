@@ -83,58 +83,90 @@ pub(super) fn enemy_reach(bonus: i16) -> i16 {
     limited_reach(ENEMY_BASE_REACH + bonus)
 }
 
+/// One actor's swing: where the weapon is, how far it reaches and with what strength.
+struct Swing {
+    attacker: usize,
+    facing: i32,
+    strength: i16,
+    reach: i16,
+    tip: (i16, i16),
+}
+
 /// One actor's swing.
 pub(super) unsafe fn swing(i: usize) {
     unsafe {
         let attacker = &raw const the_actors.list[i];
-        let fc = (*attacker).facing as i32;
         let Some(base) = melee_weapon((*attacker).weapon as i16) else {
             return;
         };
 
-        let wt = base + bitrand(2) as i16;
-        let (xs, ys) = weapon_tip(attacker, fc, wt);
-        let bv = if i == 0 {
-            hero_reach(the_hero.brave)
-        } else {
-            enemy_reach(rand4() as i16)
+        let strength = base + bitrand(2) as i16;
+        let facing = (*attacker).facing as i32;
+        let swing = Swing {
+            attacker: i,
+            facing,
+            strength,
+            tip: weapon_tip(attacker, facing, strength),
+            reach: if i == 0 {
+                hero_reach(the_hero.brave)
+            } else {
+                enemy_reach(rand4() as i16)
+            },
         };
 
-        let mut j = 0;
+        for j in 0..the_actors.active as usize {
+            if swing_at(&swing, j) {
+                break;
+            }
+        }
+    }
+}
 
-        while j < the_actors.active as usize {
-            let target = &raw const the_actors.list[j];
+/// Swings at actor `j` if it is a target (not the raft, the attacker, the dead, or by a carrier).
+/// Returns true when the swing hit, which ends it.
+unsafe fn swing_at(swing: &Swing, j: usize) -> bool {
+    unsafe {
+        let attacker = &raw const the_actors.list[swing.attacker];
+        let target = &raw const the_actors.list[j];
 
-            if j == RAFT || j == i || (*target).state == DEAD || (*attacker).kind == CARRIER {
-                j += 1;
+        if j == RAFT
+            || j == swing.attacker
+            || (*target).state == DEAD
+            || (*attacker).kind == CARRIER
+        {
+            return false;
+        }
 
-                continue;
+        let xd = ((*target).abs_x as i32 - swing.tip.0 as i32) as i16;
+        let yd = ((*target).abs_y as i32 - swing.tip.1 as i32) as i16;
+
+        match swing_result(
+            swing.attacker == 0,
+            chebyshev(xd, yd),
+            swing.reach,
+            the_world.freeze_timer != 0,
+            swing.strength,
+            the_hero.brave,
+            rand256,
+        ) {
+            SwingResult::Hit => {
+                hit_actor(
+                    swing.attacker as i32,
+                    j as i32,
+                    swing.facing,
+                    swing.strength,
+                );
+
+                true
             }
 
-            let xd = ((*target).abs_x as i32 - xs as i32) as i16;
-            let yd = ((*target).abs_y as i32 - ys as i32) as i16;
-            let dist = chebyshev(xd, yd);
+            SwingResult::Whoosh => {
+                play_effect(SWING_SOUND, SWING_SOUND_PITCH + rand256());
 
-            match swing_result(
-                i == 0,
-                dist,
-                bv,
-                the_world.freeze_timer != 0,
-                wt,
-                the_hero.brave,
-                rand256,
-            ) {
-                SwingResult::Hit => {
-                    hit_actor(i as i32, j as i32, fc, wt);
-
-                    break;
-                }
-
-                SwingResult::Whoosh => play_effect(SWING_SOUND, SWING_SOUND_PITCH + rand256()),
-                SwingResult::Miss => {}
+                false
             }
 
-            j += 1;
+            SwingResult::Miss => false,
         }
     }
 }

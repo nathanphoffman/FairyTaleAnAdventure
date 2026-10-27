@@ -181,6 +181,22 @@ fn is_off_screen(sprite: &Sprite) -> bool {
         || sprite.ystop < 0
 }
 
+/// Where the clipped sprite starts and how big it is, in words and lines: the first word column, the
+/// width in words (one more when the sprite is shifted into the next word) and the height.
+fn blit_extent(clip: &Clip) -> (i8, i8, i8) {
+    // Pixel columns to word columns (16 pixels to a word).
+    let xbw = (clip.xstart >> WORD_SHIFT) as i8;
+    let xew = (clip.xstop >> WORD_SHIFT) as i8;
+    let mut blitwide = (xew as i16 - xbw as i16 + 1) as i8;
+    let blithigh = (clip.ystop - clip.ystart + 1) as i8;
+
+    if clip.xoff as i16 & WORD_PIXELS_MASK != 0 {
+        blitwide = blitwide.wrapping_add(1);
+    }
+
+    (xbw, blitwide, blithigh)
+}
+
 /// Saves the background under the sprite and draws it through its masks into the page.
 unsafe fn blit_sprite(
     frame: &mut Frame,
@@ -191,16 +207,7 @@ unsafe fn blit_sprite(
     bytes_wide: i8,
 ) -> Drawn {
     unsafe {
-        // word offsets
-        let xbw = (clip.xstart >> WORD_SHIFT) as i8;
-        // Pixel column to word column (16 pixels to a word).
-        let xew = (clip.xstop >> WORD_SHIFT) as i8;
-        let mut blitwide = (xew as i16 - xbw as i16 + 1) as i8;
-        let blithigh = (clip.ystop - clip.ystart + 1) as i8;
-
-        if clip.xoff as i16 & WORD_PIXELS_MASK != 0 {
-            blitwide = blitwide.wrapping_add(1);
-        }
+        let (xbw, blitwide, blithigh) = blit_extent(clip);
 
         if !set_up_blit(frame, sprite, clip, bytes_wide, xbw, blitwide, blithigh) {
             return Drawn::OutOfRoom; // no more blits if no room

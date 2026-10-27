@@ -68,39 +68,51 @@ pub fn spawn_encounters() {
             place_waiting_encounters();
         }
 
-        if the_world.day_clock & ROLL_PERIOD_MASK == 0
+        if random_encounter_due() {
+            roll_random_encounter();
+        }
+    }
+}
+
+/// A new random encounter is rolled now and then, when nothing else is going on.
+unsafe fn random_encounter_due() -> bool {
+    unsafe {
+        the_world.day_clock & ROLL_PERIOD_MASK == 0
             && the_actors.on_screen == 0
             && the_actors.loading == 0
             && the_actors.active_carrier == 0
             && the_world.extent_type < NO_RANDOM_XTYPE
-        {
-            the_encounter.danger_level = (if the_world.region > INDOOR_REGION {
-                DANGER_BASE_INDOORS + the_world.extent_type
-            } else {
-                DANGER_BASE_OUTDOORS + the_world.extent_type
-            }) as u8;
+    }
+}
 
-            if rand64() <= the_encounter.danger_level as i32 {
-                the_encounter.kind = rand4() as u16;
+/// Rolls the danger of the area against a random number; if it is beaten, picks the kind of the
+/// encounter (a few extents decide it by rule) and starts loading the monsters' sprites.
+unsafe fn roll_random_encounter() {
+    unsafe {
+        the_encounter.danger_level = (if the_world.region > INDOOR_REGION {
+            DANGER_BASE_INDOORS + the_world.extent_type
+        } else {
+            DANGER_BASE_OUTDOORS + the_world.extent_type
+        }) as u8;
 
-                if the_world.extent_type == DKNIGHT_XTYPE
-                    && the_encounter.kind == KIND_DKNIGHT_SWAP.0
-                {
-                    the_encounter.kind = KIND_DKNIGHT_SWAP.1;
-                }
+        if rand64() <= the_encounter.danger_level as i32 {
+            the_encounter.kind = rand4() as u16;
 
-                if the_world.extent_type == SPIDER_PIT_XTYPE {
-                    the_encounter.kind = KIND_SPIDER_PIT;
-                    the_encounter.mix_flag = 0;
-                }
-
-                if the_world.extent_type == FINAL_XTYPE {
-                    the_encounter.kind = KIND_FINAL;
-                    the_encounter.mix_flag = 0;
-                }
-
-                load_enemy_sprites();
+            if the_world.extent_type == DKNIGHT_XTYPE && the_encounter.kind == KIND_DKNIGHT_SWAP.0 {
+                the_encounter.kind = KIND_DKNIGHT_SWAP.1;
             }
+
+            if the_world.extent_type == SPIDER_PIT_XTYPE {
+                the_encounter.kind = KIND_SPIDER_PIT;
+                the_encounter.mix_flag = 0;
+            }
+
+            if the_world.extent_type == FINAL_XTYPE {
+                the_encounter.kind = KIND_FINAL;
+                the_encounter.mix_flag = 0;
+            }
+
+            load_enemy_sprites();
         }
     }
 }

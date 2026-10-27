@@ -100,6 +100,24 @@ pub(super) unsafe fn sector_at(col: u16, row: u16) -> u8 {
 /// a clearing, say). The bit is picked from pixel bits 3 (x), 3 and 4 (y).
 pub fn terrain_at(x: i32, y: i32) -> i32 {
     let (ux, uy) = (x as u16, y as u16);
+    let bit = subarea_bit(ux, uy);
+
+    unsafe {
+        // The tile column and row: tiles are 16 pixels wide and 32 high.
+        let tile = tile_number(ux >> TILE_WIDTH_SHIFT, uy >> TILE_HEIGHT_SHIFT) as usize;
+        let entry = the_memory.terrain_mem.add(tile * TERRAIN_ENTRY_BYTES);
+
+        if *entry.add(TERRAIN_MASK_BYTE) & bit == 0 {
+            return 0;
+        }
+
+        // The terrain type is the high nibble of the second byte of the tile's entry.
+        (*entry.add(TERRAIN_TYPE_BYTE) >> TERRAIN_TYPE_SHIFT) as i32
+    }
+}
+
+/// The bit of a tile's solid-area mask for the sub-area at pixel (`ux`, `uy`).
+fn subarea_bit(ux: u16, uy: u16) -> u8 {
     let mut bit = FIRST_SUBAREA_BIT;
 
     if ux & RIGHT_HALF_PIXEL != 0 {
@@ -117,35 +135,7 @@ pub fn terrain_at(x: i32, y: i32) -> i32 {
         bit >>= 2;
     }
 
-    // The tile column and row: tiles are 16 pixels wide and 32 high.
-    let (imx, imy) = (ux >> TILE_WIDTH_SHIFT, uy >> TILE_HEIGHT_SHIFT);
-    unsafe {
-        // A sector is 16 tiles wide.
-        let col = wrap_secx((imx >> SECTOR_WIDTH_SHIFT).wrapping_sub(the_world.origin_x));
-        // A sector is 8 tiles high.
-        let row = clamp_secy((imy >> SECTOR_HEIGHT_SHIFT).wrapping_sub(the_world.origin_y) as i16);
-        let sec = sector_at(col, row) as usize;
-        let tile = *the_memory.sector_mem.add(
-            (sec * SECTOR_BYTES
-                + (imy as usize & TILE_ROW_MASK) * SECTOR_ROW_TILES
-                + (imx as usize & TILE_COLUMN_MASK)) as u16 as usize,
-        ) as usize;
-
-        if *the_memory
-            .terrain_mem
-            .add(tile * TERRAIN_ENTRY_BYTES + TERRAIN_MASK_BYTE)
-            & bit
-            == 0
-        {
-            return 0;
-        }
-
-        // The terrain type is the high nibble of the second byte of the tile's entry.
-        (*the_memory
-            .terrain_mem
-            .add(tile * TERRAIN_ENTRY_BYTES + TERRAIN_TYPE_BYTE)
-            >> TERRAIN_TYPE_SHIFT) as i32
-    }
+    bit
 }
 
 /// Collision test with two probes either side of the character (4 pixels right and left, 2 down).
@@ -203,35 +193,44 @@ pub fn fill_minimap(tile_x: i32, tile_y: i32) {
 
         for _ in 0..SCREEN_COLUMNS {
             x &= TILE_COLUMN_WRAP;
-            // Tile column to sector column: 16 tiles to a sector.
-            let col = wrap_secx((x >> SECTOR_WIDTH_SHIFT).wrapping_sub(the_world.origin_x))
-                .wrapping_add(the_world.origin_x);
 
             for j in 0..SCREEN_ROWS as i32 {
-                let y = (tile_y + j) as u16 & TILE_ROW_WRAP;
-                // Tile row to sector row: 8 tiles to a sector.
-                let row =
-                    clamp_secy((y >> SECTOR_HEIGHT_SHIFT).wrapping_sub(the_world.origin_y) as i16);
-                let sec = *the_memory
-                    .map_mem
-                    // The region map has 128 sectors in each row.
-                    .add(
-                        ((row as usize) << MAP_ROW_SHIFT).wrapping_add(col as usize) as u16
-                            as usize,
-                    ) as usize;
-                let tile = *the_memory.sector_mem.add(
-                    (sec * SECTOR_BYTES
-                        + (y as usize & TILE_ROW_MASK) * SECTOR_ROW_TILES
-                        + (x as usize & TILE_COLUMN_MASK)) as u16 as usize,
-                );
-
-                minimap[next] = tile as i16;
+                minimap[next] = tile_number(x, (tile_y + j) as u16 & TILE_ROW_WRAP) as i16;
                 next += 1;
             }
 
             x += 1;
         }
 
+        the_hero.sector = hero_sector();
+    }
+}
+
+/// The tile number at tile column `x` and row `y` of the world.
+unsafe fn tile_number(x: u16, y: u16) -> u8 {
+    unsafe {
+        // Tile column to sector column: 16 tiles to a sector.
+        let col = wrap_secx((x >> SECTOR_WIDTH_SHIFT).wrapping_sub(the_world.origin_x))
+            .wrapping_add(the_world.origin_x);
+        // Tile row to sector row: 8 tiles to a sector.
+        let row = clamp_secy((y >> SECTOR_HEIGHT_SHIFT).wrapping_sub(the_world.origin_y) as i16);
+        let sec = *the_memory
+            .map_mem
+            // The region map has 128 sectors in each row.
+            .add(((row as usize) << MAP_ROW_SHIFT).wrapping_add(col as usize) as u16 as usize)
+            as usize;
+
+        *the_memory.sector_mem.add(
+            (sec * SECTOR_BYTES
+                + (y as usize & TILE_ROW_MASK) * SECTOR_ROW_TILES
+                + (x as usize & TILE_COLUMN_MASK)) as u16 as usize,
+        )
+    }
+}
+
+/// The sector the hero is in; the second half of the sector table is used from region 8 on.
+unsafe fn hero_sector() -> i16 {
+    unsafe {
         // the assembly read the high byte of hero_x and hero_y (68000 is big-endian)
         let hx = (the_hero.x >> SECTOR_POSITION_SHIFT) as i32;
         // The hero's sector row: 256 pixels to a sector.
@@ -247,7 +246,7 @@ pub fn fill_minimap(tile_x: i32, tile_y: i32) {
             sec += SECOND_HALF_OFFSET;
         }
 
-        the_hero.sector = sec as i16;
+        sec as i16
     }
 }
 

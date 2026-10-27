@@ -117,26 +117,22 @@ pub(super) unsafe fn hit_first_actor_in_path(i: usize, ms: *mut Missile, xs: i16
 
         while j < actor_count() {
             let dodge = if j == 0 { the_hero.brave } else { OTHER_DODGE };
-            let target = &raw const the_actors.list[j];
-            let untouchable = j == RAFT
-                || (*ms).archer as i16 == j as i16
-                || (*target).state == DEAD
-                || (*target).kind == CARRIER;
+            let target = j;
             j += 1;
 
-            if untouchable {
+            if !missile_can_hit(ms, target) {
                 continue;
             }
 
-            let xd = ((*target).abs_x as i32 - xs as i32) as i16;
-            let yd = ((*target).abs_y as i32 - ys as i32) as i16;
+            let xd = ((the_actors.list[target].abs_x as i32) - xs as i32) as i16;
+            let yd = ((the_actors.list[target].abs_y as i32) - ys as i32) as i16;
 
             // the original tests the missile's own index here, not the target's
             if missile_connects(i, chebyshev(xd, yd), range, dodge, || bitrand(DODGE_RANGE)) {
                 let by = if is_rock { BY_FIREBALL } else { BY_ARROW };
                 hit_actor(
                     by,
-                    (j - 1) as i32,
+                    target as i32,
                     fc,
                     (rand8() + MISSILE_DAMAGE_BASE) as i16,
                 );
@@ -150,6 +146,18 @@ pub(super) unsafe fn hit_first_actor_in_path(i: usize, ms: *mut Missile, xs: i16
                 return;
             }
         }
+    }
+}
+
+/// A missile cannot hit the raft, its own archer, the dead or a carrier.
+unsafe fn missile_can_hit(ms: *const Missile, target: usize) -> bool {
+    unsafe {
+        let actor = &raw const the_actors.list[target];
+
+        !(target == RAFT
+            || (*ms).archer as i16 == target as i16
+            || (*actor).state == DEAD
+            || (*actor).kind == CARRIER)
     }
 }
 

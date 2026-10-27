@@ -79,40 +79,54 @@ pub fn draw_overview_map(mx: i32, my: i32) {
                     // Index into the region map: the sector row times 128 plus the column.
                     the_world.origin_x as i32 + x as i32 + i as i32 + (((y + j) as i32) << MAP_ROW_SHIFT);
                 let sec = *the_memory.map_mem.add(index as u16 as usize) as usize;
-                let tiles = the_memory.sector_mem.add(sec * SECTOR_BYTES);
 
-                for line in 0..SECTOR_TILE_ROWS {
-                    let mut words = [0u32; PLANE_COUNT];
-
-                    for px in 0..SECTOR_PIXELS {
-                        let tile = *tiles.add(line * TILE_ROW_PIXELS + px) as usize;
-                        let color = *the_memory
-                            .terrain_mem
-                            .add(tile * TERRAIN_ENTRY_BYTES + TERRAIN_COLOR_BYTE);
-
-                        for (p, word) in words.iter_mut().enumerate() {
-                            // Builds one bit per pixel for bitplane `p`: shift the row left and add the plane's bit of this colour.
-                            *word = (*word << 1) | ((color >> p) & 1) as u32;
-                        }
-                    }
-
-                    for (p, word) in words.iter().enumerate() {
-                        let d =
-                            (*the_screen.planes.add(p)).add(offset + line * OVERVIEW_LINE_BYTES);
-                        // A 16 pixel row is two bytes, high byte first.
-                        *d = (word >> BYTE_SHIFT) as u8;
-                        // The second copy is for the other page.
-                        *d.add(OVERVIEW_LINE_COPY) = (word >> BYTE_SHIFT) as u8;
-                        *d.add(1) = *word as u8;
-                        *d.add(OVERVIEW_LINE_COPY + 1) = *word as u8;
-                    }
-                }
-
+                draw_overview_sector(the_memory.sector_mem.add(sec * SECTOR_BYTES), offset);
                 offset += 2;
             }
 
             offset += OVERVIEW_ROW_SKIP;
         }
+    }
+}
+
+/// Draws one sector of the overview, 8 lines of 16 pixels, `offset` bytes into the screen planes.
+unsafe fn draw_overview_sector(tiles: *const u8, offset: usize) {
+    unsafe {
+        for line in 0..SECTOR_TILE_ROWS {
+            let words = overview_line_words(tiles, line);
+
+            for (p, word) in words.iter().enumerate() {
+                let d = (*the_screen.planes.add(p)).add(offset + line * OVERVIEW_LINE_BYTES);
+                // A 16 pixel row is two bytes, high byte first.
+                *d = (word >> BYTE_SHIFT) as u8;
+                // The second copy is for the other page.
+                *d.add(OVERVIEW_LINE_COPY) = (word >> BYTE_SHIFT) as u8;
+                *d.add(1) = *word as u8;
+                *d.add(OVERVIEW_LINE_COPY + 1) = *word as u8;
+            }
+        }
+    }
+}
+
+/// The 16 pixels of one line of a sector, as one word for each bit plane. Each pixel's colour is the
+/// overview colour of its tile.
+unsafe fn overview_line_words(tiles: *const u8, line: usize) -> [u32; PLANE_COUNT] {
+    unsafe {
+        let mut words = [0u32; PLANE_COUNT];
+
+        for px in 0..SECTOR_PIXELS {
+            let tile = *tiles.add(line * TILE_ROW_PIXELS + px) as usize;
+            let color = *the_memory
+                .terrain_mem
+                .add(tile * TERRAIN_ENTRY_BYTES + TERRAIN_COLOR_BYTE);
+
+            for (p, word) in words.iter_mut().enumerate() {
+                // Builds one bit per pixel for bitplane `p`: shift the row left and add the plane's bit of this colour.
+                *word = (*word << 1) | ((color >> p) & 1) as u32;
+            }
+        }
+
+        words
     }
 }
 

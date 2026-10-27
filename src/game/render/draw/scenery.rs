@@ -123,6 +123,16 @@ pub(super) fn scenery_rule(k: i16, xm: i32, ym: i32, ystop: i16, on_bridge: bool
     }
 }
 
+/// The sprite whose tiles are being masked: which actor, where its feet are and which minimap
+/// tiles it covers.
+struct SpriteTiles {
+    actor: *const Shape,
+    i: i32,
+    ground: i16,
+    xbw: i8,
+    ym1: u8,
+}
+
 /// Cuts out the parts of the sprite that scenery (trees, walls, roofs) should hide, one map tile at a
 /// time, by marking them in the mask buffer.
 #[allow(clippy::too_many_arguments)] // the tile loop of the original, kept as one call
@@ -138,39 +148,54 @@ pub(super) unsafe fn mask_against_scenery(
     unsafe {
         let ym1 = (ystart1 >> TILE_ROW_SHIFT) as u8;
         let ym2 = ((ystop1 >> TILE_ROW_SHIFT) as u8).wrapping_sub(ym1);
+        let tiles = SpriteTiles {
+            actor,
+            i,
+            ground,
+            xbw,
+            ym1,
+        };
 
         for xm in 0..blitwide.max(0) as i32 {
             for ym in 0..=ym2 as i32 {
-                // Back from tile rows to pixels.
-                let ystop = ground - (((ym + ym1 as i32) << TILE_ROW_SHIFT) as i16);
-                let mut cm = ((xm + xbw as i32) * MINIMAP_COLUMN_TILES + ym + ym1 as i32) as i16;
-                cm = (minimap[cm as usize] as i32 * TERRAIN_ENTRY_BYTES) as i16;
-                let mut k =
-                    (*the_memory.terrain_mem.offset(cm as isize + 1) & TERRAIN_TYPE_MASK) as i16;
-
-                if (*actor).state == FALL {
-                    if cm <= FALL_TILE_LIMIT {
-                        continue;
-                    }
-
-                    k = TYPE_BRIDGE;
+                if let Some(mask) = tiles.mask_of_tile(xm, ym) {
+                    add_scenery_mask(xm, ym, blitwide as i32, mask);
                 }
-
-                let on_bridge = the_hero.sector == BRIDGE_SECTOR && i != RAFT_SLOT;
-
-                match scenery_rule(k, xm, ym, ystop, on_bridge) {
-                    SceneryRule::Skip => continue,
-                    SceneryRule::UseFullMask => cm = TILE_FULL_MASK,
-                    SceneryRule::UseTileMask => {}
-                }
-
-                add_scenery_mask(
-                    xm,
-                    ym,
-                    blitwide as i32,
-                    *the_memory.terrain_mem.offset(cm as isize) as i32,
-                );
             }
+        }
+    }
+}
+
+impl SpriteTiles {
+    /// The mask byte to cut out of the sprite for the tile at column `xm` and row `ym` of the
+    /// sprite, or `None` when that tile does not hide it.
+    unsafe fn mask_of_tile(&self, xm: i32, ym: i32) -> Option<i32> {
+        unsafe {
+            // Back from tile rows to pixels.
+            let ystop = self.ground - (((ym + self.ym1 as i32) << TILE_ROW_SHIFT) as i16);
+            let mut cm =
+                ((xm + self.xbw as i32) * MINIMAP_COLUMN_TILES + ym + self.ym1 as i32) as i16;
+            cm = (minimap[cm as usize] as i32 * TERRAIN_ENTRY_BYTES) as i16;
+            let mut k =
+                (*the_memory.terrain_mem.offset(cm as isize + 1) & TERRAIN_TYPE_MASK) as i16;
+
+            if (*self.actor).state == FALL {
+                if cm <= FALL_TILE_LIMIT {
+                    return None;
+                }
+
+                k = TYPE_BRIDGE;
+            }
+
+            let on_bridge = the_hero.sector == BRIDGE_SECTOR && self.i != RAFT_SLOT;
+
+            match scenery_rule(k, xm, ym, ystop, on_bridge) {
+                SceneryRule::Skip => return None,
+                SceneryRule::UseFullMask => cm = TILE_FULL_MASK,
+                SceneryRule::UseTileMask => {}
+            }
+
+            Some(*the_memory.terrain_mem.offset(cm as isize) as i32)
         }
     }
 }

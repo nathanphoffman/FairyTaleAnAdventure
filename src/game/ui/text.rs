@@ -227,46 +227,57 @@ pub fn draw_placard_border() {
                 let dy = yorg + BORDER_Y_STEPS[step];
 
                 for stroke in (0..STROKES_PER_STEP).rev() {
-                    SetAPen(
-                        r,
-                        if stroke == 0 {
-                            BORDER_HIGHLIGHT_PEN
-                        } else {
-                            BORDER_PEN
-                        },
-                    );
+                    let pen = if stroke == 0 {
+                        BORDER_HIGHLIGHT_PEN
+                    } else {
+                        BORDER_PEN
+                    };
 
-                    if pass > LONG_EDGE_ABOVE_PASS {
-                        line(r, xorg, yorg, dx, dy);
-                        line(
-                            r,
-                            LONG_EDGE_FAR.0 - xorg,
-                            LONG_EDGE_FAR.1 - yorg,
-                            LONG_EDGE_FAR.0 - dx,
-                            LONG_EDGE_FAR.1 - dy,
-                        );
-                    }
-
-                    line(
-                        r,
-                        SHORT_EDGE_NEAR.0 + yorg,
-                        SHORT_EDGE_NEAR.1 - xorg,
-                        SHORT_EDGE_NEAR.0 + dy,
-                        SHORT_EDGE_NEAR.1 - dx,
-                    );
-                    line(
-                        r,
-                        SHORT_EDGE_FAR.0 - yorg,
-                        SHORT_EDGE_FAR.1 + xorg,
-                        SHORT_EDGE_FAR.0 - dy,
-                        SHORT_EDGE_FAR.1 + dx,
-                    );
+                    SetAPen(r, pen);
+                    draw_border_stroke(r, pass > LONG_EDGE_ABOVE_PASS, (xorg, yorg), (dx, dy));
                 }
 
                 xorg = dx;
                 yorg = dy;
             }
         }
+    }
+}
+
+/// One stroke of the border from `from` to `to`, repeated on the opposite edge, and on the short
+/// edges (turned a quarter) with the x and y swapped.
+unsafe fn draw_border_stroke(
+    r: *mut RastPort,
+    long_edges: bool,
+    (xorg, yorg): (i32, i32),
+    (dx, dy): (i32, i32),
+) {
+    unsafe {
+        if long_edges {
+            line(r, xorg, yorg, dx, dy);
+            line(
+                r,
+                LONG_EDGE_FAR.0 - xorg,
+                LONG_EDGE_FAR.1 - yorg,
+                LONG_EDGE_FAR.0 - dx,
+                LONG_EDGE_FAR.1 - dy,
+            );
+        }
+
+        line(
+            r,
+            SHORT_EDGE_NEAR.0 + yorg,
+            SHORT_EDGE_NEAR.1 - xorg,
+            SHORT_EDGE_NEAR.0 + dy,
+            SHORT_EDGE_NEAR.1 - dx,
+        );
+        line(
+            r,
+            SHORT_EDGE_FAR.0 - yorg,
+            SHORT_EDGE_FAR.1 + xorg,
+            SHORT_EDGE_FAR.0 - dy,
+            SHORT_EDGE_FAR.1 + dx,
+        );
     }
 }
 

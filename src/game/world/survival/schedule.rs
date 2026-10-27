@@ -74,25 +74,8 @@ enum SurvivalStep {
 fn survival_step(facts: &SurvivalFacts, hero: &mut Hero, body: &mut Shape) -> Vec<SurvivalStep> {
     let mut steps = Vec::new();
 
-    if safe_check_due(facts.clock)
-        && !facts.actors_on_screen
-        && !facts.actors_loading
-        && !facts.witch_on_screen
-        && body.environ == 0
-        && hero.safe_flag == 0
-        && body.state != DEAD
-    {
-        hero.safe_r = facts.region;
-        hero.safe_x = hero.x;
-        hero.safe_y = hero.y;
-
-        let fruit = unsafe { hero.stuff.add(FRUIT_SLOT) };
-
-        if eats_fruit(hero.hunger, unsafe { *fruit }) {
-            unsafe { *fruit -= 1 };
-            hero.hunger -= FRUIT_FOOD;
-            steps.push(SurvivalStep::Event(EVENT_ATE_FRUIT));
-        }
+    if safe_check_due(facts.clock) && is_calm_and_safe(facts, hero, body) {
+        note_safe_spot(facts, hero, &mut steps);
     }
 
     if mood_due(facts.clock, facts.battle) {
@@ -100,24 +83,54 @@ fn survival_step(facts: &SurvivalFacts, hero: &mut Hero, body: &mut Shape) -> Ve
     }
 
     if hunger_due(facts.clock, body.vitality, body.state) {
-        hero.hunger += 1;
-        hero.fatigue += 1;
-        let report = hunger_effects(hero, body);
-
-        if report.redraw_stats {
-            steps.push(SurvivalStep::RedrawStats);
-        }
-
-        steps.extend(report.events.into_iter().map(SurvivalStep::Event));
-
-        if hero.fatigue == TIRED_AT {
-            steps.push(SurvivalStep::Event(EVENT_TIRED));
-        } else if hero.hunger == STARVING_AT {
-            steps.push(SurvivalStep::Event(EVENT_STARVING));
-        }
+        add_hunger(hero, body, &mut steps);
     }
 
     steps
+}
+
+/// A safe spot can be noted when nothing is around, the hero is on dry land and alive.
+fn is_calm_and_safe(facts: &SurvivalFacts, hero: &Hero, body: &Shape) -> bool {
+    !facts.actors_on_screen
+        && !facts.actors_loading
+        && !facts.witch_on_screen
+        && body.environ == 0
+        && hero.safe_flag == 0
+        && body.state != DEAD
+}
+
+/// Remembers where the hero stands as the safe spot, and eats fruit if hungry enough.
+fn note_safe_spot(facts: &SurvivalFacts, hero: &mut Hero, steps: &mut Vec<SurvivalStep>) {
+    hero.safe_r = facts.region;
+    hero.safe_x = hero.x;
+    hero.safe_y = hero.y;
+
+    let fruit = unsafe { hero.stuff.add(FRUIT_SLOT) };
+
+    if eats_fruit(hero.hunger, unsafe { *fruit }) {
+        unsafe { *fruit -= 1 };
+        hero.hunger -= FRUIT_FOOD;
+        steps.push(SurvivalStep::Event(EVENT_ATE_FRUIT));
+    }
+}
+
+/// One more point of hunger and tiredness, with what that does and the warnings that come with it.
+fn add_hunger(hero: &mut Hero, body: &mut Shape, steps: &mut Vec<SurvivalStep>) {
+    hero.hunger += 1;
+    hero.fatigue += 1;
+    let report = hunger_effects(hero, body);
+
+    if report.redraw_stats {
+        steps.push(SurvivalStep::RedrawStats);
+    }
+
+    steps.extend(report.events.into_iter().map(SurvivalStep::Event));
+
+    if hero.fatigue == TIRED_AT {
+        steps.push(SurvivalStep::Event(EVENT_TIRED));
+    } else if hero.hunger == STARVING_AT {
+        steps.push(SurvivalStep::Event(EVENT_STARVING));
+    }
 }
 
 #[cfg(test)]

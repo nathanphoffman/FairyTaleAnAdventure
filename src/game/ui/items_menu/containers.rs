@@ -53,24 +53,7 @@ pub(super) unsafe fn container_contents() -> bool {
                 add_stuff(i, 1);
             }
 
-            Contents::Two { first, second } => {
-                if first == HUNDRED_GOLD as usize {
-                    the_hero.wealth += CONTAINER_GOLD;
-                } else {
-                    print_cont(c" a".as_ptr());
-                }
-
-                print(item_name(first));
-                print_cont(c" and a ".as_ptr());
-                print_cont(item_name(second));
-
-                if first < GOLDBASE {
-                    add_stuff(first, 1);
-                }
-
-                add_stuff(second, 1);
-            }
-
+            Contents::Two { first, second } => take_two_things(first, second),
             Contents::ThreeKeys(keys) => {
                 print(c"3 keys.".as_ptr());
 
@@ -88,6 +71,27 @@ pub(super) unsafe fn container_contents() -> bool {
         }
 
         true
+    }
+}
+
+/// Tells what two things were found and adds them (the first may be 100 gold pieces).
+unsafe fn take_two_things(first: usize, second: usize) {
+    unsafe {
+        if first == HUNDRED_GOLD as usize {
+            the_hero.wealth += CONTAINER_GOLD;
+        } else {
+            print_cont(c" a".as_ptr());
+        }
+
+        print(item_name(first));
+        print_cont(c" and a ".as_ptr());
+        print_cont(item_name(second));
+
+        if first < GOLDBASE {
+            add_stuff(first, 1);
+        }
+
+        add_stuff(second, 1);
     }
 }
 

@@ -107,6 +107,29 @@ pub(super) unsafe fn blit(t: &mut Blit) {
     }
 }
 
+/// The A source word for column `x` of a row (all ones when A is not in use): the first and last
+/// words of the row are masked.
+unsafe fn next_a_word(t: &mut Blit, x: i32) -> u32 {
+    unsafe {
+        if t.uses & USE_A == 0 {
+            return ALL_BITS;
+        }
+
+        let mut aw = read_word(t.a);
+        t.a = t.a.add(2);
+
+        if x == 0 {
+            aw &= t.afwm;
+        }
+
+        if x == t.width - 1 {
+            aw &= t.alwm;
+        }
+
+        aw
+    }
+}
+
 /// Blits one row of `t.width` words, working through the A, B and C sources and the D destination
 /// that are in use. A and B can be shifted, and carry bits over from the previous word.
 pub(super) unsafe fn blit_row(t: &mut Blit) {
@@ -114,20 +137,8 @@ pub(super) unsafe fn blit_row(t: &mut Blit) {
         let (mut a_prev, mut b_prev) = (0u32, 0u32);
 
         for x in 0..t.width {
-            let (mut aw, mut bw, mut cw) = (ALL_BITS, 0, 0);
-
-            if t.uses & USE_A != 0 {
-                aw = read_word(t.a);
-                t.a = t.a.add(2);
-
-                if x == 0 {
-                    aw &= t.afwm;
-                }
-
-                if x == t.width - 1 {
-                    aw &= t.alwm;
-                }
-            }
+            let (mut bw, mut cw) = (0, 0);
+            let aw = next_a_word(t, x);
 
             if t.uses & USE_B != 0 {
                 bw = read_word(t.b);

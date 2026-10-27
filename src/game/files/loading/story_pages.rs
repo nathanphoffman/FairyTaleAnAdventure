@@ -125,6 +125,45 @@ unsafe fn copy_rect(
     };
 }
 
+/// Copies the half page that starts at column `column` onto the screen, in the same place.
+unsafe fn copy_half_page(src: *mut BitMap, temp: *mut BitMap, column: i32) {
+    unsafe {
+        copy_rect(
+            src,
+            column,
+            0,
+            temp,
+            column,
+            0,
+            PAGE_HALF_WIDTH,
+            SCREEN_HEIGHT,
+        )
+    };
+}
+
+/// Copies a strip `wide` columns wide from `from` to `to`, `inset` lines in from the top and bottom
+/// (the curl of the page).
+unsafe fn copy_strip(
+    src: *mut BitMap,
+    temp: *mut BitMap,
+    (from, to): (i32, i32),
+    inset: i32,
+    wide: i32,
+) {
+    unsafe {
+        copy_rect(
+            src,
+            from,
+            inset,
+            temp,
+            to,
+            inset,
+            wide,
+            SCREEN_HEIGHT - inset - inset,
+        )
+    };
+}
+
 /// The page turn animation, 22 frames.
 ///
 /// The first 11 frames lift the right page: the old page is drawn as thin vertical strips that
@@ -167,7 +206,7 @@ unsafe fn turn_right_page_frame(
     unsafe {
         let bcol = SPINE_RIGHT - wide;
         let mut dcol: i32 = 0;
-        copy_rect(b, SPINE, 0, temp, SPINE, 0, PAGE_HALF_WIDTH, SCREEN_HEIGHT);
+        copy_half_page(b, temp, SPINE);
 
         if rate == 0 {
             return;
@@ -178,16 +217,7 @@ unsafe fn turn_right_page_frame(
 
         while scol < PAGE_STRIP_END {
             h = crate::game::world::map::page_turn_inset(scol as i32);
-            copy_rect(
-                a,
-                bcol + scol as i32,
-                h,
-                temp,
-                SPINE_RIGHT + dcol,
-                h,
-                wide,
-                SCREEN_HEIGHT - h - h,
-            );
+            copy_strip(a, temp, (bcol + scol as i32, SPINE_RIGHT + dcol), h, wide);
 
             dcol += wide;
             scol += rate;
@@ -218,61 +248,24 @@ unsafe fn turn_left_page_frame(
         let bcol = SPINE;
 
         if rate == 0 {
-            copy_rect(
-                b,
-                PAGE_LEFT_EDGE,
-                0,
-                temp,
-                PAGE_LEFT_EDGE,
-                0,
-                PAGE_HALF_WIDTH,
-                SCREEN_HEIGHT,
-            );
+            copy_half_page(b, temp, PAGE_LEFT_EDGE);
 
             return;
         }
 
-        copy_rect(
-            a,
-            PAGE_LEFT_EDGE,
-            0,
-            temp,
-            PAGE_LEFT_EDGE,
-            0,
-            PAGE_HALF_WIDTH,
-            SCREEN_HEIGHT,
-        );
+        copy_half_page(a, temp, PAGE_LEFT_EDGE);
         let mut dcol: i32 = 0;
         let mut scol = wide as i16;
 
         while scol < PAGE_STRIP_END {
             let h = crate::game::world::map::page_turn_inset(scol as i32);
             dcol += wide;
-            copy_rect(
-                b,
-                bcol - scol as i32,
-                h,
-                temp,
-                bcol - dcol,
-                h,
-                wide,
-                SCREEN_HEIGHT - h - h,
-            );
+            copy_strip(b, temp, (bcol - scol as i32, bcol - dcol), h, wide);
 
             scol += rate;
         }
 
-        let h = EDGE_INSET;
-        copy_rect(
-            b,
-            PAGE_LEFT_EDGE,
-            h,
-            temp,
-            SPINE - 1 - dcol,
-            h,
-            1,
-            SCREEN_HEIGHT - h - h,
-        );
+        copy_strip(b, temp, (PAGE_LEFT_EDGE, SPINE - 1 - dcol), EDGE_INSET, 1);
     }
 }
 
