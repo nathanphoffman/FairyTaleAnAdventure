@@ -35,28 +35,35 @@ const DEAD: i8 = 15;
 const ATTACK1: i8 = 1;
 const ARCHER1: i8 = 3;
 const DEATH: i8 = 7;
+
 /// A weapon with this bit set is a bow, so the monster is an archer.
 const BOW_BIT: i8 = 4;
 
 /// Tries this many random spots before giving up.
 const MAX_TRY: i32 = 15;
+
 /// The extent value (`v3`) of the special encounter that always appears at a fixed place.
 const FIXED_PLACE_ENCOUNTER: u8 = 7;
 const FIXED_PLACE: (u16, u16) = (21635, 25762);
+
 /// The spider pit extent type, where monsters may stand on terrain 7.
 const SPIDER_PIT: u16 = 52;
 const TERRAIN_SWAMP: i32 = 7;
+
 /// The monster that is the dark knight and the kinds of people that matter in `check_death`.
 const RACE_DARK_KNIGHT: u8 = 7;
 const RACE_LASSO_KEEPER: u8 = 0x89;
 const SPEAK_DARK_KNIGHT_DIES: i32 = 42;
+
 /// Penalties and rewards for a death.
 const KINDNESS_LOSS: i16 = 3;
 const LUCK_LOSS: i16 = 5;
 const DYING_COUNTDOWN: i8 = 7;
+
 /// Print queue entries: vitality and stats.
 const PRQ_STATS: i32 = 4;
 const PRQ_VITALITY: i32 = 7;
+
 /// Carrier numbers.
 const CARRIER_DRAGON: i16 = 10;
 const CARRIER_TURTLE: i16 = 5;
@@ -70,32 +77,41 @@ const FIRST_CARRIER_SLOT: usize = 3;
 /// 0 if no free spot was found in 15 tries.
 pub fn place_encounter(i: u16, spread: u16) -> i32 {
     unsafe {
-        let an = (&raw mut the_actors.list).cast::<Shape>().add(i as usize);
+        let actor = (&raw mut the_actors.list).cast::<Shape>().add(i as usize);
         let Some((xtest, ytest)) = find_open_spot(i, spread) else {
             return 0;
         };
-        (*an).abs_x = xtest;
-        (*an).abs_y = ytest;
-        (*an).kind = ENEMY;
+
+        (*actor).abs_x = xtest;
+        (*actor).abs_y = ytest;
+        (*actor).kind = ENEMY;
         let race = encounter_race();
-        (*an).race = race as u8;
+        (*actor).race = race as u8;
+
         if the_encounter.mix_flag & 4 != 0 {
             the_encounter.weapon_type = rand4() as i16;
         }
+
         let chart = &encounter_chart[race as usize];
         let w = (chart.arms as i32 * 4) + the_encounter.weapon_type as i32;
-        (*an).weapon = weapon_probs[w as usize];
-        (*an).state = STILL;
-        (*an).environ = 0;
-        (*an).facing = 0;
-        if (*an).weapon & BOW_BIT != 0 {
-            (*an).goal = ARCHER1 + chart.cleverness;
+        (*actor).weapon = weapon_probs[w as usize];
+        (*actor).state = STILL;
+        (*actor).environ = 0;
+        (*actor).facing = 0;
+
+        if (*actor).weapon & BOW_BIT != 0 {
+            (*actor).goal = ARCHER1 + chart.cleverness;
         } else {
-            (*an).goal = ATTACK1 + chart.cleverness;
+            (*actor).goal = ATTACK1 + chart.cleverness;
         }
-        (*an).vitality = chart.hitpoints as i16;
-        (*an).rel_x = (*an).abs_x.wrapping_sub(the_world.map_x).wrapping_sub(8);
-        (*an).rel_y = (*an).abs_y.wrapping_sub(the_world.map_y).wrapping_sub(26);
+
+        (*actor).vitality = chart.hitpoints as i16;
+        (*actor).rel_x = (*actor).abs_x.wrapping_sub(the_world.map_x).wrapping_sub(8);
+        (*actor).rel_y = (*actor)
+            .abs_y
+            .wrapping_sub(the_world.map_y)
+            .wrapping_sub(26);
+
         1
     }
 }
@@ -108,20 +124,24 @@ unsafe fn find_open_spot(i: u16, spread: u16) -> Option<(u16, u16)> {
         if (*the_world.extent).v3 == FIXED_PLACE_ENCOUNTER {
             return Some(FIXED_PLACE);
         }
+
         for _ in 0..MAX_TRY {
             let xtest =
                 (the_encounter.x as i32 + bitrand(spread as i32) - (spread as i32 / 2)) as u16;
             let ytest =
                 (the_encounter.y as i32 + bitrand(spread as i32) - (spread as i32 / 2)) as u16;
+
             if blocked_at(xtest as i16, ytest as i16, i as i16) == 0 {
                 return Some((xtest, ytest));
             }
+
             if the_world.extent_type == SPIDER_PIT
                 && terrain_at(xtest as i32, ytest as i32) == TERRAIN_SWAMP
             {
                 return Some((xtest, ytest));
             }
         }
+
         None
     }
 }
@@ -144,17 +164,21 @@ unsafe fn encounter_race() -> i32 {
 /// changes. The hero's stats are always refreshed on screen.
 pub extern "C" fn check_death(i: i32, dtype: i32) {
     unsafe {
-        let an = (&raw mut the_actors.list).cast::<Shape>().add(i as usize);
-        if let Some(death) = start_dying(i, &mut *an, &mut *(&raw mut the_hero)) {
+        let actor = (&raw mut the_actors.list).cast::<Shape>().add(i as usize);
+
+        if let Some(death) = start_dying(i, &mut *actor, &mut *(&raw mut the_hero)) {
             if death.dark_knight {
                 speak(SPEAK_DARK_KNIGHT_DIES);
             }
+
             if i == 0 {
                 show_event(dtype);
                 set_mood(1);
             }
+
             queue_print(PRQ_VITALITY);
         }
+
         if i == 0 {
             queue_print(PRQ_STATS);
         }
@@ -175,22 +199,27 @@ fn start_dying(i: i32, actor: &mut Shape, hero: &mut Hero) -> Option<Death> {
     if actor.vitality >= 1 || actor.state == DYING || actor.state == DEAD {
         return None;
     }
+
     actor.vitality = 0;
     actor.tactic = DYING_COUNTDOWN;
     actor.goal = DEATH;
     actor.state = DYING;
     let dark_knight = actor.race == RACE_DARK_KNIGHT;
+
     if !dark_knight && actor.kind == SETFIG && actor.race != RACE_LASSO_KEEPER {
         hero.kindness -= KINDNESS_LOSS;
     }
+
     if i != 0 {
         hero.brave += 1;
     } else {
         hero.luck -= LUCK_LOSS;
     }
+
     if hero.kindness < 0 {
         hero.kindness = 0;
     }
+
     Some(Death { dark_knight })
 }
 
@@ -198,10 +227,11 @@ fn start_dying(i: i32, actor: &mut Shape, hero: &mut Hero) -> Option<Death> {
 /// if they are not the ones already loaded, in the middle of its extent.
 pub fn load_carrier(n: i16) {
     unsafe {
-        let an = (&raw mut the_actors.list)
+        let actor = (&raw mut the_actors.list)
             .cast::<Shape>()
             .add(FIRST_CARRIER_SLOT);
-        (*an).kind = if n == CARRIER_DRAGON { DRAGON } else { CARRIER };
+
+        (*actor).kind = if n == CARRIER_DRAGON { DRAGON } else { CARRIER };
         let extent = if n == CARRIER_DRAGON {
             2
         } else if n == CARRIER_TURTLE {
@@ -209,27 +239,29 @@ pub fn load_carrier(n: i16) {
         } else {
             0
         };
+
         if the_actors.loaded_actor_file != n {
             the_memory.nextshape = (*(&raw mut the_memory.seq_list)
                 .cast::<SeqInfo>()
                 .add(SEQ_ENEMY))
             .location;
             load_sprite_file(n as i32);
-            finish_sprite_load((*an).kind as i16);
+            finish_sprite_load((*actor).kind as i16);
             motor_off();
         }
+
         let e = &*(&raw mut extent_list).cast::<Extent>().add(extent);
-        (*an).abs_x = e.x1.wrapping_add(250);
-        (*an).abs_y = e.y1.wrapping_add(200);
-        (*an).index = 0;
-        (*an).weapon = 0;
-        (*an).environ = 0;
-        (*an).state = STILL;
-        (*an).vitality = VITALITY_CARRIER;
+        (*actor).abs_x = e.x1.wrapping_add(250);
+        (*actor).abs_y = e.y1.wrapping_add(200);
+        (*actor).index = 0;
+        (*actor).weapon = 0;
+        (*actor).environ = 0;
+        (*actor).state = STILL;
+        (*actor).vitality = VITALITY_CARRIER;
         the_actors.active = 4;
         the_actors.active_carrier = n;
         the_actors.loaded_actor_file = n;
-        (*an).race = n as u8;
+        (*actor).race = n as u8;
     }
 }
 
@@ -241,6 +273,7 @@ pub fn load_enemy_sprites() {
         the_encounter.number =
             ((*the_world.extent).v1 as i32 + rnd((*the_world.extent).v2 as i32)) as u8;
         let file = encounter_chart[the_encounter.kind as usize].file_id as i16;
+
         if the_actors.loaded_actor_file != file {
             the_actors.loaded_actor_file = file;
             the_actors.active = FIRST_ENEMY_SLOT;
@@ -263,6 +296,7 @@ mod tests {
         let mut a: Shape = unsafe { std::mem::zeroed() };
         a.vitality = vitality;
         a.state = state;
+
         a
     }
 
@@ -271,6 +305,7 @@ mod tests {
         h.brave = brave;
         h.luck = luck;
         h.kindness = kindness;
+
         h
     }
 
@@ -296,10 +331,12 @@ mod tests {
             start_dying(5, &mut a, &mut h),
             Some(Death { dark_knight: false })
         );
+
         assert_eq!(
             (a.vitality, a.state, a.goal, a.tactic),
             (0, DYING, DEATH, DYING_COUNTDOWN)
         );
+
         assert_eq!((h.brave, h.luck, h.kindness), (11, 10, 10));
     }
 
@@ -336,6 +373,7 @@ mod tests {
             start_dying(5, &mut a, &mut h),
             Some(Death { dark_knight: true })
         );
+
         assert_eq!(h.kindness, 5);
     }
 

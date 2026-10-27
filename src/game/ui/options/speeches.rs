@@ -1,7 +1,12 @@
 //! What each kind of person says when talked to. Some also change things (the priest heals, the
 //! sorceress gives luck).
 
-use super::*;
+use super::{PRQ_STATS, PRQ_VITALITY};
+use crate::game::data::object_tables::{ob_list8, ob_listg};
+use crate::game::data::random::rand64;
+use crate::game::data::state::{the_actors, the_hero, the_world};
+use crate::game::data::types::Shape;
+use crate::game::ui::text::{queue_print, speak};
 
 const WRIT: usize = 28;
 const WIZARD: u8 = 0;
@@ -18,14 +23,18 @@ const SPECTRE: u8 = 10;
 const GHOST: u8 = 11;
 const RANGER: u8 = 12;
 const BEGGAR: u8 = 13;
+
 /// Kindness the hero needs for the wizard and priest to be friendly.
 const KIND_ENOUGH: i16 = 10;
+
 /// Object list slots whose state the conversations change.
 const PRIEST_WRIT_SLOT: usize = 10;
 const SORCERESS_SLOT: usize = 9;
 const PRINCESS_FREED_SLOT: usize = 9;
+
 /// Luck given by the sorceress, and the roll it must beat.
 const SORCERESS_LUCK: i16 = 5;
+
 /// Hero vitality when healed by the priest is `15 + brave / 4`.
 const FULL_VITALITY_BASE: i16 = 15;
 const PRIEST_BLESSINGS: u16 = 3;
@@ -35,7 +44,7 @@ const RANGER_SWAMP_REGION: u16 = 2;
 
 /// What each kind of person says. Some of them also change the world (the priest heals, the
 /// sorceress gives luck).
-pub(super) unsafe fn person_speaks(person: u8, an: *mut Shape) {
+pub(super) unsafe fn person_speaks(person: u8, actor: *mut Shape) {
     unsafe {
         match person {
             PRIEST => priest_speaks(),
@@ -46,9 +55,10 @@ pub(super) unsafe fn person_speaks(person: u8, an: *mut Shape) {
                     fatigue: the_hero.fatigue,
                     day_period: the_world.day_period,
                     region: the_world.region,
-                    goal: (*an).goal as i32,
+                    goal: (*actor).goal as i32,
                     princess_freed: ob_list8[PRINCESS_FREED_SLOT].ob_stat != 0,
                 };
+
                 if let Some(line) = plain_speech(person, &facts) {
                     speak(line);
                 }
@@ -105,6 +115,7 @@ fn plain_speech(person: u8, t: &Talker) -> Option<i32> {
 unsafe fn sorceress_speaks() {
     unsafe {
         let freed = ob_listg[SORCERESS_SLOT].ob_stat != 0;
+
         match sorceress_action(freed, the_hero.luck, || rand64() as i16) {
             SorceressAction::GiveLuck => the_hero.luck += SORCERESS_LUCK,
             SorceressAction::Nothing => {}
@@ -113,6 +124,7 @@ unsafe fn sorceress_speaks() {
                 ob_listg[SORCERESS_SLOT].ob_stat = 1;
             }
         }
+
         queue_print(PRQ_VITALITY);
     }
 }
@@ -142,6 +154,7 @@ fn sorceress_action(freed: bool, luck: i16, roll: impl FnOnce() -> i16) -> Sorce
 unsafe fn priest_speaks() {
     unsafe {
         let has_writ = *the_hero.stuff.add(WRIT) != 0;
+
         match priest_action(
             has_writ,
             ob_listg[PRIEST_WRIT_SLOT].ob_stat,
@@ -152,6 +165,7 @@ unsafe fn priest_speaks() {
                 speak(39);
                 ob_listg[PRIEST_WRIT_SLOT].ob_stat = 1;
             }
+
             PriestAction::WritAgain => speak(19),
             PriestAction::Scold => speak(40),
             PriestAction::Bless { speech } => {
@@ -176,6 +190,8 @@ enum PriestAction {
     Bless { speech: i32 },
 }
 
+/// What the priest does: give the writ's reward once, say so again, scold an unkind hero, or bless and
+/// heal one who is kind enough. The blessing is picked from the clock.
 fn priest_action(has_writ: bool, reward_stat: i8, kindness: i16, clock: u16) -> PriestAction {
     if has_writ {
         if reward_stat == 0 {
@@ -204,14 +220,17 @@ mod tests {
             priest_action(false, 0, KIND_ENOUGH - 1, 0),
             PriestAction::Scold
         );
+
         assert_eq!(
             priest_action(false, 0, KIND_ENOUGH, 0),
             PriestAction::Bless { speech: 36 }
         );
+
         assert_eq!(
             priest_action(false, 0, KIND_ENOUGH, 1),
             PriestAction::Bless { speech: 37 }
         );
+
         let wrap = PRIEST_BLESSINGS;
         assert_eq!(
             priest_action(false, 0, KIND_ENOUGH, wrap),
@@ -244,6 +263,7 @@ mod tests {
             ),
             Some(35)
         );
+
         assert_eq!(plain_speech(GUARD_BACK, &t), Some(15));
         assert_eq!(plain_speech(PRINCESS, &t), None);
         assert_eq!(
@@ -256,6 +276,7 @@ mod tests {
             ),
             Some(16)
         );
+
         assert_eq!(
             plain_speech(
                 KING,
@@ -266,6 +287,7 @@ mod tests {
             ),
             Some(17)
         );
+
         assert_eq!(plain_speech(RANGER, &t), Some(55));
         assert_eq!(
             plain_speech(
@@ -277,6 +299,7 @@ mod tests {
             ),
             Some(22)
         );
+
         assert_eq!(plain_speech(PRIEST, &t), None);
         assert_eq!(plain_speech(SORCERESS, &t), None);
     }
@@ -293,6 +316,7 @@ mod tests {
                 },
             )
         };
+
         assert_eq!(said(TIRED - 1, 0), Some(13));
         assert_eq!(said(TIRED, NIGHT_PERIOD), Some(14));
         assert_eq!(said(TIRED, NIGHT_PERIOD + 1), Some(12));

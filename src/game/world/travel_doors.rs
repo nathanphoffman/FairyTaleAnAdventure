@@ -11,6 +11,7 @@ use crate::game::world::places::{find_place, transfer_hero};
 const DOORCOUNT: i32 = 86;
 const DESERT: i8 = 17;
 const CAVE: i8 = 18;
+
 /// Inventory slot of the gold statues, five are needed to enter the desert.
 const STATBASE: usize = 25;
 const STATUES_NEEDED: u8 = 5;
@@ -49,6 +50,7 @@ fn may_enter(d: &Door, hero_x: u16, hero_y: u16, statues: u8) -> bool {
     } else {
         hero_x & 15 <= 6
     };
+
     lined_up && (d.kind != DESERT || statues >= STATUES_NEEDED)
 }
 
@@ -65,6 +67,7 @@ fn region_inside(d: &Door) -> u16 {
 /// rounded to a tile). Horizontal doors are also found one tile to the right.
 fn is_exit_here(d: &Door, xtest: u16, ytest: u16) -> bool {
     let horizontal = d.kind & 1 != 0;
+
     d.yc2 == ytest && (d.xc2 == xtest || (d.xc2 as i32 == xtest as i32 - 16 && horizontal))
 }
 
@@ -89,8 +92,10 @@ pub fn check_door() {
         if the_hero.riding != 0 {
             return;
         }
+
         let xtest = the_hero.x & 0xfff0;
         let ytest = the_hero.y & 0xffe0;
+
         if the_world.region < FIRST_INSIDE_REGION {
             enter_door(xtest, ytest);
         } else {
@@ -104,8 +109,10 @@ unsafe fn enter_door(xtest: u16, ytest: u16) {
         let Some(index) = find_outdoor_door(xtest, ytest) else {
             return;
         };
+
         let d = door_at(index);
         let statues = *the_hero.stuff.add(STATBASE);
+
         if may_enter(d, the_hero.x, the_hero.y, statues) {
             let (x, y) = inside_spot(d);
             the_world.new_region = region_inside(d);
@@ -128,9 +135,11 @@ unsafe fn find_outdoor_door(xtest: u16, ytest: u16) -> Option<i32> {
     unsafe {
         let mut low = 0;
         let mut high = DOORCOUNT - 1;
+
         while high >= low {
             let j = (high + low) / 2;
             let d = door_at(j);
+
             if d.xc1 > xtest {
                 high = j - 1;
             } else if d.xc1 as i32 + 16 < xtest as i32 {
@@ -144,24 +153,30 @@ unsafe fn find_outdoor_door(xtest: u16, ytest: u16) -> Option<i32> {
             } else {
                 return Some(j);
             }
+
             if low >= DOORCOUNT || high < 0 {
                 break;
             }
         }
+
         None
     }
 }
 
+/// Indoors: if the hero stands at the inside entrance of a door and is lined up with it, he is moved
+/// to the outside.
 unsafe fn leave_door(xtest: u16, ytest: u16) {
     unsafe {
         for j in 0..DOORCOUNT {
             let d = door_at(j);
+
             if is_exit_here(d, xtest, ytest) {
                 if may_leave(d, the_hero.x, the_hero.y) {
                     let (x, y) = outside_spot(d);
                     transfer_hero(x, y, 1);
                     find_place(0);
                 }
+
                 break;
             }
         }
@@ -246,6 +261,7 @@ mod tests {
                 let f = door_at(found);
                 assert_eq!((f.xc1, f.yc1), (d.xc1, d.yc1));
             }
+
             for j in UNREACHABLE {
                 let d = door_at(*j);
                 assert_eq!(find_outdoor_door(d.xc1, d.yc1), None);

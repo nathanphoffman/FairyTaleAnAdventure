@@ -23,20 +23,26 @@ pub extern "C" fn InitBitMap(bm: *mut BitMap, depth: LONG, width: LONG, height: 
 #[unsafe(no_mangle)]
 pub extern "C" fn MakeBitMap(bm: *mut BitMap, depth: LONG, width: LONG, height: LONG) -> LONG {
     InitBitMap(bm, depth, width, height);
+
     let b = unsafe { &mut *bm };
+
     for p in 0..depth as usize {
         b.Planes[p] = AllocRaster(width as ULONG, height as ULONG);
+
         if b.Planes[p].is_null() {
             UnMakeBitMap(bm);
+
             return 0;
         }
     }
+
     1
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn UnMakeBitMap(bm: *mut BitMap) {
     let b = unsafe { &mut *bm };
+
     for p in 0..b.Depth as usize {
         FreeRaster(b.Planes[p], 0, 0);
         b.Planes[p] = null_mut();
@@ -50,7 +56,9 @@ const RASTER_PAD: usize = 256;
 #[unsafe(no_mangle)]
 pub extern "C" fn AllocRaster(width: ULONG, height: ULONG) -> PLANEPTR {
     let size = bytes_per_row(width as i32) * height as usize + 2 * RASTER_PAD;
+
     let base = unsafe { libc::calloc(1, size) as PLANEPTR };
+
     if base.is_null() {
         base
     } else {
@@ -69,7 +77,10 @@ pub extern "C" fn FreeRaster(p: PLANEPTR, _w: ULONG, _h: ULONG) {
 pub(in crate::platform::gfx) unsafe fn get_bit(bm: &BitMap, plane: usize, x: i32, y: i32) -> bool {
     unsafe {
         let base = bm.Planes[plane];
+        // Byte holding the pixel: 8 pixels to a byte.
         let off = y as usize * bm.BytesPerRow as usize + (x >> 3) as usize;
+
+        // The leftmost pixel of a byte is its top bit.
         *base.add(off) & (0x80 >> (x & 7)) != 0
     }
 }
@@ -83,8 +94,11 @@ pub(in crate::platform::gfx) unsafe fn set_bit(
 ) {
     unsafe {
         let base = bm.Planes[plane];
+        // Byte holding the pixel: 8 pixels to a byte.
         let off = y as usize * bm.BytesPerRow as usize + (x >> 3) as usize;
+        // The leftmost pixel of a byte is its top bit.
         let mask = 0x80u8 >> (x & 7);
+
         if on {
             *base.add(off) |= mask
         } else {
@@ -93,6 +107,7 @@ pub(in crate::platform::gfx) unsafe fn set_bit(
     }
 }
 
+/// Whether the pixel (`x`, `y`) is inside the bitmap.
 pub(in crate::platform::gfx) fn in_bounds(bm: &BitMap, x: i32, y: i32) -> bool {
     x >= 0 && y >= 0 && y < bm.Rows as i32 && x < bm.BytesPerRow as i32 * 8
 }
@@ -108,15 +123,18 @@ pub(in crate::platform::gfx) unsafe fn plot(
     if !in_bounds(bm, x, y) {
         return;
     }
+
     for p in 0..bm.Depth as usize {
         if bm.Planes[p].is_null() {
             continue;
         }
+
         unsafe {
             if complement {
                 let cur = get_bit(bm, p, x, y);
                 set_bit(bm, p, x, y, !cur);
             } else {
+                // Bitplane `p` gets bit `p` of the pen number.
                 set_bit(bm, p, x, y, pen >> p & 1 != 0);
             }
         }

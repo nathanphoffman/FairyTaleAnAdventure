@@ -1,0 +1,8 @@
+# The original C game and the original Amiga source are reference material, not our code.
+csrc
+faery-tale-amiga
+# Build output, test output and tool worktrees.
+target
+build
+.claude
+tests/out

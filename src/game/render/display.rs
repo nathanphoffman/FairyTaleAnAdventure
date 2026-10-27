@@ -11,15 +11,25 @@ use std::ffi::{c_char, c_void};
 
 unsafe extern "C" {
     fn MakeVPort(view: *mut View, port: *mut ViewPort) -> i32;
+
     fn MrgCop(view: *mut View) -> i32;
+
     fn LoadView(view: *mut View);
+
     fn WaitBOVP(port: *mut ViewPort);
+
     fn CreatePort(name: *const c_char, pri: i32) -> *mut c_void;
+
     fn DeletePort(port: *mut c_void);
+
     fn CreateStdIO(port: *mut c_void) -> *mut c_void;
+
     fn DeleteStdIO(io: *mut c_void);
+
     fn OpenDevice(name: *const c_char, unit: u32, io: *mut c_void, flags: u32) -> i32;
+
     fn CloseDevice(io: *mut c_void);
+
     fn DoIO(io: *mut c_void) -> i32;
 }
 
@@ -42,6 +52,7 @@ pub fn flip_pages() {
             &raw mut the_screen.drawing_page,
             &raw mut the_screen.viewing_page,
         );
+
         the_screen.vp_page.RasInfo = (*finished).ri_page;
         main_view.LOFCprList = (*finished).savecop;
 
@@ -61,20 +72,28 @@ pub fn install_input_handler() -> i32 {
     unsafe {
         reset_key_buffer();
         INPUT_PORT = CreatePort(std::ptr::null(), 0);
+
         if INPUT_PORT.is_null() {
             return 0;
         }
+
         INPUT_REQUEST = CreateStdIO(INPUT_PORT);
+
         if INPUT_REQUEST.is_null() {
             DeletePort(INPUT_PORT);
+
             return 0;
         }
+
         // the original also filled in a handler (priority 51) and asked for it to be added
         let error = OpenDevice(INPUT_DEVICE.as_ptr().cast::<c_char>(), 0, INPUT_REQUEST, 0) as i16;
+
         if error != 0 {
             return 0;
         }
+
         DoIO(INPUT_REQUEST);
+
         1
     }
 }

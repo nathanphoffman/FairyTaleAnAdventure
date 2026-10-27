@@ -38,27 +38,37 @@ pub extern "C" fn SetDrMd(rp: *mut RastPort, mode: ULONG) {
 #[unsafe(no_mangle)]
 pub extern "C" fn SetRast(rp: *mut RastPort, pen: ULONG) {
     let rp = unsafe { &*rp };
+
     if rp.BitMap.is_null() {
         return;
     }
+
     let bm = unsafe { &*rp.BitMap };
     let size = bm.BytesPerRow as usize * bm.Rows as usize;
+
     for p in 0..bm.Depth as usize {
         if !bm.Planes[p].is_null() {
+            // A plane is filled with all ones if the pen has that bit set, and zeros otherwise.
             let v = if pen >> p & 1 != 0 { 0xff } else { 0 };
+
             unsafe { std::ptr::write_bytes(bm.Planes[p], v, size) };
         }
     }
 }
 
+/// The Amiga `RectFill`: fills a rectangle with the pen colour (or flips it, in COMPLEMENT mode),
+/// cut to the bitmap.
 #[unsafe(no_mangle)]
 pub extern "C" fn RectFill(rp: *mut RastPort, x0: LONG, y0: LONG, x1: LONG, y1: LONG) {
     let rp = unsafe { &*rp };
+
     if rp.BitMap.is_null() {
         return;
     }
+
     let bm = unsafe { &*rp.BitMap };
     let complement = rp.DrawMode & COMPLEMENT != 0;
+
     for y in y0.max(0)..=y1.min(bm.Rows as i32 - 1) {
         for x in x0.max(0)..=x1 {
             unsafe { plot(bm, x, y, rp.FgPen, complement) };
@@ -77,29 +87,37 @@ pub extern "C" fn Move(rp: *mut RastPort, x: LONG, y: LONG) {
 #[unsafe(no_mangle)]
 pub extern "C" fn Draw(rp: *mut RastPort, x: LONG, y: LONG) {
     let rp = unsafe { &mut *rp };
+
     if !rp.BitMap.is_null() {
         let bm = unsafe { &*rp.BitMap };
         let complement = rp.DrawMode & COMPLEMENT != 0;
         let (mut cx, mut cy) = (rp.cp_x as i32, rp.cp_y as i32);
         let (dx, dy) = ((x - cx).abs(), -(y - cy).abs());
+
         let (sx, sy) = (if cx < x { 1 } else { -1 }, if cy < y { 1 } else { -1 });
         let mut err = dx + dy;
+
         loop {
             unsafe { plot(bm, cx, cy, rp.FgPen, complement) };
+
             if cx == x && cy == y {
                 break;
             }
+
             let e2 = 2 * err;
+
             if e2 >= dy {
                 err += dy;
                 cx += sx;
             }
+
             if e2 <= dx {
                 err += dx;
                 cy += sy;
             }
         }
     }
+
     rp.cp_x = x as WORD;
     rp.cp_y = y as WORD;
 }

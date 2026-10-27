@@ -11,6 +11,7 @@ const BIRD: i16 = 11;
 
 /// Closest a person can be to count as `nearest_person`.
 const PERSON_RANGE: i16 = 50;
+
 /// Dead actors, the hero on a mount and the raft are drawn this much lower in the order.
 const DRAW_LOWER: i16 = 32;
 const WADING: i8 = 25;
@@ -22,18 +23,27 @@ pub fn sort_actors() {
     unsafe {
         the_actors.nearest_person = 0;
         the_actors.nearest_person_distance = PERSON_RANGE;
+
         for i in 0..the_actors.drawn as usize {
             the_actors.draw_order[i] = i as u8;
         }
+
         for i in 0..the_actors.drawn as usize {
-            let an = &raw const the_actors.list[i];
-            if i != 0 && (*an).kind != OBJECTS && (*an).state != DEAD && the_hero.riding != BIRD {
+            let actor = &raw const the_actors.list[i];
+
+            if i != 0
+                && (*actor).kind != OBJECTS
+                && (*actor).state != DEAD
+                && the_hero.riding != BIRD
+            {
                 let dist = actor_distance(i as i32, 0) as i16;
+
                 if dist < the_actors.nearest_person_distance {
                     the_actors.nearest_person_distance = dist;
                     the_actors.nearest_person = i as i16;
                 }
             }
+
             for j in 1..the_actors.drawn as usize {
                 bubble_step(j);
             }
@@ -50,18 +60,23 @@ unsafe fn bubble_step(j: usize) {
         let b = &raw const the_actors.list[k2 as usize];
         let mut y1 = (*a).abs_y as i16;
         let mut y2 = (*b).abs_y as i16;
+
         if (*a).state == DEAD || (k2 == 0 && the_hero.riding != 0) || k1 == RAFT_ACTOR {
             y1 = y1.wrapping_sub(DRAW_LOWER);
         }
+
         if (*b).state == DEAD || (k1 == 0 && the_hero.riding != 0) || k2 == RAFT_ACTOR {
             y2 = y2.wrapping_sub(DRAW_LOWER);
         }
+
         if (*a).environ > WADING {
             y1 = y1.wrapping_add(DRAW_LOWER);
         }
+
         if (*b).environ > WADING {
             y2 = y2.wrapping_add(DRAW_LOWER);
         }
+
         if y2 < y1 {
             the_actors.draw_order[j - 1] = k2;
             the_actors.draw_order[j] = k1;

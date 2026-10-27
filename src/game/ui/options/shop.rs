@@ -1,6 +1,12 @@
 //! The Buy menu: what the bartender sells and whether the hero can pay.
 
-use super::*;
+use super::{ARROWS, PRQ_VITALITY};
+use crate::game::actors::interaction::eat_food;
+use crate::game::data::object_tables::jtrans;
+use crate::game::data::state::{the_actors, the_hero};
+use crate::game::ui::items_menu::{add_stuff, item_name};
+use crate::game::ui::messages::{print, print_cont, print_wrapped};
+use crate::game::ui::text::{queue_print, show_event};
 
 // Buy menu: the bartender is race 0x88; entries 5-11 pick a pair in `jtrans`.
 const BARTENDER_RACE: u8 = 0x88;
@@ -28,10 +34,13 @@ fn buy_gate(person: i16, race: u8, entry: i16, table: &[i8]) -> BuyGate {
     if person == 0 || race != BARTENDER_RACE {
         return BuyGate::Nothing;
     }
+
     if entry > LAST_BUY_ENTRY {
         return BuyGate::NotHandled;
     }
+
     let pair = ((entry - FIRST_MENU_ENTRY) * 2) as usize;
+
     BuyGate::Offer {
         item: table[pair] as u8 as usize,
         price: table[pair + 1] as i16,
@@ -61,6 +70,7 @@ fn purchase(wealth: i16, price: i16, item: usize) -> Purchase {
     if !can_afford(wealth, price) {
         return Purchase::TooPoor;
     }
+
     let what = if item == FOOD {
         Bought::Food
     } else if item == ARROWS {
@@ -68,6 +78,7 @@ fn purchase(wealth: i16, price: i16, item: usize) -> Purchase {
     } else {
         Bought::Item
     };
+
     Purchase::Bought {
         wealth_left: wealth - price,
         what,
@@ -84,25 +95,30 @@ pub(super) unsafe fn buy_option(chosen_entry: i16) -> bool {
         } else {
             the_actors.list[near as usize].race
         };
+
         let (item, price) = match buy_gate(near, race, chosen_entry, &jtrans) {
             BuyGate::Nothing => return true,
             BuyGate::NotHandled => return false,
             BuyGate::Offer { item, price } => (item, price),
         };
+
         match purchase(the_hero.wealth, price, item) {
             Purchase::TooPoor => print(c"Not enough money!".as_ptr()),
             Purchase::Bought { wealth_left, what } => {
                 the_hero.wealth = wealth_left;
                 queue_print(PRQ_VITALITY);
+
                 match what {
                     Bought::Food => {
                         show_event(BOUGHT_FOOD_EVENT);
                         eat_food(FOOD_HUNGER);
                     }
+
                     Bought::Arrows => {
                         add_stuff(item, ARROWS_BOUGHT);
                         show_event(BOUGHT_ARROWS_EVENT);
                     }
+
                     Bought::Item => {
                         add_stuff(item, 1);
                         print_wrapped(c"% bought a ".as_ptr());
@@ -112,12 +128,14 @@ pub(super) unsafe fn buy_option(chosen_entry: i16) -> bool {
                 }
             }
         }
+
         true
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::super::ARROWS;
     use super::*;
 
     const SHOP: [i8; 14] = [0, 3, 8, 10, 11, 15, 1, 30, 2, 45, 3, 75, 13, 20];
@@ -130,18 +148,22 @@ mod tests {
             buy_gate(3, BARTENDER_RACE + 1, first, &SHOP),
             BuyGate::Nothing
         );
+
         assert_eq!(
             buy_gate(3, BARTENDER_RACE, LAST_BUY_ENTRY + 1, &SHOP),
             BuyGate::NotHandled
         );
+
         assert_eq!(
             buy_gate(3, BARTENDER_RACE, first, &SHOP),
             BuyGate::Offer { item: 0, price: 3 }
         );
+
         assert_eq!(
             buy_gate(3, BARTENDER_RACE, first + 1, &SHOP),
             BuyGate::Offer { item: 8, price: 10 }
         );
+
         // not a bartender wins over an entry past the end
         assert_eq!(
             buy_gate(3, BARTENDER_RACE + 1, LAST_BUY_ENTRY + 1, &SHOP),
@@ -166,6 +188,7 @@ mod tests {
                 what: Bought::Food
             }
         );
+
         assert_eq!(
             purchase(10, 3, ARROWS),
             Purchase::Bought {
@@ -173,6 +196,7 @@ mod tests {
                 what: Bought::Arrows
             }
         );
+
         assert_eq!(purchase(10, 10, 12), Purchase::TooPoor);
         assert_eq!(
             purchase(11, 10, 12),

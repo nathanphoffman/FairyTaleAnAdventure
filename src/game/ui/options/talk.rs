@@ -1,6 +1,12 @@
 //! The Talk and Yell menu entries: who the hero is talking to and what answers.
 
-use super::*;
+use super::speeches::person_speaks;
+use crate::game::actors::interaction::find_nearest_figure;
+use crate::game::data::state::{the_actors, the_hero};
+use crate::game::data::tables::setfig_table;
+use crate::game::data::types::Shape;
+use crate::game::ui::text::speak;
+use crate::game::world::objects::SetFigEntry;
 
 // Actor kinds and states (csrc/ftale.h).
 const ENEMY: i8 = 2;
@@ -8,12 +14,15 @@ const SETFIG: i8 = 4;
 const CARRIER: i8 = 5;
 const DEAD: i8 = 15;
 const TALKING: i8 = 19;
+
 /// The tactic that makes a person stand and talk.
 const TACTIC_TALK: i8 = 15;
 const SHELL: usize = 6;
+
 /// `find_nearest_figure` search ranges for yelling and for the quieter talk options.
 const YELL_RANGE: i16 = 100;
 const TALK_RANGE: i16 = 50;
+
 /// Anyone closer than this is told off for yelling.
 const TOO_CLOSE_TO_YELL: i32 = 35;
 
@@ -32,46 +41,70 @@ pub(super) unsafe fn talk_option(chosen_entry: i16) -> bool {
                 TALK_RANGE
             },
         );
+
         if the_actors.nearest_object == 0 {
             return true;
         }
-        let an = &raw mut the_actors.list[the_actors.nearest_object as usize];
-        let person = (*an).race & 0x7f;
-        let can_talk = (*(&raw const setfig_table)
-            .cast::<SetFigEntry>()
-            .add(person as usize))
-        .can_talk
-            != 0;
-        let target = Target {
-            kind: (*an).kind,
-            state: (*an).state,
-            race: (*an).race,
-            can_talk,
-        };
-        match talk_action(
+
+        let actor = &raw mut the_actors.list[the_actors.nearest_object as usize];
+        let target = describe_target(actor);
+
+        let action = talk_action(
             &target,
             chosen_entry == YELL,
             distance,
             the_actors.active_carrier,
             *the_hero.stuff.add(SHELL) != 0,
-        ) {
+        );
+
+        carry_out(action, actor);
+
+        true
+    }
+}
+
+/// What the Talk code needs to know about the actor the hero is talking to.
+unsafe fn describe_target(actor: *const Shape) -> Target {
+    unsafe {
+        let person = (*actor).race & 0x7f;
+        let can_talk = (*(&raw const setfig_table)
+            .cast::<SetFigEntry>()
+            .add(person as usize))
+        .can_talk
+            != 0;
+
+        Target {
+            kind: (*actor).kind,
+            state: (*actor).state,
+            race: (*actor).race,
+            can_talk,
+        }
+    }
+}
+
+/// Does what `talk_action` decided: speaks, and turns the person to talk or hands over the shell.
+unsafe fn carry_out(action: TalkAction, actor: *mut Shape) {
+    unsafe {
+        match action {
             TalkAction::Nothing => {}
             TalkAction::TooCloseToYell => speak(8),
             TalkAction::Person { starts_talking } => {
                 if starts_talking {
-                    (*an).state = TALKING;
-                    (*an).tactic = TACTIC_TALK;
+                    (*actor).state = TALKING;
+                    (*actor).tactic = TACTIC_TALK;
                 }
-                person_speaks(person, an);
+
+                person_speaks((*actor).race & 0x7f, actor);
             }
+
             TalkAction::TurtleHasShell => speak(57),
             TalkAction::TurtleGivesShell => {
                 *the_hero.stuff.add(SHELL) = 1;
                 speak(56);
             }
+
             TalkAction::EnemyShouts(race) => speak(race as i32),
         }
-        true
     }
 }
 
@@ -100,6 +133,8 @@ enum TalkAction {
     EnemyShouts(u8),
 }
 
+/// What a Talk or Yell does to the figure nearby. The dead say nothing; people answer (but not a yell
+/// from right next to them); the turtle gives the shell once; an enemy shouts its line.
 fn talk_action(
     target: &Target,
     yelling: bool,
@@ -110,10 +145,12 @@ fn talk_action(
     if target.state == DEAD {
         return TalkAction::Nothing;
     }
+
     match target.kind {
         SETFIG if yelling && (distance as u32) < TOO_CLOSE_TO_YELL as u32 => {
             TalkAction::TooCloseToYell
         }
+
         SETFIG => TalkAction::Person {
             starts_talking: target.can_talk,
         },
@@ -124,6 +161,7 @@ fn talk_action(
                 TalkAction::TurtleGivesShell
             }
         }
+
         ENEMY => TalkAction::EnemyShouts(target.race),
         _ => TalkAction::Nothing,
     }
@@ -152,48 +190,57 @@ mod tests {
                 starts_talking: true
             }
         );
+
         assert_eq!(
             talk_action(&target(SETFIG, 0, false), false, 10, 0, false),
             Person {
                 starts_talking: false
             }
         );
+
         // yelling at someone close is refused; far enough is fine; talking is always fine
         assert_eq!(
             talk_action(&figure, true, TOO_CLOSE_TO_YELL - 1, 0, false),
             TooCloseToYell
         );
+
         assert_eq!(
             talk_action(&figure, true, TOO_CLOSE_TO_YELL, 0, false),
             Person {
                 starts_talking: true
             }
         );
+
         assert_eq!(
             talk_action(&figure, false, 1, 0, false),
             Person {
                 starts_talking: true
             }
         );
+
         // the dead say nothing
         assert_eq!(
             talk_action(&target(SETFIG, DEAD, true), false, 10, 0, false),
             Nothing
         );
+
         // the turtle gives the shell once
         let turtle = target(CARRIER, 0, false);
         assert_eq!(
             talk_action(&turtle, false, 10, CARRIER_TURTLE, false),
             TurtleGivesShell
         );
+
         assert_eq!(
             talk_action(&turtle, false, 10, CARRIER_TURTLE, true),
             TurtleHasShell
         );
+
         assert_eq!(
             talk_action(&turtle, false, 10, CARRIER_TURTLE + 1, false),
             Nothing
         );
+
         assert_eq!(
             talk_action(&target(ENEMY, 0, false), false, 10, 0, false),
             EnemyShouts(7)

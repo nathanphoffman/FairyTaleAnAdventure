@@ -21,6 +21,7 @@ const PLACE_TRIES: i32 = 10;
 const SPREAD: u16 = 63;
 const PLAIN_TERRAIN: i32 = 0;
 const WRAITH: u8 = 2;
+
 /// Xtype values: above this no mixed groups; the limit for random encounters; special zones.
 const NO_MIX_XTYPE: u16 = 49;
 const NO_RANDOM_XTYPE: u16 = 50;
@@ -41,9 +42,11 @@ pub fn spawn_encounters() {
             the_actors.loading = 0;
             the_actors.active = FIRST_ENEMY_ACTOR;
         }
+
         if the_world.day_clock & 15 == 0 && the_encounter.number != 0 && the_actors.loading == 0 {
             place_waiting_encounters();
         }
+
         if the_world.day_clock & 31 == 0
             && the_actors.on_screen == 0
             && the_actors.loading == 0
@@ -55,19 +58,24 @@ pub fn spawn_encounters() {
             } else {
                 2 + the_world.extent_type
             }) as u8;
+
             if rand64() <= the_encounter.danger_level as i32 {
                 the_encounter.kind = rand4() as u16;
+
                 if the_world.extent_type == DKNIGHT_XTYPE && the_encounter.kind == 2 {
                     the_encounter.kind = 4;
                 }
+
                 if the_world.extent_type == SPIDER_PIT_XTYPE {
                     the_encounter.kind = 6;
                     the_encounter.mix_flag = 0;
                 }
+
                 if the_world.extent_type == FINAL_XTYPE {
                     the_encounter.kind = 2;
                     the_encounter.mix_flag = 0;
                 }
+
                 load_enemy_sprites();
             }
         }
@@ -79,33 +87,45 @@ pub fn spawn_encounters() {
 unsafe fn place_waiting_encounters() {
     unsafe {
         the_encounter.mix_flag = fta_rand() as i16;
+
         if the_world.extent_type > NO_MIX_XTYPE {
             the_encounter.mix_flag = 0;
         }
+
         the_encounter.weapon_type = rand4() as i16;
+
         if the_world.extent_type & 3 == 0 {
             the_encounter.mix_flag = 0;
         }
+
         for _ in 1..PLACE_TRIES {
             pick_encounter_spot();
+
             if terrain_at(the_encounter.x as i32, the_encounter.y as i32) != PLAIN_TERRAIN {
                 continue;
             }
+
             while the_encounter.number != 0 && the_actors.active < LAST_ENEMY_ACTOR {
                 if place_encounter(the_actors.active as u16, SPREAD) != 0 {
                     the_actors.active += 1;
                 }
+
                 the_encounter.number -= 1;
             }
+
             let mut i = FIRST_ENEMY_ACTOR as usize;
+
             while i < LAST_ENEMY_ACTOR as usize && the_encounter.number != 0 {
-                let an = &raw const the_actors.list[i];
-                if (*an).state == DEAD && ((*an).visible == 0 || (*an).race == WRAITH) {
+                let actor = &raw const the_actors.list[i];
+
+                if (*actor).state == DEAD && ((*actor).visible == 0 || (*actor).race == WRAITH) {
                     place_encounter(i as u16, SPREAD);
                     the_encounter.number -= 1;
                 }
+
                 i += 1;
             }
+
             break;
         }
     }

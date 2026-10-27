@@ -31,18 +31,15 @@ unsafe extern "C" {
 
     // AmigaOS calls the platform layer provides.
     fn SetAPen(current_rastport: *mut RastPort, pen: u32);
+
     fn Delay(ticks: i32);
+
     fn SetRGB4(current_viewport: *mut ViewPort, n: i32, r: u32, g: u32, b: u32);
+
     fn WaitBlit();
+
     // The game's own code that is still C, or lives in other files.
 }
-
-// Memory the game allocates (csrc/fmain.c).
-
-// What `open_all` has set up, so `close_all` knows what to undo (`openflags` bits).
-
-// ---- fta_main ----
-unsafe extern "C" {}
 
 // Screen modes (`view_status`).
 const VIEW_NORMAL: i8 = 0;
@@ -52,25 +49,26 @@ const VIEW_BIG_STILL: i8 = 4;
 const VIEW_PAUSED: i8 = 2;
 const VIEW_REDRAW_2: i8 = 98;
 const VIEW_REDRAW: i8 = 99;
+
 /// The game menu entry that pauses the game; bit 0 set means paused.
 const GAME_MENU: usize = 4;
 const PAUSE_ENTRY: usize = 5;
-/// Intro: how big the picture zooms (half the width in pixels), and the step.
+
 /// A region number below this means the next region is still being loaded.
 const NO_REGION: u16 = 10;
-/// Colours `LoadRGB4` sets for the page and the text.
+
 /// Pens: the title text, and the colour of the flashing pointer.
 const FLASH_COLOR: u32 = 15;
 const SPRITE_PEN: u32 = 31;
+
 /// Waits, in fiftieths of a second.
 const PAUSE_WAIT: i32 = 200;
-/// The placard shown while the copy protection question is asked.
-/// Where the picture planes in `image_mem` start: five planes, 8000 bytes apart.
-/// Disk track range holding the shadow masks.
+
 /// How `dif_x` wraps: a 10 bit signed value.
 const DIF_SIGN_BIT: i32 = 0x200;
 const DIF_SIGN_EXTEND: i32 = 0xfc00;
 const DIF_MASK: i32 = 0x03ff;
+
 /// The scroll directions `scroll_map` takes, by (dif_x, dif_y).
 const SCROLL_UP_LEFT: i32 = 5;
 const SCROLL_LEFT: i32 = 4;
@@ -84,10 +82,13 @@ const SCROLL_DOWN_RIGHT: i32 = 1;
 /// How the map moved since the last frame, in sectors (x wraps at 10 bits).
 unsafe fn scroll_step() -> (i16, i16) {
     unsafe {
+        // Map position in tiles: 16 pixels wide, 32 high.
         the_world.tile_x = the_world.map_x >> 4;
+        // Map position in tiles: 16 pixels wide, 32 high.
         the_world.tile_y = the_world.map_y >> 5;
         let dif_x = (the_world.tile_x as i32 - (*the_screen.drawing_page).isv_x) as i16;
         let dif_y = (the_world.tile_y as i32 - (*the_screen.drawing_page).isv_y) as i16;
+
         (wrap_scroll_difference(dif_x), dif_y)
     }
 }
@@ -117,8 +118,10 @@ pub(super) unsafe fn main_loop() {
             cycle: 0,
             last_terrain: 0,
         };
+
         the_ui.cheat_enabled = 0;
         the_ui.quit_requested = 0;
+
         while the_ui.quit_requested == 0 {
             run_frame(&mut state);
         }
@@ -133,13 +136,16 @@ unsafe fn run_frame(state: &mut FrameState) {
         crate::game::statedump::run_pending_command(); // test commands, does nothing normally
 
         read_keyboard();
+
         if handle_view_status() {
             return;
         }
 
         read_walk_direction();
+
         if menus[GAME_MENU].enabled[PAUSE_ENTRY] & 1 != 0 {
             Delay(1);
+
             return;
         }
 
@@ -153,9 +159,11 @@ unsafe fn run_frame(state: &mut FrameState) {
 
         undo_sprites();
         let (scroll_x, scroll_y, world_update) = update_map_view();
+
         if world_update {
             run_world_update();
         }
+
         draw_frame(state, scroll_x, scroll_y);
     }
 }
@@ -165,6 +173,7 @@ unsafe fn read_keyboard() {
     unsafe {
         let key = next_key() as i8;
         let notpause = menus[GAME_MENU].enabled[PAUSE_ENTRY] & 1 == 0;
+
         if key != 0 {
             handle_key(key as i32, notpause as i32);
         }
@@ -190,9 +199,12 @@ unsafe fn handle_view_status() -> bool {
             } else {
                 SetRGB4(&raw mut the_screen.vp_page, 31, 0, 0, 0);
             }
+
             handle_print_request();
+
             return true;
         }
+
         false
     }
 }
@@ -203,6 +215,7 @@ unsafe fn move_everything(state: &mut FrameState) {
     unsafe {
         raft_proximity();
         let mut i = 0;
+
         while i < the_actors.active as i32 {
             move_actor(i, state.cycle, &mut state.last_terrain);
             i += 1;
@@ -242,30 +255,38 @@ unsafe fn update_map_view() -> (i16, i16, bool) {
         {
             refresh_minimap();
             draw_map();
+
             if the_screen.view_status == VIEW_REDRAW {
                 the_screen.view_status = VIEW_REDRAW_2;
             } else if the_screen.view_status == VIEW_REDRAW_2 {
                 the_screen.view_status = VIEW_NORMAL;
             }
+
             return (0, 0, true);
         }
 
         if scroll_x != 0 || scroll_y != 0 {
             refresh_minimap();
         }
+
         if let Some(direction) = scroll_direction(scroll_x, scroll_y) {
             scroll_map(direction);
+
             return (scroll_x, scroll_y, false);
         }
+
         if scroll_x == 0 && scroll_y == 0 {
             // no motion: the world gets its turn here
             handle_print_request();
+
             return (scroll_x, scroll_y, true);
         }
+
         // moved too far to scroll: redraw the whole map
         scroll_x = 0;
         scroll_y = 0;
         draw_map();
+
         (scroll_x, scroll_y, false)
     }
 }
@@ -275,6 +296,7 @@ unsafe fn update_map_view() -> (i16, i16, bool) {
 unsafe fn run_world_update() {
     unsafe {
         day_night_tick();
+
         if the_world.freeze_timer == 0 {
             spawn_encounters();
             speak_nearby();
@@ -306,12 +328,14 @@ unsafe fn draw_frame(state: &mut FrameState, scroll_x: i16, scroll_y: i16) {
         repair_map_and_witch(scroll_x, scroll_y);
 
         draw_sprites(state.cycle);
+
         // The drawing loop used to leave `j` here; the next frame's actor loop reads it.
         state.last_terrain = the_actors.drawn;
         WaitBlit();
         (*(*the_screen.drawing_page).ri_page).RxOffset = (the_world.map_x & 15) as i16; // modulus 16
         (*(*the_screen.drawing_page).ri_page).RyOffset = (the_world.map_y & 31) as i16; // modulus 32
         flip_pages();
+
         if the_screen.view_status == VIEW_CHANGED {
             fade_normal();
             the_screen.view_status = VIEW_NORMAL;

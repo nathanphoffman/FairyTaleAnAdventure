@@ -17,6 +17,7 @@ use crate::game::files::disk::{
     is_last_read_pending, last_read_finished, load_track_range, mark_read_unused, motor_off,
     wait_for_read,
 };
+
 use crate::game::files::iff_picture::load_picture;
 use crate::game::input::handler::next_key;
 use crate::game::render::blit::make_sprite_masks;
@@ -26,11 +27,17 @@ use std::ffi::c_char;
 
 unsafe extern "C" {
     fn Open(name: *const c_char, mode: i32) -> BPTR;
+
     fn Close(file: BPTR);
+
     fn Read(file: BPTR, buf: *mut u8, len: i32) -> i32;
+
     fn Delay(ticks: i32);
+
     fn AllocMem(size: u32, flags: u32) -> *mut u8;
+
     fn TypeOfMem(p: *const u8) -> u32;
+
     fn BltBitMap(
         src: *mut BitMap,
         sx: i32,
@@ -44,6 +51,7 @@ unsafe extern "C" {
         mask: u32,
         temp: *mut u8,
     ) -> i32;
+
     fn playsample(data: *const u8, len: i32, period: i32);
 }
 
@@ -63,9 +71,11 @@ const ALL_PLANES: u32 = 0x1f;
 
 /// Scratch memory for sprites: bytes available in `shape_mem`.
 pub const SHAPE_SIZE: usize = 78000;
+
 /// A sprite sequence is loaded with room for its mask and the shifted copies after it.
 const SIZE_WITH_MASK: usize = 6;
 const SIZE_WITHOUT_MASK: usize = 5;
+
 /// Drive request used when loading sprite files.
 const SPRITE_REQUEST: i16 = 8;
 
@@ -177,6 +187,7 @@ pub fn load_sprite_file(num: i32) {
         slot.width = file.width as i16;
         slot.height = file.height as i16;
         slot.count = file.count as i16;
+
         if the_memory.nextshape.add(size * SIZE_WITH_MASK) <= the_memory.shape_mem.add(SHAPE_SIZE) {
             load_track_range(
                 file.file_id as i16,
@@ -184,6 +195,7 @@ pub fn load_sprite_file(num: i32) {
                 the_memory.nextshape.cast(),
                 SPRITE_REQUEST,
             );
+
             the_memory.nextshape = the_memory.nextshape.add(size * SIZE_WITHOUT_MASK);
             slot.maskloc = the_memory.nextshape;
             the_memory.nextshape = the_memory.nextshape.add(size);
@@ -238,17 +250,22 @@ const SCORE_MEMORY: i32 = 5900;
 pub fn read_score() {
     unsafe {
         let file = Open(c"songs".as_ptr(), MODE_OLDFILE) as i32;
+
         if file == 0 {
             return;
         }
+
         let (mut loaded, mut tracks) = (0, 0);
+
         for _ in 0..TRACK_COUNT {
             let mut length = 0i32;
             Read(file as BPTR, (&raw mut length).cast(), 4);
             length = length.swap_bytes(); // the length is stored big-endian
+
             if length * 2 + loaded > SCORE_MEMORY {
                 break;
             }
+
             the_memory.track[tracks] = the_memory.scoremem.offset(loaded as isize);
             tracks += 1;
             Read(
@@ -256,8 +273,10 @@ pub fn read_score() {
                 the_memory.scoremem.offset(loaded as isize),
                 length * 2,
             );
+
             loaded += length * 2;
         }
+
         Close(file as BPTR);
     }
 }
@@ -272,15 +291,18 @@ pub fn intro_skipped() -> i32 {
         if next_key() == b' ' as i32 {
             intro_skip_requested = 1;
         }
+
         intro_skip_requested as i32
     }
 }
 
 const SCREEN_WIDTH: i32 = 320;
 const SCREEN_HEIGHT: i32 = 200;
+
 /// Where the first story picture goes on the page.
 const PICTURE_X: i16 = 4;
 const PICTURE_Y: i16 = 24;
+
 /// Ticks to show a page before turning it.
 const PAGE_DELAY: i32 = 350;
 
@@ -291,6 +313,7 @@ pub fn show_story_page(br1: *const c_char, br2: *const c_char, x: i16, y: i16) {
         if intro_skip_requested != 0 {
             return;
         }
+
         Delay(PAGE_DELAY);
         BltBitMap(
             &raw mut the_screen.pageb,
@@ -305,11 +328,14 @@ pub fn show_story_page(br1: *const c_char, br2: *const c_char, x: i16, y: i16) {
             ALL_PLANES,
             std::ptr::null_mut(),
         );
+
         load_picture(br1, &raw mut the_screen.pageb, PICTURE_X, PICTURE_Y);
         load_picture(br2, &raw mut the_screen.pageb, x, y);
+
         if intro_skipped() != 0 {
             return;
         }
+
         turn_page();
         intro_skipped();
     }
@@ -319,12 +345,15 @@ pub fn show_story_page(br1: *const c_char, br2: *const c_char, x: i16, y: i16) {
 const FLIP_RATE: [i16; 22] = [
     8, 6, 5, 4, 3, 2, 3, 5, 13, 0, 0, 13, 5, 3, 2, 3, 4, 5, 6, 8, 0, 0,
 ];
+
 const FLIP_WIDE: [i16; 22] = [
     7, 5, 4, 3, 2, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 2, 3, 4, 5, 7, 0, 0,
 ];
+
 const FLIP_DELAY: [i32; 22] = [
     12, 9, 6, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 6, 9, 0, 0,
 ];
+
 /// The first half of the frames turn the right page up, the rest lay the left one down.
 const FIRST_HALF: usize = 11;
 const PAGE_HALF_WIDTH: i32 = 135;
@@ -368,16 +397,20 @@ unsafe fn copy_rect(
 pub fn turn_page() {
     unsafe {
         let (a, b) = (&raw mut the_screen.pagea, &raw mut the_screen.pageb);
+
         for frame in 0..FLIP_RATE.len() {
             let temp = (*(*the_screen.drawing_page).ri_page).BitMap;
             let rate = FLIP_RATE[frame];
             let wide = FLIP_WIDE[frame] as i32;
+
             if frame < FIRST_HALF {
                 turn_right_page_frame(a, b, temp, rate, wide);
             } else {
                 turn_left_page_frame(a, b, temp, rate, wide);
             }
+
             flip_pages();
+
             if FLIP_DELAY[frame] != 0 {
                 Delay(FLIP_DELAY[frame]);
             }
@@ -398,11 +431,14 @@ unsafe fn turn_right_page_frame(
         let bcol = 161 - wide;
         let mut dcol: i32 = 0;
         copy_rect(b, 160, 0, temp, 160, 0, PAGE_HALF_WIDTH, SCREEN_HEIGHT);
+
         if rate == 0 {
             return;
         }
+
         let mut h = 0;
         let mut scol = wide as i16;
+
         while scol < PAGE_STRIP_END {
             h = crate::game::world::map::page_turn_inset(scol as i32);
             copy_rect(
@@ -415,9 +451,11 @@ unsafe fn turn_right_page_frame(
                 wide,
                 SCREEN_HEIGHT - h - h,
             );
+
             dcol += wide;
             scol += rate;
         }
+
         copy_rect(a, 296, 7, temp, 161 + dcol, h, 1, 186);
     }
 }
@@ -432,13 +470,17 @@ unsafe fn turn_left_page_frame(
 ) {
     unsafe {
         let bcol = 160;
+
         if rate == 0 {
             copy_rect(b, 24, 0, temp, 24, 0, PAGE_HALF_WIDTH, SCREEN_HEIGHT);
+
             return;
         }
+
         copy_rect(a, 24, 0, temp, 24, 0, PAGE_HALF_WIDTH, SCREEN_HEIGHT);
         let mut dcol: i32 = 0;
         let mut scol = wide as i16;
+
         while scol < PAGE_STRIP_END {
             let h = crate::game::world::map::page_turn_inset(scol as i32);
             dcol += wide;
@@ -452,8 +494,10 @@ unsafe fn turn_left_page_frame(
                 wide,
                 SCREEN_HEIGHT - h - h,
             );
+
             scol += rate;
         }
+
         let h = 7;
         copy_rect(b, 24, h, temp, 159 - dcol, h, 1, SCREEN_HEIGHT - h - h);
     }
@@ -465,8 +509,10 @@ pub fn into_chip(oldpointer: *mut u8, size: i32) -> *mut u8 {
         if TypeOfMem(oldpointer) & MEMF_CHIP != 0 {
             return oldpointer;
         }
+
         let newpointer = AllocMem(size as u32, MEMF_CHIP);
         std::ptr::copy_nonoverlapping(oldpointer, newpointer, size as usize);
+
         newpointer
     }
 }
@@ -479,10 +525,13 @@ pub fn copy_protection_riddle() -> i32 {
 /// Where the sound effects are on the disk (block) and how many blocks they take.
 const SAMPLE_BLOCK: i16 = 920;
 const SAMPLE_BLOCKS: i16 = 11;
+
 /// The disk request number used for sound samples.
 const SAMPLE_REQUEST: i16 = 8;
+
 /// There are 6 sound effects.
 const SAMPLE_COUNT: usize = 6;
+
 /// The game menu entry that switches sound effects on and off.
 const GAME_MENU: usize = 4;
 const SOUND_ENTRY: usize = 7;
@@ -497,10 +546,12 @@ pub fn read_sample() {
             the_memory.sample_mem.cast(),
             SAMPLE_REQUEST,
         );
+
         wait_for_read(SAMPLE_REQUEST as i32);
         mark_read_unused(SAMPLE_REQUEST as i32);
 
         let mut at = the_memory.sample_mem;
+
         for i in 0..SAMPLE_COUNT {
             let length = u32::from_be_bytes([*at, *at.add(1), *at.add(2), *at.add(3)]);
             at = at.add(4);

@@ -9,6 +9,7 @@ const CODE_BACKSPACE: u8 = 8;
 const CODE_TAB: u8 = 9;
 const CODE_RETURN: u8 = 13;
 const CODE_DELETE: u8 = 0x7f;
+
 /// F1 is code 10, F2 is 11 ... F10 is 19.
 const FUNCTION_KEY_BASE: u8 = 10;
 
@@ -19,6 +20,7 @@ const FUNCTION_KEY_BASE: u8 = 10;
 pub(super) fn dir_code(up: bool, down: bool, left: bool, right: bool) -> u8 {
     let dx = right as i32 - left as i32;
     let dy = down as i32 - up as i32;
+
     match (dx, dy) {
         (-1, -1) => DIR_BASE,
         (0, -1) => DIR_BASE + 1,
@@ -46,6 +48,7 @@ fn keypad_code(key: Keycode) -> Option<u8> {
         Keycode::Kp5 => 9,
         _ => return None,
     };
+
     Some(DIR_BASE + offset)
 }
 
@@ -71,7 +74,9 @@ fn function_key_code(key: Keycode) -> Option<u8> {
         Keycode::F9,
         Keycode::F10,
     ];
+
     let index = keys.iter().position(|&k| k == key)?;
+
     Some(FUNCTION_KEY_BASE + index as u8)
 }
 
@@ -96,9 +101,11 @@ pub(super) fn translate(key: Keycode) -> u8 {
         Keycode::Kp0 => b'0',
         _ => 0,
     };
+
     if simple != 0 {
         return simple;
     }
+
     alphanumeric_code(key)
         .or_else(|| function_key_code(key))
         .or_else(|| keypad_code(key))

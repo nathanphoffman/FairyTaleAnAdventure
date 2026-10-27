@@ -9,6 +9,7 @@ use std::os::raw::c_char;
 #[unsafe(no_mangle)]
 pub extern "C" fn Lock(name: *const c_char, _mode: LONG) -> BPTR {
     let name = unsafe { cstr(name) };
+
     if resolve(name, false).is_some() { 1 } else { 0 }
 }
 

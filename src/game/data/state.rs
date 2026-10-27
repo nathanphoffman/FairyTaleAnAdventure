@@ -62,6 +62,7 @@ pub struct World {
 
 pub static mut the_world: World = World {
     region: 3,
+
     ..unsafe { std::mem::zeroed() }
 };
 

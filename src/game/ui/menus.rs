@@ -14,8 +14,11 @@ use std::ffi::c_char;
 
 unsafe extern "C" {
     fn SetAPen(current_rastport: *mut RastPort, pen: u32);
+
     fn SetBPen(current_rastport: *mut RastPort, pen: u32);
+
     fn Move(current_rastport: *mut RastPort, x: i32, y: i32);
+
     fn Text(current_rastport: *mut RastPort, s: *const c_char, len: i32) -> i32;
 }
 
@@ -31,6 +34,7 @@ const SAVEX: usize = 5;
 /// An entry that is shown but cannot be used, and one that can.
 const GREYED: i8 = 8;
 const AVAILABLE: i8 = 10;
+
 /// The game menu entry that pauses the game; bit 0 set means paused.
 const PAUSE_ENTRY: usize = 5;
 
@@ -40,6 +44,7 @@ const KEY_ITEM_BASE: i32 = 16;
 const SUNSTONE: i32 = 7;
 const WRIT: i32 = 28;
 const BONE: i32 = 29;
+
 /// The hero must have more than this much gold to be able to give some away.
 const GIVE_GOLD_MIN: i16 = 2;
 
@@ -50,15 +55,19 @@ pub fn update_menu_availability() {
             menus[MAGIC].enabled[i + 5] = item_menu_state(i as i32 + MAGIC_ITEM_BASE) as i8;
             menus[USE].enabled[i] = item_menu_state(i as i32) as i8;
         }
+
         // "use a key" is available if any key slot reports available
         let mut keys = GREYED;
+
         for i in 0..6 {
             let flag = item_menu_state(i as i32 + KEY_ITEM_BASE) as i8;
             menus[KEYS].enabled[i + 5] = flag;
+
             if flag == AVAILABLE {
                 keys = AVAILABLE;
             }
         }
+
         menus[USE].enabled[7] = keys;
         menus[USE].enabled[8] = item_menu_state(SUNSTONE) as i8;
         menus[GIVE].enabled[5] = if the_hero.wealth > GIVE_GOLD_MIN {
@@ -66,6 +75,7 @@ pub fn update_menu_availability() {
         } else {
             GREYED
         }; // gold
+
         menus[GIVE].enabled[6] = GREYED; // book
         menus[GIVE].enabled[7] = item_menu_state(WRIT) as i8;
         menus[GIVE].enabled[8] = item_menu_state(BONE) as i8;
@@ -74,6 +84,7 @@ pub fn update_menu_availability() {
 
 /// Most entries a menu shows at once (two columns of six).
 const SLOTS: usize = 12;
+
 /// An entry with this bit set is shown.
 const SHOWN: i8 = 2;
 
@@ -83,25 +94,32 @@ pub fn print_options() {
     unsafe {
         let menu = &menus[the_ui.current_menu as usize];
         let mut slot = 0usize;
+
         for entry in 0..menu.num as usize {
             let enabled = menu.enabled[entry];
+
             if enabled & SHOWN == 0 {
                 continue;
             }
+
             the_ui.slot_entries[slot] = entry as i8;
             print_menu_entry(slot as i16, (enabled & 1) as i16);
             slot += 1;
+
             if slot > SLOTS - 1 {
                 break;
             }
         }
+
         SetBPen(&raw mut the_screen.rp_text2, 0);
+
         while slot < SLOTS {
             let x = if slot & 1 != 0 {
                 RIGHT_COLUMN_X
             } else {
                 LEFT_COLUMN_X
             };
+
             let y = (slot / 2) as i32 * ROW_HEIGHT + FIRST_ROW_Y;
             Move(&raw mut the_screen.rp_text2, x, y);
             Text(&raw mut the_screen.rp_text2, c"      ".as_ptr(), 6);
@@ -117,6 +135,7 @@ pub fn go_to_menu(mode: i16) {
         if menus[GAME].enabled[PAUSE_ENTRY] & 1 != 0 {
             return;
         }
+
         the_ui.current_menu = mode;
         forget_last_menu();
         print_options();
@@ -128,11 +147,14 @@ const LEFT_COLUMN_X: i32 = 430;
 const RIGHT_COLUMN_X: i32 = 482;
 const FIRST_ROW_Y: i32 = 8;
 const ROW_HEIGHT: i32 = 9;
+
 /// The entry's text is inset from the edge of its coloured box by this much.
 const TEXT_INSET: i32 = 4;
+
 /// Each label is 5 characters; the box behind it is 6 wide.
 const LABEL_LEN: i32 = 5;
 const BOX: &[u8; 6] = b"      ";
+
 /// The first 5 entries of every menu are the main menu names, taken from `label1`.
 const MAIN_ENTRIES: i32 = 5;
 const FILE_PEN: u32 = 13;
@@ -158,6 +180,7 @@ pub fn print_menu_entry(j: i16, pena: i16) {
         } else {
             menus[the_ui.current_menu as usize].color as u32
         };
+
         SetAPen(r, pena as u32);
         SetBPen(r, box_pen);
 
@@ -167,11 +190,13 @@ pub fn print_menu_entry(j: i16, pena: i16) {
         } else {
             LEFT_COLUMN_X
         };
+
         let y = (j as i32 / 2) * ROW_HEIGHT + FIRST_ROW_Y;
         Move(r, x, y);
         Text(r, BOX.as_ptr().cast(), BOX.len() as i32);
         Move(r, x + TEXT_INSET, y);
         let labels = menus[the_ui.current_menu as usize].label_list;
+
         // The main names come from `label1`; the other menus have their own list, which for the
         // first 5 slots is skipped over.
         let label = if the_ui.current_menu as usize >= USE {
@@ -181,6 +206,7 @@ pub fn print_menu_entry(j: i16, pena: i16) {
         } else {
             labels.offset((offset - MAIN_ENTRIES * LABEL_LEN) as isize)
         };
+
         Text(r, label, LABEL_LEN);
     }
 }

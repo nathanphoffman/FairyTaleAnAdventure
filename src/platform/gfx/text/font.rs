@@ -40,6 +40,7 @@ fn be32(d: &[u8], o: usize) -> Option<u32> {
 /// AmigaDOS hunk file markers.
 const HUNK_HEADER: u32 = 0x3f3;
 const HUNK_CODE: u32 = 0x3e9;
+
 /// Bytes before the per-hunk size table in a HUNK_HEADER, and bytes of HUNK_CODE tag and size.
 const HUNK_HEADER_FIXED: usize = 20;
 const HUNK_CODE_PREFIX: usize = 8;
@@ -80,11 +81,13 @@ fn read_font_tables(seg: &[u8]) -> Option<BitmapFont> {
         .to_vec();
     let mut loc = Vec::new();
     let (mut space, mut kern) = (Vec::new(), Vec::new());
+
     for i in 0..count {
         loc.push((be16(seg, charloc + i * 4)?, be16(seg, charloc + i * 4 + 2)?));
         space.push(be16(seg, charspace + i * 2)?);
         kern.push(be16(seg, charkern + i * 2)? as i16);
     }
+
     Some(BitmapFont {
         height,
         baseline,
@@ -102,20 +105,25 @@ fn read_font_tables(seg: &[u8]) -> Option<BitmapFont> {
 /// DiskFontHeader. Offsets inside it are relative to the start of that hunk's data.
 fn load_disk_font(path: &std::path::Path) -> Option<BitmapFont> {
     let file = std::fs::read(path).ok()?;
+
     if be32(&file, 0)? != HUNK_HEADER {
         return None;
     }
+
     // HUNK_HEADER: 0, table size, first, last, one size per hunk, then HUNK_CODE, size, data
     let table = be32(&file, 8)? as usize;
     let hunk = HUNK_HEADER_FIXED + LONG_BYTES * table;
+
     if be32(&file, hunk)? != HUNK_CODE {
         return None;
     }
+
     read_font_tables(file.get(hunk + HUNK_CODE_PREFIX..)?)
 }
 
 fn new_font(data: FontData, width: i32, height: i32, baseline: i32) -> *mut TextFont {
     let data = Box::into_raw(Box::new(data));
+
     Box::into_raw(Box::new(TextFont {
         tf_YSize: height as UWORD,
         tf_XSize: width as UWORD,
@@ -155,11 +163,14 @@ pub extern "C" fn LoadSeg(name: *const c_char) -> BPTR {
     let Some(path) = crate::platform::dos::resolve(&name, false) else {
         return 0;
     };
+
     let tf = match load_disk_font(&path) {
         Some(font) => {
             let (h, b) = (font.height, font.baseline);
+
             new_font(FontData::Bitmap(font), STORY_FONT_WIDTH, h, b)
         }
+
         None => new_font(
             FontData::Builtin,
             STORY_FALLBACK.0,
@@ -167,9 +178,12 @@ pub extern "C" fn LoadSeg(name: *const c_char) -> BPTR {
             STORY_FALLBACK.2,
         ),
     };
+
     let header = Box::into_raw(Box::new(DiskFontHeader {
         dfh_TF: unsafe { std::ptr::read(tf) },
     }));
+
+    // The Amiga segment pointer counts in 4 byte units.
     ((header as isize) - SEG_HEADER_BYTES) >> 2
 }
 

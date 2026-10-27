@@ -11,28 +11,35 @@ use crate::game::data::types::Need;
 use crate::game::files::disk::{
     is_read_pending, load_track_range, mark_read_unused, motor_off, read_finished, wait_for_read,
 };
+
 use crate::game::world::map::fill_minimap;
 use std::ffi::c_void;
 
 /// `new_region` value meaning no region is waiting to be loaded.
 const NO_REGION: u16 = 10;
+
 /// First region number that is indoors.
 const FIRST_INDOOR_REGION: u16 = 8;
+
 /// Block on the disk where the terrain tables start.
 const TERRA_BLOCK: i16 = 149;
+
 /// Bytes in one bitplane of 256 tiles, and of 64 tiles.
 const IMAGE_PLANE_SIZE: usize = 16384;
 const QUARTER_PLANE_SIZE: usize = 4096;
+
 /// Blocks for the sector data, the region map and one image plane.
 const SECTOR_BLOCKS: i16 = 64;
 const REGION_MAP_BLOCKS: i16 = 8;
 const IMAGE_PLANE_BLOCKS: i16 = 8;
+
 /// Disk request numbers for each kind of data (see `load_track_range`).
 const REQ_SECTOR: i16 = 0;
 const REQ_MAP: i16 = 0;
 const REQ_TERRA1: i16 = 1;
 const REQ_TERRA2: i16 = 2;
 const REQ_IMAGE_FIRST: i16 = 3;
+
 /// Terrain tables are one block (512 bytes) each; the second goes after the first.
 const TERRA_TABLE_SIZE: usize = 512;
 
@@ -55,15 +62,22 @@ pub fn refresh_minimap() {
             if the_world.new_region < NO_REGION {
                 let xs = the_world.map_x as u32 & 0x3fff;
                 let ys = the_world.map_y as u32 & 0x1fff;
+
                 if (ys > 109 && ys < 7936) && !(16128..=16156).contains(&xs) {
                     load_region_now();
                 }
             }
+
+            // The sector at the middle of the screen, 256 pixels to a sector.
             let xs = (the_world.map_x as u32 + 151) >> 8;
+            // The sector at the middle of the screen, 256 pixels to a sector.
             let ys = (the_world.map_y as u32 + 64) >> 8;
+            // The map is two regions wide (64 sectors each).
             let xr = (xs >> 6) & 1;
+            // The map is four regions high (32 sectors each).
             let yr = (ys >> 5) & 3;
             the_world.target_region = (xr + yr + yr) as u16;
+
             if the_world.target_region != the_world.region {
                 the_world.new_region = the_world.target_region;
                 load_region_now();
@@ -73,13 +87,17 @@ pub fn refresh_minimap() {
         }
 
         if (read_finished(2) != 0 && read_finished(0) != 0) || the_world.new_region >= NO_REGION {
+            // Regions are numbered along the row: two to a row, so the row is the number halved.
             let yr = the_world.target_region >> 1;
             let xr = if the_world.target_region > 7 {
                 0
             } else {
                 the_world.target_region & 1
             };
+
+            // Where the region starts in sectors: 64 across, 32 down.
             the_world.origin_x = xr << 6;
+            // Where the region starts in sectors: 64 across, 32 down.
             the_world.origin_y = yr << 5;
         }
 
@@ -105,45 +123,15 @@ pub fn load_region_piece() {
         if the_world.new_region >= NO_REGION {
             return;
         }
+
         let need = &region_disk_blocks[the_world.new_region as usize];
-        if need.sector != loaded_blocks.sector {
-            load_track_range(
-                need.sector as i16,
-                SECTOR_BLOCKS,
-                the_memory.sector_mem.cast::<c_void>(),
-                REQ_SECTOR,
-            );
-            loaded_blocks.sector = need.sector;
-        }
-        if need.region != loaded_blocks.region {
-            load_track_range(
-                need.region as i16,
-                REGION_MAP_BLOCKS,
-                the_memory.map_mem.cast::<c_void>(),
-                REQ_MAP,
-            );
-            loaded_blocks.region = need.region;
-        }
-        if need.terra1 != loaded_blocks.terra1 {
-            load_track_range(
-                TERRA_BLOCK + need.terra1 as i16,
-                1,
-                the_memory.terrain_mem.cast::<c_void>(),
-                REQ_TERRA1,
-            );
-            loaded_blocks.terra1 = need.terra1;
-        }
-        if need.terra2 != loaded_blocks.terra2 {
-            let dest = the_memory
-                .terrain_mem
-                .add(TERRA_TABLE_SIZE)
-                .cast::<c_void>();
-            load_track_range(TERRA_BLOCK + need.terra2 as i16, 1, dest, REQ_TERRA2);
-            loaded_blocks.terra2 = need.terra2;
-        }
+
+        load_changed_tables(need);
+
         if load_next_image_bank(need) {
             return;
         }
+
         block_desert_door_without_statues();
         wait_for_all_reads();
         motor_off();
@@ -152,14 +140,63 @@ pub fn load_region_piece() {
     }
 }
 
+/// Loads the sector data, region map and two terrain tables that differ from the loaded ones.
+unsafe fn load_changed_tables(need: &Need) {
+    unsafe {
+        if need.sector != loaded_blocks.sector {
+            load_track_range(
+                need.sector as i16,
+                SECTOR_BLOCKS,
+                the_memory.sector_mem.cast::<c_void>(),
+                REQ_SECTOR,
+            );
+
+            loaded_blocks.sector = need.sector;
+        }
+
+        if need.region != loaded_blocks.region {
+            load_track_range(
+                need.region as i16,
+                REGION_MAP_BLOCKS,
+                the_memory.map_mem.cast::<c_void>(),
+                REQ_MAP,
+            );
+
+            loaded_blocks.region = need.region;
+        }
+
+        if need.terra1 != loaded_blocks.terra1 {
+            load_track_range(
+                TERRA_BLOCK + need.terra1 as i16,
+                1,
+                the_memory.terrain_mem.cast::<c_void>(),
+                REQ_TERRA1,
+            );
+
+            loaded_blocks.terra1 = need.terra1;
+        }
+
+        if need.terra2 != loaded_blocks.terra2 {
+            let dest = the_memory
+                .terrain_mem
+                .add(TERRA_TABLE_SIZE)
+                .cast::<c_void>();
+            load_track_range(TERRA_BLOCK + need.terra2 as i16, 1, dest, REQ_TERRA2);
+            loaded_blocks.terra2 = need.terra2;
+        }
+    }
+}
+
 /// Loads the first of the four image banks that differs from the loaded one. Returns true if it
 /// loaded one (only one bank per call, so the game keeps running), false if all are up to date.
 unsafe fn load_next_image_bank(need: &Need) -> bool {
     unsafe {
         let mut bank_mem = the_memory.image_mem;
+
         for bank in 0..4 {
             if need.image[bank] != loaded_blocks.image[bank] {
                 let first = need.image[bank] as i16;
+
                 for plane in 0..5 {
                     let dest = bank_mem.add(plane * IMAGE_PLANE_SIZE).cast::<c_void>();
                     let block = first + plane as i16 * IMAGE_PLANE_BLOCKS;
@@ -170,11 +207,15 @@ unsafe fn load_next_image_bank(need: &Need) -> bool {
                         REQ_IMAGE_FIRST + plane as i16,
                     );
                 }
+
                 loaded_blocks.image[bank] = need.image[bank];
+
                 return true;
             }
+
             bank_mem = bank_mem.add(QUARTER_PLANE_SIZE);
         }
+
         false
     }
 }
@@ -198,6 +239,7 @@ fn wait_for_all_reads() {
         if is_read_pending(request) != 0 {
             wait_for_read(request);
         }
+
         mark_read_unused(request);
     }
 }

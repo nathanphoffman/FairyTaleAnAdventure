@@ -8,6 +8,7 @@ use crate::game::render::witch::witch_fx;
 
 unsafe extern "C" {
     fn OwnBlitter();
+
     fn DisownBlitter();
 }
 
@@ -19,13 +20,16 @@ pub fn undo_sprites() {
 
         OwnBlitter();
         let queue = (*the_screen.drawing_page).shape_queue.cast::<SShape>();
+
         for i in (1..=(*the_screen.drawing_page).obcount as isize).rev() {
             current_sshape = queue.offset(i - 1);
             restore_background((*current_sshape).backsave);
         }
+
         DisownBlitter();
 
         the_screen.rp_map.BitMap = (*(*the_screen.drawing_page).ri_page).BitMap;
+
         if (*the_screen.drawing_page).wflag != 0 {
             witch_fx(the_screen.drawing_page);
         }

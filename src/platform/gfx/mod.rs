@@ -5,8 +5,13 @@
 //! (display.rs) converts them to RGB.
 
 mod area;
+
 mod bitmap;
+
 mod blit;
+
 mod draw;
+
 mod text;
+
 mod view;

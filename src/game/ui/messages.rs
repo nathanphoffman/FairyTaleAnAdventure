@@ -30,17 +30,21 @@ const TEXT_X_MIN: i32 = 16;
 const TEXT_X_MAX: i32 = 400;
 const TEXT_Y_MIN: i32 = 5;
 const TEXT_Y_MAX: i32 = 44;
+
 /// Pixels the panel scrolls up for each new line, and the baseline of that new line.
 const LINE_HEIGHT: i32 = 10;
 const NEW_LINE_Y: i32 = 42;
 
 /// Characters on a line before `print_wrapped` looks for a place to wrap it.
 const WRAP_COLUMN: i16 = 37;
+
 /// Past this count `print_wrapped` knows the message is finished.
 const END_COLUMN: i16 = 38;
+
 /// Set when the message text ends, to leave the line loop.
 const MESSAGE_ENDED: i16 = 1000;
 const CARRIAGE_RETURN: c_char = 13;
+
 /// In message text: replaced by the current brother's name.
 const NAME_MARK: c_char = b'%' as c_char;
 
@@ -70,6 +74,7 @@ pub fn print(s: *const c_char) {
             TEXT_X_MAX,
             TEXT_Y_MAX,
         );
+
         move_to(TEXT_X_MIN, NEW_LINE_Y);
         draw_text(s, length(s));
     }
@@ -85,12 +90,14 @@ unsafe fn append_brother_name() -> i16 {
     unsafe {
         let mut length = 0;
         let mut name = brother_name();
+
         while *name != 0 {
             *MBUF = *name;
             MBUF = MBUF.add(1);
             name = name.add(1);
             length += 1;
         }
+
         length
     }
 }
@@ -106,54 +113,77 @@ pub fn print_wrapped(mut start: *const c_char) {
         let mut line_start = (&raw mut MESBUF).cast::<c_char>();
         MBUF = line_start;
         let mut i: i16 = 0;
+
         loop {
-            let mut line_break: *mut c_char = std::ptr::null_mut(); // end of the current line
-            while i < WRAP_COLUMN {
-                let c = *start;
-                start = start.add(1);
-                if c == b' ' as c_char {
-                    line_break = MBUF;
-                }
-                if c == 0 {
-                    line_break = MBUF;
-                    *line_break = 0;
-                    i = MESSAGE_ENDED;
-                }
-                if c == CARRIAGE_RETURN {
-                    line_break = MBUF;
-                    *line_break = 0;
-                    break;
-                }
-                if c == NAME_MARK {
-                    i += append_brother_name();
-                } else {
-                    *MBUF = c;
-                    MBUF = MBUF.add(1);
-                }
-                i += 1;
-            }
+            let mut line_break = copy_up_to_a_line(&mut start, &mut i);
+
             if !line_break.is_null() {
                 // found a wrap point: end the line and print it
                 *line_break = 0;
                 line_break = line_break.add(1);
                 print(line_start);
+
                 if i > END_COLUMN {
                     break;
                 }
+
                 i = MBUF.offset_from(line_break) as i16;
                 line_start = line_break;
             } else {
                 // no wrap point, so print the whole thing
                 *MBUF = 0;
                 MBUF = MBUF.add(1);
+
                 if i > END_COLUMN {
                     break;
                 }
+
                 print(line_start);
                 i = 0;
                 line_start = MBUF;
             }
         }
+    }
+}
+
+/// Copies message characters into the buffer until a line is full or the text ends, counting them in
+/// `i` and returning where the last space (or the end) was, or null if there was none.
+unsafe fn copy_up_to_a_line(start: &mut *const c_char, i: &mut i16) -> *mut c_char {
+    unsafe {
+        let mut line_break: *mut c_char = std::ptr::null_mut(); // end of the current line
+
+        while *i < WRAP_COLUMN {
+            let c = **start;
+            *start = start.add(1);
+
+            if c == b' ' as c_char {
+                line_break = MBUF;
+            }
+
+            if c == 0 {
+                line_break = MBUF;
+                *line_break = 0;
+                *i = MESSAGE_ENDED;
+            }
+
+            if c == CARRIAGE_RETURN {
+                line_break = MBUF;
+
+                *line_break = 0;
+                break;
+            }
+
+            if c == NAME_MARK {
+                *i += append_brother_name();
+            } else {
+                *MBUF = c;
+                MBUF = MBUF.add(1);
+            }
+
+            *i += 1;
+        }
+
+        line_break
     }
 }
 

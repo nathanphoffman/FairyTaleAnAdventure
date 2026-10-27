@@ -9,6 +9,7 @@ use std::io::{Read as _, Seek as _, SeekFrom, Write as _};
 use std::os::raw::c_char;
 
 const MODE_NEWFILE: i32 = 1006;
+
 /// Seek modes.
 const OFFSET_BEGINNING: LONG = -1;
 const OFFSET_CURRENT: LONG = 0;
@@ -29,13 +30,17 @@ fn store_file(f: File) -> BPTR {
         let mut files = files.borrow_mut();
         let slot = files.iter().position(|s| s.is_none()).unwrap_or_else(|| {
             files.push(None);
+
             files.len() - 1
         });
+
         files[slot] = Some(f);
+
         slot as BPTR + 1
     })
 }
 
+/// The Amiga `Open`: opens an existing file, or creates a new one in write mode. Returns 0 on failure.
 #[unsafe(no_mangle)]
 pub extern "C" fn Open(name: *const c_char, mode: LONG) -> BPTR {
     let name = unsafe { cstr(name) };
@@ -43,6 +48,7 @@ pub extern "C" fn Open(name: *const c_char, mode: LONG) -> BPTR {
     let Some(path) = resolve(name, write) else {
         return 0;
     };
+
     let file = if write {
         OpenOptions::new()
             .write(true)
@@ -52,10 +58,12 @@ pub extern "C" fn Open(name: *const c_char, mode: LONG) -> BPTR {
     } else {
         File::open(&path)
     };
+
     match file {
         Ok(f) => store_file(f),
         Err(e) => {
             eprintln!("Could not open {}: {e}", path.display());
+
             0
         }
     }
@@ -73,6 +81,7 @@ pub extern "C" fn Close(f: BPTR) {
 fn with_file<R>(f: BPTR, op: impl FnOnce(&mut File) -> R) -> Option<R> {
     FILES.with(|files| {
         let mut files = files.borrow_mut();
+
         files.get_mut((f - 1) as usize)?.as_mut().map(op)
     })
 }
@@ -80,16 +89,19 @@ fn with_file<R>(f: BPTR, op: impl FnOnce(&mut File) -> R) -> Option<R> {
 /// Reads until `buf` is full or the file ends. Returns the byte count, or ERROR.
 fn read_fully(file: &mut File, buf: &mut [u8]) -> LONG {
     let mut total = 0;
+
     while total < buf.len() {
         match file.read(&mut buf[total..]) {
             Ok(0) => break,
             Ok(n) => total += n,
             Err(e) => {
                 eprintln!("Read failed: {e}");
+
                 return ERROR;
             }
         }
     }
+
     total as LONG
 }
 
@@ -98,20 +110,26 @@ pub extern "C" fn Read(f: BPTR, buf: *mut u8, len: LONG) -> LONG {
     if len <= 0 {
         return 0;
     }
+
     let buf = unsafe { std::slice::from_raw_parts_mut(buf, len as usize) };
+
     with_file(f, |file| read_fully(file, buf)).unwrap_or(ERROR)
 }
 
+/// The Amiga `Write`: writes `len` bytes to an open file. Returns the number written, or -1.
 #[unsafe(no_mangle)]
 pub extern "C" fn Write(f: BPTR, buf: *const u8, len: LONG) -> LONG {
     if len <= 0 {
         return 0;
     }
+
     let buf = unsafe { std::slice::from_raw_parts(buf, len as usize) };
+
     with_file(f, |file| match file.write_all(buf) {
         Ok(()) => len,
         Err(e) => {
             eprintln!("Write failed: {e}");
+
             ERROR
         }
     })
@@ -128,10 +146,12 @@ pub extern "C" fn Seek(f: BPTR, pos: LONG, mode: LONG) -> LONG {
             OFFSET_CURRENT => SeekFrom::Current(pos as i64),
             _ => SeekFrom::End(pos as i64),
         };
+
         match file.seek(target) {
             Ok(_) => old as LONG,
             Err(e) => {
                 eprintln!("Seek failed: {e}");
+
                 ERROR
             }
         }

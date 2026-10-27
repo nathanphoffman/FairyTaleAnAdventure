@@ -11,6 +11,7 @@ use crate::game::data::globals::main_view;
 use crate::game::data::object_tables::{
     comptable, fader, page_colors, pplay, prec, print_que, sun_colors,
 };
+
 use crate::game::data::random::bitrand;
 use crate::game::data::state::{the_actors, the_hero, the_memory, the_screen, the_world};
 use crate::game::data::tables::{black_colors, intro_colors};
@@ -34,16 +35,24 @@ unsafe extern "C" {
         mask: u32,
         temp: *mut u8,
     ) -> i32;
+
     fn LoadRGB4(current_viewport: *mut ViewPort, colors: *const u16, count: i32);
+
     fn Delay(ticks: i32);
+
     fn SetDrMd(current_rastport: *mut RastPort, mode: u32);
+
     fn SetAPen(current_rastport: *mut RastPort, pen: u32);
+
     fn SetRast(current_rastport: *mut RastPort, pen: u32);
+
     fn AvailMem(flags: u32) -> u32;
+
     fn MakeVPort(view: *mut View, port: *mut ViewPort) -> i32;
 }
 
 const BLIT_COPY: u32 = 0xC0;
+
 /// The compass only touches the plane the highlight is in.
 const COMPASS_PLANE_MASK: u32 = 4;
 const COMPASS_PLANE: usize = 2;
@@ -51,6 +60,7 @@ const COMPASS_X: i32 = 567;
 const COMPASS_Y: i32 = 15;
 const COMPASS_WIDTH: i32 = 48;
 const COMPASS_HEIGHT: i32 = 24;
+
 /// Compass directions below this are lit; the rest mean "not walking".
 const COMPASS_DIRECTIONS: i16 = 9;
 
@@ -74,6 +84,7 @@ pub fn draw_compass(dir: i16) {
             COMPASS_PLANE_MASK,
             std::ptr::null_mut(),
         );
+
         if dir < COMPASS_DIRECTIONS {
             (*the_screen.bm_source).Planes[COMPASS_PLANE] = the_memory.nhivar;
             BltBitMap(
@@ -126,6 +137,7 @@ pub fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: *const u16) {
         g = g.min(FULL_LEVEL);
         b = b.min(FULL_LEVEL);
         let g2;
+
         if limit != 0 {
             r = r.max(NIGHT_MIN.0);
             g = g.max(NIGHT_MIN.1);
@@ -137,6 +149,7 @@ pub fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: *const u16) {
             b = b.max(0);
             g2 = 0;
         }
+
         for (i, slot) in (*(&raw mut fader)).iter_mut().take(COLOR_COUNT).enumerate() {
             *slot = faded_color(
                 i,
@@ -147,6 +160,7 @@ pub fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: *const u16) {
                 the_world.light_timer != 0,
             );
         }
+
         LoadRGB4(
             &raw mut the_screen.vp_page,
             (&raw const fader).cast(),
@@ -167,15 +181,19 @@ fn faded_color(
     lit: bool,
 ) -> u16 {
     let color = color as i32;
+    // Colours are 12 bit 0RGB. Red is moved down a nibble so all three work on the same scale.
     let mut r1 = (color & 0x0f00) >> 4;
     let mut g1 = color & 0x00f0;
     let mut b1 = color & 0x000f;
+
     if lit && r1 < g1 {
         r1 = g1;
     }
+
     r1 = (r * r1) / 1600;
     g1 = (g * g1) / 1600;
     b1 = (b * b1 + g2 * g1) / 100;
+
     if night {
         if (16..=24).contains(&i) && g > 20 {
             if g < 50 {
@@ -184,8 +202,11 @@ fn faded_color(
                 b1 += 1;
             }
         }
+
         b1 = b1.min(MAX_COMPONENT);
     }
+
+    // Back to 0RGB.
     ((r1 << 8) + (g1 << 4) + b1) as u16
 }
 
@@ -196,11 +217,13 @@ pub fn flicker_colors() {
             for slot in (*(&raw mut fader)).iter_mut().take(COLOR_COUNT).skip(1) {
                 *slot = bitrand(0xfff) as u16;
             }
+
             LoadRGB4(
                 &raw mut the_screen.vp_page,
                 (&raw const fader).cast(),
                 COLOR_COUNT as i32,
             );
+
             Delay(1);
         }
     }
@@ -224,10 +247,13 @@ pub fn handle_print_request() {
     unsafe {
         if prec == pplay {
             Delay(1);
+
             return;
         }
+
         let request = (*(&raw const print_que))[pplay as usize] as i32;
         pplay = (pplay + 1) & QUEUE_MASK;
+
         match request {
             REQUEST_DEBUG_COORDS => {
                 print(c"Coords = ".as_ptr());
@@ -236,6 +262,7 @@ pub fn handle_print_request() {
                 print(c"Memory Available: ".as_ptr());
                 print_number(AvailMem(0) as i32, 6);
             }
+
             REQUEST_DEBUG_SECTOR => {
                 print(c"You are at: ".as_ptr());
                 print_number(the_hero.x as i32 / 256, 3);
@@ -245,14 +272,17 @@ pub fn handle_print_request() {
                 draw_text(c" Extent = ".as_ptr(), 10);
                 print_number(the_world.extent_type as i32, 2);
             }
+
             REQUEST_VITALITY => {
                 move_to(VITALITY_POSITION.0, VITALITY_POSITION.1);
                 draw_text(c"Vit:".as_ptr(), 4);
                 print_number(the_actors.list[0].vitality as i32, 3);
             }
+
             REQUEST_OPTIONS => {
                 print_options();
             }
+
             REQUEST_STATS => draw_stats(),
             REQUEST_TAKE_WHAT => print(c"Take What?".as_ptr()),
             _ => {}
@@ -266,6 +296,7 @@ unsafe fn draw_stats() {
         if the_hero.luck < 0 {
             the_hero.luck = 0;
         }
+
         for (x, label, len, value) in [
             (14, c"Brv:", 4, the_hero.brave),
             (90, c"Lck:", 4, the_hero.luck),
@@ -285,9 +316,11 @@ const SPRITES: u16 = 0x4000;
 const VP_HIDE: u16 = 0x2000;
 const MAP_PEN: u32 = 24;
 const JAM1: u32 = 0;
+
 /// `view_status` values: showing a map message, and showing the normal view again.
 const VIEW_MESSAGE: i8 = 2;
 const VIEW_NORMAL_AGAIN: i8 = 3;
+
 /// Fading goes in steps of 5 percent, one tick each.
 const FADE_STEP: usize = 5;
 
@@ -301,6 +334,7 @@ pub fn fade_down() {
             0,
             (&raw const page_colors).cast(),
         );
+
         unsafe { Delay(1) };
     }
 }
@@ -315,6 +349,7 @@ pub fn fade_normal() {
             0,
             (&raw const page_colors).cast(),
         );
+
         unsafe { Delay(1) };
     }
 }
@@ -346,6 +381,7 @@ pub fn map_message() {
             (&raw const page_colors).cast(),
             COLOR_COUNT as i32,
         );
+
         the_screen.view_status = VIEW_MESSAGE;
     }
 }
@@ -386,13 +422,16 @@ pub fn win_colors() {
             (&raw const black_colors).cast::<u16>(),
             COLOR_COUNT as i32,
         );
+
         LoadRGB4(
             &raw mut the_screen.vp_text,
             (&raw const black_colors).cast::<u16>(),
             COLOR_COUNT as i32,
         );
+
         the_screen.vp_text.Modes = HIRES | SPRITES | VP_HIDE;
         set_intro_zoom(WIN_SCREEN_SIZE);
+
         for i in (SUNRISE_END + 1..=SUNRISE_START).rev() {
             fader = sunrise_palette(i);
             LoadRGB4(
@@ -400,11 +439,14 @@ pub fn win_colors() {
                 (&raw const fader).cast(),
                 COLOR_COUNT as i32,
             );
+
             if i == SUNRISE_START {
                 Delay(60);
             }
+
             Delay(9);
         }
+
         Delay(30);
         LoadRGB4(
             &raw mut the_screen.vp_page,
@@ -421,6 +463,7 @@ fn sunrise_palette(i: i32) -> [u16; 32] {
     let mut colors = [0u16; 32];
     colors[1] = 0xfff;
     colors[28] = 0xfff;
+
     for j in SUNRISE_COLORS {
         let index = i + j as i32;
         colors[j] = if index > 0 {
@@ -429,6 +472,7 @@ fn sunrise_palette(i: i32) -> [u16; 32] {
             0
         };
     }
+
     if i > SUN_GLOW_UNTIL {
         colors[29] = 0x800;
         colors[30] = 0x400;
@@ -437,14 +481,17 @@ fn sunrise_palette(i: i32) -> [u16; 32] {
         colors[29] = (0x100 * j) as u16;
         colors[30] = (0x100 * (j / 2)) as u16;
     }
+
     colors
 }
 
 // Daylight: the page colours follow the time of day.
 const DAY_DARKEN: (i32, i32, i32) = (80, 61, 62);
 const LIGHT_SPELL_BONUS: i32 = 200;
+
 /// Inside buildings (regions from here on) it is never night.
 const FIRST_INDOOR_REGION: u16 = 8;
+
 /// `view_status` above this means the screen has to be rebuilt.
 const VIEW_REBUILD: i8 = 97;
 
@@ -457,8 +504,10 @@ pub fn day_fade() {
         } else {
             0
         };
+
         if the_world.day_clock & 3 == 0 || the_screen.view_status > VIEW_REBUILD {
             let colors = (&raw const page_colors).cast();
+
             if the_world.region < FIRST_INDOOR_REGION {
                 let level = the_world.light_level as i32;
                 fade_page(
@@ -570,9 +619,11 @@ mod tests {
             (early[0], early[1], early[28], early[31]),
             (0, 0xfff, 0xfff, 0)
         );
+
         assert_eq!((early[29], early[30]), (0x800, 0x400));
         let late = sunrise_palette(SUN_GLOW_UNTIL);
         assert_eq!((late[29], late[30]), (0x100 * 8, 0x100 * 4));
+
         // the sky colours at the very end (index <= 0) are black
         assert!(sunrise_palette(-30)[2..28].iter().all(|&c| c == 0));
     }

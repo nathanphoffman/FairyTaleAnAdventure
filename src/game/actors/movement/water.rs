@@ -1,6 +1,11 @@
 //! Wading into water: sinking, drowning, climbing back out.
 
-use super::*;
+use super::{
+    Ctx, DEAD, DYING, ENVIRON_DROWNED, ENVIRON_SINKING, PIT_SECTOR, SINK, STILL, TERRAIN_SLOW_SINK,
+};
+
+use crate::game::data::state::{the_hero, the_world};
+use crate::game::world::places::{find_place, transfer_hero};
 
 /// Standing in water (depth `k` above 2) on ground that is dry (`j` 0), or wading with a depth over
 /// the limit of the terrain (3: 5, 4: 10): the actor climbs out one step a frame.
@@ -26,6 +31,7 @@ fn wade_step(depth: i8, j: i16, dead_or_dying: bool) -> (i8, Wading) {
     } else {
         ENVIRON_DROWNED
     };
+
     if depth > limit {
         (depth - 1, Wading::Nothing)
     } else if depth < limit {
@@ -39,6 +45,7 @@ fn wade_step(depth: i8, j: i16, dead_or_dying: bool) -> (i8, Wading) {
         } else {
             Wading::Nothing
         };
+
         (depth, outcome)
     } else {
         (depth, Wading::Nothing)
@@ -50,25 +57,29 @@ impl Ctx {
     /// actor sinks, or at the pit sector falls through to the dungeon.
     pub(super) unsafe fn wade(&mut self, j: i16) {
         unsafe {
-            let an = self.an;
-            let (depth, outcome) = wade_step(self.k, j, self.s == DYING || self.s == DEAD);
-            self.k = depth;
+            let actor = self.actor;
+            let (depth, outcome) =
+                wade_step(self.environ, j, self.state == DYING || self.state == DEAD);
+            self.environ = depth;
+
             match outcome {
                 Wading::Nothing => {}
                 Wading::Drowned => {
                     if the_hero.sector == PIT_SECTOR {
-                        if self.i == 0 {
-                            self.k = 0;
+                        if self.slot == 0 {
+                            self.environ = 0;
                             the_world.new_region = 9;
                             transfer_hero(0x1080, 34950, 0);
                             find_place(1);
                         } else {
-                            (*an).vitality = 0;
+                            (*actor).vitality = 0;
                         }
                     }
-                    (*an).state = STILL;
+
+                    (*actor).state = STILL;
                 }
-                Wading::Sinking => (*an).state = SINK as i8,
+
+                Wading::Sinking => (*actor).state = SINK as i8,
             }
         }
     }
@@ -76,6 +87,8 @@ impl Ctx {
 
 #[cfg(test)]
 mod tests {
+    use super::super::ENVIRON_DROWNED;
+    use super::super::ENVIRON_SINKING;
     use super::*;
 
     #[test]
@@ -97,18 +110,22 @@ mod tests {
             wade_step(ENVIRON_SINKING, 5, false),
             (ENVIRON_SINKING + 1, Wading::Sinking)
         );
+
         assert_eq!(
             wade_step(ENVIRON_DROWNED - 1, 5, false),
             (ENVIRON_DROWNED, Wading::Drowned)
         );
+
         assert_eq!(
             wade_step(ENVIRON_DROWNED, 5, false),
             (ENVIRON_DROWNED, Wading::Nothing)
         );
+
         // shallow water (4) stops at 10 and comes back up from deeper
         assert_eq!(wade_step(9, 4, false), (10, Wading::Nothing));
         assert_eq!(wade_step(10, 4, false), (10, Wading::Nothing));
         assert_eq!(wade_step(12, 4, false), (11, Wading::Nothing));
+
         // the dead are not affected
         assert_eq!(
             wade_step(ENVIRON_SINKING, 5, true),

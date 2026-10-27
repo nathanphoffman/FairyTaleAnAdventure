@@ -38,9 +38,12 @@ fn steer(xdif: i16, ydif: i16, mode: i32, random_bit: impl FnOnce() -> bool) -> 
     let (mut xdir, mut ydir) = (sign(xdif), sign(ydif));
 
     if mode != 4 {
+        // An axis less than half as far as the other is ignored, so the actor goes straight along the long one.
         if (yabs as i16) < (xabs >> 1) as i16 {
             ydir = 0;
         }
+
+        // An axis less than half as far as the other is ignored, so the actor goes straight along the long one.
         if (xabs as i16) < (yabs >> 1) as i16 {
             xdir = 0;
         }
@@ -48,22 +51,28 @@ fn steer(xdif: i16, ydif: i16, mode: i32, random_bit: impl FnOnce() -> bool) -> 
 
     let close = (xabs as i32 + yabs as i32) as i16;
     let mut deviation = 0;
+
     if mode == 1 && close < 40 {
         deviation = 1;
     }
+
     if mode == 2 && close < 30 {
         deviation = 1;
     }
+
     if mode == 3 {
         xdir = -xdir;
         ydir = -ydir;
     }
 
     let mut facing = DIRECTION_TABLE[(4 - ydir * 3 - xdir) as usize] as i32;
+
     if facing == NO_DIRECTION {
         return Course::Stop;
     }
+
     facing += if random_bit() { deviation } else { -deviation };
+
     Course::Face { facing: facing & 7 }
 }
 
@@ -82,10 +91,12 @@ pub fn steer_actor(object: i32, target_x: i32, target_y: i32, mode: i32) {
                 (actor.abs_y as i32 - target_y) as i16,
             )
         };
+
         match steer(xdif, ydif, mode, || fta_rand() & 2 != 0) {
             Course::Stop => actor.state = STILL,
             Course::Face { facing } => {
                 actor.facing = facing as i8;
+
                 if mode != 5 {
                     actor.state = WALKING;
                 }
@@ -102,8 +113,10 @@ mod tests {
     fn steers_toward_a_target() {
         // actor is right of and level with the target: direction 7
         assert_eq!(steer(100, 0, 0, || false), Course::Face { facing: 7 });
+
         // below the target: direction 1
         assert_eq!(steer(0, 100, 0, || false), Course::Face { facing: 1 });
+
         // exactly on the target: stop
         assert_eq!(steer(0, 0, 0, || false), Course::Stop);
     }
@@ -117,6 +130,7 @@ mod tests {
     fn close_targets_wobble_in_modes_1_and_2() {
         assert_eq!(steer(10, 0, 1, || true), Course::Face { facing: 0 });
         assert_eq!(steer(10, 0, 1, || false), Course::Face { facing: 6 });
+
         // 35 is close enough for mode 1 (under 40) but not for mode 2 (under 30)
         assert_eq!(steer(35, 0, 1, || true), Course::Face { facing: 0 });
         assert_eq!(steer(35, 0, 2, || true), Course::Face { facing: 7 });
@@ -134,8 +148,10 @@ mod tests {
         let mut asked = false;
         steer(0, 0, 0, || {
             asked = true;
+
             true
         });
+
         assert!(!asked);
     }
 }

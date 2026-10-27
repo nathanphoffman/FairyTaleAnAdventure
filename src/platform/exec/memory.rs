@@ -5,6 +5,7 @@ use std::os::raw::c_void;
 
 /// A little slack at the end: the original's blitter code reads a word past some buffers.
 const ALLOC_SLACK: usize = 128;
+
 /// What `AvailMem` claims is free.
 const FAKE_FREE_BYTES: ULONG = 1_000_000;
 

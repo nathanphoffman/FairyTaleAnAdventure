@@ -22,15 +22,20 @@ unsafe extern "C" {
     static placard_msgs: [*const c_char; 0];
 
     fn Move(current_rastport: *mut RastPort, x: i32, y: i32);
+
     fn Draw(current_rastport: *mut RastPort, x: i32, y: i32);
+
     fn Text(current_rastport: *mut RastPort, s: *const c_char, len: i32) -> i32;
+
     fn SetAPen(current_rastport: *mut RastPort, pen: u32);
 }
 
 /// In a string: followed by x/2 and y, moves the text position.
 const XY: u8 = 128;
+
 /// Digits in the number buffer; one trailing space follows them.
 const NUMBER_DIGITS: usize = 10;
+
 /// Size of the print queue; the indexes wrap with this mask.
 const PRINT_QUEUE_MASK: i16 = 31;
 
@@ -40,16 +45,20 @@ pub fn format_number(mut value: u32) -> i32 {
     unsafe {
         let digits = &mut (&mut *(&raw mut number_buffer))[..NUMBER_DIGITS];
         let mut i = NUMBER_DIGITS;
+
         loop {
             i -= 1;
             digits[i] = b'0' as c_char + (value % 10) as c_char;
             value /= 10;
+
             if value == 0 || i == 0 {
                 break;
             }
         }
+
         digits[..i].fill(b' ' as c_char);
     }
+
     0
 }
 
@@ -91,14 +100,18 @@ pub fn print_positioned(mut s: *const u8) {
                     *s.add(1) as i32 * 2,
                     *s.add(2) as i32,
                 );
+
                 s = s.add(3);
             } else {
                 let mut n = 0;
+
                 while *s.add(n) != 0 && *s.add(n) < XY {
                     n += 1;
                 }
+
                 Text(the_screen.current_rastport, s.cast(), n as i32);
                 s = s.add(n);
+
                 if n == 0 {
                     s = s.add(1); // stray byte >= 128 that is not XY
                 }
@@ -126,10 +139,12 @@ unsafe fn skip_strings(mut p: *const c_char, mut n: i32) -> *const c_char {
             while *p != 0 {
                 p = p.add(1);
             }
+
             p = p.add(1);
             n -= 1;
         }
     }
+
     p
 }
 
@@ -153,9 +168,11 @@ pub fn speak(n: i32) {
 pub fn queue_print(x: i32) {
     unsafe {
         let next = (prec + 1) & PRINT_QUEUE_MASK;
+
         if next == pplay {
             return;
         }
+
         (*(&raw mut print_que))[prec as usize] = x as c_char;
         prec = next;
     }
@@ -167,10 +184,12 @@ const BORDER_X_STEPS: [i32; 16] = [-4, -4, -4, 0, 0, 0, 4, 4, 0, -4, 0, 4, 4, 0,
 const BORDER_Y_STEPS: [i32; 16] = [0, 0, 0, 4, 4, 4, 0, 0, -4, 0, -4, 0, 0, 4, 4, 4];
 const BORDER_START_X: i32 = 12;
 const BORDER_PASSES: i32 = 17;
+
 /// Passes numbered above this also draw the long (top and bottom) edges.
 const LONG_EDGE_ABOVE_PASS: i32 = 9;
 const BORDER_PEN: u32 = 1;
 const BORDER_HIGHLIGHT_PEN: u32 = 24;
+
 /// Strokes per step; the last one is drawn in the highlight pen.
 const STROKES_PER_STEP: i32 = 5;
 
@@ -188,10 +207,12 @@ pub fn draw_placard_border() {
     unsafe {
         let r = &raw mut the_screen.rp_map;
         let (mut xorg, mut yorg) = (BORDER_START_X, 0);
+
         for pass in (0..BORDER_PASSES).rev() {
             for step in 0..16 {
                 let dx = xorg + BORDER_X_STEPS[step];
                 let dy = yorg + BORDER_Y_STEPS[step];
+
                 for stroke in (0..STROKES_PER_STEP).rev() {
                     SetAPen(
                         r,
@@ -201,13 +222,16 @@ pub fn draw_placard_border() {
                             BORDER_PEN
                         },
                     );
+
                     if pass > LONG_EDGE_ABOVE_PASS {
                         line(r, xorg, yorg, dx, dy);
                         line(r, 284 - xorg, 124 - yorg, 284 - dx, 124 - dy);
                     }
+
                     line(r, 16 + yorg, 12 - xorg, 16 + dy, 12 - dx);
                     line(r, 268 - yorg, 112 + xorg, 268 - dy, 112 + dx);
                 }
+
                 xorg = dx;
                 yorg = dy;
             }
@@ -226,6 +250,7 @@ pub fn item_menu_state(n: i32) -> i32 {
 
 const ERROR_SCREEN_X: i32 = 200;
 const ERROR_SCREEN_Y: i32 = 90;
+
 /// Error number meaning graphics are not open, so nothing can be printed.
 const ERROR_NO_GRAPHICS: i32 = 2;
 
@@ -234,6 +259,7 @@ pub fn show_error(n: i32) {
     if n == ERROR_NO_GRAPHICS {
         return;
     }
+
     move_to(ERROR_SCREEN_X, ERROR_SCREEN_Y);
     draw_text(c"ERROR ".as_ptr(), 6);
     print_number(n, 2);

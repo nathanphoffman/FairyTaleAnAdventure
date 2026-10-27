@@ -23,14 +23,23 @@ unsafe extern "C" {
         flags: i32,
         super_bitmap: *mut BitMap,
     ) -> *mut Layer;
+
     fn DeleteLayer(dummy: *mut std::ffi::c_void, layer: *mut Layer) -> i32;
+
     fn AllocRaster(w: u32, h: u32) -> *mut u8;
+
     fn FreeRaster(p: *mut u8, w: u32, h: u32);
+
     fn InitTmpRas(t: *mut TmpRas, buf: *mut u8, size: i32) -> *mut TmpRas;
+
     fn InitArea(a: *mut AreaInfo, buf: *mut i16, max_vectors: i32);
+
     fn AreaMove(current_rastport: *mut RastPort, x: i32, y: i32) -> i32;
+
     fn AreaDraw(current_rastport: *mut RastPort, x: i32, y: i32) -> i32;
+
     fn AreaEnd(current_rastport: *mut RastPort) -> i32;
+
     fn SetDrMd(current_rastport: *mut RastPort, mode: u32);
 }
 
@@ -46,6 +55,7 @@ static mut MY_TMP: TmpRas = TmpRas {
     RasPtr: std::ptr::null_mut(),
     Size: 0,
 };
+
 static mut MY_AREA_INFO: AreaInfo = AreaInfo {
     VctrTbl: std::ptr::null_mut(),
     VctrPtr: std::ptr::null_mut(),
@@ -54,6 +64,7 @@ static mut MY_AREA_INFO: AreaInfo = AreaInfo {
     Count: 0,
     MaxCount: 0,
 };
+
 static mut AREA_BUFFER: [i16; 20] = [0; 20];
 static mut MY_RAS: *mut u8 = std::ptr::null_mut();
 static mut LAYER: *mut Layer = std::ptr::null_mut();
@@ -61,15 +72,19 @@ static mut OLD_LAYER: *mut Layer = std::ptr::null_mut();
 
 const LAYER_SIMPLE: i32 = 1;
 const COMPLEMENT: u32 = 2;
+
 /// The layer covers the 19 x 6 tiles of the play field.
 const LAYER_WIDTH: i32 = 16 * 19;
 const LAYER_HEIGHT: i32 = 6 * 32;
+
 /// Work raster for filling the beam.
 const RASTER_SIZE: u32 = 100;
 const AREA_MAX_VECTORS: i32 = 9;
+
 /// The map position is cut to whole tiles (16 wide, 32 tall).
 const TILE_X_MASK: u16 = 0xfff0;
 const TILE_Y_MASK: u16 = 0xffe0;
+
 /// The beam has 64 directions, 4 bytes (two points) each.
 const POINT_BYTES: i32 = 4;
 const DIRECTIONS_BEFORE: i32 = 63;
@@ -77,6 +92,7 @@ const DIRECTIONS_AFTER: i32 = 1;
 
 /// RASSIZE(w, h) from the Amiga headers: bytes needed for a raster.
 fn raster_bytes(width: u32, height: u32) -> i32 {
+    // Bytes in the raster: the width in pixels rounded up to a whole word, as bytes, times the height.
     (height * ((width + 15) >> 3 & 0xfffe)) as i32
 }
 
@@ -85,6 +101,7 @@ fn edge(dir: i16, fp: &FPage) -> ((i16, i16), (i16, i16)) {
     {
         let start = ((dir as i32 * POINT_BYTES) as u8) as usize;
         let w = &witchpoints[start..start + 4];
+
         (
             (w[0] as i16 + fp.witchx, w[1] as i16 + fp.witchy),
             (w[2] as i16 + fp.witchx, w[3] as i16 + fp.witchy),
@@ -98,6 +115,7 @@ fn side(p1: (i16, i16), p2: (i16, i16), xh: i16, yh: i16) -> (i16, i16) {
     let (dx, dy) = (p2.0.wrapping_sub(p1.0), p2.1.wrapping_sub(p1.1));
     let (dx1, dy1) = (xh.wrapping_sub(p1.0), yh.wrapping_sub(p1.1));
     let cross = (dx as i32 * dy1 as i32 - dy as i32 * dx1 as i32) as i16;
+
     (cross, (cross >= 0) as i16)
 }
 
@@ -119,6 +137,7 @@ pub fn witch_fx(fp: *mut FPage) {
             LAYER_SIMPLE,
             std::ptr::null_mut(),
         );
+
         let r = &raw mut the_screen.rp_map;
         OLD_LAYER = (*r).Layer;
         (*r).Layer = LAYER;
@@ -128,8 +147,20 @@ pub fn witch_fx(fp: *mut FPage) {
         (SIDE_1, SIDE_FLAG_1) = side(p1, p2, xh, yh);
         (SIDE_2, SIDE_FLAG_2) = side(p3, p4, xh, yh);
 
+        paint_beam(r, [p1, p2, p4, p3]);
+
+        (*r).Layer = OLD_LAYER;
+        DeleteLayer(std::ptr::null_mut(), LAYER);
+    }
+}
+
+/// Fills the beam's quadrilateral with corners `p` in complement mode, using a temporary raster
+/// and area buffer that are given back afterwards.
+unsafe fn paint_beam(r: *mut RastPort, p: [(i16, i16); 4]) {
+    unsafe {
         SetDrMd(r, COMPLEMENT);
         MY_RAS = AllocRaster(RASTER_SIZE, RASTER_SIZE);
+
         if !MY_RAS.is_null() {
             let old_tmp = (*r).TmpRas;
             let old_area = (*r).AreaInfo;
@@ -138,19 +169,19 @@ pub fn witch_fx(fp: *mut FPage) {
                 MY_RAS,
                 raster_bytes(RASTER_SIZE, RASTER_SIZE),
             );
+
             InitArea(
                 &raw mut MY_AREA_INFO,
                 (&raw mut AREA_BUFFER).cast(),
                 AREA_MAX_VECTORS,
             );
+
             (*r).AreaInfo = &raw mut MY_AREA_INFO;
-            fill_beam(r, [p1, p2, p4, p3]);
+            fill_beam(r, p);
             FreeRaster(MY_RAS, RASTER_SIZE, RASTER_SIZE);
             (*r).TmpRas = old_tmp;
             (*r).AreaInfo = old_area;
         }
-        (*r).Layer = OLD_LAYER;
-        DeleteLayer(std::ptr::null_mut(), LAYER);
     }
 }
 
@@ -158,9 +189,11 @@ pub fn witch_fx(fp: *mut FPage) {
 unsafe fn fill_beam(r: *mut RastPort, p: [(i16, i16); 4]) {
     unsafe {
         AreaMove(r, p[0].0 as i32, p[0].1 as i32);
+
         for corner in &p[1..] {
             AreaDraw(r, corner.0 as i32, corner.1 as i32);
         }
+
         AreaEnd(r);
     }
 }

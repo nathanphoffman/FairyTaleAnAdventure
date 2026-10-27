@@ -12,6 +12,7 @@ use crate::game::data::object_tables::ob_list8;
 use crate::game::data::state::{
     the_actors, the_encounter, the_hero, the_screen, the_ui, the_world,
 };
+
 use crate::game::data::tables::extent_list;
 use crate::game::data::types::Extent;
 use crate::game::files::disk::motor_off;
@@ -31,12 +32,15 @@ unsafe extern "C" {
 /// The first region number that is indoors.
 const FIRST_INDOOR_REGION: u16 = 8;
 const NO_REGION: u16 = 10;
+
 /// The place message that stands for "the mountains", which depends on the region.
 const MOUNTAINS_MESSAGE: u8 = 4;
 const NORTHERN_MOUNTAINS_MESSAGE: u8 = 0;
 const SOUTHERN_MOUNTAINS_MESSAGE: u8 = 5;
+
 /// How many extents there are (the last one covers the whole world).
 const EXTENT_COUNT: usize = 22;
+
 /// Sector numbers inside buildings are offset by this in the place table.
 const INSIDE_SECTOR_OFFSET: i16 = 256;
 
@@ -49,14 +53,18 @@ const XT_PRINCESS: u16 = 83;
 const XT_SPECIAL_MIN: u16 = 60;
 const XT_CARRIER_MIN: u16 = 70;
 const XT_CARRIER: u16 = 70;
+
 /// Slot in `ob_list8` of the princess object.
 const PRINCESS_OBJECT: usize = 9;
+
 /// Slot of the first monster in `actor_list`, and the first slot after the monsters.
 const FIRST_MONSTER: i16 = 3;
 const MONSTER_SLOTS_END: i16 = 7;
+
 /// How far from the encounter spot monsters are placed.
 const ENCOUNTER_SPREAD: u16 = 63;
 const ENEMY_SLOT: i16 = 2;
+
 /// Encounter type used in the spider pit.
 const SPIDER_ENCOUNTER: u16 = 8;
 
@@ -73,21 +81,27 @@ pub extern "C" fn transfer_hero(xtest: u16, ytest: u16, flag: u16) -> i32 {
         the_actors.list[0].abs_y = ytest;
 
         the_encounter.number = 0;
+
         if flag != 0 {
+            // The sector at the middle of the screen (offset 151 and 64 pixels from the corner), 256 pixels to a sector.
             let sector_x = (the_world.map_x as u32 + 151) >> 8;
+            // The sector at the middle of the screen, 256 pixels to a sector.
             let sector_y = (the_world.map_y as u32 + 64) >> 8;
             let column = (sector_x >> 6) & 1; // 64 sectors across
             let row = (sector_y >> 5) & 7; // 32 sectors down
             the_world.new_region = (column + row + row) as u16;
         }
+
         the_ui.held_direction = 0;
         load_region_now();
         refresh_minimap(); // to set region_origin_x and region_origin_y
         the_screen.view_status = 99;
         set_mood(1);
+
         while blocked_at(the_hero.x as i16, the_hero.y as i16, 0) != 0 {
             the_hero.y = the_hero.y.wrapping_add(1);
         }
+
         0
     }
 }
@@ -105,10 +119,12 @@ unsafe fn start_forced_encounter() {
         the_actors.loading = 0;
         the_encounter.number = (*the_world.extent).v1;
         the_actors.active = FIRST_MONSTER;
+
         while the_encounter.number != 0 && the_actors.active < MONSTER_SLOTS_END {
             if place_encounter(the_actors.active as u16, ENCOUNTER_SPREAD) != 0 {
                 the_actors.active += 1;
             }
+
             the_encounter.number -= 1;
         }
     }
@@ -121,15 +137,20 @@ unsafe fn start_forced_encounter() {
 pub fn find_place(flag: i16) -> i32 {
     unsafe {
         let mut flag = flag;
+
         loop {
             announce_place(flag);
             locate_extent();
+
             if !enter_extent(flag) {
                 // the princess was rescued: look again from the top, without the messages
                 flag = 0;
+
                 continue;
             }
+
             update_carrier();
+
             return 0;
         }
     }
@@ -144,6 +165,7 @@ unsafe fn place_message_number() -> u8 {
         let sector = the_hero.sector as u8;
         let table = if the_world.region >= FIRST_INDOOR_REGION {
             the_hero.sector += INSIDE_SECTOR_OFFSET;
+
             inside_tbl.as_ptr()
         } else {
             place_tbl.as_ptr()
@@ -151,13 +173,17 @@ unsafe fn place_message_number() -> u8 {
 
         // find the table row (three bytes: first sector, last sector, message) that holds this sector
         let mut row = table;
+
         for _ in 0..256 {
             if sector >= *row && sector <= *row.add(1) {
                 break;
             }
+
             row = row.add(3);
         }
+
         let mut message = *row.add(2);
+
         if message == MOUNTAINS_MESSAGE {
             if the_world.region >= FIRST_INDOOR_REGION {
             } else if the_world.region & 1 != 0 {
@@ -166,11 +192,16 @@ unsafe fn place_message_number() -> u8 {
                 message = SOUTHERN_MOUNTAINS_MESSAGE;
             }
         }
+
+        // The hero's sector column: 256 pixels to a sector.
         let hero_column = (the_hero.x >> 8).wrapping_sub(the_world.origin_x);
+        // The hero's sector row: 256 pixels to a sector.
         let hero_row = (the_hero.y >> 8).wrapping_sub(the_world.origin_y);
+
         if the_world.new_region < NO_REGION || hero_column & 64 != 0 || hero_row & 32 != 0 {
             message = 0;
         }
+
         message
     }
 }
@@ -179,14 +210,17 @@ unsafe fn place_message_number() -> u8 {
 unsafe fn announce_place(flag: i16) {
     unsafe {
         let message = place_message_number();
+
         if message != 0 && message as u16 != the_hero.place {
             the_hero.place = message as u16;
+
             if flag != 0 {
                 let messages = if the_world.region >= FIRST_INDOOR_REGION {
                     inside_msg.as_ptr()
                 } else {
                     place_msg.as_ptr()
                 };
+
                 show_message(messages, message as i32);
             }
         }
@@ -197,11 +231,14 @@ unsafe fn announce_place(flag: i16) {
 unsafe fn locate_extent() {
     unsafe {
         the_world.extent = (&raw mut extent_list).cast::<Extent>();
+
         for _ in 0..EXTENT_COUNT {
             let e = &*the_world.extent;
+
             if the_hero.x > e.x1 && the_hero.x < e.x2 && the_hero.y > e.y1 && the_hero.y < e.y2 {
                 break;
             }
+
             the_world.extent = the_world.extent.add(1);
         }
     }
@@ -215,10 +252,13 @@ unsafe fn enter_extent(flag: i16) -> bool {
         if the_world.extent_type == (*the_world.extent).etype as u16 {
             return true;
         }
+
         the_world.extent_type = (*the_world.extent).etype as u16;
         let mut force = false;
+
         if the_world.extent_type == XT_PRINCESS && ob_list8[PRINCESS_OBJECT].ob_stat != 0 {
             rescue_princess();
+
             return false;
         } else if the_world.extent_type >= XT_SPECIAL_MIN {
             // birds, turtles, special
@@ -243,9 +283,11 @@ unsafe fn enter_extent(flag: i16) -> bool {
             the_encounter.y = the_hero.y;
             force = true;
         }
+
         if force {
             start_forced_encounter();
         }
+
         true
     }
 }

@@ -49,6 +49,7 @@ pub extern "C" fn OpenDevice(
     _flags: ULONG,
 ) -> LONG {
     let name = unsafe { CStr::from_ptr(name) }.to_string_lossy();
+
     if name == AUDIO_DEVICE { -1 } else { 0 }
 }
 

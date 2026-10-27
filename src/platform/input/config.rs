@@ -21,6 +21,7 @@ pub(super) fn remapped(key: Keycode) -> Keycode {
 fn parse_line(line: &str) -> Option<(&str, &str)> {
     let line = line.split('#').next().unwrap_or("").trim();
     let (from, to) = line.split_once('=')?;
+
     Some((from.trim(), to.trim()))
 }
 
@@ -31,14 +32,17 @@ pub fn load_config() {
     let Ok(text) = std::fs::read_to_string(&path) else {
         return; // no config file is normal
     };
+
     for line in text.lines() {
         let Some((from, to)) = parse_line(line) else {
             continue;
         };
+
         match (Keycode::from_name(from), Keycode::from_name(to)) {
             (Some(f), Some(t)) => {
                 REMAP.with(|r| r.borrow_mut().insert(f, t));
             }
+
             _ => eprintln!("{path}: cannot read line '{line}'"),
         }
     }

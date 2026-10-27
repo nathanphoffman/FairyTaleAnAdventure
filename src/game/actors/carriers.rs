@@ -11,9 +11,11 @@ const TURTLE_ENVIRON: i8 = -2;
 /// smaller one).
 const NEAR: i16 = 16;
 const VERY_NEAR: i16 = 9;
+
 /// The carrier is the raft (slot 1), or slot 3 when a turtle or bird is out.
 const RAFT_SLOT: i16 = 1;
 const CARRIER_SLOT: i16 = 3;
+
 /// The hero's centre is a little off the carrier's.
 const CARRIER_OFFSET: i32 = 4;
 
@@ -39,11 +41,13 @@ pub fn raft_proximity() {
         } else {
             RAFT_SLOT
         };
+
         let carrier = &raw const the_actors.list[the_actors.carrier_slot as usize];
         let hero = &raw mut the_actors.list[0];
         let dx = ((*hero).abs_x as i32 - (*carrier).abs_x as i32 - CARRIER_OFFSET) as i16;
         let dy = ((*hero).abs_y as i32 - (*carrier).abs_y as i32 - CARRIER_OFFSET) as i16;
         the_actors.raft_nearness = nearness(dx, dy);
+
         if the_hero.riding == BIRD {
             (*hero).environ = TURTLE_ENVIRON;
         }

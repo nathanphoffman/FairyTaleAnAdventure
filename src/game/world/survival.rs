@@ -59,11 +59,13 @@ pub fn survival_tick() {
             witch_on_screen: the_witch.on_screen != 0,
             battle: the_actors.battle_flag != 0,
         };
+
         let steps = survival_step(
             &facts,
             &mut *(&raw mut the_hero),
             &mut *(&raw mut the_actors.list[0]),
         );
+
         for step in steps {
             match step {
                 SurvivalStep::Event(e) => show_event(e),
@@ -96,6 +98,7 @@ enum SurvivalStep {
 /// music, then makes the hero hungrier and more tired. `body` is the hero's actor.
 fn survival_step(facts: &SurvivalFacts, hero: &mut Hero, body: &mut Shape) -> Vec<SurvivalStep> {
     let mut steps = Vec::new();
+
     if safe_check_due(facts.clock)
         && !facts.actors_on_screen
         && !facts.actors_loading
@@ -107,30 +110,38 @@ fn survival_step(facts: &SurvivalFacts, hero: &mut Hero, body: &mut Shape) -> Ve
         hero.safe_r = facts.region;
         hero.safe_x = hero.x;
         hero.safe_y = hero.y;
+
         let fruit = unsafe { hero.stuff.add(FRUIT_SLOT) };
+
         if eats_fruit(hero.hunger, unsafe { *fruit }) {
             unsafe { *fruit -= 1 };
             hero.hunger -= FRUIT_FOOD;
             steps.push(SurvivalStep::Event(EVENT_ATE_FRUIT));
         }
     }
+
     if mood_due(facts.clock, facts.battle) {
         steps.push(SurvivalStep::PickMusic);
     }
+
     if hunger_due(facts.clock, body.vitality, body.state) {
         hero.hunger += 1;
         hero.fatigue += 1;
         let report = hunger_effects(hero, body);
+
         if report.redraw_stats {
             steps.push(SurvivalStep::RedrawStats);
         }
+
         steps.extend(report.events.into_iter().map(SurvivalStep::Event));
+
         if hero.fatigue == TIRED_AT {
             steps.push(SurvivalStep::Event(3));
         } else if hero.hunger == STARVING_AT {
             steps.push(SurvivalStep::Event(4));
         }
     }
+
     steps
 }
 
@@ -147,6 +158,7 @@ struct HungerReport {
 /// from hunger (falling asleep).
 fn hunger_effects(hero: &mut Hero, body: &mut Shape) -> HungerReport {
     let mut report = HungerReport::default();
+
     if hero.hunger == HUNGRY {
         report.events.push(0);
     } else if hero.hunger == VERY_HUNGRY {
@@ -157,6 +169,7 @@ fn hunger_effects(hero: &mut Hero, body: &mut Shape) -> HungerReport {
                 body.vitality -= 2;
                 report.redraw_stats = true;
             }
+
             if hero.hunger > STARVING_AT {
                 report.events.push(2);
             }
@@ -169,6 +182,7 @@ fn hunger_effects(hero: &mut Hero, body: &mut Shape) -> HungerReport {
             body.state = SLEEP;
         }
     }
+
     report
 }
 
@@ -181,16 +195,19 @@ mod tests {
 
     fn hero_and_body(hunger: i16, fatigue: i16, vitality: i16) -> (Hero, Shape) {
         let mut hero: Hero = unsafe { std::mem::zeroed() };
+
         let mut body: Shape = unsafe { std::mem::zeroed() };
         hero.hunger = hunger;
         hero.fatigue = fatigue;
         body.vitality = vitality;
+
         (hero, body)
     }
 
     /// A hero with a pack the test controls, standing in a calm place on a safe-check frame.
     fn calm_hero(pack: &mut [u8; 40]) -> (SurvivalFacts, Hero, Shape) {
         let mut hero: Hero = unsafe { std::mem::zeroed() };
+
         let mut body: Shape = unsafe { std::mem::zeroed() };
         hero.stuff = pack.as_mut_ptr();
         hero.x = 1234;
@@ -205,6 +222,7 @@ mod tests {
             witch_on_screen: false,
             battle: true,
         };
+
         (facts, hero, body)
     }
 
@@ -221,14 +239,17 @@ mod tests {
     #[test]
     fn danger_stops_the_safe_spot_but_not_the_hunger() {
         let mut pack = [0u8; 40];
+
         for danger in 0..4 {
             let (mut facts, mut hero, mut body) = calm_hero(&mut pack);
+
             match danger {
                 0 => facts.actors_on_screen = true,
                 1 => facts.actors_loading = true,
                 2 => facts.witch_on_screen = true,
                 _ => hero.safe_flag = 1,
             }
+
             survival_step(&facts, &mut hero, &mut body);
             assert_eq!(hero.safe_r, 0);
             assert_eq!(hero.hunger, 1);
@@ -257,6 +278,7 @@ mod tests {
             survival_step(&facts, &mut hero, &mut body),
             vec![SurvivalStep::PickMusic]
         );
+
         facts.battle = true;
         assert!(survival_step(&facts, &mut hero, &mut body).is_empty());
     }
@@ -271,6 +293,7 @@ mod tests {
             survival_step(&facts, &mut hero, &mut body),
             vec![SurvivalStep::Event(0)]
         );
+
         // damage is shown (stats) before the starving messages, and the tired one comes last
         hero.hunger = 103;
         hero.fatigue = TIRED_AT - 1;
@@ -283,6 +306,7 @@ mod tests {
                 SurvivalStep::Event(3)
             ]
         );
+
         assert_eq!(body.vitality, 48);
     }
 

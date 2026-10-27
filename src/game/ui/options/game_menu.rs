@@ -1,6 +1,10 @@
 //! The Game and Save/Exit menus and loading: music on and off, saving, quitting and loading.
 
-use super::*;
+use super::{FILE, GAME, SAVEX};
+use crate::game::data::state::the_ui;
+use crate::game::files::savegame::{is_saving, savegame};
+use crate::game::ui::menus::go_to_menu;
+use crate::game::ui::music::set_mood;
 
 // Game menu entries.
 const MUSIC: i16 = 6;
@@ -17,13 +21,16 @@ pub(super) unsafe fn game_option(chosen_entry: i16) -> bool {
         if chosen_entry == MUSIC {
             set_mood(1);
         }
+
         if chosen_entry == QUIT {
             go_to_menu(SAVEX as i16);
         }
+
         if chosen_entry == LOAD {
             is_saving = 0;
             go_to_menu(FILE as i16);
         }
+
         true
     }
 }
@@ -34,10 +41,12 @@ pub(super) unsafe fn save_exit_option(chosen_entry: i16) -> bool {
         if chosen_entry == EXIT {
             the_ui.quit_requested = 1;
         }
+
         if chosen_entry == SAVE {
             is_saving = 1;
             go_to_menu(FILE as i16);
         }
+
         true
     }
 }
@@ -46,5 +55,6 @@ pub(super) unsafe fn save_exit_option(chosen_entry: i16) -> bool {
 pub(super) fn file_option(chosen_entry: i16) -> bool {
     savegame(chosen_entry);
     go_to_menu(GAME as i16);
+
     true
 }

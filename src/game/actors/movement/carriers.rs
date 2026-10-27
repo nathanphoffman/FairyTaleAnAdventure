@@ -1,6 +1,12 @@
 //! The raft, the swan and the turtle: when they carry the hero, and where the turtle swims on its own.
 
-use super::*;
+use super::{
+    CARRIER_SLOT, Ctx, Pc, RIDING_RAFT, RIDING_SWAN, RIDING_TURTLE, STUFF_SWAN_ITEM, SWAN_FILE,
+    TURTLE_WATER, WALKING, XTEST, YTEST, pos_x, pos_y, terrain,
+};
+
+use crate::game::actors::interaction::center_extent_on;
+use crate::game::data::state::{the_actors, the_hero};
 
 /// The swan carries the hero once he is near, with the swan on its slot and the lasso in the pack.
 fn swan_carries(nearness: i16, carrier_slot: i16, has_lasso: bool) -> bool {
@@ -19,14 +25,19 @@ fn turtle_heading(dir: i16, water_ahead: impl Fn(i16) -> bool) -> i16 {
     if water_ahead(dir) {
         return dir;
     }
+
     let right = (dir + 1) & 7;
+
     if water_ahead(right) {
         return right;
     }
+
     let left = (right - 2) & 7;
+
     if water_ahead(left) {
         return left;
     }
+
     (left - 1) & 7
 }
 
@@ -34,50 +45,76 @@ impl Ctx {
     /// The swan (sprite file 11) or the turtle: carries the hero when the hero is close enough.
     pub(super) unsafe fn carrier(&mut self) -> Pc {
         unsafe {
-            let an = self.an;
-            self.k = 0;
-            self.j = 0;
-            let hero = &raw const the_actors.list[0];
+            self.environ = 0;
+            self.terrain = 0;
+
             if the_actors.loaded_actor_file == SWAN_FILE {
-                if swan_carries(
-                    the_actors.raft_nearness,
-                    the_actors.carrier_slot,
-                    *the_hero.stuff.add(STUFF_SWAN_ITEM) != 0,
-                ) {
-                    self.d = (*hero).facing as i16;
-                    (*an).abs_x = (*hero).abs_x;
-                    XTEST = (*hero).abs_x;
-                    (*an).abs_y = (*hero).abs_y;
-                    YTEST = (*hero).abs_y;
-                    the_hero.riding = RIDING_SWAN;
-                } else {
-                    XTEST = (*an).abs_x;
-                    YTEST = (*an).abs_y;
-                }
-                self.dex = self.d;
-                self.e = 0;
+                self.swan_moves();
             } else {
-                if turtle_carries(the_actors.raft_nearness, the_actors.carrier_slot) {
-                    self.d = (*hero).facing as i16;
-                    XTEST = (*hero).abs_x;
-                    YTEST = (*hero).abs_y;
-                    the_hero.riding = RIDING_TURTLE;
-                    self.dex = self.d + self.d;
-                    if (*hero).state as i16 == WALKING {
-                        self.dex += self.cycle & 1;
-                    }
-                } else {
-                    self.turtle_swims();
-                }
-                self.j = terrain(XTEST, YTEST);
-                if self.j == TURTLE_WATER {
-                    (*an).abs_x = XTEST;
-                    (*an).abs_y = YTEST;
-                }
-                self.e = 1;
+                self.turtle_moves();
             }
-            center_extent_on(self.e, XTEST as i16, YTEST as i16);
+
+            center_extent_on(self.step, XTEST as i16, YTEST as i16);
+
             Pc::Raise
+        }
+    }
+
+    /// The swan goes where the hero goes if he is near and has the lasso, otherwise it stays.
+    unsafe fn swan_moves(&mut self) {
+        unsafe {
+            let actor = self.actor;
+            let hero = &raw const the_actors.list[0];
+
+            if swan_carries(
+                the_actors.raft_nearness,
+                the_actors.carrier_slot,
+                *the_hero.stuff.add(STUFF_SWAN_ITEM) != 0,
+            ) {
+                self.facing = (*hero).facing as i16;
+                (*actor).abs_x = (*hero).abs_x;
+                XTEST = (*hero).abs_x;
+                (*actor).abs_y = (*hero).abs_y;
+                YTEST = (*hero).abs_y;
+                the_hero.riding = RIDING_SWAN;
+            } else {
+                XTEST = (*actor).abs_x;
+                YTEST = (*actor).abs_y;
+            }
+
+            self.image = self.facing;
+            self.step = 0;
+        }
+    }
+
+    /// The turtle carries the hero when he is near, otherwise it swims on its own.
+    unsafe fn turtle_moves(&mut self) {
+        unsafe {
+            let actor = self.actor;
+            let hero = &raw const the_actors.list[0];
+
+            if turtle_carries(the_actors.raft_nearness, the_actors.carrier_slot) {
+                self.facing = (*hero).facing as i16;
+                XTEST = (*hero).abs_x;
+                YTEST = (*hero).abs_y;
+                the_hero.riding = RIDING_TURTLE;
+                self.image = self.facing + self.facing;
+
+                if (*hero).state as i16 == WALKING {
+                    self.image += self.cycle & 1;
+                }
+            } else {
+                self.turtle_swims();
+            }
+
+            self.terrain = terrain(XTEST, YTEST);
+
+            if self.terrain == TURTLE_WATER {
+                (*actor).abs_x = XTEST;
+                (*actor).abs_y = YTEST;
+            }
+
+            self.step = 1;
         }
     }
 
@@ -85,35 +122,41 @@ impl Ctx {
     /// tries turning right, then left, then back to straight on the left again.
     unsafe fn turtle_swims(&mut self) {
         unsafe {
-            let an = self.an;
-            let (ax, ay) = ((*an).abs_x as i32, (*an).abs_y as i32);
-            self.d = turtle_heading(self.d, |dir| {
+            let actor = self.actor;
+            let (ax, ay) = ((*actor).abs_x as i32, (*actor).abs_y as i32);
+            self.facing = turtle_heading(self.facing, |dir| {
                 terrain(pos_x(ax, dir, 3), pos_y(ay, dir, 3)) == TURTLE_WATER
             });
-            XTEST = pos_x(ax, self.d, 3);
-            YTEST = pos_y(ay, self.d, 3);
+
+            XTEST = pos_x(ax, self.facing, 3);
+            YTEST = pos_y(ay, self.facing, 3);
             the_hero.riding = 0;
-            self.dex = self.d + self.d + (self.cycle & 1);
+            self.image = self.facing + self.facing + (self.cycle & 1);
         }
     }
 
     /// The raft: follows the hero when the hero is very near and the terrain is water.
     pub(super) unsafe fn raft(&mut self) -> Pc {
         unsafe {
-            let an = self.an;
+            let actor = self.actor;
             the_hero.riding = 0;
+
             if the_actors.carrier_slot != RIDING_RAFT || the_actors.raft_nearness != 2 {
                 return Pc::Statc;
             }
+
             XTEST = the_actors.list[0].abs_x;
             YTEST = the_actors.list[0].abs_y;
-            self.j = terrain(XTEST, YTEST);
-            if self.j < 3 || self.j > 5 {
+            self.terrain = terrain(XTEST, YTEST);
+
+            if self.terrain < 3 || self.terrain > 5 {
                 return Pc::Statc;
             }
-            (*an).abs_x = XTEST;
-            (*an).abs_y = YTEST;
+
+            (*actor).abs_x = XTEST;
+            (*actor).abs_y = YTEST;
             the_hero.riding = RIDING_RAFT;
+
             Pc::Statc
         }
     }
@@ -121,6 +164,7 @@ impl Ctx {
 
 #[cfg(test)]
 mod tests {
+    use super::super::CARRIER_SLOT;
     use super::*;
 
     #[test]
@@ -141,6 +185,7 @@ mod tests {
         assert_eq!(turtle_heading(2, |d| d == 3), 3);
         assert_eq!(turtle_heading(2, |d| d == 1), 1);
         assert_eq!(turtle_heading(2, |_| false), 0);
+
         // the compass wraps
         assert_eq!(turtle_heading(7, |d| d == 0), 0);
         assert_eq!(turtle_heading(0, |d| d == 7), 7);

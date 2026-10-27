@@ -16,6 +16,7 @@ const BED_WAIT: i16 = 30;
 const TOO_RESTED: i16 = 50;
 const EVENT_NOT_TIRED: i32 = 25;
 const EVENT_SLEEPING: i32 = 26;
+
 /// Sleeping puts the hero at the bottom of the tile.
 const BED_Y_MASK: u16 = 0x1f;
 
@@ -23,20 +24,25 @@ const BED_Y_MASK: u16 = 0x1f;
 pub fn check_bed() {
     unsafe {
         let hero = &raw mut the_actors.list[0];
+
         if (*hero).state != STILL {
             the_world.bed_wait = 0;
         }
+
         the_hero.x = (*hero).abs_x;
         the_hero.y = (*hero).abs_y;
 
         if the_world.region == INSIDE_REGION {
+            // The tile under the hero: 16 pixels wide, 32 high.
             let tile = *tile_address((the_hero.x >> 4) as i32, (the_hero.y >> 5) as i32);
             let (wait, action) = bed_step(
                 the_world.bed_wait,
                 BED_TILES.contains(&tile),
                 the_hero.fatigue,
             );
+
             the_world.bed_wait = wait;
+
             match action {
                 BedAction::Nothing => {}
                 BedAction::NotTired => show_event(EVENT_NOT_TIRED),
@@ -65,6 +71,7 @@ fn bed_step(wait: i16, on_bed: bool, fatigue: i16) -> (i16, BedAction) {
     if !on_bed {
         return (0, BedAction::Nothing);
     }
+
     let wait = wait + 1;
     let action = if wait != BED_WAIT {
         BedAction::Nothing
@@ -73,6 +80,7 @@ fn bed_step(wait: i16, on_bed: bool, fatigue: i16) -> (i16, BedAction) {
     } else {
         BedAction::FallAsleep
     };
+
     (wait, action)
 }
 
@@ -83,10 +91,12 @@ mod tests {
     #[test]
     fn a_tired_hero_falls_asleep_after_thirty_frames_on_a_bed() {
         let (mut wait, mut last) = (0, BedAction::Nothing);
+
         for frame in 1..=BED_WAIT {
             (wait, last) = bed_step(wait, true, TOO_RESTED);
             assert_eq!(last == BedAction::FallAsleep, frame == BED_WAIT);
         }
+
         assert_eq!(wait, BED_WAIT);
         assert_eq!(last, BedAction::FallAsleep);
     }

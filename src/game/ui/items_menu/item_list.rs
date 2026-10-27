@@ -1,6 +1,12 @@
 //! Showing the list of the things the hero carries, with their pictures.
 
-use super::*;
+use super::{BltBitMap, GOLDBASE, InitBitMap, LoadRGB4, OBJECTS, SetRGB4, SetRast, item};
+use crate::amiga::BitMap;
+use crate::game::data::object_tables::page_colors;
+use crate::game::data::state::{the_hero, the_memory, the_screen};
+use crate::game::data::types::SeqInfo;
+use crate::game::render::screen_fx::show_still_screen;
+use crate::game::ui::text::queue_print;
 
 // Print queue entries and events.
 const PRQ_LIST: i32 = 5;
@@ -15,6 +21,7 @@ const ITEM_X_MARGIN: i32 = 20;
 const BLIT_COPY: u32 = 0xC0;
 const ALL_PLANES: u32 = 0xff;
 const BACKGROUND_PEN: u32 = 31;
+
 /// `view_status` value while the item list is shown.
 const VIEW_ITEMS: i8 = 4;
 pub(super) const VIEW_GAME_OVER: i8 = 2;
@@ -33,10 +40,12 @@ pub(super) unsafe fn show_item_list() {
             ITEM_IMAGE_WIDTH,
             ITEM_IMAGE_ROWS,
         );
+
         let data = (*(&raw mut the_memory.seq_list)
             .cast::<SeqInfo>()
             .add(OBJECTS as usize))
         .location;
+
         for plane in 0..ITEM_IMAGE_PLANES as usize {
             the_screen.pagea.Planes[plane] = data.add(plane * ITEM_IMAGE_BYTES);
         }
@@ -50,6 +59,7 @@ pub(super) unsafe fn show_item_list() {
             (&raw const page_colors).cast(),
             COLOURS_SHOWN,
         );
+
         the_screen.view_status = VIEW_ITEMS;
         queue_print(PRQ_LIST);
     }
@@ -65,6 +75,7 @@ unsafe fn draw_item_icons(bm: *mut BitMap) {
             let x = it.xoff as i32 + ITEM_X_MARGIN;
             let mut y = it.yoff as u16;
             let source_row = it.image_number as i32 * ITEM_ROW_HEIGHT + it.img_off as i32;
+
             for _ in 0..shown {
                 BltBitMap(
                     &raw mut the_screen.pagea,
@@ -79,6 +90,7 @@ unsafe fn draw_item_icons(bm: *mut BitMap) {
                     ALL_PLANES,
                     std::ptr::null_mut(),
                 );
+
                 y = y.wrapping_add(it.ydelta as u16);
             }
         }

@@ -452,6 +452,7 @@ mod tests {
     #[test]
     fn doors_are_sorted_by_x_for_the_binary_search() {
         let doors = unsafe { &*(&raw const door_list) };
+
         for pair in doors.windows(2) {
             assert!(pair[0].xc1 <= pair[1].xc1, "door at x {} is out of order", pair[1].xc1);
         }
@@ -464,6 +465,7 @@ mod tests {
     #[test]
     fn extents_are_proper_rectangles() {
         let extents = unsafe { &*(&raw const extent_list) };
+
         for (n, e) in extents.iter().enumerate() {
             if n == INVERTED_EXTENT {
                 assert!(e.y1 > e.y2, "the quirk of extent {n} is gone; update this test");
@@ -477,6 +479,7 @@ mod tests {
     fn menu_labels_cover_all_the_entries() {
         // Entries 0-4 are the menu names; every entry after that has a 5 character label.
         let all_menus = unsafe { &*(&raw const menus) };
+
         for (n, menu) in all_menus.iter().enumerate() {
             let label = unsafe { CStr::from_ptr(menu.label_list) };
             let needed = (menu.num as usize).saturating_sub(5) * 5;
@@ -488,8 +491,10 @@ mod tests {
     #[test]
     fn every_shortcut_key_picks_a_real_entry() {
         let all_menus = unsafe { &*(&raw const menus) };
+
         let shortcuts = unsafe { &*(&raw const menu_shortcuts) };
         let mut seen = HashSet::new();
+
         for shortcut in shortcuts {
             let menu = &all_menus[shortcut.menu as usize];
             assert!(shortcut.choice < menu.num, "key {}", shortcut.letter);
@@ -500,6 +505,7 @@ mod tests {
     #[test]
     fn swing_transitions_lead_to_swing_states() {
         let transitions = unsafe { &*(&raw const swing_transitions) };
+
         for (state, next) in transitions.iter().enumerate() {
             for &to in next {
                 assert!((0..=8).contains(&to), "state {state} goes to {to}");
@@ -511,10 +517,12 @@ mod tests {
     fn every_item_has_a_name() {
         let items = unsafe { &*(&raw const item_list) };
         assert_eq!(items.len(), 36);
+
         for (n, item) in items.iter().enumerate() {
             let name = unsafe { CStr::from_ptr(item.name) };
             assert!(!name.to_bytes().is_empty(), "item {n}");
         }
+
         assert_eq!(unsafe { CStr::from_ptr(items[0].name) }.to_str(), Ok("Dirk"));
     }
 
@@ -523,6 +531,7 @@ mod tests {
         let brothers = unsafe { &*(&raw const brother_stats) };
         let lists: HashSet<_> = brothers.iter().map(|b| b.stuff as usize).collect();
         assert_eq!(lists.len(), 3);
+
         let names = unsafe { &*(&raw const brother_names) };
         assert_eq!(unsafe { CStr::from_ptr(names[0]) }.to_str(), Ok("Julian"));
     }
@@ -530,6 +539,7 @@ mod tests {
     #[test]
     fn monsters_use_the_enemy_sprite_files() {
         let chart = unsafe { &*(&raw const encounter_chart) };
+
         for (n, monster) in chart.iter().enumerate() {
             assert!((6..=9).contains(&monster.file_id), "monster {n}");
         }

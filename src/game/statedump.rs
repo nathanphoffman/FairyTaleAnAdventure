@@ -9,16 +9,18 @@ use crate::game::data::state::{the_actors, the_hero, the_world};
 use crate::game::data::tables::{seed1, seed2};
 use crate::game::data::types::Shape;
 use crate::game::world::places::transfer_hero;
-use std::fmt::Write as _;
 use std::path::Path;
 use std::sync::Mutex;
 
 /// Number of inventory slots the dump lists (the weapons and keys, up to the arrows).
 const DUMPED_STUFF_SLOTS: usize = 35;
+
 /// Actor kind of enemies.
 const ENEMY: i8 = 2;
+
 /// First actor slot that can be an enemy.
 const FIRST_ENEMY_SLOT: i16 = 3;
+
 /// Death type used when the "kill the hero" command ends the game.
 const DEATH_BY_TEST: i32 = 5;
 
@@ -40,21 +42,31 @@ pub enum Command {
 /// The queued command. The display thread writes it and the game thread reads it.
 static PENDING: Mutex<Option<Command>> = Mutex::new(None);
 
+/// The pending command. A thread that panicked while holding the lock leaves the command intact, so
+/// the lock is used anyway.
+fn lock_pending() -> std::sync::MutexGuard<'static, Option<Command>> {
+    PENDING
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 /// Queues a command to run at the start of the next frame (a later one replaces an earlier one).
 pub fn queue_command(command: Command) {
-    *PENDING.lock().unwrap() = Some(command);
+    *lock_pending() = Some(command);
 }
 
 /// Runs the queued command, if any. Called at the top of every frame.
 pub fn run_pending_command() {
     unsafe {
-        let Some(command) = PENDING.lock().unwrap().take() else {
+        let Some(command) = lock_pending().take() else {
             return;
         };
+
         match command {
             Command::Teleport { x, y } => {
                 transfer_hero(x as u16, y as u16, 1);
             }
+
             Command::Give { slot, count } => *the_hero.stuff.add(slot as usize) = count as u8,
             Command::SetStat { stat: 0, value } => the_hero.hunger = value as i16,
             Command::SetStat { stat: 1, value } => the_hero.fatigue = value as i16,
@@ -85,46 +97,59 @@ unsafe fn slay_enemies() {
 /// inventory.
 pub fn state_text() -> String {
     unsafe {
+        let mut out = hero_and_world_lines();
+        out.push_str(&format!("seed {} {}\n", { seed1 }, { seed2 }));
+
+        for i in 0..20 {
+            out.push_str(&actor_line(i, &*(&raw const the_actors.list[i])));
+        }
+
+        out.push_str("stuff");
+
+        for slot in 0..DUMPED_STUFF_SLOTS {
+            out.push_str(&format!(" {}", *the_hero.stuff.add(slot)));
+        }
+
+        out.push('\n');
+
+        out
+    }
+}
+
+/// The first lines of the dump: where the hero is, his stats, and the clock and light.
+unsafe fn hero_and_world_lines() -> String {
+    unsafe {
         let mut out = String::new();
-        let _ = writeln!(
-            out,
-            "brother {} region {} hero {},{} map {},{}",
+        out.push_str(&format!(
+            "brother {} region {} hero {},{} map {},{}\n",
             { the_hero.brother },
             { the_world.region },
             { the_hero.x },
             { the_hero.y },
             { the_world.map_x },
             { the_world.map_y }
-        );
-        let _ = writeln!(
-            out,
-            "brave {} luck {} kind {} wealth {} hunger {} fatigue {}",
+        ));
+
+        out.push_str(&format!(
+            "brave {} luck {} kind {} wealth {} hunger {} fatigue {}\n",
             { the_hero.brave },
             { the_hero.luck },
             { the_hero.kindness },
             { the_hero.wealth },
             { the_hero.hunger },
             { the_hero.fatigue }
-        );
-        let _ = writeln!(
-            out,
-            "daynight {} light {} riding {} flying {} anix {},{}",
+        ));
+
+        out.push_str(&format!(
+            "daynight {} light {} riding {} flying {} anix {},{}\n",
             { the_world.day_clock },
             { the_world.light_level },
             { the_hero.riding },
             { the_hero.flying },
             { the_actors.active },
             { the_actors.drawn }
-        );
-        let _ = writeln!(out, "seed {} {}", { seed1 }, { seed2 });
-        for i in 0..20 {
-            out.push_str(&actor_line(i, &*(&raw const the_actors.list[i])));
-        }
-        out.push_str("stuff");
-        for slot in 0..DUMPED_STUFF_SLOTS {
-            let _ = write!(out, " {}", *the_hero.stuff.add(slot));
-        }
-        out.push('\n');
+        ));
+
         out
     }
 }
@@ -153,7 +178,9 @@ fn actor_line(i: usize, a: &Shape) -> String {
 
 /// Writes `state_text` to the file at `path`.
 pub fn dump_state(path: &Path) {
-    let _ = std::fs::write(path, state_text());
+    if let Err(error) = std::fs::write(path, state_text()) {
+        eprintln!("Could not write the state dump {}: {error}", path.display());
+    }
 }
 
 #[cfg(test)]
@@ -178,7 +205,7 @@ mod tests {
         queue_command(Command::SlayEnemies);
         queue_command(Command::Give { slot: 1, count: 2 });
         assert_eq!(
-            PENDING.lock().unwrap().take(),
+            lock_pending().take(),
             Some(Command::Give { slot: 1, count: 2 })
         );
     }

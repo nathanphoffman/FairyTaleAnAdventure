@@ -96,6 +96,7 @@ pub(super) const TICK_HZ: f64 = 60.0; // the sequencer ran from the vertical bla
 pub(super) const GAP: i32 = 300; // silence at the end of a note
 /// Hardware limit: periods below this are not honoured.
 pub(super) const MIN_PERIOD: u32 = 124;
+
 /// Played for note numbers past the end of `NOTES`.
 pub(super) const FALLBACK_NOTE: (u16, u16) = (508, 0);
 
@@ -103,10 +104,13 @@ pub(super) const VOICE_COUNT: usize = 4;
 pub(super) const MAX_VOLUME: u8 = 64;
 pub(super) const DEFAULT_TEMPO: i32 = 150;
 pub(super) const TEMPO_MASK: i32 = 0xffff;
+
 /// The voice that sound effects take over.
 pub(super) const EFFECT_VOICE: usize = 1;
+
 /// Voices 1 and 4 play on the left, 2 and 3 on the right, as on the Amiga.
 pub(super) const LEFT_VOICES: [usize; 2] = [0, 3];
+
 /// Scales the four mixed channels down so they rarely clip.
 pub(super) const MIX_LEVEL: f32 = 0.45;
 
@@ -123,6 +127,7 @@ pub(super) const INSTRUMENT_MASK: u8 = 15;
 pub(super) const WAVE_BYTES: usize = 128;
 pub(super) const WAVE_WORDS: usize = 32;
 pub(super) const ENVELOPE_BYTES: usize = 256;
+
 /// `NOTES` start offsets are in units of this many bytes.
 pub(super) const OFFSET_UNIT: usize = 4;
 

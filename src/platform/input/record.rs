@@ -15,16 +15,20 @@ pub(super) fn record(line: std::fmt::Arguments) {
     static LOG: OnceLock<Option<Mutex<std::fs::File>>> = OnceLock::new();
     let log = LOG.get_or_init(|| {
         let path = std::env::var_os(RECORD_VAR)?;
+
         match std::fs::File::create(&path) {
             Ok(f) => Some(Mutex::new(f)),
             Err(e) => {
                 eprintln!("Could not create the record file: {e}");
+
                 None
             }
         }
     });
+
     if let Some(f) = log {
         let tick = TICK.load(Ordering::Relaxed);
+
         if let Ok(mut f) = f.lock()
             && let Err(e) = writeln!(f, "{tick} {line}")
         {

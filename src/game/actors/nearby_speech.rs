@@ -16,6 +16,7 @@ const PRINCESS_FREED_SLOT: usize = 9;
 pub fn speak_nearby() {
     unsafe {
         let race = the_actors.list[the_actors.nearest_person as usize].race as i16;
+
         if the_actors.nearest_person != 0 && race != the_actors.last_person {
             match race {
                 BEGGAR => speak(23),
@@ -25,10 +26,12 @@ pub fn speak_nearby() {
                         speak(16);
                     }
                 }
+
                 NECROMANCER => speak(43),
                 DKNIGHT => speak(41),
                 _ => {}
             }
+
             the_actors.last_person = race;
         }
     }

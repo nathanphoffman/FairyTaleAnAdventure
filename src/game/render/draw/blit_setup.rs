@@ -1,19 +1,29 @@
 //! Getting a sprite ready for the blitter: cutting it to the screen, where its background is saved,
 //! and the blit values.
 
-use super::*;
+use super::images::sprite_sheet;
+use super::{Frame, OBJECTS, Sprite};
+use crate::game::data::globals::current_sshape;
+use crate::game::data::globals::{
+    last_word_mask, shadow_mask_offset, sprite_mask_modulo, sprite_mask_offset, sprite_x_shift,
+};
+use crate::game::data::state::{the_memory, the_screen};
+use crate::game::render::blit::SShape;
 
 // ---- draw_sprites ----
 /// Screen size in pixels the sprites are clipped to (the play field is 320 by 174).
 pub(super) const SCREEN_RIGHT: i16 = 319;
 pub(super) const SCREEN_BOTTOM: i16 = 173;
+
 /// Bytes in a page row, and the first row of the spare bit planes used as quick background saves.
 const ROW_BYTES: usize = 40;
 const SPARE_PLANE_OFFSET: usize = 192 * ROW_BYTES;
 const SPARE_SAVES: u8 = 5;
+
 /// A saved background smaller than this many bytes (per plane) goes in a spare plane.
 const SMALL_SAVE: i16 = 64;
 pub(super) const PLANES: i32 = 5;
+
 /// The background-save buffer holds this many bytes; running out stops drawing for the frame.
 const SAVE_LIMIT: i32 = 74 * 80;
 
@@ -41,10 +51,12 @@ pub(super) fn clip_to_screen(sprite: &mut Sprite) -> Clip {
         xoff: (xstart - sprite.xstart) as i8,
         yoff: (ystart - sprite.ystart) as i8,
     };
+
     if sprite.atype == OBJECTS && (sprite.inum & 128) != 0 {
         sprite.inum &= 0x7f;
         clip.yoff = clip.yoff.wrapping_add(8);
     }
+
     clip
 }
 
@@ -53,22 +65,93 @@ pub(super) fn clip_to_screen(sprite: &mut Sprite) -> Clip {
 pub(super) unsafe fn assign_background_save(frame: &mut Frame) -> bool {
     unsafe {
         let page = the_screen.drawing_page;
+
         if (*current_sshape).savesize < SMALL_SAVE && frame.crack < SPARE_SAVES {
             (*current_sshape).backsave =
                 (*the_screen.planes.add(frame.crack as usize)).add(SPARE_PLANE_OFFSET);
             frame.crack += 1;
+
             return true;
         }
+
         (*current_sshape).backsave = frame.backalloc;
         let bytes = PLANES * (*current_sshape).savesize as i32;
         frame.backalloc = frame.backalloc.offset(bytes as isize);
         (*page).saveused += bytes;
+
         (*page).saveused < SAVE_LIMIT
+    }
+}
+
+/// Fills in the blitter's registers and the queue entry for this sprite: sizes, where the image,
+/// its mask and the saved background are, and the shifts. Returns false when the save buffer is
+/// full.
+#[allow(clippy::too_many_arguments)] // the blit set-up of the original, kept as one call
+pub(super) unsafe fn set_up_blit(
+    frame: &mut Frame,
+    sprite: &Sprite,
+    clip: &Clip,
+    cwide: i8,
+    xbw: i8,
+    blitwide: i8,
+    blithigh: i8,
+) -> bool {
+    unsafe {
+        // The sheet is looked up again: a sunk actor is drawn from the objects sheet, but is as wide
+        // and high as its own.
+        let seq = sprite_sheet(sprite.atype);
+        current_sshape = (*the_screen.drawing_page)
+            .shape_queue
+            .cast::<SShape>()
+            .offset((*the_screen.drawing_page).obcount as isize);
+        the_screen.planesize = seq.bytes;
+        (*current_sshape).savesize = (blitwide as i32 * blithigh as i32 * 2) as i16;
+        // Blitter size word: height in the high bits, width in words in the low 6 bits.
+        (*current_sshape).blitsize = (((blithigh as i32) << 6) + blitwide as i32) as i16;
+
+        the_memory.shapedata = seq
+            .location
+            .offset(the_screen.planesize as isize * PLANES as isize * sprite.inum as isize);
+        the_memory.mask_buffer = seq
+            .maskloc
+            .offset(the_screen.planesize as isize * sprite.inum as isize);
+
+        if !assign_background_save(frame) {
+            return false;
+        }
+
+        set_blitter_registers(sprite, clip, cwide, xbw, blitwide);
+
+        true
+    }
+}
+
+/// Sets the blitter's mask offsets, shift and modulo for the clipped sprite, and where in the page
+/// it goes.
+unsafe fn set_blitter_registers(sprite: &Sprite, clip: &Clip, cwide: i8, xbw: i8, blitwide: i8) {
+    unsafe {
+        shadow_mask_offset = ((clip.ystart & 31) as i32 * blitwide as i32 * 2) as i16;
+        // Where the visible part starts in the mask: whole words (2 bytes per 16 pixels) in, and whole rows down.
+        sprite_mask_offset = ((clip.xoff >> 4) as i32 * 2 + cwide as i32 * clip.yoff as i32) as i16;
+        (*current_sshape).coff = (xbw as i32 * 2 + clip.ystart as i32 * 40) as i16;
+        sprite_x_shift = sprite.xstart & 15;
+
+        if clip.xoff & 15 != 0 {
+            (*current_sshape).coff -= 2;
+            last_word_mask = 0;
+        } else {
+            last_word_mask = -1;
+        }
+
+        sprite_mask_modulo = (cwide as i32 - blitwide as i32 * 2) as i16;
+        (*current_sshape).cmod = (40 - blitwide as i32 * 2) as i16;
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::super::PHIL;
+    use super::super::sprite_at;
     use super::*;
 
     #[test]
@@ -79,6 +162,7 @@ mod tests {
             (clip.xstart, clip.ystart, clip.xstop, clip.ystop),
             (100, 50, 131, 81)
         );
+
         assert_eq!((clip.xoff, clip.yoff), (0, 0));
     }
 

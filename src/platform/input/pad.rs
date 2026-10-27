@@ -37,5 +37,6 @@ pub fn pad_button(button: Button, down: bool) {
         Button::DPadRight => return pad_direction(DIR_RIGHT, down),
         _ => return,
     };
+
     send_key(code, down);
 }

@@ -16,8 +16,11 @@ use crate::game::files::iff_chunks::{read_chunk_id, read_chunk_length, unpack_li
 
 unsafe extern "C" {
     fn Open(name: *const c_char, mode: i32) -> BPTR;
+
     fn Close(file: BPTR);
+
     fn Read(file: BPTR, buf: *mut u8, len: i32) -> i32;
+
     fn Seek(file: BPTR, pos: i32, mode: i32) -> i32;
 }
 
@@ -25,18 +28,23 @@ unsafe extern "C" {
 /// Bytes left in the FORM being read.
 pub static mut bytes_left_in_file: i32 = 0;
 pub static mut picture_file: i32 = 0;
+
 /// The id of the chunk just read.
 pub static mut current_chunk_id: i32 = 0;
 pub static mut chunk_length: i32 = 0;
+
 /// Bytes in one unpacked scan line.
 pub static mut row_byte_count: i32 = 0;
+
 /// Read position in the compressed body.
 pub static mut pack_cursor: *const i8 = std::ptr::null();
+
 /// Compression type of the body: 0 = none, 1 = ByteRun1.
 pub static mut compression_type: i8 = 0;
 
 /// AmigaDOS open mode for an existing file.
 const MODE_OLDFILE: i32 = 1005;
+
 /// Seek relative to the current position.
 const OFFSET_CURRENT: i32 = 0;
 const TRUE: i32 = 1;
@@ -49,6 +57,7 @@ const BRUSH_PLANES: usize = 5;
 const fn chunk_id(name: &[u8; 4]) -> i32 {
     i32::from_ne_bytes(*name)
 }
+
 const FORM: i32 = chunk_id(b"FORM");
 const ILBM: i32 = chunk_id(b"ILBM");
 const BMHD: i32 = chunk_id(b"BMHD");
@@ -88,8 +97,10 @@ unsafe fn read_bitmap_header() -> BitMapHeader {
         let len = chunk_length.clamp(0, size_of::<BitMapHeader>() as i32);
         Read(picture_file as BPTR, (&raw mut bmhd).cast(), len);
     }
+
     bmhd.width = bmhd.width.swap_bytes();
     bmhd.height = bmhd.height.swap_bytes();
+
     bmhd
 }
 
@@ -107,14 +118,17 @@ unsafe fn read_body(bmhd: &BitMapHeader, bitmap: &BitMap, offset: usize) {
             the_memory.shape_mem.cast(),
             chunk_length,
         );
+
         compression_type = bmhd.compression as i8;
         let mut planes: [*mut u8; BRUSH_PLANES] =
             std::array::from_fn(|p| bitmap.Planes[p].wrapping_add(offset));
+
         for _ in 0..bmhd.height {
             for (p, plane) in planes.iter_mut().enumerate() {
                 if bitmap.Depth as usize > p {
                     unpack_line(*plane);
                 }
+
                 *plane = plane.wrapping_add(bitmap.BytesPerRow as usize);
             }
         }
@@ -129,20 +143,37 @@ pub fn load_picture(filename: *const c_char, bitmap: *mut BitMap, x: i16, y: i16
         let offset = (x as i32 + bitmap.BytesPerRow as i32 * y as i32) as usize;
 
         picture_file = Open(filename, MODE_OLDFILE) as i32;
+
         if picture_file == 0 {
             return FALSE;
         }
+
+        let read_ok = read_form(bitmap, offset);
+
+        Close(picture_file as BPTR);
+
+        if read_ok { TRUE } else { FALSE }
+    }
+}
+
+/// Reads the chunks of the open IFF file: the header, then the picture body into `bitmap` at byte
+/// `offset`. Returns false if this is not a picture file the game can read.
+unsafe fn read_form(bitmap: &BitMap, offset: usize) -> bool {
+    unsafe {
         read_chunk_id();
+
         if current_chunk_id != FORM {
-            Close(picture_file as BPTR);
-            return FALSE;
+            return false;
         }
+
         read_chunk_length();
         bytes_left_in_file = chunk_length;
 
         let mut bmhd = BitMapHeader::default();
+
         while bytes_left_in_file != 0 {
             read_chunk_id();
+
             if current_chunk_id == ILBM {
                 // just the form type, no data
             } else if current_chunk_id == BMHD {
@@ -153,14 +184,14 @@ pub fn load_picture(filename: *const c_char, bitmap: *mut BitMap, x: i16, y: i16
                 Seek(picture_file as BPTR, chunk_length, OFFSET_CURRENT);
             } else if current_chunk_id == BODY {
                 read_body(&bmhd, bitmap, offset);
+
                 break;
             } else {
-                Close(picture_file as BPTR);
-                return FALSE;
+                return false;
             }
         }
-        Close(picture_file as BPTR);
-        TRUE
+
+        true
     }
 }
 

@@ -15,6 +15,7 @@ use crate::game::actors::interaction::turtle_eggs;
 use crate::game::data::object_tables::{
     CHEST, TURTLE, dstobs, glbobs, mapobs, ob_listg, ob_table, rand_treasure,
 };
+
 use crate::game::data::random::bitrand;
 use crate::game::data::state::{the_actors, the_memory, the_witch, the_world};
 use crate::game::data::tables::setfig_table;
@@ -23,6 +24,7 @@ use crate::game::files::disk::motor_off;
 use crate::game::files::loading::sprite_files;
 use crate::game::files::loading::{finish_sprite_load, load_sprite_file};
 use crate::game::world::map::terrain_at;
+
 /// Mirror of the `setfig_table` entries in csrc/fmain.c: for each kind of person (wizard, priest,
 /// guard, princess, king, noble, sorceress, bartender, witch, ranger ...), which sprite file
 /// holds them, which image to start from, and whether they can talk.
@@ -41,6 +43,7 @@ const DEAD: i8 = 15;
 
 /// What a chest turns into when opened.
 const OPENED_CHEST: i8 = 0x1d;
+
 /// The witch's set figure id.
 const WITCH: i8 = 9;
 
@@ -51,16 +54,20 @@ const STAT_PERSON: i8 = 3;
 const STAT_DEAD_PERSON: i8 = 4;
 const STAT_RAFT_ITEM: i8 = 5;
 const STAT_SECOND_ITEM: i8 = 6;
+
 /// A visible object (also what new random treasure starts as).
 const STAT_SHOWN: i8 = 1;
 
 /// Actors 0 and 1 are the hero and the raft; objects and people start after the carrier slots.
 const FIRST_OBJECT_ACTOR: i16 = 2;
 const MAX_ACTORS: i16 = 20;
+
 /// Region numbers from this one on mean the map is stable (csrc/fmain.c `MAP_STABLE`).
 const NO_REGION: u16 = 10;
+
 /// Random treasures added to a region the first time it is visited.
 const RANDOM_TREASURES: usize = 10;
+
 /// Offset of the global object list's ids in `vitality`, and the bit marking "global list".
 const OBJECT_INDEX_MASK: i16 = 0x7f;
 const GLOBAL_LIST_BIT: i16 = 0x80;
@@ -71,8 +78,10 @@ const PERSON_LOAD_Y: (i16, i16) = (-100, 300);
 const SHOWN_X: (i16, i16) = (-20, 340);
 const SHOWN_Y: (i16, i16) = (-20, 190);
 const SPRITE_CENTER_OFFSET: i16 = 8;
+
 /// People stand this much higher than their position.
 const PERSON_RAISE: i16 = 18;
+
 /// Actor `race` for a person is their id plus this.
 const PERSON_RACE_BASE: i32 = 0x80;
 
@@ -95,6 +104,7 @@ pub fn spawn_object_actors() {
             mapobs[the_world.region as usize],
             0,
         );
+
         if J1 > 3 {
             the_actors.active = J1;
         }
@@ -125,6 +135,7 @@ pub fn change_object(id: i32, flag: i32) {
         } else {
             ob_table[the_world.region as usize].add(index)
         };
+
         if (*object).ob_id == CHEST as i8 {
             (*object).ob_id = OPENED_CHEST;
         } else {
@@ -140,15 +151,19 @@ unsafe fn distribute_treasure() {
     unsafe {
         let region = the_world.region as usize;
         let objects = ob_table[region];
+
         for _ in 0..RANDOM_TREASURES {
             let (mut x, mut y);
+
             loop {
                 x = (bitrand(0x3fff) + ((the_world.region & 1) as i32 * 0x4000)) as i16;
                 y = (bitrand(0x1fff) + ((the_world.region & 6) as i32 * 0x1000)) as i16;
+
                 if terrain_at(x as i32, y as i32) == 0 {
                     break;
                 }
             }
+
             let k = mapobs[region] as usize;
             mapobs[region] += 1;
             let object = &mut *objects.add(k);
@@ -157,6 +172,7 @@ unsafe fn distribute_treasure() {
             object.ob_id = rand_treasure[bitrand(15) as usize] as i8;
             object.ob_stat = STAT_SHOWN;
         }
+
         dstobs[region] = 1; // mark this region as distributed
     }
 }
@@ -169,6 +185,7 @@ unsafe fn load_set_figure(id: i8) {
             .cast::<SetFigEntry>()
             .add(id as usize))
         .cfile_entry;
+
         if sprite_files[entry as usize].file_id
             != sprite_files[the_actors.loaded_setfig_file as usize].file_id
         {
@@ -195,15 +212,20 @@ pub fn add_objects_near(mut list: *mut WorldObject, mut length: i16, f: i32) {
     unsafe {
         turtle_eggs = 0;
         the_witch.on_screen = 0;
+
         if dstobs[the_world.region as usize] == 0 && the_world.new_region >= NO_REGION {
             distribute_treasure();
         }
+
         let mut index: i16 = 0;
+
         while length > 0 {
             length -= 1;
+
             if the_actors.drawn >= MAX_ACTORS {
                 return;
             }
+
             add_object(&mut *list, index, f);
             list = list.add(1); // next object
             index += 1;
@@ -218,24 +240,31 @@ unsafe fn add_object(object: &mut WorldObject, index: i16, f: i32) {
             (object.xc as i32 - the_world.map_x as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
         let ystart =
             (object.yc as i32 - the_world.map_y as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
+
         // States 3 and 4 are people; everything else is an item.
         let is_person = object.ob_stat == STAT_PERSON || object.ob_stat == STAT_DEAD_PERSON;
         let id = object.ob_id;
+
         if is_person {
             if !(inside(xstart, PERSON_LOAD_X) && inside(ystart, PERSON_LOAD_Y)) {
                 return;
             }
+
             load_set_figure(id);
+
             if object.ob_id == WITCH && object.ob_stat == STAT_PERSON {
                 the_witch.on_screen = 1;
             }
         }
+
         if object.ob_stat == STAT_TAKEN || object.ob_stat == STAT_HIDDEN {
             return;
         }
+
         if !(inside(xstart, SHOWN_X) && inside(ystart, SHOWN_Y)) {
             return;
         }
+
         let (actor, ystart) = if is_person {
             match add_person_actor(object, index, ystart) {
                 Some(placed) => placed,
@@ -244,6 +273,7 @@ unsafe fn add_object(object: &mut WorldObject, index: i16, f: i32) {
         } else {
             (add_item_actor(object, index, f), ystart)
         };
+
         actor.abs_x = object.xc;
         actor.abs_y = object.yc;
         actor.rel_x = xstart as u16;
@@ -263,12 +293,15 @@ unsafe fn add_person_actor(
         let id = object.ob_id;
         let actor = &mut (*(&raw mut the_actors.list))[J1 as usize];
         J1 += 1;
+
         if actor.abs_x == object.xc && actor.abs_y == object.yc {
             if actor.state == DEAD {
                 object.ob_stat = STAT_DEAD_PERSON;
             }
+
             return None;
         }
+
         actor.kind = SETFIG;
         actor.index = (*(&raw const setfig_table)
             .cast::<SetFigEntry>()
@@ -283,11 +316,14 @@ unsafe fn add_person_actor(
         } else {
             STILL
         };
+
         // A person's race is 0x80 plus their kind, so they can be told from monsters.
         actor.race = (id as i32 + PERSON_RACE_BASE) as u8;
+
         if J1 > the_actors.drawn {
             the_actors.drawn = J1;
         }
+
         Some((actor, ystart - PERSON_RAISE))
     }
 }
@@ -298,6 +334,7 @@ unsafe fn add_item_actor(object: &WorldObject, index: i16, f: i32) -> &'static m
         if object.ob_id == TURTLE as i8 {
             turtle_eggs = the_actors.drawn as i8;
         }
+
         let actor = &mut (*(&raw mut the_actors.list))[the_actors.drawn as usize];
         the_actors.drawn += 1;
         actor.kind = OBJECTS;
@@ -309,6 +346,7 @@ unsafe fn add_item_actor(object: &WorldObject, index: i16, f: i32) -> &'static m
             STAT_RAFT_ITEM => 0,
             _ => 1,
         };
+
         actor
     }
 }

@@ -22,12 +22,14 @@ fn is_fullscreen_toggle(key: Keycode, keymod: Mod) -> bool {
         || (key == Keycode::Return && keymod.intersects(Mod::LALTMOD | Mod::RALTMOD))
 }
 
+/// Switches between the window and fullscreen. A failure is reported but the game goes on.
 fn toggle_fullscreen(d: &mut Display) {
     let window = d.canvas.window_mut();
     let next = match window.fullscreen_state() {
         FullscreenType::Off => FullscreenType::Desktop,
         _ => FullscreenType::Off,
     };
+
     if let Err(e) = window.set_fullscreen(next) {
         eprintln!("Could not change fullscreen: {e}");
     }
@@ -47,6 +49,7 @@ fn stick_motion(d: &mut Display, axis: Axis, value: i16) {
         ],
         _ => return,
     };
+
     for (si, dir, on) in changes {
         if d.stick[si] != on {
             d.stick[si] = on;
@@ -55,12 +58,14 @@ fn stick_motion(d: &mut Display, axis: Axis, value: i16) {
     }
 }
 
+/// Mouse motion and buttons, with the position changed from window to game screen coordinates.
 fn handle_mouse(event: Event) {
     match event {
         Event::MouseMotion { x, y, .. } => {
             let (fx, fy) = to_frame(x, y);
             input::mouse_move(fx, fy);
         }
+
         Event::MouseButtonDown {
             mouse_btn, x, y, ..
         } => {
@@ -68,11 +73,14 @@ fn handle_mouse(event: Event) {
             input::mouse_move(fx, fy);
             input::mouse_button(mouse_btn, true);
         }
+
         Event::MouseButtonUp { mouse_btn, .. } => input::mouse_button(mouse_btn, false),
         _ => {}
     }
 }
 
+/// One window event: closing or Escape ends the program; the other keys, the mouse and window
+/// changes are passed on.
 fn handle_event(d: &mut Display, event: Event) {
     match event {
         Event::Quit { .. }
@@ -90,6 +98,7 @@ fn handle_event(d: &mut Display, event: Event) {
                 d.pads.push(c);
             }
         }
+
         Event::ControllerButtonDown { button, .. } => input::pad_button(button, true),
         Event::ControllerButtonUp { button, .. } => input::pad_button(button, false),
         Event::ControllerAxisMotion { axis, value, .. } => stick_motion(d, axis, value),
@@ -107,6 +116,7 @@ fn handle_event(d: &mut Display, event: Event) {
 
 pub(super) fn handle_events(d: &mut Display) {
     let events: Vec<Event> = d.events.poll_iter().collect();
+
     for event in events {
         handle_event(d, event);
     }

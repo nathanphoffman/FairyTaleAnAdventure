@@ -187,8 +187,10 @@ pub fn check_layout() {
         ("TmpRas", size_of::<TmpRas>()),
         ("DiskFontHeader", size_of::<DiskFontHeader>()),
     ];
+
     unsafe {
         assert_eq!(fta_sizes_count as usize, rust.len());
+
         for (i, (name, size)) in rust.iter().enumerate() {
             assert_eq!(
                 fta_sizes[i] as usize, *size,

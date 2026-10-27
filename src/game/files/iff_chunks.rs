@@ -26,6 +26,7 @@ pub fn read_chunk_id() {
             (&raw mut current_chunk_id).cast(),
             CHUNK_FIELD_BYTES,
         );
+
         bytes_left_in_file -= CHUNK_FIELD_BYTES;
     }
 }
@@ -38,6 +39,7 @@ pub fn read_chunk_length() {
             (&raw mut chunk_length).cast(),
             CHUNK_FIELD_BYTES,
         );
+
         chunk_length = chunk_length.swap_bytes();
         bytes_left_in_file -= chunk_length + CHUNK_FIELD_BYTES;
     }
@@ -51,14 +53,19 @@ pub fn read_chunk_length() {
 unsafe fn unpack_byte_run(mut src: *const i8, mut dest: *mut u8, width: i32) -> usize {
     let start = src;
     let mut written = 0;
+
     while written < width {
         let mut count = unsafe { *src } as i32;
+
         src = unsafe { src.add(1) };
+
         if count >= 0 {
             // a literal run of count + 1 bytes
             while count >= 0 {
                 unsafe { *dest = *src as u8 };
+
                 dest = unsafe { dest.add(1) };
+
                 src = unsafe { src.add(1) };
                 written += 1;
                 count -= 1;
@@ -66,16 +73,21 @@ unsafe fn unpack_byte_run(mut src: *const i8, mut dest: *mut u8, width: i32) -> 
         } else {
             // one byte repeated -count + 1 times
             count = -count;
+
             let byte = unsafe { *src } as u8;
+
             src = unsafe { src.add(1) };
+
             while count >= 0 {
                 unsafe { *dest = byte };
+
                 dest = unsafe { dest.add(1) };
                 written += 1;
                 count -= 1;
             }
         }
     }
+
     unsafe { src.offset_from(start) as usize }
 }
 
@@ -100,6 +112,7 @@ mod tests {
     fn literal_runs_are_copied() {
         let src: [i8; 4] = [2, 10, 20, 30]; // 3 literal bytes
         let mut out = [0u8; 3];
+
         let used = unsafe { unpack_byte_run(src.as_ptr(), out.as_mut_ptr(), 3) };
         assert_eq!(out, [10, 20, 30]);
         assert_eq!(used, 4);
@@ -109,6 +122,7 @@ mod tests {
     fn repeat_runs_are_expanded() {
         let src: [i8; 2] = [-3, 7]; // 7 repeated 4 times
         let mut out = [0u8; 4];
+
         let used = unsafe { unpack_byte_run(src.as_ptr(), out.as_mut_ptr(), 4) };
         assert_eq!(out, [7, 7, 7, 7]);
         assert_eq!(used, 2);

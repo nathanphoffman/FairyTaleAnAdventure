@@ -10,8 +10,10 @@ use crate::game::statedump::{Command, queue_command};
 
 /// A key press stays down this many ticks unless the script says otherwise.
 const DEFAULT_HOLD_TICKS: u32 = 4;
+
 /// A scripted click releases the button this many ticks after pressing it.
 const CLICK_HOLD_TICKS: u32 = 3;
+
 /// A test command has at least tick, name and one number.
 const MIN_CMD_FIELDS: usize = 3;
 const LORES_TO_FRAME: i32 = 2;
@@ -20,20 +22,24 @@ const LORES_TO_FRAME: i32 = 2;
 /// the given number.
 pub(super) fn parse_script() -> Vec<(u32, String, bool)> {
     let mut script = Vec::new();
+
     for item in std::env::var("FTA_INJECT").unwrap_or_default().split(',') {
         let mut parts = item.split(':');
         let (Some(t), Some(name)) = (parts.next(), parts.next()) else {
             continue;
         };
+
         let hold: u32 = parts
             .next()
             .and_then(|h| h.parse().ok())
             .unwrap_or(DEFAULT_HOLD_TICKS);
+
         if let Ok(t) = t.parse::<u32>() {
             script.push((t, name.to_string(), true));
             script.push((t + hold, name.to_string(), false));
         }
     }
+
     script
 }
 
@@ -48,6 +54,7 @@ fn parse_click_list(text: &str) -> Vec<(u32, i32, i32)> {
     text.split(',')
         .filter_map(|item| {
             let mut p = item.split(':').map(|v| v.parse::<i32>().ok());
+
             Some((p.next()?? as u32, p.next()??, p.next()??))
         })
         .collect()
@@ -60,45 +67,56 @@ fn load_replay() -> ReplayLog {
     let Some(path) = std::env::var_os("FTA_REPLAY") else {
         return Vec::new();
     };
+
     let text = match std::fs::read_to_string(&path) {
         Ok(text) => text,
         Err(e) => {
             eprintln!("Could not read the replay file: {e}");
+
             return Vec::new();
         }
     };
+
     let mut log = Vec::new();
+
     for line in text.lines() {
         let mut words = line.split_whitespace().map(String::from);
+
         if let Some(tick) = words.next().and_then(|t| t.parse().ok()) {
             log.push((tick, words.collect()));
         }
     }
+
     log
 }
 
 /// Plays one logged event: "key NAME 1", "move X Y" or "button left|right 1".
 fn replay_event(w: &[String]) {
     let down = w.last().map(|s| s == "1").unwrap_or(false);
+
     match w[0].as_str() {
         "key" => {
             if let Some(k) = Keycode::from_name(&w[1].replace('_', " ")) {
                 input::key_event(k, down);
             }
         }
+
         "move" => {
             if let (Ok(x), Ok(y)) = (w[1].parse(), w[2].parse()) {
                 input::mouse_move(x, y);
             }
         }
+
         "button" => {
             let b = if w[1] == "left" {
                 MouseButton::Left
             } else {
                 MouseButton::Right
             };
+
             input::mouse_button(b, down);
         }
+
         _ => {}
     }
 }
@@ -108,6 +126,7 @@ fn replay_events(tick: u32) {
     thread_local! {
         static LOG: RefCell<ReplayLog> = RefCell::new(load_replay());
     }
+
     LOG.with(|log| {
         for (_, w) in log.borrow().iter().filter(|(t, _)| *t == tick) {
             replay_event(w);
@@ -123,13 +142,17 @@ fn run_cmds(tick: u32) {
     let Ok(cmds) = std::env::var("FTA_CMD") else {
         return;
     };
+
     for item in cmds.split(',') {
         let p: Vec<&str> = item.split(':').collect();
+
         if p.len() < MIN_CMD_FIELDS || p[0].parse::<u32>().ok() != Some(tick) {
             continue;
         }
+
         let a: i32 = p[2].parse().unwrap_or(0);
         let b: i32 = p.get(3).and_then(|v| v.parse().ok()).unwrap_or(0);
+
         match p[1] {
             "tp" => queue_command(Command::Teleport { x: a, y: b }),
             "kill" => queue_command(Command::KillHero { luck: a }),
@@ -147,6 +170,7 @@ pub(super) fn run_script(d: &mut Display) {
     run_cmds(tick);
     input::TICK.store(tick, std::sync::atomic::Ordering::Relaxed);
     replay_events(tick);
+
     for &(t, x, y) in &d.clicks {
         if t == tick {
             input::mouse_move(x * LORES_TO_FRAME, y);
@@ -155,6 +179,7 @@ pub(super) fn run_script(d: &mut Display) {
             input::mouse_button(MouseButton::Left, false);
         }
     }
+
     for (t, name, down) in &d.script {
         if *t == tick
             && let Some(k) = Keycode::from_name(name)

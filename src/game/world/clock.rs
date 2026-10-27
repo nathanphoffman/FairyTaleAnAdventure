@@ -17,20 +17,25 @@ const SLEEP: i8 = 23;
 const PRQ_STATS: i32 = 4;
 
 const DAY_LENGTH: u16 = 24000;
+
 /// Sleeping makes time pass this much faster.
 const SLEEP_TIME_STEP: u16 = 63;
+
 /// The hero wakes at dawn (this window) if only a little tired.
 const DAWN: (u16, u16) = (9000, 10000);
 const LITTLE_TIRED: i16 = 30;
 const LIGHT_PEAK: u16 = 300;
 const DARK: u16 = 40;
+
 /// The night-time object: the lamp post at this slot of `ob_listg` is on in the dark.
 const LAMP_SLOT: usize = 5;
 const LAMP_ON: i8 = 3;
 const LAMP_OFF: i8 = 2;
 const PERIOD_LENGTH: u16 = 2000;
+
 /// Events said when a new part of the day starts.
 const PERIOD_EVENTS: [(i16, i32); 4] = [(0, 28), (4, 29), (6, 30), (9, 31)];
+
 /// The hero heals a little every time the clock passes a multiple of this (minus one).
 const HEAL_MASK: u16 = 0x3ff;
 const HEAL_BASE: i16 = 15;
@@ -42,6 +47,7 @@ fn clock_step(clock: u16, frozen: bool) -> u16 {
     if frozen {
         return clock;
     }
+
     if clock >= DAY_LENGTH {
         0
     } else {
@@ -52,6 +58,7 @@ fn clock_step(clock: u16, frozen: bool) -> u16 {
 /// The light level for a clock value: it rises to `LIGHT_PEAK` at midday and falls again.
 fn light_level(clock: u16) -> u16 {
     let level = clock / DARK;
+
     if level >= LIGHT_PEAK {
         2 * LIGHT_PEAK - level
     } else {
@@ -86,9 +93,11 @@ fn heal_due(clock: u16, vitality: i16, bravery: i16, state: i8) -> bool {
 pub fn day_night_tick() {
     unsafe {
         let hero = &raw mut the_actors.list[0];
+
         if (*hero).state == SLEEP {
             sleep_tick(hero);
         }
+
         let tick = day_step(
             the_world.day_clock,
             the_world.freeze_timer != 0,
@@ -97,10 +106,13 @@ pub fn day_night_tick() {
             the_hero.brave,
             (*hero).state,
         );
+
         the_world.day_clock = tick.clock;
         the_world.light_level = tick.light;
+
         ob_listg[LAMP_SLOT].ob_stat = if tick.lamp_on { LAMP_ON } else { LAMP_OFF };
         the_world.day_period = tick.period;
+
         if let Some(e) = tick.period_event {
             show_event(e);
         }
@@ -139,6 +151,7 @@ fn day_step(
     let clock = clock_step(clock, frozen);
     let light = light_level(clock);
     let period = day_period(clock);
+
     DayTick {
         clock,
         light,
@@ -163,10 +176,12 @@ fn sleep_step(
     fight_wakes: impl FnOnce() -> bool,
 ) -> (u16, i16, bool) {
     let clock = clock.wrapping_add(SLEEP_TIME_STEP);
+
     let tired = if tired != 0 { tired - 1 } else { tired };
     let wake = tired == 0
         || (tired < LITTLE_TIRED && clock > DAWN.0 && clock < DAWN.1)
         || (battle && fight_wakes());
+
     (clock, tired, wake)
 }
 
@@ -179,8 +194,10 @@ unsafe fn sleep_tick(hero: *mut Shape) {
             the_actors.battle_flag != 0,
             || rand64() == 0,
         );
+
         the_world.day_clock = clock;
         the_hero.fatigue = tired;
+
         if wake {
             (*hero).state = STILL;
             (*hero).abs_y &= WAKE_Y_MASK;
@@ -207,15 +224,20 @@ mod tests {
             ),
             (2000, 50, false, 1, None, false)
         );
+
         // a new period with a message
         let t = day_step(7999, false, 3, 50, 0, STILL);
         assert_eq!((t.period, t.period_event), (4, Some(29)));
+
         // the same period again says nothing
         assert_eq!(day_step(8000, false, 4, 50, 0, STILL).period_event, None);
+
         // night: the lamp is on
         assert!(day_step(100, false, 0, 50, 0, STILL).lamp_on);
+
         // frozen time stands still
         assert_eq!(day_step(500, true, 0, 50, 0, STILL).clock, 500);
+
         // healing lands on multiples of 1024 for a hurt hero
         assert!(day_step(1023, false, 0, 10, 0, STILL).heal);
         assert!(!day_step(1023, false, 0, 10, 0, DEAD).heal);
@@ -270,8 +292,10 @@ mod tests {
         let mut drawn = 0;
         let (clock, tired, wake) = sleep_step(100, 50, false, || {
             drawn += 1;
+
             true
         });
+
         assert_eq!((clock, tired, wake, drawn), (163, 49, false, 0));
         assert!(sleep_step(100, 1, false, || false).2);
         assert!(sleep_step(9000, 20, false, || false).2);
@@ -285,12 +309,15 @@ mod tests {
             })
             .2
         );
+
         assert_eq!(drawn, 1);
         let mut drawn = 0;
         sleep_step(100, 1, true, || {
             drawn += 1;
+
             true
         });
+
         assert_eq!(drawn, 0);
         assert_eq!(sleep_step(0, 0, false, || false).1, 0);
     }

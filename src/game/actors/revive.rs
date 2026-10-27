@@ -22,10 +22,15 @@ use crate::game::world::regions::load_region_now;
 
 unsafe extern "C" {
     fn stopscore();
+
     fn Delay(ticks: i32);
+
     fn SetFont(current_rastport: *mut RastPort, font: *mut TextFont);
+
     fn SetAPen(current_rastport: *mut RastPort, pen: u32);
+
     fn SetRast(current_rastport: *mut RastPort, pen: u32);
+
     fn RectFill(current_rastport: *mut RastPort, x0: i32, y0: i32, x1: i32, y1: i32);
 }
 
@@ -39,41 +44,53 @@ const STILL: i8 = 13;
 /// Where the raft and the actor in slot 2 start.
 const RAFT_START: (u16, u16) = (13668, 14470);
 const SETFIG_START: (u16, u16) = (13668, 15000);
+
 /// Where the first brother starts, and the region it is in.
 const FIRST_SAFE_SPOT: (u16, u16) = (19036, 15755);
 const FIRST_REGION: u16 = 3;
+
 /// The number of inventory slots that are goods (the rest are gold and arrows).
 const GOLDBASE: usize = 31;
+
 /// Where the hero is on the screen: the map is centred on the hero.
 const CAMERA_OFFSET: (u16, u16) = (144, 90);
+
 /// The last brother is number 3; one past that is the end of the game.
 const LAST_BROTHER: i16 = 3;
+
 /// Time of day when a brother starts or revives, and the light then.
 const START_DAYNIGHT: u16 = 8000;
 const START_LIGHT: u16 = 300;
+
 /// Print queue entries: vitality and stats.
 const PRQ_STATS: i32 = 4;
 const PRQ_VITALITY: i32 = 7;
+
 /// Object list slots: where the fallen brother's bones are and the objects that become people.
 const DEAD_BROTHER_PERSON: usize = 2;
 const SPECTRE_SLOT: usize = 9;
 const PERSON: i8 = 3;
 const ON_GROUND: i8 = 1;
+
 /// Place message numbers: "You are in..." for the start village.
 const START_PLACE: u16 = 2;
+
 /// Sound/graphics: pen colours and the panel area that is cleared between messages.
 const PEN_BLACK: u32 = 0;
 const PEN_TEXT: u32 = 24;
 const PANEL: (i32, i32, i32, i32) = (13, 13, 271, 107);
+
 /// Delays, in 50ths of a second.
 const SHOW_PLACARD: i32 = 120;
 const SHORT_PAUSE: i32 = 80;
 const TINY_PAUSE: i32 = 10;
 const GAME_OVER_PAUSE: i32 = 500;
+
 /// Value of `view_status` for "fade in" (3) and "game over screen" (2).
 const VIEW_FADE_IN: i8 = 3;
 const VIEW_GAME_OVER: i8 = 2;
 const VIEW_REDRAW: i8 = 99;
+
 /// Sprite file for the hero and its set number at the start.
 const HERO_SPRITE_FILE: i16 = 6;
 const HERO_SET_FILE: i16 = 13;
@@ -98,6 +115,7 @@ pub fn revive(new: i16) {
         the_actors.battle_flag = 0;
         the_hero.good_fairy_timer = 0;
         the_actors.next_missile = 0;
+
         if new != 0 {
             stopscore();
             leave_fallen_brother();
@@ -110,12 +128,14 @@ pub fn revive(new: i16) {
 
         put_hero_at_safe_spot(hero);
         restore_hero(hero);
+
         if the_hero.brother > 3 {
             the_screen.view_status = VIEW_GAME_OVER;
         } else {
             the_screen.view_status = VIEW_FADE_IN;
             set_mood(1);
         }
+
         the_world.extent_type = 0;
         the_actors.fiery_death = 0;
     }
@@ -150,6 +170,7 @@ unsafe fn leave_fallen_brother() {
             ob_listg[the_hero.brother as usize].ob_stat = ON_GROUND;
             ob_listg[the_hero.brother as usize + DEAD_BROTHER_PERSON].ob_stat = PERSON;
         }
+
         ob_list8[SPECTRE_SLOT].ob_stat = PERSON;
     }
 }
@@ -193,9 +214,11 @@ unsafe fn start_next_brother(hero: &mut Hero, body: &mut Shape, next: &Bro) {
         hero.wealth = next.wealth as i16;
         hero.stuff = next.stuff;
         hero.brother += 1;
+
         for slot in 0..GOLDBASE {
             *hero.stuff.add(slot) = 0; // has no stuff
         }
+
         *hero.stuff = 1; // okay, a dirk, then
         body.weapon = 1;
     }
@@ -206,6 +229,7 @@ unsafe fn show_brother_placards() {
     unsafe {
         map_message();
         SetFont(the_screen.current_rastport, story_font);
+
         if the_hero.brother == 1 {
             placard_text(0);
             the_screen.rp_map.BitMap = (*(*the_screen.drawing_page).ri_page).BitMap;
@@ -235,8 +259,10 @@ unsafe fn show_brother_placards() {
                 PANEL.2,
                 PANEL.3,
             );
+
             Delay(TINY_PAUSE);
             SetAPen(the_screen.current_rastport, PEN_TEXT);
+
             placard_text(if the_hero.brother == 2 { 2 } else { 4 });
             Delay(SHOW_PLACARD);
         }
@@ -257,6 +283,7 @@ unsafe fn announce_brother() {
             message_off();
             the_hero.place = START_PLACE;
             show_event(9);
+
             if the_hero.brother == 1 {
                 print_cont(c".".as_ptr());
             } else if the_hero.brother == 2 {
@@ -276,6 +303,7 @@ unsafe fn put_hero_at_safe_spot(hero: *mut Shape) {
             &mut *hero,
             &mut *(&raw mut the_world),
         );
+
         load_region_now();
     }
 }
@@ -300,6 +328,7 @@ unsafe fn restore_hero(hero: *mut Shape) {
             &mut *hero,
             &mut *(&raw mut the_world),
         );
+
         the_actors.active = 3;
         update_menu_availability();
         queue_print(PRQ_VITALITY);
@@ -340,6 +369,7 @@ mod tests {
             (world.secret_timer, world.light_timer, world.freeze_timer),
             (0, 0, 0)
         );
+
         assert_eq!(world.region, FIRST_REGION);
         assert_eq!(
             (hero.safe_x, hero.safe_y, hero.safe_r),
@@ -358,10 +388,12 @@ mod tests {
             (hero.x, hero.y, body.abs_x, body.abs_y),
             (1000, 2000, 1000, 2000)
         );
+
         assert_eq!(
             (world.map_x, world.map_y),
             (1000 - CAMERA_OFFSET.0, 2000 - CAMERA_OFFSET.1)
         );
+
         assert_eq!(world.new_region, 5);
     }
 
@@ -379,6 +411,7 @@ mod tests {
             (body.vitality, body.state, body.environ, body.race),
             (25, STILL, 0, 255)
         );
+
         assert_eq!((hero.hunger, hero.fatigue), (0, 0));
         assert_eq!(
             (world.day_clock, world.light_level),
@@ -396,14 +429,18 @@ mod tests {
             wealth: 15,
             stuff: pack.as_mut_ptr(),
         };
+
         let mut hero: Hero = unsafe { std::mem::zeroed() };
         hero.brother = 1;
+
         let mut body: Shape = unsafe { std::mem::zeroed() };
+
         unsafe { start_next_brother(&mut hero, &mut body, &next) };
         assert_eq!(
             (hero.brave, hero.luck, hero.kindness, hero.wealth),
             (20, 35, 15, 15)
         );
+
         assert_eq!(hero.brother, 2);
         assert_eq!(body.weapon, 1);
         assert_eq!(pack[0], 1);

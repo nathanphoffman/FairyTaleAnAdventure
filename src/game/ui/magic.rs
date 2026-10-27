@@ -17,8 +17,11 @@ use std::ffi::c_char;
 
 unsafe extern "C" {
     fn SetDrMd(current_rastport: *mut RastPort, mode: u32);
+
     fn SetAPen(current_rastport: *mut RastPort, pen: u32);
+
     fn Move(current_rastport: *mut RastPort, x: i32, y: i32);
+
     fn Text(current_rastport: *mut RastPort, s: *const c_char, len: i32) -> i32;
 }
 
@@ -36,13 +39,16 @@ const SPELL_SLOT_BASE: usize = 4;
 const LIGHT_TIME: i16 = 760;
 const SECRET_TIME: i16 = 360;
 const FREEZE_TIME: i16 = 100;
+
 /// Where the spells cannot be used: the extent type with this `v3` (a quiet place).
 const NO_MAGIC_ZONE: u8 = 9;
 const NO_MAGIC_SPEECH: i32 = 59;
 const NO_SPELL_EVENT: i32 = 21;
 const BATTLE_EVENT: i32 = 34;
+
 /// Regions above this are indoors (no overview map there).
 const LAST_OUTDOOR_REGION: u16 = 7;
+
 /// Riding something bigger than the raft stops the freeze spell.
 const RIDING_BIG: i16 = 1;
 
@@ -62,9 +68,11 @@ const VIEW_MAP: i8 = 1;
 
 const PRQ_STATS: i32 = 4;
 const PRQ_MAP: i32 = 5;
+
 /// Healing is capped at this plus a quarter of bravery.
 const HEAL_CAP_BASE: i16 = 15;
 const HEAL_MIN: i32 = 4;
+
 /// The fear spell only hits enemies of races below this.
 const FEAR_RACE_LIMIT: u8 = 7;
 const ENEMY: i8 = 2;
@@ -73,11 +81,30 @@ const ENEMY: i8 = 2;
 /// (the spell did not work, so the stone is not used up).
 pub unsafe fn magic_option(chosen_entry: i16) -> bool {
     unsafe {
+        if let Some(result) = refuse_spell(chosen_entry) {
+            return result;
+        }
+
+        if !cast_spell(chosen_entry) {
+            return false;
+        }
+
+        use_up_one(chosen_entry);
+
+        true
+    }
+}
+
+/// Checks that the spell can be cast here and now. Gives `Some(result)` for `magic_option` to
+/// return when it cannot, and `None` when the spell goes ahead.
+unsafe fn refuse_spell(chosen_entry: i16) -> Option<bool> {
+    unsafe {
         let count = if chosen_entry < FIRST_SPELL {
             0
         } else {
             *the_hero.stuff.add(SPELL_SLOT_BASE + chosen_entry as usize)
         };
+
         let gate = spell_gate(
             chosen_entry,
             count,
@@ -86,18 +113,29 @@ pub unsafe fn magic_option(chosen_entry: i16) -> bool {
             the_ui.cheat_enabled,
             the_world.region,
         );
+
         match gate {
             SpellGate::NoSpell => {
                 show_event(NO_SPELL_EVENT);
-                return true;
+
+                Some(true)
             }
+
             SpellGate::QuietZone => {
                 speak(NO_MAGIC_SPEECH);
-                return true;
+
+                Some(true)
             }
-            SpellGate::Refused => return false,
-            SpellGate::Proceed => {}
+
+            SpellGate::Refused => Some(false),
+            SpellGate::Proceed => None,
         }
+    }
+}
+
+/// Casts the spell. Returns false if it did not work (the stone ring only works in a circle).
+unsafe fn cast_spell(chosen_entry: i16) -> bool {
+    unsafe {
         match chosen_entry {
             SPELL_LIGHT => the_world.light_timer += LIGHT_TIME,
             SPELL_SECRET => the_world.secret_timer += SECRET_TIME,
@@ -107,18 +145,29 @@ pub unsafe fn magic_option(chosen_entry: i16) -> bool {
                 if !stone_jump() {
                     return false;
                 }
+
                 heal();
             }
+
             SPELL_HEAL => heal(),
             SPELL_FEAR => scare_enemies(),
             _ => {}
         }
+
+        true
+    }
+}
+
+/// Takes one of the spell's stones from the stack, and updates the menu when the last is gone.
+unsafe fn use_up_one(chosen_entry: i16) {
+    unsafe {
         let slot = SPELL_SLOT_BASE + chosen_entry as usize;
+
         *the_hero.stuff.add(slot) = (*the_hero.stuff.add(slot)).wrapping_sub(1);
+
         if *the_hero.stuff.add(slot) == 0 {
             update_menu_availability();
         }
-        true
     }
 }
 
@@ -140,15 +189,19 @@ fn spell_gate(entry: i16, count: u8, zone: u8, riding: i16, cheat: i16, region: 
     if entry < FIRST_SPELL || count == 0 {
         return SpellGate::NoSpell;
     }
+
     if zone == NO_MAGIC_ZONE {
         return SpellGate::QuietZone;
     }
+
     if entry == SPELL_FREEZE && riding > RIDING_BIG {
         return SpellGate::Refused;
     }
+
     if entry == SPELL_MAP && cheat == 0 && region > LAST_OUTDOOR_REGION {
         return SpellGate::Refused;
     }
+
     SpellGate::Proceed
 }
 
@@ -159,19 +212,23 @@ unsafe fn show_map() {
         the_screen.planes = (*the_screen.bm_draw).Planes.as_mut_ptr();
         draw_overview_map(the_world.map_x as i32, the_world.map_y as i32);
 
+        // The hero on the overview map: his tile column minus the left edge of the shown sectors (16 tiles to a sector).
         let x = ((the_hero.x >> 4) as i64
             - ((the_world.sector_x as i64 + the_world.origin_x as i64) << 4)
             - MARK_X_OFFSET) as u32;
+        // The hero on the overview map: his position in 16 pixel steps minus the top edge of the shown sectors.
         let y = ((the_hero.y >> 4) as i64
             - ((the_world.sector_y as i64 + the_world.origin_y as i64) << 4)
             + MARK_Y_OFFSET) as u32;
         the_screen.rp_map.BitMap = the_screen.bm_draw;
         SetDrMd(&raw mut the_screen.rp_map, JAM1);
         SetAPen(&raw mut the_screen.rp_map, MAP_MARK_PEN);
+
         if x > 0 && x < MARK_MAX.0 && y > 0 && y < MARK_MAX.1 {
             Move(&raw mut the_screen.rp_map, x as i32, y as i32);
             Text(&raw mut the_screen.rp_map, c"+".as_ptr(), 1);
         }
+
         the_screen.view_status = VIEW_MAP;
         show_still_screen();
         queue_print(PRQ_MAP);
@@ -183,6 +240,7 @@ unsafe fn show_map() {
 unsafe fn stone_jump() -> bool {
     unsafe {
         let ring_list = stone_ring_sectors;
+
         match stone_target(
             the_hero.sector,
             the_hero.x,
@@ -195,12 +253,14 @@ unsafe fn stone_jump() -> bool {
             StoneJump::To(x, y) => {
                 flicker_colors();
                 transfer_hero(x, y, 1);
+
                 if the_hero.riding != 0 {
                     the_actors.list[the_actors.carrier_slot as usize].abs_x =
                         the_actors.list[0].abs_x;
                     the_actors.list[the_actors.carrier_slot as usize].abs_y =
                         the_actors.list[0].abs_y;
                 }
+
                 true
             }
         }
@@ -224,21 +284,30 @@ fn stone_target(sector: i16, px: u16, py: u16, facing: i8, list: &[u8]) -> Stone
     if sector != STONE_SECTOR {
         return StoneJump::Refused;
     }
+
     if (px & 255) / STONE_COLUMN_WIDTH != 1 || (py & 255) / STONE_ROW_HEIGHT != 1 {
         return StoneJump::Refused;
     }
+
+    // Sectors are 256 pixels wide and high.
     let (sector_x, sector_y) = (px >> 8, py >> 8);
+
     for ring in 0..STONE_CIRCLES {
         if list[ring * 2] as u16 == sector_x && list[ring * 2 + 1] as u16 == sector_y {
             let mut target = ring + (facing + 1) as usize;
+
             if target > STONE_CIRCLES - 1 {
                 target -= STONE_CIRCLES;
             }
+
+            // Back to pixels: the target sector, then the same spot inside it.
             let x = ((list[target * 2] as u16) << 8) + (px & 255);
             let y = ((list[target * 2 + 1] as u16) << 8) + (py & 255);
+
             return StoneJump::To(x, y);
         }
     }
+
     StoneJump::NoRing
 }
 
@@ -248,9 +317,11 @@ unsafe fn heal() {
         let hero = &raw mut the_actors.list[0];
         let (vitality, capped) = healed_vitality((*hero).vitality, the_hero.brave, rand8());
         (*hero).vitality = vitality;
+
         if !capped {
             print(c"That feels a lot better!".as_ptr());
         }
+
         queue_print(PRQ_STATS);
     }
 }
@@ -260,6 +331,7 @@ unsafe fn heal() {
 fn healed_vitality(vitality: i16, brave: i16, roll: i32) -> (i16, bool) {
     let cap = HEAL_CAP_BASE + brave / 4;
     let healed = vitality.wrapping_add((roll + HEAL_MIN) as i16);
+
     if healed > cap {
         (cap, true)
     } else {
@@ -276,15 +348,19 @@ fn is_scared_by_fear_spell(actor: &Shape) -> bool {
 unsafe fn scare_enemies() {
     unsafe {
         let mut i = 1;
+
         while i < the_actors.active as usize {
-            let an = &raw mut the_actors.list[i];
-            if is_scared_by_fear_spell(&*an) {
-                (*an).vitality = 0;
+            let actor = &raw mut the_actors.list[i];
+
+            if is_scared_by_fear_spell(&*actor) {
+                (*actor).vitality = 0;
                 check_death(i as i32, 0);
                 the_hero.brave -= 1;
             }
+
             i += 1;
         }
+
         if the_actors.battle_flag != 0 {
             show_event(BATTLE_EVENT);
         }
@@ -307,6 +383,7 @@ mod tests {
             spell_gate(SPELL_LIGHT, 1, NO_MAGIC_ZONE, 0, 0, 0),
             SpellGate::QuietZone
         );
+
         assert_eq!(spell_gate(SPELL_FREEZE, 1, 0, 2, 0, 0), SpellGate::Refused);
         assert_eq!(spell_gate(SPELL_FREEZE, 1, 0, 1, 0, 0), SpellGate::Proceed);
         assert_eq!(spell_gate(SPELL_LIGHT, 1, 0, 5, 0, 9), SpellGate::Proceed);
@@ -326,17 +403,20 @@ mod tests {
             stone_target(144, 0x0500 + 100, 0x0500 + 70, 0, &LIST),
             StoneJump::NoRing
         );
+
         // Facing 0 goes one circle on, same offset inside the sector.
         assert_eq!(
             stone_target(144, x, y, 0, &LIST),
             StoneJump::To((71 << 8) + 100, (77 << 8) + 70)
         );
+
         // From the last circle the list wraps: 10 + 8 - 11 = 7.
         let (x, y) = ((84 << 8) + 90, (60 << 8) + 65);
         assert_eq!(
             stone_target(144, x, y, 7, &LIST),
             StoneJump::To((73 << 8) + 90, (21 << 8) + 65)
         );
+
         // Landing exactly on the last index does not wrap.
         let (x, y) = ((54 << 8) + 90, (43 << 8) + 65);
         assert_eq!(

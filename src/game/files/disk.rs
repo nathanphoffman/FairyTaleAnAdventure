@@ -49,20 +49,35 @@ const ZERO_REQUEST: IoExtTd = IoExtTd {
 
 unsafe extern "C" {
     fn Lock(name: *const c_char, mode: i32) -> BPTR;
+
     fn UnLock(lock: BPTR);
+
     fn Open(name: *const c_char, mode: i32) -> BPTR;
+
     fn Close(file: BPTR);
+
     fn Read(file: BPTR, buf: *mut u8, len: i32) -> i32;
+
     fn Seek(file: BPTR, pos: i32, mode: i32) -> i32;
+
     fn CreatePort(name: *const c_char, pri: i32) -> *mut c_void;
+
     fn DeletePort(port: *mut c_void);
+
     fn CreateExtIO(port: *mut c_void, size: i32) -> *mut c_void;
+
     fn DeleteExtIO(io: *mut c_void);
+
     fn OpenDevice(name: *const c_char, unit: u32, io: *mut c_void, flags: u32) -> i32;
+
     fn CloseDevice(io: *mut c_void);
+
     fn DoIO(io: *mut c_void) -> i32;
+
     fn SendIO(io: *mut c_void);
+
     fn WaitIO(io: *mut c_void) -> i32;
+
     fn CheckIO(io: *mut c_void) -> i32;
 }
 
@@ -83,6 +98,7 @@ const IMAGE_FILE: &[u8] = b"image\0";
 
 /// Bytes in a disk block.
 const BLOCK_SIZE: i32 = 512;
+
 /// Requests 0-8 are for loading (5 landscape, 2 terrain, 1 map/sector/monster); 9 is the motor.
 const LOADING_REQUESTS: usize = 9;
 const MOTOR_REQUEST: usize = 9;
@@ -125,29 +141,40 @@ fn has_flag(flag: u16) -> bool {
 pub fn open_disk() -> i32 {
     unsafe {
         let lock = Lock(IMAGE_FILE.as_ptr().cast(), ACCESS_READ);
+
         if lock != 0 {
             FROM_FILE = true;
             UnLock(lock);
             IMAGE = Open(IMAGE_FILE.as_ptr().cast(), MODE_OLDFILE);
+
             return if IMAGE == 0 { ERR_NO_FILE } else { 0 };
         }
+
         DISKPORT = CreatePort(std::ptr::null(), 0);
+
         if DISKPORT.is_null() {
             return ERR_NO_FILE;
         }
+
         set_flag(AL_PORT);
         DISKREQ1 = CreateExtIO(DISKPORT, size_of::<IoExtTd>() as i32).cast();
+
         if DISKREQ1.is_null() {
             return ERR_NO_REQUEST;
         }
+
         set_flag(AL_IOREQ);
+
         if OpenDevice(TD_NAME.as_ptr().cast(), 0, DISKREQ1.cast(), 0) != 0 {
             return ERR_NO_DEVICE;
         }
+
         set_flag(AL_TDISK);
+
         for request in (*(&raw mut DISKREQS)).iter_mut().take(LOADING_REQUESTS) {
             *request = *DISKREQ1;
         }
+
         0
     }
 }
@@ -158,12 +185,15 @@ pub fn close_disk() {
         if IMAGE != 0 {
             Close(IMAGE);
         }
+
         if has_flag(AL_TDISK) {
             CloseDevice(DISKREQ1.cast());
         }
+
         if has_flag(AL_IOREQ) {
             DeleteExtIO(DISKREQ1.cast());
         }
+
         if has_flag(AL_PORT) {
             DeletePort(DISKPORT);
         }
@@ -189,6 +219,7 @@ pub fn read_finished(num: i32) -> i32 {
     if from_file() {
         return 1;
     }
+
     unsafe { CheckIO(request(num as usize).cast()) }
 }
 
@@ -216,6 +247,7 @@ pub fn last_read_finished() -> i32 {
     if from_file() {
         return 1;
     }
+
     unsafe { CheckIO(LASTREQ.cast()) }
 }
 
@@ -235,12 +267,16 @@ pub fn load_track_range(f_block: i16, b_count: i16, buffer: *mut c_void, dr: i16
         if from_file() {
             Seek(IMAGE, f_block as i32 * BLOCK_SIZE, OFFSET_BEGINNING);
             Read(IMAGE, buffer.cast(), b_count as i32 * BLOCK_SIZE);
+
             return;
         }
+
         LASTREQ = request(dr as usize);
+
         if (*LASTREQ).command == CMD_READ {
             WaitIO(LASTREQ.cast());
         }
+
         *LASTREQ = *DISKREQ1;
         (*LASTREQ).length = (b_count as i32 * BLOCK_SIZE) as u32;
         (*LASTREQ).data = buffer;
@@ -255,6 +291,7 @@ pub fn motor_off() {
     if from_file() {
         return;
     }
+
     unsafe {
         let req = request(MOTOR_REQUEST);
         *req = *DISKREQ1;

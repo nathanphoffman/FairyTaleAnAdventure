@@ -22,8 +22,10 @@ fn step(seed: i32) -> (i32, i32) {
     // mulu.w multiplies only the low 16 bits of the seed
     let product = (seed as u16 as u32).wrapping_mul(SEED_MULTIPLIER);
     let next = (product as i32).wrapping_add(1);
+
     // ror.l #6
     let rotated = (next as u32).rotate_right(ROTATE_BITS);
+
     (next, (rotated & RESULT_MASK) as i32)
 }
 
@@ -39,7 +41,9 @@ fn bounded(value: i32, n: i32) -> i32 {
 /// replaces the libc one. The seed lives in `seed1`, defined in csrc/fmain.c.
 pub fn fta_rand() -> i32 {
     let (next, value) = step(unsafe { seed1 });
+
     unsafe { seed1 = next };
+
     value
 }
 
@@ -89,15 +93,18 @@ mod tests {
     fn matches_the_c_generator() {
         let mut seed = START_SEED;
         let mut values = Vec::new();
+
         for _ in 0..5 {
             let (next, value) = step(seed);
             seed = next;
             values.push(value);
         }
+
         assert_eq!(
             values,
             [1777372681, 1298959771, 555739856, 636999534, 442890465]
         );
+
         assert_eq!(seed, -1719781274);
     }
 
@@ -105,11 +112,13 @@ mod tests {
     fn bounded_values_match_the_c_original() {
         let mut seed = START_SEED;
         let mut values = Vec::new();
+
         for _ in 0..5 {
             let (next, value) = step(seed);
             seed = next;
             values.push(bounded(value, 100));
         }
+
         assert_eq!(values, [61, 51, 12, 50, 13]);
     }
 }

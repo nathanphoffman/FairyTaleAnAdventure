@@ -447,8 +447,10 @@ pub static mut ob_table: [*mut WorldObject; 10] = [
 
 /// How many entries of each region's list are in use.
 pub static mut mapobs: [i16; 10] = [3, 1, 5, 12, 3, 5, 1, 1, 61 + 16, 9];
+
 /// Whether random treasure has been scattered over each region yet (1 = done).
 pub static mut dstobs: [i16; 10] = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1];
+
 /// Entries in the global object list.
 pub static glbobs: i16 = 11;
 

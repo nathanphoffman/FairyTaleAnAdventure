@@ -3,8 +3,11 @@
 //! title and intro, starts the game and runs the main loop, one pass per frame.
 
 pub mod amiga_leftovers;
+
 pub mod game_loop;
+
 pub mod intro;
+
 pub mod open_close;
 
 use game_loop::main_loop;
@@ -23,34 +26,20 @@ unsafe extern "C" {
 
     // AmigaOS calls the platform layer provides.
     fn SetRast(current_rastport: *mut RastPort, pen: u32);
+
     fn CurrentDir(lock: isize) -> isize;
+
     // The game's own code that is still C, or lives in other files.
     fn stopscore();
 }
 
-// Memory the game allocates (csrc/fmain.c).
-
-// What `open_all` has set up, so `close_all` knows what to undo (`openflags` bits).
-
-// ---- fta_main ----
-unsafe extern "C" {}
-
-// Screen modes (`view_status`).
-/// The game menu entry that pauses the game; bit 0 set means paused.
-/// Intro: how big the picture zooms (half the width in pixels), and the step.
-/// A region number below this means the next region is still being loaded.
-/// Colours `LoadRGB4` sets for the page and the text.
-/// Pens: the title text, and the colour of the flashing pointer.
-/// Waits, in fiftieths of a second.
-/// The placard shown while the copy protection question is asked.
-/// Where the picture planes in `image_mem` start: five planes, 8000 bytes apart.
-/// Disk track range holding the shadow masks.
-/// How `dif_x` wraps: a 10 bit signed value.
+/// An argument of the Workbench start message (the program is never started that way here).
 #[repr(C)]
 struct WBArg {
     wa_lock: isize,
 }
 
+/// The Workbench start message: the list of arguments.
 #[repr(C)]
 struct WBStartup {
     sm_arglist: *const WBArg,
@@ -67,9 +56,11 @@ pub extern "C" fn fta_main(argc: i32, _argv: *mut c_char) {
 
         the_world.light_timer = 0;
         let err = open_all();
+
         if err != 0 {
             show_error(err);
             quit_all();
+
             return;
         }
 
@@ -77,6 +68,7 @@ pub extern "C" fn fta_main(argc: i32, _argv: *mut c_char) {
             main_loop();
             stopscore();
         }
+
         quit_all();
     }
 }

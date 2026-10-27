@@ -1,41 +1,73 @@
 //! Searching a dead enemy: the weapon it carried and any treasure.
 
-use super::*;
+use super::{ARROWS, GOLDBASE, add_stuff, item, item_name};
+use crate::game::actors::encounters::Encounter;
+use crate::game::data::object_tables::treasure_probs;
+use crate::game::data::random::rand8;
+use crate::game::data::state::{the_actors, the_hero};
+use crate::game::data::tables::encounter_chart;
+use crate::game::data::types::Shape;
+use crate::game::ui::messages::{print, print_cont, print_wrapped};
+use crate::game::ui::text::print_number;
 
 /// Searches the dead body `nearest_object`: takes its weapon and any treasure.
 pub(super) unsafe fn search_body() {
     unsafe {
-        let an = &raw mut the_actors.list[the_actors.nearest_object as usize];
+        let actor = &raw mut the_actors.list[the_actors.nearest_object as usize];
         print_wrapped(c"% searched the body and found".as_ptr());
         print(c"".as_ptr());
         let loot = body_loot(
-            (*an).weapon,
+            (*actor).weapon,
             the_actors.list[0].weapon,
             || rand8() + EXTRA_ARROWS_MIN,
-            || roll_body_treasure(an),
+            || roll_body_treasure(actor),
         );
-        (*an).weapon = -1;
+
+        (*actor).weapon = -1;
+
+        take_found_weapon(&loot);
+
+        if let Some(arrows) = loot.arrows {
+            print_cont(c" and ".as_ptr());
+            print_number(arrows, 1);
+            print_cont(c" Arrows.".as_ptr());
+            add_stuff(ARROWS, arrows as u8);
+
+            return;
+        }
+
+        take_treasure(&loot);
+        print_cont(c".".as_ptr());
+    }
+}
+
+/// Says what weapon was found, adds it to the pack, and arms the hero with it if it is better.
+unsafe fn take_found_weapon(loot: &BodyLoot) {
+    unsafe {
         if loot.weapon != 0 {
             print_cont(c"a ".as_ptr());
             print_cont(item_name(loot.weapon as usize - 1));
             add_stuff(loot.weapon as usize - 1, 1);
             the_actors.list[0].weapon = loot.hero_weapon;
         }
-        if let Some(arrows) = loot.arrows {
-            print_cont(c" and ".as_ptr());
-            print_number(arrows, 1);
-            print_cont(c" Arrows.".as_ptr());
-            add_stuff(ARROWS, arrows as u8);
-            return;
-        }
+    }
+}
+
+/// Says what other treasure was found and takes it: gold into the purse, anything else into the
+/// pack. Says "nothing" if there was neither weapon nor treasure.
+unsafe fn take_treasure(loot: &BodyLoot) {
+    unsafe {
         if loot.treasure != 0 {
             if loot.weapon != 0 {
                 print_cont(c" and ".as_ptr());
             }
+
             if loot.treasure < GOLDBASE as u32 {
                 print_cont(c"a ".as_ptr());
             }
+
             print_cont(item_name(loot.treasure as usize));
+
             if loot.treasure >= GOLDBASE as u32 {
                 the_hero.wealth += item(loot.treasure as usize).maxshown as i16;
             } else {
@@ -44,7 +76,6 @@ pub(super) unsafe fn search_body() {
         } else if loot.weapon == 0 {
             print_cont(c"nothing".as_ptr());
         }
-        print_cont(c".".as_ptr());
     }
 }
 
@@ -78,6 +109,7 @@ fn body_loot(
     } else {
         hero_weapon
     };
+
     if weapon == ARCHER_WEAPON {
         return BodyLoot {
             weapon,
@@ -86,6 +118,7 @@ fn body_loot(
             treasure: 0,
         };
     }
+
     BodyLoot {
         weapon,
         hero_weapon,
@@ -117,17 +150,19 @@ fn better_weapon(current: i8, found: u32) -> i8 {
 
 /// Picks what a dead enemy carries besides its weapon, from the treasure table for its race.
 /// Returns an item number (0 for nothing); characters like shopkeepers (a set figure) carry none.
-unsafe fn roll_body_treasure(an: *mut Shape) -> u32 {
+unsafe fn roll_body_treasure(actor: *mut Shape) -> u32 {
     const SETFIG_RACE_BIT: u8 = 0x80;
     const TREASURE_CLASS_SIZE: i32 = 8;
     unsafe {
-        if (*an).race & SETFIG_RACE_BIT != 0 {
+        if (*actor).race & SETFIG_RACE_BIT != 0 {
             return 0;
         }
+
         let class = (*(&raw const encounter_chart)
             .cast::<Encounter>()
-            .add((*an).race as usize))
+            .add((*actor).race as usize))
         .treasure;
+
         treasure_probs[(class as i32 * TREASURE_CLASS_SIZE + rand8()) as usize] as i32 as u32
     }
 }
@@ -144,17 +179,21 @@ mod tests {
             (l.weapon, l.hero_weapon, l.arrows, l.treasure),
             (2, 2, None, 7)
         );
+
         // a weaker weapon does not replace the one in hand
         assert_eq!(body_loot(2, 3, || unreachable!(), none).hero_weapon, 3);
+
         // an archer gives arrows and nothing else
         let l = body_loot(4, 1, || 5, || unreachable!());
         assert_eq!(
             (l.weapon, l.arrows, l.treasure, l.hero_weapon),
             (4, Some(5), 0, 4)
         );
+
         // no weapon at all
         let l = body_loot(0, 2, || unreachable!(), none);
         assert_eq!((l.weapon, l.hero_weapon, l.treasure), (0, 2, 0));
+
         // an already searched body (-1) has no weapon
         assert_eq!(body_loot(-1, 2, || unreachable!(), none).weapon, 0);
     }

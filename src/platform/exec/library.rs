@@ -13,6 +13,7 @@ static mut GFX_BASE: GfxBase = GfxBase {
     ActiView: null_mut(),
     DisplayFlags: 0,
 };
+
 static mut DUMMY_LIB: [u8; DUMMY_LIB_BYTES] = [0; DUMMY_LIB_BYTES];
 static mut THIS_TASK: Process = Process {
     pr_Task: Task {

@@ -14,6 +14,7 @@ pub static mut bumped_locked_door: i8 = 0;
 
 /// The terrain type that marks a door.
 const DOOR_TERRAIN: i32 = 15;
+
 /// Value of `view_status` that makes the whole map redraw.
 const REDRAW_MAP: i8 = 99;
 
@@ -88,20 +89,27 @@ pub fn open_door_near(x: u16, y: u16, keytype: u32) -> i32 {
         let Some((x, y)) = find_door_corner(x, y) else {
             return 0;
         };
+
         // we know where the door starts; now which type is it?
         let sector_id = *tile(x, y);
+        // Each map set covers 64 sector numbers.
         let map_id = loaded_blocks.image[(sector_id >> 6) as usize];
+
         if let Some(open) = find_open(sector_id, map_id, keytype) {
             swap_in_open_door_tiles(open, x, y);
             the_screen.view_status = REDRAW_MAP;
             the_ui.held_direction = 0;
             print(c"It opened.".as_ptr());
+
             return 1;
         }
+
         if bumped_locked_door == 0 && keytype == 0 {
             print(c"It's locked.".as_ptr());
         }
+
         bumped_locked_door = 1;
+
         0
     }
 }
@@ -112,26 +120,33 @@ fn find_door_corner(x: u16, y: u16) -> Option<(i32, i32)> {
     let mut x = x;
     let mut y = y;
     let mut found = terrain_at(x as i32, y as i32) == DOOR_TERRAIN;
+
     if !found {
         x = x.wrapping_add(4);
         found = terrain_at(x as i32, y as i32) == DOOR_TERRAIN;
     }
+
     if !found {
         x = x.wrapping_sub(8);
         found = terrain_at(x as i32, y as i32) == DOOR_TERRAIN;
     }
+
     if !found {
         return None;
     }
+
     // A door can be up to three tiles wide; step to its left edge.
     for _ in 0..2 {
         if terrain_at(x as i32 - 16, y as i32) == DOOR_TERRAIN {
             x = x.wrapping_sub(16);
         }
     }
+
     if terrain_at(x as i32, y as i32 + 32) == DOOR_TERRAIN {
         y = y.wrapping_add(32);
     }
+
+    // The door's top left tile: 16 pixels wide, 32 high.
     Some(((x >> 4) as i32, (y >> 5) as i32))
 }
 
@@ -140,6 +155,7 @@ fn find_door_corner(x: u16, y: u16) -> Option<(i32, i32)> {
 unsafe fn swap_in_open_door_tiles(open: &DoorOpen, x: i32, y: i32) {
     unsafe {
         let (changes, count) = open_changes(open, x, y);
+
         for &(tx, ty, value) in &changes[..count] {
             *tile(tx, ty) = value;
         }
@@ -162,25 +178,30 @@ fn open_changes(open: &DoorOpen, x: i32, y: i32) -> ([(i32, i32, u8); 4], usize)
     let mut changes = [(x, y, open.new1), (0, 0, 0), (0, 0, 0), (0, 0, 0)];
     let mut count = 1;
     let second = open.new2;
+
     if second != 0 {
         match open.above {
             ABOVE => {
                 changes[1] = (x, y - 1, second);
                 count = 2;
             }
+
             BACK => {
                 changes[1] = (x - 1, y, second);
                 count = 2;
             }
+
             CABINET_LAYOUT => {
                 changes[1] = (x, y - 1, 87);
                 changes[2] = (x + 1, y, 86);
                 changes[3] = (x + 1, y - 1, 88);
                 count = 4;
             }
+
             layout => {
                 changes[1] = (x + 1, y, second);
                 count = 2;
+
                 if layout != SIDE {
                     changes[2] = (x + 2, y, layout);
                     count = 3;
@@ -188,6 +209,7 @@ fn open_changes(open: &DoorOpen, x: i32, y: i32) -> ([(i32, i32, u8); 4], usize)
             }
         }
     }
+
     (changes, count)
 }
 
@@ -200,8 +222,10 @@ mod tests {
         assert!(find_open(64, 360, GREEN as u32).is_some());
         assert!(find_open(64, 360, 0).is_none());
         assert!(find_open(64, 360, GOLD as u32).is_none());
+
         // A wooden door needs no key: walking into it (key 0) opens it.
         assert_eq!(find_open(120, 360, 0).unwrap().new1, 125);
+
         // The same door tile in another map set is a different door.
         assert_eq!(find_open(64, 280, GREY as u32).unwrap().new1, 124);
         assert!(find_open(64, 999, GREEN as u32).is_none());

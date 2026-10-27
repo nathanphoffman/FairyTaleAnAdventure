@@ -1,6 +1,9 @@
 //! What is inside a chest, urn or sacks: nothing, an item, two things, three keys or three of one item.
 
-use super::*;
+use super::{ARROWBASE, GOLDBASE, KEYBASE, add_stuff, item_name};
+use crate::game::data::random::{rand4, rand8};
+use crate::game::data::state::the_hero;
+use crate::game::ui::messages::{print, print_cont};
 
 /// The 100 gold pieces entry of `item_list`.
 const HUNDRED_GOLD: i32 = GOLDBASE as i32 + 3;
@@ -9,6 +12,7 @@ const CONTAINER_GOLD: i16 = 100;
 /// The item a container holds when it rolls `roll` (0-7) for one item: slot 8 means arrows.
 fn container_item(roll: i32) -> usize {
     let i = roll as usize + 8;
+
     if i == 8 { ARROWBASE } else { i }
 }
 
@@ -32,26 +36,33 @@ pub(super) unsafe fn container_contents() -> bool {
                 print_cont(c".".as_ptr());
                 add_stuff(i, 1);
             }
+
             Contents::Two { first, second } => {
                 if first == HUNDRED_GOLD as usize {
                     the_hero.wealth += CONTAINER_GOLD;
                 } else {
                     print_cont(c" a".as_ptr());
                 }
+
                 print(item_name(first));
                 print_cont(c" and a ".as_ptr());
                 print_cont(item_name(second));
+
                 if first < GOLDBASE {
                     add_stuff(first, 1);
                 }
+
                 add_stuff(second, 1);
             }
+
             Contents::ThreeKeys(keys) => {
                 print(c"3 keys.".as_ptr());
+
                 for key in keys {
                     add_stuff(key as usize, 1);
                 }
             }
+
             Contents::ThreeOf(i) => {
                 print(c"3 ".as_ptr());
                 print_cont(item_name(i));
@@ -59,6 +70,7 @@ pub(super) unsafe fn container_contents() -> bool {
                 add_stuff(i, 3);
             }
         }
+
         true
     }
 }
@@ -82,26 +94,34 @@ fn roll_contents(mut pick4: impl FnMut() -> i32, mut pick8: impl FnMut() -> i32)
         1 => Contents::One(container_item(pick8())),
         2 => {
             let mut first = pick8() + 8;
+
             if first == 8 {
                 first = HUNDRED_GOLD;
             }
+
             let mut second;
+
             loop {
                 second = pick8() + 8;
+
                 if second != first {
                     break;
                 }
             }
+
             if second == 8 {
                 second = ARROWBASE as i32;
             }
+
             Contents::Two {
                 first: first as usize,
                 second: second as usize,
             }
         }
+
         _ => {
             let i = pick8() + 8;
+
             if i == 8 {
                 Contents::ThreeKeys([0; 3].map(|_| container_key(pick8())))
             } else {
@@ -113,17 +133,21 @@ fn roll_contents(mut pick4: impl FnMut() -> i32, mut pick8: impl FnMut() -> i32)
 
 #[cfg(test)]
 mod tests {
+    use super::super::ARROWBASE;
     use super::*;
 
     #[test]
     fn container_contents_follow_the_rolls() {
         let rolls = |kind: i32, items: &[i32]| {
             let mut next = items.iter().copied();
+
             roll_contents(|| kind, || next.next().unwrap())
         };
+
         assert_eq!(rolls(0, &[]), Contents::Nothing);
         assert_eq!(rolls(1, &[0]), Contents::One(ARROWBASE));
         assert_eq!(rolls(1, &[3]), Contents::One(11));
+
         // two things: a first item and a different second one
         assert_eq!(
             rolls(2, &[2, 5]),
@@ -132,6 +156,7 @@ mod tests {
                 second: 13
             }
         );
+
         // 100 gold first can never match the second roll, so the arrows are accepted
         assert_eq!(
             rolls(2, &[0, 0]),
@@ -140,6 +165,7 @@ mod tests {
                 second: ARROWBASE
             }
         );
+
         assert_eq!(
             rolls(2, &[0, 4]),
             Contents::Two {
@@ -147,6 +173,7 @@ mod tests {
                 second: 12
             }
         );
+
         assert_eq!(
             rolls(2, &[3, 3, 0]),
             Contents::Two {
@@ -154,6 +181,7 @@ mod tests {
                 second: ARROWBASE
             }
         );
+
         // three of one thing, or three keys
         assert_eq!(rolls(3, &[4]), Contents::ThreeOf(12));
         assert_eq!(rolls(3, &[0, 0, 5, 6]), Contents::ThreeKeys([16, 21, 16]));

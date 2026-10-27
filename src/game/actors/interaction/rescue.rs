@@ -1,6 +1,15 @@
 //! Rescuing the princess: the story page, the reward and the keys.
 
-use super::*;
+use super::extents::center_extent_on;
+use super::{Delay, RectFill, SetAPen, SetFont};
+use crate::game::data::globals::{princesses_rescued, story_font};
+use crate::game::data::object_tables::ob_list8;
+use crate::game::data::state::{the_hero, the_screen};
+use crate::game::data::types::WorldObject;
+use crate::game::render::screen_fx::{map_message, message_off};
+use crate::game::ui::messages::name;
+use crate::game::ui::text::{draw_placard_border, placard_text, speak};
+use crate::game::world::places::transfer_hero;
 
 // The rescue scene.
 const PLACARD_PEN: u32 = 24;
@@ -9,11 +18,13 @@ const CLEAR_PAUSE: i32 = 10;
 const PLACARD_AREA: (i32, i32, i32, i32) = (13, 13, 271, 107);
 const PRINCESS_HOME: (u16, u16) = (5511, 33780);
 const PRINCESS_EXTENT: (i16, i16) = (22205, 21231);
+
 /// Entries of the interior object list (`ob_list8`) that change when the princess is rescued.
 const PRINCESS_OBJECT: usize = 2;
 const PRINCESS_OBJECT_ID: i8 = 4;
 const CAPTIVE_OBJECT: usize = 9;
 const PRINCESS_STUFF: usize = 28;
+
 /// Items 16 to 21 (the keys) get this many extra.
 const KEY_ITEMS: std::ops::Range<usize> = 16..22;
 const KEYS_REWARD: u8 = 3;
@@ -57,6 +68,7 @@ pub fn rescue_princess() {
         speak(REWARD_MESSAGE);
         the_hero.wealth = the_hero.wealth.wrapping_add(REWARD_GOLD);
         (*objects.add(CAPTIVE_OBJECT)).ob_stat = 0;
+
         for item in KEY_ITEMS {
             *the_hero.stuff.add(item) = (*the_hero.stuff.add(item)).wrapping_add(KEYS_REWARD);
         }

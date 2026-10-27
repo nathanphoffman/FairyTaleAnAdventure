@@ -30,6 +30,7 @@ impl Channel {
         if !self.active || self.data.is_empty() {
             return None;
         }
+
         let len = self.data.len();
         let i = self.phase as usize;
         let a = self.data[i.min(len - 1)] as f32;
@@ -40,6 +41,7 @@ impl Channel {
         } else {
             a
         };
+
         Some((a, b))
     }
 
@@ -47,6 +49,7 @@ impl Channel {
     fn advance(&mut self) {
         self.phase += self.step;
         let len = self.data.len() as f64;
+
         if self.phase >= len {
             if self.looping {
                 self.phase -= len;
@@ -61,9 +64,11 @@ impl Channel {
         let Some((a, b)) = self.current_pair() else {
             return 0.0;
         };
+
         let frac = (self.phase - self.phase.floor()) as f32;
         let sample = (a + (b - a) * frac) / 128.0 * (self.volume as f32 / MAX_VOLUME as f32);
         self.advance();
+
         sample
     }
 }

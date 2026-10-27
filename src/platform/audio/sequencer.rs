@@ -79,6 +79,7 @@ impl Sound {
         if self.ins.is_null() || self.wav.is_null() || self.vol.is_null() {
             return;
         }
+
         for (v, t) in tracks.into_iter().enumerate() {
             let word = unsafe { *self.ins.add(v) };
             let ch = &mut self.chans[v];
@@ -87,12 +88,14 @@ impl Sound {
             self.voices[v] = Voice {
                 trak_ptr: t,
                 trak_beg: t,
+                // An instrument word holds the waveform number in its high byte and the volume envelope in the low one.
                 wave_num: (word >> 8) as u8,
                 vol_num: word as u8,
                 vol_delay: -1,
                 ..Voice::new()
             };
         }
+
         self.timeclock = 0;
         self.nosound = false;
     }
@@ -112,9 +115,11 @@ impl Sound {
     /// One vertical blank of the music driver (`vblank_server` in gdriver.asm).
     fn tick(&mut self) {
         self.timeclock = self.timeclock.wrapping_add(self.tempo);
+
         if self.nosound {
             return;
         }
+
         for v in 0..VOICE_COUNT {
             self.do_voice(v);
         }
@@ -124,8 +129,10 @@ impl Sound {
         if self.voices[v].trak_ptr.is_null() {
             return;
         }
+
         let now = self.timeclock;
         let vc = self.voices[v];
+
         if now.wrapping_sub(vc.event_start) >= 0 {
             self.new_note(v);
         } else if vc.stat != 0 {
@@ -140,12 +147,16 @@ impl Sound {
     /// Steps the volume envelope of a sounding note.
     fn follow_envelope(&mut self, v: usize) {
         let vc = self.voices[v];
+
         if vc.vol_delay != 0 || vc.vol_list.is_null() {
             return;
         }
+
         let level = unsafe { *vc.vol_list } as i8;
+
         if level >= 0 {
             self.chans[v].volume = level as u8;
+
             self.voices[v].vol_list = unsafe { vc.vol_list.add(1) };
         }
     }
@@ -156,12 +167,16 @@ impl Sound {
             let (cmd, value) = unsafe {
                 let p = self.voices[v].trak_ptr;
                 self.voices[v].trak_ptr = p.add(2);
+
                 (*p, *p.add(1))
             };
+
             if cmd & CMD_NOTE_FLAG == 0 || cmd == CMD_REST {
                 self.start_note(v, cmd, value);
+
                 return;
             }
+
             if !self.run_command(v, cmd, value) {
                 return;
             }
@@ -173,13 +188,16 @@ impl Sound {
         match cmd {
             CMD_INSTRUMENT => {
                 let word = unsafe { *self.ins.add((value & INSTRUMENT_MASK) as usize) };
+                // An instrument word holds the waveform number in its high byte and the volume envelope in the low one.
                 self.voices[v].wave_num = (word >> 8) as u8;
                 self.voices[v].vol_num = word as u8;
             }
+
             CMD_TEMPO => self.tempo = value as i32,
             CMD_END => return self.end_of_track(v, value != 0),
             _ => {} // unknown command, skip it
         }
+
         true
     }
 
@@ -188,35 +206,47 @@ impl Sound {
         if looping && !self.voices[v].trak_beg.is_null() {
             self.voices[v].loops += 1;
             self.voices[v].trak_ptr = self.voices[v].trak_beg;
+
             return true;
         }
+
         self.voices[v].trak_ptr = std::ptr::null();
         self.voices[v].vol_delay = -1;
         self.chans[v].volume = 0;
+
         false
     }
 
     fn start_note(&mut self, v: usize, cmd: u8, value: u8) {
         let len = NOTE_LENGTHS[(value & NOTE_LENGTH_MASK) as usize];
         let mut stop = len - GAP;
+
         if stop < 0 {
             stop = len;
         }
+
         let vc = &mut self.voices[v];
         vc.event_stop = vc.event_start.wrapping_add(stop);
         vc.event_start = vc.event_start.wrapping_add(len);
+
         if vc.stat != 0 {
             return; // sound effect has the channel
         }
+
         let env = unsafe { self.vol.add(vc.vol_num as usize * ENVELOPE_BYTES) };
+
         let start_vol = unsafe { *env };
+
         vc.vol_list = unsafe { env.add(1) };
         vc.vol_delay = 0;
+
         if cmd == CMD_REST {
             self.chans[v].volume = 0;
             vc.event_stop = self.timeclock;
+
             return;
         }
+
         self.start_wave(v, cmd, start_vol);
     }
 
@@ -225,6 +255,7 @@ impl Sound {
         let (period, offset) = NOTES.get(cmd as usize).copied().unwrap_or(FALLBACK_NOTE);
         let wave_start =
             self.voices[v].wave_num as usize * WAVE_BYTES + offset as usize * OFFSET_UNIT;
+
         let wave = unsafe { self.wav.add(wave_start) };
         let words = WAVE_WORDS - offset as usize;
         let ch = &mut self.chans[v];
@@ -241,16 +272,20 @@ impl Sound {
     /// Mixes `out` (interleaved left, right).
     pub(super) fn mix(&mut self, out: &mut [f32]) {
         let per_tick = self.rate / TICK_HZ;
+
         for frame in out.chunks_exact_mut(2) {
             self.tick_acc += 1.0;
+
             if self.tick_acc >= per_tick {
                 self.tick_acc -= per_tick;
                 self.tick();
             }
+
             let (left, right) = self.mix_frame();
             frame[0] = (left * MIX_LEVEL).clamp(-1.0, 1.0);
             frame[1] = (right * MIX_LEVEL).clamp(-1.0, 1.0);
         }
+
         // a finished sound effect gives its voice back to the music
         if self.voices[EFFECT_VOICE].stat != 0 && !self.chans[EFFECT_VOICE].active {
             self.voices[EFFECT_VOICE].stat = 0;
@@ -260,14 +295,17 @@ impl Sound {
     /// One sample from every channel, summed into (left, right).
     fn mix_frame(&mut self) -> (f32, f32) {
         let (mut left, mut right) = (0.0f32, 0.0f32);
+
         for c in 0..VOICE_COUNT {
             let s = self.chans[c].next();
+
             if LEFT_VOICES.contains(&c) {
                 left += s;
             } else {
                 right += s;
             }
         }
+
         (left, right)
     }
 }

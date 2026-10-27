@@ -5,6 +5,7 @@ use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 const WATCHDOG_CHECK: Duration = Duration::from_secs(1);
+
 /// Used when FTA_STATE_AFTER / FTA_SHOT_AFTER are not set.
 const DEFAULT_AFTER_TICKS: u32 = 1;
 
@@ -17,14 +18,18 @@ pub(super) fn start_watchdog() {
     else {
         return;
     };
+
     std::thread::spawn(move || {
         let mut last = BEAT.load(Ordering::Relaxed);
         let mut still = 0;
+
         loop {
             std::thread::sleep(WATCHDOG_CHECK);
             let now = BEAT.load(Ordering::Relaxed);
+
             still = if now == last { still + 1 } else { 0 };
             last = now;
+
             if still >= limit {
                 eprintln!("WATCHDOG: game stuck for {limit}s");
                 std::process::abort();
@@ -46,9 +51,11 @@ fn dump_state_hook(d: &Display) {
     let Some(path) = std::env::var_os("FTA_STATE") else {
         return;
     };
+
     if d.ticks < ticks_from_env("FTA_STATE_AFTER") {
         return;
     }
+
     crate::game::statedump::dump_state(std::path::Path::new(&path));
     std::process::exit(0);
 }
@@ -56,9 +63,12 @@ fn dump_state_hook(d: &Display) {
 /// The frame as a binary PPM image.
 fn frame_as_ppm(frame: &[u32]) -> Vec<u8> {
     let mut out = format!("P6\n{WIDTH} {HEIGHT}\n255\n").into_bytes();
+
     for px in frame {
+        // The pixel as red, green and blue bytes.
         out.extend_from_slice(&[(px >> 16) as u8, (px >> 8) as u8, *px as u8]);
     }
+
     out
 }
 
@@ -67,12 +77,15 @@ fn screenshot_hook(d: &Display) {
     let Some(path) = std::env::var_os("FTA_SHOT") else {
         return;
     };
+
     if d.ticks < ticks_from_env("FTA_SHOT_AFTER") {
         return;
     }
+
     if let Err(e) = std::fs::write(&path, frame_as_ppm(&d.frame)) {
         eprintln!("Could not save the screenshot: {e}");
     }
+
     crate::platform::audio::dump();
     std::process::exit(0);
 }
@@ -82,6 +95,7 @@ fn screenshot_hook(d: &Display) {
 pub(super) fn test_hooks(d: &mut Display) {
     dump_state_hook(d);
     screenshot_hook(d);
+
     if let Some(secs) = std::env::var("FTA_SECONDS")
         .ok()
         .and_then(|s| s.parse::<u64>().ok())

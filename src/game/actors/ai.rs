@@ -44,20 +44,27 @@ const EGG_SEEK: i16 = 10;
 
 /// The first actors are the hero and the raft.
 const FIRST_AI_ACTOR: usize = 2;
+
 /// The good fairy is on screen below this countdown; nobody acts then.
 const FAIRY_ARRIVES: u8 = 120;
+
 /// An actor within this many pixels (in x and y) of the hero counts as on screen.
 const SCREEN_RANGE: i16 = 300;
+
 /// Special encounters (extent_type above this) only fight if they are the encounter's race.
 const SPECIAL_XTYPE: u16 = 59;
+
 /// Carriers (the turtle) re-aim every 16 ticks, steering mode 5.
 const CARRIER_AIM_MASK: u16 = 15;
 const CARRIER_AIM_MODE: i32 = 5;
+
 /// Weapon bit for a bow.
 const BOW_BIT: i8 = 4;
+
 /// Archers back off when closer than this, shoot inside the second pair, else close in.
 const ARCHER_TOO_CLOSE: (i16, i16) = (40, 30);
 const ARCHER_IN_RANGE: i16 = 70;
+
 /// Distance at which a fighter closes to strike, minus its goal number (the dark knight: this).
 const STRIKE_BASE: i16 = 14;
 const DKNIGHT: u8 = 7;
@@ -77,16 +84,20 @@ pub fn update_enemy_goals() {
         let battle2 = the_actors.battle_flag;
         the_actors.battle_flag = 0;
         let mut i = FIRST_AI_ACTOR;
+
         while i < the_actors.active as usize {
             if the_hero.good_fairy_timer != 0 && the_hero.good_fairy_timer < FAIRY_ARRIVES {
                 break;
             }
+
             think(i, battle2);
             i += 1;
         }
+
         if battle2 == 0 && the_actors.battle_flag != 0 {
             set_mood(1);
         }
+
         if the_actors.battle_flag == 0 && battle2 != 0 {
             queue_print(PRQ_VITALITY);
             queue_print(PRQ_STATS);
@@ -99,83 +110,135 @@ pub fn update_enemy_goals() {
 /// anyone out of hit points who is on screen.
 unsafe fn think(i: usize, battle2: i8) {
     unsafe {
-        let an = &raw mut the_actors.list[i];
-        if (*an).kind == CARRIER {
-            if the_world.day_clock & CARRIER_AIM_MASK == 0 {
-                steer_actor(
-                    i as i32,
-                    the_hero.x as i32,
-                    the_hero.y as i32,
-                    CARRIER_AIM_MODE,
-                );
-            }
+        let actor = &raw mut the_actors.list[i];
+
+        if (*actor).kind == CARRIER {
+            aim_carrier(i);
+
             return;
-        } else if (*an).kind == SETFIG {
+        } else if (*actor).kind == SETFIG {
             return;
         }
-        let mut mode = (*an).goal as i16;
-        let mut tactic = (*an).tactic as i16;
 
-        let xd = ((*an).abs_x as i32 - the_hero.x as i32) as i16;
-        let yd = ((*an).abs_y as i32 - the_hero.y as i32) as i16;
-        let (xd, yd) = (xd.wrapping_abs(), yd.wrapping_abs());
-        if on_screen(xd, yd) {
-            the_actors.on_screen = 1;
-            if (*an).vitality < 1 {
-                return;
-            }
-            if (*an).visible != 0 || battle2 != 0 {
-                the_actors.battle_flag = 1;
-            }
-        }
-        let mut r = bitrand(15) == 0;
-        mode = adjust_mode_for_situation(an, mode);
+        let (xd, yd) = distance_from_hero(actor);
 
-        if tactic == FRUST || tactic == SHOOTFRUST {
-            if (*an).weapon & BOW_BIT != 0 {
-                run_tactic(i as i32, rand4() + 2);
-            } else {
-                run_tactic(i as i32, rand2() + 3);
-            }
-        } else if (*an).state == SHOOT1 {
-            (*an).state = SHOOT3;
-        } else if mode <= ARCHER2 {
-            if mode & 2 == 0 {
-                r = rand4() == 0;
-            }
-            if r {
-                (mode, tactic) = choose_tactic(an, mode, xd, yd);
-            }
-            hostile_action(i, an, mode, tactic, xd, yd);
-        } else if mode == FLEE {
-            run_tactic(i as i32, BACKUP);
-        } else if mode == FOLLOWER {
-            run_tactic(i as i32, FOLLOW);
-        } else if mode == STAND {
-            steer_actor(i as i32, the_hero.x as i32, the_hero.y as i32, 0);
-            (*an).state = STILL;
-        } else if mode == WAIT {
-            (*an).state = STILL;
+        if !notice_actor(actor, xd, yd, battle2) {
+            return;
         }
 
-        (*an).goal = mode as i8;
+        let tactic = (*actor).tactic as i16;
+        let new_tactic_roll = bitrand(15) == 0;
+        let mode = adjust_mode_for_situation(actor, (*actor).goal as i16);
+        let mode = act_on_goal(i, actor, mode, tactic, (xd, yd), new_tactic_roll);
+
+        (*actor).goal = mode as i8;
+
         if the_actors.leader == 0 {
             the_actors.leader = i as i16;
         }
     }
 }
 
+/// A carrier (raft, turtle, swan) keeps steering toward the hero every few frames.
+unsafe fn aim_carrier(i: usize) {
+    unsafe {
+        if the_world.day_clock & CARRIER_AIM_MASK == 0 {
+            steer_actor(
+                i as i32,
+                the_hero.x as i32,
+                the_hero.y as i32,
+                CARRIER_AIM_MODE,
+            );
+        }
+    }
+}
+
+/// How far the actor is from the hero along each axis, never negative.
+unsafe fn distance_from_hero(actor: *const Shape) -> (i16, i16) {
+    unsafe {
+        let xd = ((*actor).abs_x as i32 - the_hero.x as i32) as i16;
+        let yd = ((*actor).abs_y as i32 - the_hero.y as i32) as i16;
+
+        (xd.wrapping_abs(), yd.wrapping_abs())
+    }
+}
+
+/// Notes that an actor is on screen, and that a battle is on if it is awake and in view. Returns
+/// false for an actor that is on screen but out of hit points (it does nothing more).
+unsafe fn notice_actor(actor: *const Shape, xd: i16, yd: i16, battle2: i8) -> bool {
+    unsafe {
+        if on_screen(xd, yd) {
+            the_actors.on_screen = 1;
+
+            if (*actor).vitality < 1 {
+                return false;
+            }
+
+            if (*actor).visible != 0 || battle2 != 0 {
+                the_actors.battle_flag = 1;
+            }
+        }
+
+        true
+    }
+}
+
+/// Carries out the actor's goal for this frame: a stuck actor tries something else, a hostile one
+/// picks a tactic now and then and acts on it, the others flee, follow, stand or wait. Returns the
+/// goal for next frame, which a hostile actor may change.
+unsafe fn act_on_goal(
+    i: usize,
+    actor: *mut Shape,
+    mut mode: i16,
+    mut tactic: i16,
+    (xd, yd): (i16, i16),
+    mut new_tactic_roll: bool,
+) -> i16 {
+    unsafe {
+        if tactic == FRUST || tactic == SHOOTFRUST {
+            if (*actor).weapon & BOW_BIT != 0 {
+                run_tactic(i as i32, rand4() + 2);
+            } else {
+                run_tactic(i as i32, rand2() + 3);
+            }
+        } else if (*actor).state == SHOOT1 {
+            (*actor).state = SHOOT3;
+        } else if mode <= ARCHER2 {
+            if mode & 2 == 0 {
+                new_tactic_roll = rand4() == 0;
+            }
+
+            if new_tactic_roll {
+                (mode, tactic) = choose_tactic(actor, mode, xd, yd);
+            }
+
+            hostile_action(i, actor, mode, tactic, xd, yd);
+        } else if mode == FLEE {
+            run_tactic(i as i32, BACKUP);
+        } else if mode == FOLLOWER {
+            run_tactic(i as i32, FOLLOW);
+        } else if mode == STAND {
+            steer_actor(i as i32, the_hero.x as i32, the_hero.y as i32, 0);
+            (*actor).state = STILL;
+        } else if mode == WAIT {
+            (*actor).state = STILL;
+        }
+
+        mode
+    }
+}
+
 /// Overrides an actor's mode when the situation demands: flee or follow when the hero is down,
 /// flee when nearly dead.
-unsafe fn adjust_mode_for_situation(an: *mut Shape, mode: i16) -> i16 {
+unsafe fn adjust_mode_for_situation(actor: *mut Shape, mode: i16) -> i16 {
     unsafe {
         adjusted_mode(
             mode,
             the_actors.list[0].state,
             the_actors.leader,
-            (*an).vitality,
+            (*actor).vitality,
             the_world.extent_type,
-            (*an).race,
+            (*actor).race,
             (*the_world.extent).v3,
         )
     }
@@ -209,14 +272,15 @@ fn adjusted_mode(
 }
 
 /// A hostile enemy picks a new tactic. May also change its mode to wandering if it has no weapon.
-unsafe fn choose_tactic(an: *mut Shape, mode: i16, xd: i16, yd: i16) -> (i16, i16) {
+unsafe fn choose_tactic(actor: *mut Shape, mode: i16, xd: i16, yd: i16) -> (i16, i16) {
     unsafe {
         let facts = TacticFacts {
-            race: (*an).race,
-            weapon: (*an).weapon,
-            vitality: (*an).vitality,
+            race: (*actor).race,
+            weapon: (*actor).weapon,
+            vitality: (*actor).vitality,
             eggs_to_guard: turtle_eggs != 0,
         };
+
         pick_tactic(&facts, mode, xd, yd, || rand2() != 0)
     }
 }
@@ -241,6 +305,7 @@ fn pick_tactic(
     coin: impl FnOnce() -> bool,
 ) -> (i16, i16) {
     let tactic;
+
     if enemy.race == SPIDER_EGGS_RACE && enemy.eggs_to_guard {
         tactic = EGG_SEEK;
     } else if enemy.weapon < 1 {
@@ -259,23 +324,34 @@ fn pick_tactic(
     } else {
         tactic = PURSUE;
     }
+
     (mode, tactic)
 }
 
 /// A hostile enemy strikes if close enough, otherwise acts on its tactic.
-unsafe fn hostile_action(i: usize, an: *mut Shape, mode: i16, tactic: i16, xd: i16, yd: i16) {
+unsafe fn hostile_action(i: usize, actor: *mut Shape, mode: i16, tactic: i16, xd: i16, yd: i16) {
     unsafe {
-        match hostile_choice((*an).race, (*an).weapon, (*an).vitality, mode, xd, yd) {
+        match hostile_choice(
+            (*actor).race,
+            (*actor).weapon,
+            (*actor).vitality,
+            mode,
+            xd,
+            yd,
+        ) {
             Hostile::Strike => {
                 steer_actor(i as i32, the_hero.x as i32, the_hero.y as i32, 0);
-                if (*an).state >= WALKING {
-                    (*an).state = FIGHTING;
+
+                if (*actor).state >= WALKING {
+                    (*actor).state = FIGHTING;
                 }
             }
+
             Hostile::KnightGuard => {
-                (*an).state = STILL;
-                (*an).facing = DKNIGHT_FACING;
+                (*actor).state = STILL;
+                (*actor).facing = DKNIGHT_FACING;
             }
+
             Hostile::Tactic => run_tactic(i as i32, tactic as i32),
         }
     }
@@ -292,11 +368,15 @@ enum Hostile {
     Tactic,
 }
 
+/// What a hostile enemy does this frame: strike if close enough with a hand weapon (the dark knight
+/// has its own, longer reach), the knight stands guard while alive, and anything else follows its tactic.
 fn hostile_choice(race: u8, weapon: i8, vitality: i16, mode: i16, xd: i16, yd: i16) -> Hostile {
     let mut thresh = STRIKE_BASE - mode;
+
     if race == DKNIGHT {
         thresh = DKNIGHT_STRIKE;
     }
+
     if weapon & BOW_BIT == 0 && xd < thresh && yd < thresh {
         Hostile::Strike
     } else if race == DKNIGHT && vitality != 0 {
@@ -344,6 +424,7 @@ mod tests {
             pick_tactic(&enemy(1, WEAK - 1), ATTACK_MODE, 0, 0, || true).1,
             EVADE
         );
+
         assert_eq!(
             pick_tactic(&enemy(1, WEAK - 1), ATTACK_MODE, 0, 0, || false).1,
             PURSUE
@@ -365,11 +446,13 @@ mod tests {
             pick_tactic(&archer, ARCHER1, close_x, close_y, || false).1,
             BACKUP as i16
         );
+
         let mid = ARCHER_IN_RANGE - 1;
         assert_eq!(
             pick_tactic(&archer, ARCHER1, ARCHER_TOO_CLOSE.0, mid, || false).1,
             SHOOT
         );
+
         assert_eq!(
             pick_tactic(&archer, ARCHER1, ARCHER_IN_RANGE, ARCHER_IN_RANGE, || false).1,
             PURSUE
@@ -384,6 +467,7 @@ mod tests {
             vitality: 20,
             eggs_to_guard: true,
         };
+
         assert_eq!(
             pick_tactic(&spider, ATTACK_MODE, 0, 0, || false).1,
             EGG_SEEK
@@ -400,6 +484,7 @@ mod tests {
             adjusted_mode(1, STILL, 0, 10, SPECIAL_XTYPE + 1, 5, 6),
             FLEE
         );
+
         assert_eq!(adjusted_mode(1, STILL, 0, 10, SPECIAL_XTYPE + 1, 6, 6), 1);
         assert_eq!(adjusted_mode(1, STILL, 0, 10, SPECIAL_XTYPE, 5, 6), 1);
     }
@@ -417,15 +502,18 @@ mod tests {
             hostile_choice(0, 1, 10, ATTACK_MODE, near - 1, near - 1),
             Hostile::Strike
         );
+
         assert_eq!(
             hostile_choice(0, 1, 10, ATTACK_MODE, near, 5),
             Hostile::Tactic
         );
+
         // bows never strike
         assert_eq!(
             hostile_choice(0, BOW_BIT, 10, ATTACK_MODE, 1, 1),
             Hostile::Tactic
         );
+
         assert_eq!(
             hostile_choice(
                 DKNIGHT,
@@ -437,10 +525,12 @@ mod tests {
             ),
             Hostile::Strike
         );
+
         assert_eq!(
             hostile_choice(DKNIGHT, 1, 10, ATTACK_MODE, DKNIGHT_STRIKE, 5),
             Hostile::KnightGuard
         );
+
         assert_eq!(
             hostile_choice(DKNIGHT, 1, 0, ATTACK_MODE, DKNIGHT_STRIKE, 5),
             Hostile::Tactic

@@ -11,10 +11,15 @@
 //! of track (value non-zero = loop).
 
 mod calls;
+
 mod channel;
+
 mod dump;
+
 mod export;
+
 mod sequencer;
+
 mod tables;
 
 pub use dump::dump;
@@ -30,11 +35,15 @@ struct Callback(Arc<Mutex<Sound>>);
 
 impl AudioCallback for Callback {
     type Channel = f32;
+
+    /// Called by SDL when it needs more sound: mixes the music and effects into `out` (silence if
+    /// another thread panicked while holding the sound state).
     fn callback(&mut self, out: &mut [f32]) {
         match self.0.lock() {
             Ok(mut s) => s.mix(out),
             Err(_) => out.fill(0.0),
         }
+
         if dump::enabled() {
             dump::capture(out);
         }
@@ -50,21 +59,26 @@ pub fn init(audio: &AudioSubsystem) {
         channels: Some(OUTPUT_CHANNELS),
         samples: Some(BUFFER_SAMPLES),
     };
+
     let mut shared = None;
     let device: Result<AudioDevice<Callback>, String> =
         audio.open_playback(None, &desired, |spec| {
             let sound = Arc::new(Mutex::new(Sound::new(spec.freq as f64)));
             shared = Some(sound.clone());
+
             Callback(sound)
         });
+
     match device {
         Ok(d) => {
             d.resume();
             std::mem::forget(d); // keep playing for the life of the program
+
             if let Some(s) = shared {
                 let _ = SOUND.set(s);
             }
         }
+
         Err(e) => eprintln!("No audio: {e}"),
     }
 }

@@ -7,8 +7,10 @@
 use std::fs;
 
 const BLOCK: usize = 512;
+
 /// Blocks summarised per line of the overview.
 const OVERVIEW_BLOCKS: usize = 16;
+
 /// Bytes shown per block in the hex dump.
 const PERCENT: usize = 100;
 const HEX_BYTES: usize = 32;
@@ -59,26 +61,31 @@ fn label(block: usize) -> &'static str {
         .unwrap_or("")
 }
 
+/// Prints the map of the image file, or a hex dump of a range of blocks.
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let Some(path) = args.get(1) else {
         eprintln!("usage: dump_image <image> [first_block] [count]");
         std::process::exit(2);
     };
+
     let data = fs::read(path).unwrap_or_else(|e| {
         eprintln!("cannot read {path}: {e}");
         std::process::exit(1);
     });
+
     let blocks = data.len() / BLOCK;
     println!("{path}: {} bytes, {blocks} blocks", data.len());
 
     if let Some(first) = args.get(2).and_then(|s| s.parse::<usize>().ok()) {
         let count = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(1);
+
         for b in first..(first + count).min(blocks) {
             let bytes = &data[b * BLOCK..b * BLOCK + HEX_BYTES];
             let hex: Vec<String> = bytes.iter().map(|x| format!("{x:02x}")).collect();
             println!("{b:5} {}  {}", hex.join(" "), label(b));
         }
+
         return;
     }
 

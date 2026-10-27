@@ -1,16 +1,27 @@
 //! Hitting an actor: who can be hurt, the sound, the knock-back, and what is said after a fight.
 
-use super::*;
+use super::blocking::step_figure;
+use super::extents::summon_turtle;
+use super::{DEAD, DRAGON, ENEMY, FLEE, HERO, SETFIG, turtle_eggs};
+use crate::game::actors::encounters::check_death;
+use crate::game::data::random::{bitrand, rand64, rand256};
+use crate::game::data::state::{the_actors, the_hero, the_world};
+use crate::game::data::types::Shape;
+use crate::game::files::loading::play_effect;
+use crate::game::ui::messages::{print, print_cont};
+use crate::game::ui::text::{print_number, speak};
 
 // Races with special rules when hit.
 pub(super) const RACE_WRAITH: u8 = 2;
 const RACE_SPIRIT: u8 = 9;
 const RACE_GHOST_KEEPER: u8 = 0x89;
 const RACE_UNHITTABLE: [u8; 2] = [0x8a, 0x8b];
+
 /// The weapon level needed to hurt spirits, and the item that also does.
 const MIN_HURT_WEAPON: i8 = 4;
 const SPIRIT_HURT_ITEM: usize = 7;
 const MESSAGE_NEEDS_WEAPON: i32 = 58;
+
 /// How far hit actors are pushed back.
 const KNOCKBACK: i16 = 2;
 const WORLD_DEAD_CHECK: i32 = 5;
@@ -20,12 +31,13 @@ const EFFECT_ARROW_HIT: i16 = 2;
 const EFFECT_ROCK_HIT: i16 = 5;
 const EFFECT_HERO_HURT: i16 = 0;
 const EFFECT_FOE_HURT: i16 = 3;
+
 /// Message count shown after a fight only while the area is this peaceful (`extent_type` below).
 const PEACEFUL_EXTENT: u16 = 50;
 const BRAVE_LOW_VITALITY: i16 = 5;
 
 /// Actor `i`. A raw pointer, because the functions called while it is in use change actors too.
-pub(super) fn actor(i: i32) -> *mut Shape {
+pub(super) fn actor_at(i: i32) -> *mut Shape {
     unsafe {
         (&raw mut the_actors.list)
             .cast::<Shape>()
@@ -42,23 +54,29 @@ pub(super) fn actor(i: i32) -> *mut Shape {
 /// ghost brothers) are never hurt. Dragons and people are not pushed back.
 pub fn hit_actor(i: i32, j: i32, fc: i32, wt: i16) {
     unsafe {
-        let target = actor(j);
-        let hero_weapon = (*actor(HERO as i32)).weapon;
+        let target = actor_at(j);
+        let hero_weapon = (*actor_at(HERO as i32)).weapon;
         let has_spirit_item = *the_hero.stuff.add(SPIRIT_HURT_ITEM) != 0;
+
         if too_weak_to_hurt((*target).race, hero_weapon, has_spirit_item) {
             speak(MESSAGE_NEEDS_WEAPON);
+
             return;
         }
+
         if RACE_UNHITTABLE.contains(&(*target).race) {
             return;
         }
+
         (*target).vitality = vitality_after_hit((*target).vitality, wt);
+
         match hit_sound(i, j) {
             HitSound::Arrow => play_effect(EFFECT_ARROW_HIT, 500 + rand64()),
             HitSound::Rock => play_effect(EFFECT_ROCK_HIT, 3200 + bitrand(511)),
             HitSound::HeroHurt => play_effect(EFFECT_HERO_HURT, 800 + bitrand(511)),
             HitSound::FoeHurt => play_effect(EFFECT_FOE_HURT, 400 + rand256()),
         }
+
         // push back the foe
         if can_be_pushed((*target).kind)
             && step_figure(j as i16, fc as i16, KNOCKBACK) != 0
@@ -66,6 +84,7 @@ pub fn hit_actor(i: i32, j: i32, fc: i32, wt: i16) {
         {
             step_figure(i as i16, fc as i16, KNOCKBACK);
         }
+
         check_death(j, WORLD_DEAD_CHECK);
     }
 }
@@ -79,6 +98,8 @@ enum HitSound {
     FoeHurt,
 }
 
+/// Which sound a hit makes, by who attacked (-1 an arrow, -2 a fireball, otherwise an actor slot) and
+/// who was hit (slot 0 is the hero).
 fn hit_sound(attacker: i32, target: i32) -> HitSound {
     match (attacker, target) {
         (-1, _) => HitSound::Arrow,
@@ -135,18 +156,23 @@ fn vitality_after_hit(vitality: i16, wt: i16) -> i16 {
 pub fn report_battle_result() {
     unsafe {
         let (mut dead, mut fled) = (0, 0);
+
         for i in 3..the_actors.active as i32 {
-            let a = actor(i);
+            let a = actor_at(i);
+
             if (*a).kind != ENEMY {
                 continue;
             }
+
             if (*a).state == DEAD {
                 dead += 1;
             } else if (*a).goal == FLEE {
                 fled += 1;
             }
         }
-        let vitality = (*actor(HERO as i32)).vitality;
+
+        let vitality = (*actor_at(HERO as i32)).vitality;
+
         match battle_report(vitality, dead, fled, the_world.extent_type) {
             BattleReport::Silent => {}
             BattleReport::Bravely => print(c"Bravely done!".as_ptr()),
@@ -156,6 +182,7 @@ pub fn report_battle_result() {
                     print_number(dead, 1);
                     print_cont(c"foes were defeated in battle.".as_ptr());
                 }
+
                 if fled != 0 {
                     print(c"".as_ptr());
                     print_number(fled, 1);
@@ -163,6 +190,7 @@ pub fn report_battle_result() {
                 }
             }
         }
+
         // check for presence of turtle eggs
         if turtle_eggs != 0 {
             summon_turtle();
@@ -172,6 +200,8 @@ pub fn report_battle_result() {
 
 #[cfg(test)]
 mod tests {
+    use super::super::DRAGON;
+    use super::super::SETFIG;
     use super::*;
 
     #[test]
@@ -220,15 +250,18 @@ mod tests {
             battle_report(BRAVE_LOW_VITALITY - 1, 1, 0, calm),
             BattleReport::Bravely
         );
+
         // nearly dead but nobody died: the normal report
         assert_eq!(
             battle_report(BRAVE_LOW_VITALITY - 1, 0, 2, calm),
             BattleReport::Foes { dead: 0, fled: 2 }
         );
+
         assert_eq!(
             battle_report(50, 2, 1, calm),
             BattleReport::Foes { dead: 2, fled: 1 }
         );
+
         // peaceful places say nothing
         assert_eq!(
             battle_report(50, 2, 1, PEACEFUL_EXTENT),

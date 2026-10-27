@@ -7,30 +7,23 @@
 //! of code between labels a method that returns the next `Pc`, so the order of the original is kept.
 
 mod after_move;
+
 mod carriers;
+
 mod dragon;
+
 mod people;
+
 mod shooting;
+
 mod walking;
+
 mod water;
 
-use self::water::*;
-
-use crate::game::actors::encounters::check_death;
-use crate::game::actors::interaction::{blocked_at, center_extent_on};
-use crate::game::actors::steering::steer_actor;
-use crate::game::data::object_tables::{bowshotx, bowshoty, fallstates, gunshoty};
-use crate::game::data::random::{rand2, rand4, rand256};
-use crate::game::data::state::{the_actors, the_hero, the_witch, the_world};
-use crate::game::data::tables::{facing_frame_offsets, setfig_table, swing_transitions};
+use crate::game::data::state::{the_actors, the_world};
+use crate::game::data::tables::facing_frame_offsets;
 use crate::game::data::types::{Missile, Shape};
-use crate::game::files::loading::play_effect;
-use crate::game::ui::messages::print;
-use crate::game::ui::music::set_mood;
-use crate::game::world::key_doors::{bumped_locked_door, open_door_near};
-use crate::game::world::map::{move_camera_to, step_x, step_y, terrain_at, wrap_coordinate};
-use crate::game::world::objects::{SetFigEntry, leave_item};
-use crate::game::world::places::{find_place, transfer_hero};
+use crate::game::world::map::{step_x, step_y, terrain_at};
 
 // Actor kinds and states (csrc/ftale.h).
 const OBJECTS: i8 = 1;
@@ -51,11 +44,13 @@ const FALL: i16 = 22;
 const SLEEP: i16 = 23;
 const SHOOT1: i16 = 24;
 const SHOOT3: i16 = 25;
+
 /// The tactic that means "frustrated, try something else".
 const FRUST: i8 = 0;
 
 /// Not a region number: nothing is waiting to load, so the terrain state may be stored.
 const NO_REGION: u16 = 10;
+
 /// Regions below this wrap around at the world's edges.
 const OUTDOOR_REGIONS: u16 = 8;
 const WORLD_MIN: u16 = 300;
@@ -63,12 +58,15 @@ const WORLD_MAX: u16 = 32565;
 
 /// The swan's sprite file; the turtle's is any other.
 const SWAN_FILE: i16 = 11;
+
 /// `riding` values: on the raft, on the turtle, on the swan.
 const RIDING_RAFT: i16 = 1;
 const RIDING_TURTLE: i16 = 5;
 const RIDING_SWAN: i16 = 11;
+
 /// The carrier's slot in the actor list when a turtle or swan is out.
 const CARRIER_SLOT: usize = 3;
+
 /// Terrain type the turtle swims in.
 const TURTLE_WATER: i16 = 5;
 
@@ -78,40 +76,51 @@ const TERRAIN_DEEP_WATER: i16 = 5;
 const ENVIRON_ICE: i8 = -2;
 const ENVIRON_BACKWARDS: i8 = -3;
 const ENVIRON_SLOW: i8 = -1;
+
 /// `environ` where an actor is in over its head, and the depth at which it starts to sink.
 const ENVIRON_DROWNED: i8 = 30;
 const ENVIRON_SINKING: i8 = 15;
+
 /// The sector with the pit that drops the hero into the dungeon region.
 const PIT_SECTOR: i16 = 181;
+
 /// The `extent_type` of the room with the pit floor.
 const PIT_XTYPE: u16 = 52;
+
 /// Arrows are not fired in extents with `extent_type` above this ("pax" areas).
 const NO_SHOOT_XTYPE: u16 = 80;
+
 /// Sprite frames.
 const FRAME_SINK: i16 = 83;
 const FRAME_FLAT: i16 = 82;
 const FRAME_SLEEP: i16 = 86;
 const FRAME_OSCIL: i16 = 84;
 const FRAME_FRUSTRATED: i16 = 40;
+
 /// Fixed stuff slots (inventory): arrows, and the fire-proof item.
 const STUFF_ARROWS: usize = 8;
 const STUFF_FIREPROOF: usize = 23;
 const STUFF_GOLD_KEY_SLOT: usize = 30;
 const STUFF_SWAN_ITEM: usize = 5;
+
 /// Objects the dead leave behind: the talisman and the lasso.
 const TALISMAN: i16 = 139;
 const LASSO: i16 = 27;
+
 /// Races with special handling.
 const RACE_WRAITH: u8 = 2;
 const RACE_SNAKE: u8 = 4;
 const RACE_WITCH: u8 = 0x09;
 const RACE_WITCH_BODY: u8 = 10;
 const RACE_LASSO_CARRIER: u8 = 0x89;
+
 /// The setfig id of the witch.
 const SETFIG_WITCH: i16 = 9;
+
 /// Door-find terrain codes `blocked_at` returns.
 const BLOCK_DOOR: i16 = 15;
 const BLOCK_PASSABLE_WITH_KEY: i16 = 12;
+
 /// Dragon and fireball constants.
 const MISSILE_SPEED_FIREBALL: i8 = 5;
 const MISSILE_SPEED_ARROW: i8 = 3;
@@ -119,10 +128,13 @@ const MISSILE_ROCK_TYPE: i8 = 2;
 const WEAPON_BOW: i8 = 4;
 const WEAPON_FIREBALL: i8 = 5;
 const MAX_MISSILE: i16 = 5;
+
 /// Facing a dragon takes when it breathes (it does not turn to the hero).
 const DRAGON_BREATH_FACING: i8 = 5;
+
 /// Hitting the pit: the luck it costs.
 const PIT_LUCK_COST: i16 = 2;
+
 /// Burning in lava, and running out of breath: dtype for `check_death`.
 const DEATH_LAVA: i32 = 27;
 const DEATH_DROWN: i32 = 6;
@@ -150,23 +162,24 @@ static mut YTEST: u16 = 0;
 
 /// The working variables of one `move_actor` call (the C locals).
 struct Ctx {
-    pub(super) an: *mut Shape,
-    pub(super) ms: *mut Missile,
-    pub(super) i: i32,
+    pub(super) actor: *mut Shape,
+    pub(super) missile: *mut Missile,
+    pub(super) slot: i32,
     pub(super) cycle: i16,
     /// The actor's environ (terrain state).
-    pub(super) k: i8,
+    pub(super) environ: i8,
     /// Facing.
-    pub(super) d: i16,
+    pub(super) facing: i16,
     /// State.
-    pub(super) s: i16,
+    pub(super) state: i16,
     /// Sprite image index.
-    pub(super) dex: i16,
+    pub(super) image: i16,
     /// Start of the facing's frames in the sprite sheet.
-    pub(super) inum: i16,
+    pub(super) frame_base: i16,
     /// Terrain type under the actor.
-    pub(super) j: i16,
-    pub(super) e: i16,
+    pub(super) terrain: i16,
+    /// How far the actor moves this frame.
+    pub(super) step: i16,
 }
 
 fn diroff(d: i16) -> i16 {
@@ -191,32 +204,8 @@ fn terrain(x: u16, y: u16) -> i16 {
 /// it), so it is passed in and written back.
 pub fn move_actor(i: i32, cycle: i16, jp: *mut i16) {
     unsafe {
-        let an = &raw mut the_actors.list[i as usize];
-        let mut c = Ctx {
-            an,
-            ms: (&raw mut the_actors.missiles as *mut Missile).offset(0),
-            i,
-            cycle,
-            k: 0,
-            d: 0,
-            s: 0,
-            dex: 0,
-            inum: 0,
-            j: *jp,
-            e: 0,
-        };
-        let mut pc = if the_world.freeze_timer != 0 && i > 0 {
-            Pc::Statc
-        } else {
-            c.k = (*an).environ;
-            c.d = (*an).facing as i16;
-            c.s = (*an).state as i16;
-            c.dex = (*an).index as i16;
-            c.inum = diroff(c.d);
-            c.ms = (&raw mut the_actors.missiles as *mut Missile)
-                .offset(the_actors.next_missile as isize);
-            Pc::Dispatch
-        };
+        let (mut c, mut pc) = Ctx::start(i, cycle, *jp);
+
         loop {
             pc = match pc {
                 Pc::Dispatch => c.dispatch(),
@@ -232,8 +221,47 @@ pub fn move_actor(i: i32, cycle: i16, jp: *mut i16) {
                 Pc::Statc => break,
             };
         }
+
         c.statc();
-        *jp = c.j;
+        *jp = c.terrain;
+    }
+}
+
+impl Ctx {
+    /// Sets up the working variables for actor `i`, and where to start: frozen enemies skip straight
+    /// to the end, everyone else is dispatched on their kind and state. `terrain` is what the last
+    /// actor left in the main loop's `j`.
+    unsafe fn start(i: i32, cycle: i16, terrain: i16) -> (Ctx, Pc) {
+        unsafe {
+            let actor = &raw mut the_actors.list[i as usize];
+            let mut c = Ctx {
+                actor,
+                missile: (&raw mut the_actors.missiles as *mut Missile).offset(0),
+                slot: i,
+                cycle,
+                environ: 0,
+                facing: 0,
+                state: 0,
+                image: 0,
+                frame_base: 0,
+                terrain,
+                step: 0,
+            };
+
+            if the_world.freeze_timer != 0 && i > 0 {
+                return (c, Pc::Statc);
+            }
+
+            c.environ = (*actor).environ;
+            c.facing = (*actor).facing as i16;
+            c.state = (*actor).state as i16;
+            c.image = (*actor).index as i16;
+            c.frame_base = diroff(c.facing);
+            c.missile = (&raw mut the_actors.missiles as *mut Missile)
+                .offset(the_actors.next_missile as isize);
+
+            (c, Pc::Dispatch)
+        }
     }
 }
 
@@ -241,10 +269,12 @@ impl Ctx {
     /// Picks the code for this kind of actor and state (the `if` chain at the top of the C).
     unsafe fn dispatch(&mut self) -> Pc {
         unsafe {
-            let an = self.an;
-            let kind = (*an).kind;
+            let actor = self.actor;
+            let kind = (*actor).kind;
+
             if kind == OBJECTS {
-                self.j = 0;
+                self.terrain = 0;
+
                 Pc::Raise
             } else if kind == DRAGON {
                 self.dragon()
@@ -254,19 +284,21 @@ impl Ctx {
                 self.setfig()
             } else if kind == RAFT {
                 self.raft()
-            } else if self.s == SINK {
-                if (*an).vitality > 0 {
-                    self.dex = FRAME_SINK;
+            } else if self.state == SINK {
+                if (*actor).vitality > 0 {
+                    self.image = FRAME_SINK;
                 }
+
                 the_actors.frustration = 0;
+
                 Pc::Cpx
-            } else if self.s == WALKING {
+            } else if self.state == WALKING {
                 self.walking()
-            } else if self.s == STILL as i16 {
+            } else if self.state == STILL as i16 {
                 Pc::Still
-            } else if self.s >= SHOOT1 {
+            } else if self.state >= SHOOT1 {
                 self.shooting()
-            } else if self.s < 9 {
+            } else if self.state < 9 {
                 self.fighting()
             } else {
                 self.other_states()

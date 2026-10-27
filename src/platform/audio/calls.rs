@@ -53,6 +53,7 @@ pub extern "C" fn stopscore() {
             s.voices[v].vol_delay = 0;
             s.voices[v].stat = 0;
         }
+
         s.nosound = true;
     });
 }
@@ -68,6 +69,7 @@ pub extern "C" fn playsample(data: *const i8, len: i32, period: i32) {
     if data.is_null() || len <= 0 {
         return;
     }
+
     let bytes: Vec<i8> = unsafe { std::slice::from_raw_parts(data, len as usize * 2) }.to_vec();
     with_sound(|s| {
         let ch = &mut s.chans[EFFECT_VOICE];

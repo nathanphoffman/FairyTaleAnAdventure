@@ -15,6 +15,7 @@ const FULL_SCALE: f32 = 32767.0;
 
 pub(super) fn enabled() -> bool {
     static ON: OnceLock<bool> = OnceLock::new();
+
     *ON.get_or_init(|| std::env::var_os(DUMP_VAR).is_some())
 }
 
@@ -41,6 +42,7 @@ pub(super) fn wav_header(data_len: u32) -> Vec<u8> {
     out.extend_from_slice(&BITS_PER_SAMPLE.to_le_bytes());
     out.extend_from_slice(b"data");
     out.extend_from_slice(&data_len.to_le_bytes());
+
     out
 }
 
@@ -49,11 +51,14 @@ pub fn dump() {
     let Some(path) = std::env::var_os(DUMP_VAR) else {
         return;
     };
+
     let samples = DUMP.lock().map(|d| d.clone()).unwrap_or_default();
     let mut out = wav_header((samples.len() * 2) as u32);
+
     for s in samples {
         out.extend_from_slice(&s.to_le_bytes());
     }
+
     if let Err(e) = std::fs::write(&path, out) {
         eprintln!("Could not write audio dump: {e}");
     }

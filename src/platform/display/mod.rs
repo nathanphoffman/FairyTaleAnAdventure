@@ -6,8 +6,11 @@
 //! doubled horizontally.
 
 mod compose;
+
 mod events;
+
 mod hooks;
+
 mod scripting;
 
 use crate::amiga::*;
@@ -37,9 +40,11 @@ const MAX_LAG_TICKS: u32 = 4;
 const WINDOW_TITLE: &str = "The Faery Tale Adventure";
 const WINDOW_WIDTH: u32 = 1280;
 const WINDOW_HEIGHT: u32 = 800;
+
 /// 640x200 pixels are shown on a 4:3 screen, so each row is drawn two pixels tall.
 const ROW_SCALE: u32 = 2;
 const BYTES_PER_PIXEL: usize = 4;
+
 /// Scripted Space press that skips the intro: (press tick, release tick).
 const SKIP_INTRO_TICKS: (u32, u32) = (5, 9);
 
@@ -66,6 +71,7 @@ struct Display {
 thread_local! {
     static DISPLAY: RefCell<Option<Display>> = const { RefCell::new(None) };
     static VIEW: RefCell<*mut View> = const { RefCell::new(std::ptr::null_mut()) };
+
     /// mouse pointer sprite data (Amiga sprite format), set by ChangeSprite
     static SPRITE: RefCell<*const u32> = const { RefCell::new(std::ptr::null()) };
 }
@@ -73,6 +79,7 @@ thread_local! {
 /// Opens every gamepad that is already plugged in.
 fn open_pads(system: &sdl2::GameControllerSubsystem) -> Vec<sdl2::controller::GameController> {
     let mut pads = Vec::new();
+
     for i in 0..system.num_joysticks().unwrap_or(0) {
         if system.is_game_controller(i)
             && let Ok(c) = system.open(i)
@@ -80,16 +87,19 @@ fn open_pads(system: &sdl2::GameControllerSubsystem) -> Vec<sdl2::controller::Ga
             pads.push(c);
         }
     }
+
     pads
 }
 
 /// The scripted key presses for tests, plus the Space press that skips the intro.
 fn initial_script() -> Vec<(u32, String, bool)> {
     let mut script = scripting::parse_script();
+
     if SKIP_INTRO.load(Ordering::Relaxed) {
         script.push((SKIP_INTRO_TICKS.0, "Space".to_string(), true));
         script.push((SKIP_INTRO_TICKS.1, "Space".to_string(), false));
     }
+
     script
 }
 
@@ -113,10 +123,12 @@ pub fn init() -> Result<(), String> {
     let pads = open_pads(&controller_system);
     super::input::load_config();
     sdl.mouse().show_cursor(false); // the game draws its own pointer
+
     match sdl.audio() {
         Ok(audio) => super::audio::init(&audio),
         Err(e) => eprintln!("No audio: {e}"),
     }
+
     std::mem::forget(sdl);
     std::mem::forget(video);
     let display = Display {
@@ -134,7 +146,9 @@ pub fn init() -> Result<(), String> {
         stick: [false; 4],
         script: initial_script(),
     };
+
     DISPLAY.with(|d| *d.borrow_mut() = Some(display));
+
     Ok(())
 }
 
@@ -155,20 +169,26 @@ fn draw(d: &mut Display, view: *mut View) {
             d.frame.len() * BYTES_PER_PIXEL,
         )
     };
+
     let texture = d
         .creator
         .create_texture_streaming(PixelFormatEnum::ARGB8888, WIDTH, HEIGHT);
+
     match texture {
         Ok(mut texture) => {
             if let Err(e) = texture.update(None, bytes, WIDTH as usize * BYTES_PER_PIXEL) {
                 eprintln!("Could not update the screen texture: {e}");
             }
+
             d.canvas.clear();
+
             if let Err(e) = d.canvas.copy(&texture, None, None) {
                 eprintln!("Could not draw the screen texture: {e}");
             }
+
             d.canvas.present();
         }
+
         Err(e) => eprintln!("Could not create the screen texture: {e}"),
     }
 }
@@ -179,6 +199,7 @@ pub fn present() {
     let view = VIEW.with(|c| *c.borrow());
     DISPLAY.with(|d| {
         let mut d = d.borrow_mut();
+
         let Some(d) = d.as_mut() else { return };
         draw(d, view);
         d.presents += 1;
@@ -207,6 +228,7 @@ fn pace(d: &mut Display) -> Duration {
     } else {
         d.next_tick + TICK
     };
+
     wait
 }
 
@@ -220,13 +242,16 @@ pub fn wait_frame() {
         hooks::test_hooks(d);
         d.ticks += 1;
         scripting::run_script(d);
+
         Some(pace(d))
     });
+
     if let Some(w) = wait {
         // FTA_FAST=1 runs flat out (regression tests); game logic only counts ticks, not time
         if std::env::var_os("FTA_FAST").is_none() {
             std::thread::sleep(w);
         }
+
         redraw();
     }
 }

@@ -64,11 +64,13 @@ pub extern "C" fn WaitBlit() {}
 pub extern "C" fn GetSprite(_s: *mut SimpleSprite, _n: LONG) -> LONG {
     0
 }
+
 #[unsafe(no_mangle)]
 pub extern "C" fn FreeSprite(_n: LONG) {}
 #[unsafe(no_mangle)]
 pub extern "C" fn ChangeSprite(_vp: *mut ViewPort, _s: *mut SimpleSprite, data: *mut c_void) {
     crate::platform::display::set_sprite(data as *const u32);
 }
+
 #[unsafe(no_mangle)]
 pub extern "C" fn MoveSprite(_vp: *mut ViewPort, _s: *mut SimpleSprite, _x: LONG, _y: LONG) {}

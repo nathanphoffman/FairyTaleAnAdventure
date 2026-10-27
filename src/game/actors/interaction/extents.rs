@@ -1,6 +1,11 @@
 //! Where encounters and carriers appear: picking a spot, summoning the turtle and centring an extent.
 
-use super::*;
+use crate::game::actors::encounters::load_carrier;
+use crate::game::data::random::{rand8, rand64};
+use crate::game::data::state::{the_encounter, the_hero};
+use crate::game::data::tables::extent_list;
+use crate::game::data::types::Extent;
+use crate::game::world::map::{step_x, step_y, terrain_at};
 
 /// Places the turtle: tries up to 25 random spots around the hero for one on water (terrain 5),
 /// then moves the turtle extent there and loads the turtle as the carrier. Called when turtle
@@ -12,21 +17,27 @@ pub fn summon_turtle() {
     const TURTLE_CARRIER: i16 = 5;
     unsafe {
         let mut tries_used = 0;
+
         while tries_used < TRIES {
             pick_encounter_spot();
+
             if terrain_at(the_encounter.x as i32, the_encounter.y as i32) == WATER {
                 break;
             }
+
             tries_used += 1;
         }
+
         if tries_used == TRIES {
             return;
         }
+
         center_extent_on(
             TURTLE_EXTENT,
             the_encounter.x as i16,
             the_encounter.y as i16,
         );
+
         load_carrier(TURTLE_CARRIER);
     }
 }

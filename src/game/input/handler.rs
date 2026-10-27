@@ -76,8 +76,10 @@ const COMPASS_LEFT_END_X: i32 = 292;
 const COMPASS_CENTER_END_X: i32 = 300;
 const COMPASS_LOWER_Y: i32 = 166;
 const COMPASS_MIDDLE_END_Y: i32 = 174;
+
 /// Direction value meaning "not walking".
 const DIR_NONE: i16 = 9;
+
 /// Keyboard direction keys are numbered from this value (keypad digits, offset by 20).
 const KEYDIR_BASE: i16 = 20;
 const DIRECTION_COUNT: i16 = 10;
@@ -92,6 +94,7 @@ fn push_key(code: i32) {
         let slot = data.laydown;
         data.keybuf[slot as usize] = code as u8;
         let next = (slot + 1) & KEY_BUFFER_MASK;
+
         if next != data.pickup {
             data.laydown = next;
         }
@@ -129,11 +132,14 @@ pub fn forget_last_menu() {
 pub fn next_key() -> i32 {
     unsafe {
         let data = &mut *(&raw mut the_ui.handler_data);
+
         if data.pickup == data.laydown {
             return 0;
         }
+
         let code = data.keybuf[data.pickup as usize];
         data.pickup = (data.pickup + 1) & KEY_BUFFER_MASK;
+
         code as i32
     }
 }
@@ -156,8 +162,10 @@ fn menu_key_at(x: i32, y: i32) -> Option<i32> {
     if !(MENU_MIN_X..=MENU_MAX_X).contains(&x) || y < MENU_TOP_Y {
         return None;
     }
+
     let row = (y - MENU_TOP_Y) / MENU_ROW_HEIGHT;
     let right = (x >= MENU_RIGHT_COLUMN_X) as i32;
+
     Some(row * 2 + MENU_FIRST_KEY + right)
 }
 
@@ -170,22 +178,28 @@ pub extern "C" fn fta_mouse_button(left: i32, right: i32) {
         (if left != 0 { LEFT_BUTTON } else { 0 }) | (if right != 0 { RIGHT_BUTTON } else { 0 });
     unsafe {
         let data = &mut *(&raw mut the_ui.handler_data);
+
+        // Xor with the old state leaves only the bits that changed: the left button was pressed or released.
         if (new_qualifier ^ data.qualifier) & LEFT_BUTTON != 0 {
             let key = if new_qualifier & LEFT_BUTTON != 0 {
                 menu_key_at(data.xsprite as i32, data.ysprite as i32)
             } else if data.lastmenu != 0 {
                 let released = (data.lastmenu as u8 as i32) | KEY_RELEASED;
                 data.lastmenu = 0;
+
                 Some(released)
             } else {
                 None
             };
+
             if let Some(key) = key {
                 push_key(key);
+
                 // as in the original: the last key sent is remembered, release included
                 data.lastmenu = key as i8;
             }
         }
+
         data.qualifier = new_qualifier;
     }
 }
@@ -198,6 +212,7 @@ fn compass_direction(x: i32, y: i32) -> i16 {
     if x <= COMPASS_MIN_X {
         return DIR_NONE;
     }
+
     let (up, center, down) = if x < COMPASS_LEFT_END_X {
         (0, 7, 6)
     } else if x <= COMPASS_CENTER_END_X {
@@ -205,6 +220,7 @@ fn compass_direction(x: i32, y: i32) -> i16 {
     } else {
         (2, 3, 4)
     };
+
     if y < COMPASS_LOWER_Y {
         up
     } else if y <= COMPASS_MIDDLE_END_Y {
@@ -218,6 +234,7 @@ fn compass_direction(x: i32, y: i32) -> i16 {
 pub fn take_new_disk() -> bool {
     unsafe {
         let data = &mut *(&raw mut the_ui.handler_data);
+
         std::mem::replace(&mut data.newdisk, 0) != 0
     }
 }
@@ -234,13 +251,16 @@ pub fn read_walk_direction() {
             compass_direction(data.xsprite as i32, data.ysprite as i32)
         } else {
             let dir = the_ui.held_direction.wrapping_sub(KEYDIR_BASE);
+
             if (0..DIRECTION_COUNT).contains(&dir) {
                 dir
             } else {
                 the_ui.held_direction = 0;
+
                 DIR_NONE
             }
         };
+
         if dir != compass_lit_direction {
             compass_lit_direction = dir;
             draw_compass(dir);
