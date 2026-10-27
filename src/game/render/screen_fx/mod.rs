@@ -25,38 +25,6 @@ pub use self::print_queue::handle_print_request;
 pub use self::win::win_colors;
 pub use self::zoom::set_intro_zoom;
 
-use crate::amiga::{BitMap, RastPort, View, ViewPort};
-
-unsafe extern "C" {
-    fn BltBitMap(
-        src: *mut BitMap,
-        sx: i32,
-        sy: i32,
-        dst: *mut BitMap,
-        dx: i32,
-        dy: i32,
-        w: i32,
-        h: i32,
-        minterm: u32,
-        mask: u32,
-        temp: *mut u8,
-    ) -> i32;
-
-    fn LoadRGB4(current_viewport: *mut ViewPort, colors: *const u16, count: i32);
-
-    fn Delay(ticks: i32);
-
-    fn SetDrMd(current_rastport: *mut RastPort, mode: u32);
-
-    fn SetAPen(current_rastport: *mut RastPort, pen: u32);
-
-    fn SetRast(current_rastport: *mut RastPort, pen: u32);
-
-    fn AvailMem(flags: u32) -> u32;
-
-    fn MakeVPort(view: *mut View, port: *mut ViewPort) -> i32;
-}
-
 const COLOR_COUNT: usize = 32;
 
 // The view modes of the text panel.

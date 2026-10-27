@@ -15,26 +15,13 @@ use self::brothers::{
 
 use self::safe_spot::{put_hero_at_safe_spot, restore_hero};
 
-use crate::amiga::{RastPort, TextFont};
 use crate::game::data::state::{the_actors, the_hero, the_screen, the_world};
 use crate::game::data::types::Shape;
 use crate::game::render::display::reset_input;
 use crate::game::render::screen_fx::fade_down;
 use crate::game::ui::music::set_mood;
 
-unsafe extern "C" {
-    fn stopscore();
-
-    fn Delay(ticks: i32);
-
-    fn SetFont(current_rastport: *mut RastPort, font: *mut TextFont);
-
-    fn SetAPen(current_rastport: *mut RastPort, pen: u32);
-
-    fn SetRast(current_rastport: *mut RastPort, pen: u32);
-
-    fn RectFill(current_rastport: *mut RastPort, x0: i32, y0: i32, x1: i32, y1: i32);
-}
+use crate::platform::audio::stopscore;
 
 // Actor kinds and goals.
 const PHIL: i8 = 0;

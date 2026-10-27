@@ -2,15 +2,21 @@
 
 use super::{
     AL_BMAP, AL_FONT, AL_GBASE, AL_HANDLE, AL_IMAGE, AL_MUSIC, AL_SAMPLE, AL_SECTOR, AL_SHADOW,
-    AL_SHAPE, AL_TERR, AllocMem, AllocRaster, BACKSAVE_OFFSET, BITMAP_COUNT, BeginIO, CMD_RESET,
-    ChangeSprite, Close, CreateExtIO, CreatePort, FindTask, FreeSprite, GetColorMap, GetSprite,
-    HIRES_WIDTH, IMAGE_SZ, IOF_QUICK, InitBitMap, InitRastPort, InitVPort, InitView, LOWRES_WIDTH,
-    LoadSeg, MAXSHAPES, MEMF_CLEAR, MODE_OLDFILE, MakeBitMap, MakeVPort, NORM_HIGH_SZ,
-    NewLayerInfo, Open, OpenDevice, OpenFont, OpenLibrary, PAGE_DEPTH, PAGE_HEIGHT,
-    PAGE_VIEW_HEIGHT, PAGE_VIEW_X, PHANTA_WIDTH, RAST_HEIGHT, Read, S_VOLBUF, S_WAVBUF, SAMPLE_SZ,
-    SCORE_SZ, SECTOR_OFF, SECTOR_SZ, SHADOW_SZ, SHAPE_SZ, SPRITE_DATA_SZ, SPRITES, Seek, SetBPen,
-    SetDrMd, SetFont, SetRast, TERRA_SZ, TEXT_DEPTH, TEXT_HEIGHT, TEXT_ROW_BYTES, VOICE_SZ,
-    VP_HIDE, WaitIO, init_music, set_flag,
+    AL_SHAPE, AL_TERR, BACKSAVE_OFFSET, BITMAP_COUNT, CMD_RESET, HIRES_WIDTH, IMAGE_SZ, IOF_QUICK,
+    LOWRES_WIDTH, MAXSHAPES, MEMF_CLEAR, MODE_OLDFILE, NORM_HIGH_SZ, PAGE_DEPTH, PAGE_HEIGHT,
+    PAGE_VIEW_HEIGHT, PAGE_VIEW_X, PHANTA_WIDTH, RAST_HEIGHT, S_VOLBUF, S_WAVBUF, SAMPLE_SZ,
+    SCORE_SZ, SECTOR_OFF, SECTOR_SZ, SHADOW_SZ, SHAPE_SZ, SPRITE_DATA_SZ, SPRITES, TERRA_SZ,
+    TEXT_DEPTH, TEXT_HEIGHT, TEXT_ROW_BYTES, VOICE_SZ, VP_HIDE, set_flag,
+};
+use crate::platform::audio::init_music;
+use crate::platform::dos::{close_file, open_file, read_file, seek_file};
+use crate::platform::exec::{
+    alloc_mem, begin_io, create_ext_io, create_port, find_task, open_device, open_library, wait_io,
+};
+use crate::platform::gfx::{
+    alloc_raster, change_sprite, free_sprite, get_color_map, get_sprite, init_bit_map,
+    init_rast_port, init_view, init_vport, load_seg, make_bit_map, make_vport, new_layer_info,
+    open_font, set_b_pen, set_draw_mode, set_font, set_rast,
 };
 
 use crate::amiga::{BitMap, DiskFontHeader, HIRES, JAM2, MEMF_CHIP};
@@ -117,13 +123,13 @@ pub(super) unsafe fn open_everything() -> Result<(), i32> {
 /// one.
 pub(super) unsafe fn open_text_screen() -> Result<(), i32> {
     unsafe {
-        gfx_base = OpenLibrary(c"graphics.library".as_ptr(), 0).cast();
+        gfx_base = open_library(c"graphics.library".as_ptr(), 0).cast();
 
         if gfx_base.is_null() {
             return Err(ERROR_NO_GRAPHICS);
         }
 
-        layers_base = OpenLibrary(c"layers.library".as_ptr(), 0);
+        layers_base = open_library(c"layers.library".as_ptr(), 0);
 
         if layers_base.is_null() {
             return Err(ERROR_NO_GRAPHICS);
@@ -132,7 +138,7 @@ pub(super) unsafe fn open_text_screen() -> Result<(), i32> {
         set_flag(AL_GBASE);
         the_screen.old_view = (*gfx_base).ActiView;
 
-        if MakeBitMap(
+        if make_bit_map(
             &raw mut the_screen.work_bm,
             WORKBENCH_DEPTH,
             WORKBENCH_WIDTH,
@@ -142,7 +148,7 @@ pub(super) unsafe fn open_text_screen() -> Result<(), i32> {
             return Err(ERROR_NO_GRAPHICS);
         }
 
-        layer_info = NewLayerInfo();
+        layer_info = new_layer_info();
         set_up_rast_ports();
 
         Ok(())
@@ -153,23 +159,23 @@ pub(super) unsafe fn open_text_screen() -> Result<(), i32> {
 /// bitmap, cleared to pen 0.
 unsafe fn set_up_rast_ports() {
     unsafe {
-        InitRastPort(&raw mut the_screen.rp_map);
-        InitRastPort(&raw mut the_screen.rp_text);
-        InitRastPort(&raw mut the_screen.rp_text2);
+        init_rast_port(&raw mut the_screen.rp_map);
+        init_rast_port(&raw mut the_screen.rp_text);
+        init_rast_port(&raw mut the_screen.rp_text2);
         the_screen.current_rastport = &raw mut the_screen.rp_text;
 
         the_screen.wb_bmap = &raw mut the_screen.work_bm;
         the_screen.rp_text.BitMap = the_screen.wb_bmap; // the "workbench screen" (not)
-        SetBPen(the_screen.current_rastport, 0);
-        SetDrMd(the_screen.current_rastport, JAM2 as u32);
-        SetRast(the_screen.current_rastport, 0);
+        set_b_pen(the_screen.current_rastport, 0);
+        set_draw_mode(the_screen.current_rastport, JAM2 as u32);
+        set_rast(the_screen.current_rastport, 0);
     }
 }
 
 /// Allocates the five bitmap headers (two pages, text, source, limit) in one block.
 pub(super) unsafe fn allocate_bitmap_headers() -> Result<(), i32> {
     unsafe {
-        the_screen.bm_page1 = AllocMem(
+        the_screen.bm_page1 = alloc_mem(
             BITMAP_COUNT * size_of::<BitMap>() as u32,
             MEMF_CHIP | MEMF_CLEAR,
         )
@@ -188,7 +194,7 @@ pub(super) unsafe fn allocate_bitmap_headers() -> Result<(), i32> {
 /// Loads the story font and opens the panel font, and gives all the rast ports the panel font.
 pub(super) unsafe fn open_fonts() -> Result<(), i32> {
     unsafe {
-        font_segment = LoadSeg(c"fonts/Amber/9".as_ptr());
+        font_segment = load_seg(c"fonts/Amber/9".as_ptr());
 
         if font_segment == 0 {
             return Err(ERROR_NO_FONT);
@@ -198,10 +204,10 @@ pub(super) unsafe fn open_fonts() -> Result<(), i32> {
         font_header = ((font_segment << BPTR_SHIFT) + FONT_HEADER_OFFSET) as *mut DiskFontHeader;
         set_flag(AL_FONT);
 
-        panel_font = OpenFont(&raw mut topaz_attr);
-        SetFont(&raw mut the_screen.rp_text, panel_font);
-        SetFont(&raw mut the_screen.rp_text2, panel_font);
-        SetFont(&raw mut the_screen.rp_map, panel_font);
+        panel_font = open_font(&raw mut topaz_attr);
+        set_font(&raw mut the_screen.rp_text, panel_font);
+        set_font(&raw mut the_screen.rp_text2, panel_font);
+        set_font(&raw mut the_screen.rp_map, panel_font);
         story_font = &raw mut (*font_header).dfh_TF;
 
         Ok(())
@@ -220,13 +226,13 @@ pub(super) unsafe fn install_input() -> Result<(), i32> {
             return Err(ERROR_NO_INPUT_HANDLER);
         }
 
-        this_task = FindTask(std::ptr::null());
+        this_task = find_task(std::ptr::null());
         (*this_task).pr_WindowPtr = usize::MAX as *mut c_void; // (APTR)-1: no requesters
         (*this_task).pr_Task.tc_TrapCode = trapper as *mut c_void;
 
         set_flag(AL_HANDLE);
-        FreeSprite(0);
-        GetSprite(&raw mut pointer_sprite, 0);
+        free_sprite(0);
+        get_sprite(&raw mut pointer_sprite, 0);
 
         Ok(())
     }
@@ -235,9 +241,9 @@ pub(super) unsafe fn install_input() -> Result<(), i32> {
 /// Sets up the view and its two view ports: the text panel (hi-res) and the play field (lo-res).
 pub(super) unsafe fn set_up_view_ports() {
     unsafe {
-        InitView(&raw mut main_view);
-        InitVPort(&raw mut the_screen.vp_page);
-        InitVPort(&raw mut the_screen.vp_text);
+        init_view(&raw mut main_view);
+        init_vport(&raw mut the_screen.vp_page);
+        init_vport(&raw mut the_screen.vp_text);
 
         main_view.ViewPort = &raw mut the_screen.vp_text;
         the_screen.vp_text.Next = &raw mut the_screen.vp_page;
@@ -266,8 +272,8 @@ pub(super) unsafe fn set_up_bitmaps() {
         set_up_rast_infos();
         set_up_pages();
 
-        the_screen.vp_page.ColorMap = GetColorMap(PAGE_COLOR_COUNT);
-        the_screen.vp_text.ColorMap = GetColorMap(TEXT_COLOR_COUNT);
+        the_screen.vp_page.ColorMap = get_color_map(PAGE_COLOR_COUNT);
+        the_screen.vp_text.ColorMap = get_color_map(TEXT_COLOR_COUNT);
     }
 }
 
@@ -284,16 +290,16 @@ unsafe fn split_bitmap_block() {
 /// Gives every bitmap its depth and size (the planes are filled in later).
 unsafe fn init_bitmaps() {
     unsafe {
-        InitBitMap(the_screen.bm_page1, PAGE_DEPTH, PHANTA_WIDTH, RAST_HEIGHT);
-        InitBitMap(the_screen.bm_page2, PAGE_DEPTH, PHANTA_WIDTH, RAST_HEIGHT);
-        InitBitMap(
+        init_bit_map(the_screen.bm_page1, PAGE_DEPTH, PHANTA_WIDTH, RAST_HEIGHT);
+        init_bit_map(the_screen.bm_page2, PAGE_DEPTH, PHANTA_WIDTH, RAST_HEIGHT);
+        init_bit_map(
             &raw mut the_screen.pagea,
             PLAY_DEPTH,
             PLAY_WIDTH,
             PLAY_HEIGHT,
         );
 
-        InitBitMap(
+        init_bit_map(
             &raw mut the_screen.pageb,
             PLAY_DEPTH,
             PLAY_WIDTH,
@@ -307,28 +313,28 @@ unsafe fn init_bitmaps() {
 /// The bitmaps of the text panel and the helper bitmaps (limit, scroll, source).
 unsafe fn init_panel_bitmaps() {
     unsafe {
-        InitBitMap(
+        init_bit_map(
             the_screen.bm_text,
             TEXT_DEPTH,
             TEXT_BITMAP_WIDTH,
             TEXT_HEIGHT,
         );
 
-        InitBitMap(
+        init_bit_map(
             the_screen.bm_lim,
             LIMIT_BITMAP_DEPTH,
             PLAY_WIDTH,
             PLAY_HEIGHT,
         );
 
-        InitBitMap(
+        init_bit_map(
             &raw mut the_screen.bm_scroll,
             LIMIT_BITMAP_DEPTH,
             TEXT_BITMAP_WIDTH,
             TEXT_HEIGHT,
         );
 
-        InitBitMap(
+        init_bit_map(
             the_screen.bm_source,
             SOURCE_BITMAP_DEPTH,
             SOURCE_BITMAP_WIDTH,
@@ -379,13 +385,15 @@ pub(super) unsafe fn allocate_page_planes() -> Result<(), i32> {
         }
 
         for i in 0..PAGE_DEPTH as usize {
-            (*the_screen.bm_page1).Planes[i] = AllocRaster(PHANTA_WIDTH as u32, RAST_HEIGHT as u32);
+            (*the_screen.bm_page1).Planes[i] =
+                alloc_raster(PHANTA_WIDTH as u32, RAST_HEIGHT as u32);
 
             if (*the_screen.bm_page1).Planes[i].is_null() {
                 return Err(ERROR_NO_PAGE1_PLANES);
             }
 
-            (*the_screen.bm_page2).Planes[i] = AllocRaster(PHANTA_WIDTH as u32, RAST_HEIGHT as u32);
+            (*the_screen.bm_page2).Planes[i] =
+                alloc_raster(PHANTA_WIDTH as u32, RAST_HEIGHT as u32);
 
             if (*the_screen.bm_page2).Planes[i].is_null() {
                 return Err(ERROR_NO_PAGE2_PLANES);
@@ -419,20 +427,20 @@ pub(super) unsafe fn share_text_bitmap_memory() {
             .cast();
 
         the_screen.vp_text.RasInfo = &raw mut the_screen.ri_text;
-        MakeVPort(&raw mut main_view, &raw mut the_screen.vp_text);
+        make_vport(&raw mut main_view, &raw mut the_screen.vp_text);
     }
 }
 
 /// Allocates the waveform/volume buffers and the score memory, and starts the music player.
 pub(super) unsafe fn allocate_music_memory() -> Result<(), i32> {
     unsafe {
-        the_memory.wavmem = AllocMem(VOICE_SZ, MEMF_CHIP);
+        the_memory.wavmem = alloc_mem(VOICE_SZ, MEMF_CHIP).cast();
 
         if the_memory.wavmem.is_null() {
             return Err(ERROR_NO_WAVEFORM_MEMORY);
         }
 
-        the_memory.scoremem = AllocMem(SCORE_SZ, 0);
+        the_memory.scoremem = alloc_mem(SCORE_SZ, 0).cast();
 
         if the_memory.scoremem.is_null() {
             return Err(ERROR_NO_SCORE_MEMORY);
@@ -452,11 +460,13 @@ pub(super) unsafe fn allocate_music_memory() -> Result<(), i32> {
 }
 
 /// Allocates one chip memory area; `error` is the number shown if there is no memory.
-pub(super) unsafe fn allocate_chip_area(size: u32, error: i32) -> Result<*mut u8, i32> {
-    unsafe {
-        let area = AllocMem(size, MEMF_CHIP);
+pub(super) fn allocate_chip_area(size: u32, error: i32) -> Result<*mut u8, i32> {
+    let area = alloc_mem(size, MEMF_CHIP);
 
-        if area.is_null() { Err(error) } else { Ok(area) }
+    if area.is_null() {
+        Err(error)
+    } else {
+        Ok(area.cast())
     }
 }
 
@@ -484,13 +494,13 @@ pub(super) unsafe fn allocate_game_memory() -> Result<(), i32> {
 /// Reads the waveforms and volume envelopes for the music from the file `v6`.
 pub(super) unsafe fn load_music_waveforms() {
     unsafe {
-        let file = Open(c"v6".as_ptr(), MODE_OLDFILE);
+        let file = open_file(c"v6".as_ptr(), MODE_OLDFILE);
 
         if file != 0 {
-            Read(file, the_memory.wavmem, S_WAVBUF);
-            Seek(file, S_WAVBUF, 0);
-            Read(file, the_memory.volmem, S_VOLBUF);
-            Close(file);
+            read_file(file, the_memory.wavmem, S_WAVBUF);
+            seek_file(file, S_WAVBUF, 0);
+            read_file(file, the_memory.volmem, S_VOLBUF);
+            close_file(file);
         }
     }
 }
@@ -503,10 +513,10 @@ pub(super) unsafe fn set_up_pointer_data() {
 
         the_memory.sprite_data = into_chip((&raw mut pointer_sprite_data).cast(), SPRITE_DATA_SZ);
 
-        ChangeSprite(
+        change_sprite(
             &raw mut the_screen.vp_text,
             &raw mut pointer_sprite,
-            the_memory.sprite_data,
+            the_memory.sprite_data.cast(),
         );
 
         the_ui.handler_data.vbase = (&raw mut the_screen.vp_text).cast();
@@ -519,13 +529,13 @@ pub(super) unsafe fn set_up_pointer_data() {
 /// Opens the audio device and resets it. If anything fails the game goes on without it.
 pub(super) unsafe fn open_audio() {
     unsafe {
-        audio_port = CreatePort(std::ptr::null(), 0);
+        audio_port = create_port(std::ptr::null(), 0);
 
         if audio_port.is_null() {
             return;
         }
 
-        audio_request = CreateExtIO(audio_port, size_of::<IOAudio>() as i32).cast();
+        audio_request = create_ext_io(audio_port, size_of::<IOAudio>() as i32).cast();
 
         if audio_request.is_null() {
             return;
@@ -536,14 +546,14 @@ pub(super) unsafe fn open_audio() {
         (*audio_request).ioa_length = 1;
         let request = &raw mut (*audio_request).ioa_request;
 
-        if OpenDevice(c"audio.device".as_ptr(), 0, request.cast(), 0) == 0 {
+        if open_device(c"audio.device".as_ptr(), 0, request.cast(), 0) == 0 {
             (*request).io_command = CMD_RESET;
             (*request).io_flags = IOF_QUICK;
-            BeginIO(request.cast());
+            begin_io(request.cast());
 
             // Masks with IOF_QUICK, keeping only the bits that matter here.
             if (*request).io_flags & IOF_QUICK == 0 {
-                WaitIO(request.cast());
+                wait_io(request.cast());
             }
 
             audio_is_open = 1;

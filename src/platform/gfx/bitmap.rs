@@ -16,8 +16,7 @@ fn bytes_per_row(width: i32) -> usize {
     (((width + WORD_PIXELS - 1) / WORD_PIXELS) * WORD_BYTES) as usize
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn InitBitMap(bm: *mut BitMap, depth: LONG, width: LONG, height: LONG) {
+pub fn init_bit_map(bm: *mut BitMap, depth: LONG, width: LONG, height: LONG) {
     let bm = unsafe { &mut *bm };
     bm.BytesPerRow = bytes_per_row(width) as UWORD;
     bm.Rows = height as UWORD;
@@ -28,17 +27,16 @@ pub extern "C" fn InitBitMap(bm: *mut BitMap, depth: LONG, width: LONG, height: 
 }
 
 /// Allocates the planes too. Returns 1 on success (this one was assembly in the original).
-#[unsafe(no_mangle)]
-pub extern "C" fn MakeBitMap(bm: *mut BitMap, depth: LONG, width: LONG, height: LONG) -> LONG {
-    InitBitMap(bm, depth, width, height);
+pub fn make_bit_map(bm: *mut BitMap, depth: LONG, width: LONG, height: LONG) -> LONG {
+    init_bit_map(bm, depth, width, height);
 
     let b = unsafe { &mut *bm };
 
     for p in 0..depth as usize {
-        b.Planes[p] = AllocRaster(width as ULONG, height as ULONG);
+        b.Planes[p] = alloc_raster(width as ULONG, height as ULONG);
 
         if b.Planes[p].is_null() {
-            UnMakeBitMap(bm);
+            unmake_bit_map(bm);
 
             return 0;
         }
@@ -47,12 +45,11 @@ pub extern "C" fn MakeBitMap(bm: *mut BitMap, depth: LONG, width: LONG, height: 
     1
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn UnMakeBitMap(bm: *mut BitMap) {
+pub fn unmake_bit_map(bm: *mut BitMap) {
     let b = unsafe { &mut *bm };
 
     for p in 0..b.Depth as usize {
-        FreeRaster(b.Planes[p], 0, 0);
+        free_raster(b.Planes[p], 0, 0);
         b.Planes[p] = null_mut();
     }
 }
@@ -61,8 +58,7 @@ pub extern "C" fn UnMakeBitMap(bm: *mut BitMap) {
 /// word or two outside the visible area, as the Amiga's memory allowed.
 const RASTER_PAD: usize = 256;
 
-#[unsafe(no_mangle)]
-pub extern "C" fn AllocRaster(width: ULONG, height: ULONG) -> PLANEPTR {
+pub fn alloc_raster(width: ULONG, height: ULONG) -> PLANEPTR {
     let size = bytes_per_row(width as i32) * height as usize + 2 * RASTER_PAD;
 
     let base = unsafe { libc::calloc(1, size) as PLANEPTR };
@@ -74,8 +70,7 @@ pub extern "C" fn AllocRaster(width: ULONG, height: ULONG) -> PLANEPTR {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn FreeRaster(p: PLANEPTR, _w: ULONG, _h: ULONG) {
+pub fn free_raster(p: PLANEPTR, _w: ULONG, _h: ULONG) {
     if !p.is_null() {
         unsafe { libc::free(p.sub(RASTER_PAD) as *mut c_void) }
     }

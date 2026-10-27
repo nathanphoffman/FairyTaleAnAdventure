@@ -15,38 +15,11 @@ use self::item_list::show_item_list;
 use self::look::look_around;
 use self::take::take_nearest;
 
-use crate::amiga::{BitMap, RastPort, TextFont, ViewPort};
 use crate::game::data::state::the_hero;
 use crate::game::data::tables::item_list;
 use crate::game::data::types::InvItem;
 use crate::game::ui::menus::go_to_menu;
 use std::ffi::c_char;
-
-unsafe extern "C" {
-    fn SetRast(current_rastport: *mut RastPort, pen: u32);
-
-    fn InitBitMap(bm: *mut BitMap, depth: i32, width: i32, height: i32);
-
-    fn SetRGB4(current_viewport: *mut ViewPort, n: i32, r: u32, g: u32, b: u32);
-
-    fn LoadRGB4(current_viewport: *mut ViewPort, colors: *const u16, count: i32);
-
-    fn SetFont(current_rastport: *mut RastPort, font: *mut TextFont);
-
-    fn BltBitMap(
-        src: *mut BitMap,
-        sx: i32,
-        sy: i32,
-        dst: *mut BitMap,
-        dx: i32,
-        dy: i32,
-        w: i32,
-        h: i32,
-        minterm: u32,
-        mask: u32,
-        temp: *mut u8,
-    ) -> i32;
-}
 
 // Menu numbers and the entries of the Items menu.
 const USE: i16 = 8;

@@ -17,15 +17,7 @@ use crate::game::data::tables::number_buffer;
 use crate::game::ui::messages::print_wrapped;
 use std::ffi::c_char;
 
-unsafe extern "C" {
-    fn Move(current_rastport: *mut RastPort, x: i32, y: i32);
-
-    fn Draw(current_rastport: *mut RastPort, x: i32, y: i32);
-
-    fn Text(current_rastport: *mut RastPort, s: *const c_char, len: i32) -> i32;
-
-    fn SetAPen(current_rastport: *mut RastPort, pen: u32);
-}
+use crate::platform::gfx::{draw_line, move_pen, set_a_pen, text_out};
 
 /// In a string: followed by x/2 and y, moves the text position.
 const XY: u8 = 128;
@@ -69,12 +61,13 @@ pub fn format_number(mut value: u32) -> i32 {
 pub fn print_number(value: i32, len: i32) {
     format_number(value as u32);
     unsafe {
-        Text(
+        text_out(
             the_screen.current_rastport,
             (&raw const number_buffer)
                 .cast::<c_char>()
                 .add(NUMBER_DIGITS)
-                .offset(-(len as isize)),
+                .offset(-(len as isize))
+                .cast(),
             len + 1,
         )
     };
@@ -82,13 +75,13 @@ pub fn print_number(value: i32, len: i32) {
 
 // `move` is a Rust keyword, so this one is exported under the C name.
 /// Moves the text position (the C name is `move`, a keyword in Rust).
-pub extern "C" fn move_to(x: i32, y: i32) {
-    unsafe { Move(the_screen.current_rastport, x, y) };
+pub fn move_to(x: i32, y: i32) {
+    unsafe { move_pen(the_screen.current_rastport, x, y) };
 }
 
 /// Prints `len` characters at the text position.
 pub fn draw_text(s: *const c_char, len: i32) {
-    unsafe { Text(the_screen.current_rastport, s, len) };
+    unsafe { text_out(the_screen.current_rastport, s.cast(), len) };
 }
 
 /// Prints a string that may hold XY escapes (128, x/2, y) to move the text position. A string
@@ -98,7 +91,7 @@ pub fn print_positioned(mut s: *const u8) {
     unsafe {
         while *s != 0 {
             if *s == XY {
-                Move(
+                move_pen(
                     the_screen.current_rastport,
                     *s.add(1) as i32 * XY_X_SCALE,
                     *s.add(2) as i32,
@@ -112,7 +105,7 @@ pub fn print_positioned(mut s: *const u8) {
                     n += 1;
                 }
 
-                Text(the_screen.current_rastport, s.cast(), n as i32);
+                text_out(the_screen.current_rastport, s.cast(), n as i32);
                 s = s.add(n);
 
                 if n == 0 {
@@ -195,11 +188,9 @@ const BORDER_HIGHLIGHT_PEN: u32 = 24;
 const STROKES_PER_STEP: i32 = 5;
 
 /// Draws a line from (x0, y0) to (x1, y1).
-unsafe fn line(r: *mut RastPort, x0: i32, y0: i32, x1: i32, y1: i32) {
-    unsafe {
-        Move(r, x0, y0);
-        Draw(r, x1, y1);
-    }
+fn line(r: *mut RastPort, x0: i32, y0: i32, x1: i32, y1: i32) {
+    move_pen(r, x0, y0);
+    draw_line(r, x1, y1);
 }
 
 /// Draws the decorative border around a story page: many short strokes, five each with the last in
@@ -221,7 +212,7 @@ pub fn draw_placard_border() {
                         BORDER_PEN
                     };
 
-                    SetAPen(r, pen);
+                    set_a_pen(r, pen);
                     draw_border_stroke(r, pass > LONG_EDGE_ABOVE_PASS, (xorg, yorg), (dx, dy));
                 }
 
@@ -234,40 +225,38 @@ pub fn draw_placard_border() {
 
 /// One stroke of the border from `from` to `to`, repeated on the opposite edge, and on the short
 /// edges (turned a quarter) with the x and y swapped.
-unsafe fn draw_border_stroke(
+fn draw_border_stroke(
     r: *mut RastPort,
     long_edges: bool,
     (xorg, yorg): (i32, i32),
     (dx, dy): (i32, i32),
 ) {
-    unsafe {
-        if long_edges {
-            line(r, xorg, yorg, dx, dy);
-            line(
-                r,
-                LONG_EDGE_FAR.0 - xorg,
-                LONG_EDGE_FAR.1 - yorg,
-                LONG_EDGE_FAR.0 - dx,
-                LONG_EDGE_FAR.1 - dy,
-            );
-        }
-
+    if long_edges {
+        line(r, xorg, yorg, dx, dy);
         line(
             r,
-            SHORT_EDGE_NEAR.0 + yorg,
-            SHORT_EDGE_NEAR.1 - xorg,
-            SHORT_EDGE_NEAR.0 + dy,
-            SHORT_EDGE_NEAR.1 - dx,
-        );
-
-        line(
-            r,
-            SHORT_EDGE_FAR.0 - yorg,
-            SHORT_EDGE_FAR.1 + xorg,
-            SHORT_EDGE_FAR.0 - dy,
-            SHORT_EDGE_FAR.1 + dx,
+            LONG_EDGE_FAR.0 - xorg,
+            LONG_EDGE_FAR.1 - yorg,
+            LONG_EDGE_FAR.0 - dx,
+            LONG_EDGE_FAR.1 - dy,
         );
     }
+
+    line(
+        r,
+        SHORT_EDGE_NEAR.0 + yorg,
+        SHORT_EDGE_NEAR.1 - xorg,
+        SHORT_EDGE_NEAR.0 + dy,
+        SHORT_EDGE_NEAR.1 - dx,
+    );
+
+    line(
+        r,
+        SHORT_EDGE_FAR.0 - yorg,
+        SHORT_EDGE_FAR.1 + xorg,
+        SHORT_EDGE_FAR.0 - dy,
+        SHORT_EDGE_FAR.1 + dx,
+    );
 }
 
 /// Menu states: an item the player has, and one they lack.

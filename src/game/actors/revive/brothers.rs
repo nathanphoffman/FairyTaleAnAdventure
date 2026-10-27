@@ -1,6 +1,5 @@
 //! Handing over from a fallen brother to the next: his body, the placards and the new stats.
 
-use super::{Delay, RectFill, SetAPen, SetFont, SetRast};
 use crate::game::data::globals::{panel_font, story_font};
 use crate::game::data::object_tables::{ob_list8, ob_listg};
 use crate::game::data::state::{Hero, World, the_actors, the_hero, the_screen, the_ui, the_world};
@@ -11,6 +10,8 @@ use crate::game::render::screen_fx::{map_message, message_off};
 use crate::game::ui::messages::print_cont;
 use crate::game::ui::text::{draw_placard_border, placard_text, show_event};
 use crate::game::world::map::move_camera_to;
+use crate::platform::display::delay;
+use crate::platform::gfx::{rect_fill, set_a_pen, set_font, set_rast};
 
 const RAFT: i8 = 3;
 const SETFIG: i8 = 4;
@@ -160,12 +161,12 @@ pub(super) unsafe fn start_next_brother(hero: &mut Hero, body: &mut Shape, next:
 pub(super) unsafe fn show_brother_placards() {
     unsafe {
         map_message();
-        SetFont(the_screen.current_rastport, story_font);
+        set_font(the_screen.current_rastport, story_font);
 
         if the_hero.brother == JULIAN {
             placard_text(PLACARD_JULIAN);
             the_screen.rp_map.BitMap = (*(*the_screen.drawing_page).ri_page).BitMap;
-            SetRast(&raw mut the_screen.rp_map, PEN_BLACK);
+            set_rast(&raw mut the_screen.rp_map, PEN_BLACK);
             the_screen.rp_map.BitMap = (*(*the_screen.viewing_page).ri_page).BitMap;
         } else if the_hero.brother == PHILLIP {
             placard_text(PLACARD_PHILLIP);
@@ -176,11 +177,11 @@ pub(super) unsafe fn show_brother_placards() {
         }
 
         draw_placard_border();
-        Delay(SHOW_PLACARD);
+        delay(SHOW_PLACARD);
 
         if the_hero.brother > LAST_BROTHER {
             the_ui.quit_requested = 1;
-            Delay(GAME_OVER_PAUSE);
+            delay(GAME_OVER_PAUSE);
         } else if the_hero.brother > JULIAN {
             show_follow_up_placard();
         }
@@ -190,9 +191,9 @@ pub(super) unsafe fn show_brother_placards() {
 /// After the first story page the panel is cleared and the follow-up page for this brother is shown.
 unsafe fn show_follow_up_placard() {
     unsafe {
-        Delay(SHORT_PAUSE);
-        SetAPen(the_screen.current_rastport, PEN_BLACK);
-        RectFill(
+        delay(SHORT_PAUSE);
+        set_a_pen(the_screen.current_rastport, PEN_BLACK);
+        rect_fill(
             the_screen.current_rastport,
             PANEL.0,
             PANEL.1,
@@ -200,8 +201,8 @@ unsafe fn show_follow_up_placard() {
             PANEL.3,
         );
 
-        Delay(TINY_PAUSE);
-        SetAPen(the_screen.current_rastport, PEN_TEXT);
+        delay(TINY_PAUSE);
+        set_a_pen(the_screen.current_rastport, PEN_TEXT);
 
         placard_text(if the_hero.brother == PHILLIP {
             PLACARD_PHILLIP_FOLLOW_UP
@@ -209,14 +210,14 @@ unsafe fn show_follow_up_placard() {
             PLACARD_KEVIN_FOLLOW_UP
         });
 
-        Delay(SHOW_PLACARD);
+        delay(SHOW_PLACARD);
     }
 }
 
 /// Loads the brother's sprites and tells where the story starts.
 pub(super) unsafe fn announce_brother() {
     unsafe {
-        SetFont(the_screen.current_rastport, panel_font);
+        set_font(the_screen.current_rastport, panel_font);
         the_screen.current_rastport = &raw mut the_screen.rp_text;
 
         the_actors.loaded_actor_file = HERO_SPRITE_FILE;

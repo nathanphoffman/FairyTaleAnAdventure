@@ -1,6 +1,5 @@
 //! What the spells do once cast: the map, the stone jump, healing and scaring enemies.
 
-use super::{Move, SetAPen, SetDrMd, Text};
 use crate::game::actors::encounters::check_death;
 use crate::game::data::random::rand8;
 use crate::game::data::state::{the_actors, the_hero, the_screen, the_world};
@@ -11,6 +10,7 @@ use crate::game::ui::messages::print;
 use crate::game::ui::text::{queue_print, show_event};
 use crate::game::world::map::draw_overview_map;
 use crate::game::world::places::transfer_hero;
+use crate::platform::gfx::{move_pen, set_a_pen, set_draw_mode, text_out};
 
 // The menu entries: the spells are entries 5-11 and use the item slots 9-15 (`4 + entry`).
 /// A sector is 256 pixels wide and high, and a tile 16 (shifts of 8 and 4).
@@ -65,12 +65,12 @@ pub(super) unsafe fn show_map() {
             - ((the_world.sector_y as i64 + the_world.origin_y as i64) << TILE_SHIFT)
             + MARK_Y_OFFSET) as u32;
         the_screen.rp_map.BitMap = the_screen.bm_draw;
-        SetDrMd(&raw mut the_screen.rp_map, JAM1);
-        SetAPen(&raw mut the_screen.rp_map, MAP_MARK_PEN);
+        set_draw_mode(&raw mut the_screen.rp_map, JAM1);
+        set_a_pen(&raw mut the_screen.rp_map, MAP_MARK_PEN);
 
         if x > 0 && x < MARK_MAX.0 && y > 0 && y < MARK_MAX.1 {
-            Move(&raw mut the_screen.rp_map, x as i32, y as i32);
-            Text(&raw mut the_screen.rp_map, c"+".as_ptr(), 1);
+            move_pen(&raw mut the_screen.rp_map, x as i32, y as i32);
+            text_out(&raw mut the_screen.rp_map, c"+".as_ptr().cast(), 1);
         }
 
         the_screen.view_status = VIEW_MAP;

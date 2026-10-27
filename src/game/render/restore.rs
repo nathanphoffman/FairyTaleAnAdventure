@@ -6,11 +6,7 @@ use crate::game::data::state::the_screen;
 use crate::game::render::blit::{SShape, restore_background};
 use crate::game::render::witch::witch_fx;
 
-unsafe extern "C" {
-    fn OwnBlitter();
-
-    fn DisownBlitter();
-}
+use crate::platform::gfx::{disown_blitter, own_blitter};
 
 /// Puts back the background under last frame's sprites, then undoes the witch effect on that page.
 pub fn undo_sprites() {
@@ -18,7 +14,7 @@ pub fn undo_sprites() {
         the_screen.bm_draw = (*(*the_screen.drawing_page).ri_page).BitMap;
         the_screen.planes = (*the_screen.bm_draw).Planes.as_mut_ptr();
 
-        OwnBlitter();
+        own_blitter();
         let queue = (*the_screen.drawing_page).shape_queue.cast::<SShape>();
 
         for i in (1..=(*the_screen.drawing_page).obcount as isize).rev() {
@@ -26,7 +22,7 @@ pub fn undo_sprites() {
             restore_background((*current_sshape).backsave);
         }
 
-        DisownBlitter();
+        disown_blitter();
 
         the_screen.rp_map.BitMap = (*(*the_screen.drawing_page).ri_page).BitMap;
 

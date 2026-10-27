@@ -284,3 +284,12 @@ and tables are now `src/game/data/story_text.rs`, generated from `narr.asm` by `
 (a unit test had compared the bytes with the old C data before it was deleted). The struct size check
 became a unit test in `src/amiga.rs`, and `main` calls `game::startup::run_game` directly. The rest of
 `csrc/` is reference only and is not compiled.
+
+## Ordinary Rust calls between game and platform
+
+The game and `src/platform/` no longer meet through the C calling convention. There is no
+`extern "C"` and no `#[no_mangle]` left; the platform functions are plain `pub fn`s, re-exported by
+their module (`platform::gfx`, `exec`, `dos`, `audio`, ...) and imported with `use`. They were renamed
+from the Amiga CamelCase to snake_case (`SetAPen` is `set_a_pen`, `BltBitMap` is `blt_bit_map`, `Open`
+is `open_file`). The platform calls the game's input handlers (`fta_key`, `fta_mouse_move`, ...)
+directly the same way. About 150 `unsafe` blocks that only wrapped those calls were removed.

@@ -1,7 +1,6 @@
 //! The main loop (from csrc/fmain.c): one pass per frame, reading input, moving the actors, updating
 //! the world and drawing.
 
-use crate::amiga::{RastPort, ViewPort};
 use crate::game::render::draw::{draw_sprites, repair_edges};
 
 use crate::game::actors::ai::update_enemy_goals;
@@ -27,19 +26,8 @@ use crate::game::world::regions::refresh_minimap;
 use crate::game::world::survival::survival_tick;
 use crate::game::world::travel_doors::check_door;
 
-unsafe extern "C" {
-
-    // AmigaOS calls the platform layer provides.
-    fn SetAPen(current_rastport: *mut RastPort, pen: u32);
-
-    fn Delay(ticks: i32);
-
-    fn SetRGB4(current_viewport: *mut ViewPort, n: i32, r: u32, g: u32, b: u32);
-
-    fn WaitBlit();
-
-    // The game's own code that is still C, or lives in other files.
-}
+use crate::platform::display::delay;
+use crate::platform::gfx::{set_a_pen, set_rgb4, wait_blit};
 
 // Screen modes (`view_status`).
 const VIEW_NORMAL: i8 = 0;
@@ -159,7 +147,7 @@ unsafe fn run_frame(state: &mut FrameState) {
 
         // Masks with GAME_MENU, keeping only the bits that matter here.
         if menus[GAME_MENU].enabled[PAUSE_ENTRY] & 1 != 0 {
-            Delay(1);
+            delay(1);
 
             return;
         }
@@ -202,12 +190,12 @@ unsafe fn read_keyboard() {
 unsafe fn handle_view_status() -> bool {
     unsafe {
         if the_screen.view_status == VIEW_PAUSED {
-            Delay(PAUSE_WAIT);
+            delay(PAUSE_WAIT);
             the_screen.view_status = VIEW_REDRAW;
         } else if the_screen.view_status == VIEW_BIG || the_screen.view_status == VIEW_BIG_STILL {
             // Masks with FLASH_BIT, keeping only the bits that matter here.
             if the_screen.flasher & FLASH_BIT != 0 && the_screen.view_status == VIEW_BIG {
-                SetRGB4(
+                set_rgb4(
                     &raw mut the_screen.vp_page,
                     STATUS_COLOR,
                     FLASH_COLOR,
@@ -215,7 +203,7 @@ unsafe fn handle_view_status() -> bool {
                     FLASH_COLOR,
                 );
             } else {
-                SetRGB4(&raw mut the_screen.vp_page, STATUS_COLOR, 0, 0, 0);
+                set_rgb4(&raw mut the_screen.vp_page, STATUS_COLOR, 0, 0, 0);
             }
 
             handle_print_request();
@@ -342,7 +330,7 @@ unsafe fn draw_frame(state: &mut FrameState, scroll_x: i16, scroll_y: i16) {
         (*the_screen.drawing_page).isv_x = the_world.tile_x as i32;
         (*the_screen.drawing_page).isv_y = the_world.tile_y as i32;
 
-        SetAPen(&raw mut the_screen.rp_map, SPRITE_PEN);
+        set_a_pen(&raw mut the_screen.rp_map, SPRITE_PEN);
 
         resolve_melee();
         advance_missiles();
@@ -361,7 +349,7 @@ unsafe fn draw_frame(state: &mut FrameState, scroll_x: i16, scroll_y: i16) {
 
         // The drawing loop used to leave `j` here; the next frame's actor loop reads it.
         state.last_terrain = the_actors.drawn;
-        WaitBlit();
+        wait_blit();
         (*(*the_screen.drawing_page).ri_page).RxOffset =
             // Masks with TILE_X_MASK, keeping only the bits that matter here.
             (the_world.map_x as i32 & TILE_X_MASK) as i16;

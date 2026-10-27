@@ -14,19 +14,11 @@ use game_loop::main_loop;
 use intro::start_up;
 use open_close::{close_all, open_all};
 
-use crate::amiga::RastPort;
-
 use crate::game::data::state::{the_screen, the_world};
 use crate::game::ui::text::show_error;
 
-unsafe extern "C" {
-
-    // AmigaOS calls the platform layer provides.
-    fn SetRast(current_rastport: *mut RastPort, pen: u32);
-
-    // The music player (in the platform layer).
-    fn stopscore();
-}
+use crate::platform::audio::stopscore;
+use crate::platform::gfx::set_rast;
 
 /// The game: the original `main`. Called once from `src/main.rs`.
 pub fn run_game() {
@@ -54,7 +46,7 @@ pub fn run_game() {
 unsafe fn quit_all() {
     unsafe {
         the_screen.rp_text.BitMap = the_screen.wb_bmap;
-        SetRast(&raw mut the_screen.rp_text, 0);
+        set_rast(&raw mut the_screen.rp_text, 0);
         close_all();
     }
 }

@@ -22,39 +22,7 @@ pub use self::sprites::{
 
 pub use self::story_pages::{intro_skip_requested, intro_skipped, show_story_page};
 
-use crate::amiga::{BPTR, BitMap};
-
-use std::ffi::c_char;
-
-unsafe extern "C" {
-    fn Open(name: *const c_char, mode: i32) -> BPTR;
-
-    fn Close(file: BPTR);
-
-    fn Read(file: BPTR, buf: *mut u8, len: i32) -> i32;
-
-    fn Delay(ticks: i32);
-
-    fn AllocMem(size: u32, flags: u32) -> *mut u8;
-
-    fn TypeOfMem(p: *const u8) -> u32;
-
-    fn BltBitMap(
-        src: *mut BitMap,
-        sx: i32,
-        sy: i32,
-        dst: *mut BitMap,
-        dx: i32,
-        dy: i32,
-        w: i32,
-        h: i32,
-        minterm: u32,
-        mask: u32,
-        temp: *mut u8,
-    ) -> i32;
-
-    fn playsample(data: *const u8, len: i32, period: i32);
-}
+use crate::platform::exec::{alloc_mem, type_of_mem};
 
 const CARRIER: u8 = 5;
 const DRAGON: u8 = 6;
@@ -107,11 +75,11 @@ pub fn copy_protection_check() {
 pub fn into_chip(oldpointer: *mut u8, size: i32) -> *mut u8 {
     unsafe {
         // Masks with MEMF_CHIP, keeping only the bits that matter here.
-        if TypeOfMem(oldpointer) & MEMF_CHIP != 0 {
+        if type_of_mem(oldpointer.cast()) & MEMF_CHIP != 0 {
             return oldpointer;
         }
 
-        let newpointer = AllocMem(size as u32, MEMF_CHIP);
+        let newpointer = alloc_mem(size as u32, MEMF_CHIP).cast::<u8>();
         std::ptr::copy_nonoverlapping(oldpointer, newpointer, size as usize);
 
         newpointer

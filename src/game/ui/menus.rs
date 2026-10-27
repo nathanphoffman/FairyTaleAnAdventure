@@ -4,7 +4,6 @@
 //! how it is drawn: 8 is greyed out, 10 is available, and other values come from whether the hero
 //! has the matching item (`item_menu_state`).
 
-use crate::amiga::RastPort;
 use crate::game::data::state::the_hero;
 use crate::game::data::state::{the_screen, the_ui};
 use crate::game::data::tables::{key_colors, label1, menus};
@@ -12,15 +11,7 @@ use crate::game::input::handler::forget_last_menu;
 use crate::game::ui::text::item_menu_state;
 use std::ffi::c_char;
 
-unsafe extern "C" {
-    fn SetAPen(current_rastport: *mut RastPort, pen: u32);
-
-    fn SetBPen(current_rastport: *mut RastPort, pen: u32);
-
-    fn Move(current_rastport: *mut RastPort, x: i32, y: i32);
-
-    fn Text(current_rastport: *mut RastPort, s: *const c_char, len: i32) -> i32;
-}
+use crate::platform::gfx::{move_pen, set_a_pen, set_b_pen, text_out};
 
 // Menu numbers (`enum cmodes` in csrc/fmain.c).
 const MAGIC: usize = 1;
@@ -139,7 +130,7 @@ pub fn print_options() {
 /// Blanks the slots from `first` to the last one: nothing is shown there.
 unsafe fn blank_slots_from(first: usize) {
     unsafe {
-        SetBPen(&raw mut the_screen.rp_text2, 0);
+        set_b_pen(&raw mut the_screen.rp_text2, 0);
 
         for slot in first..SLOTS {
             // Masks off the low bits (a cheap remainder or a flag test).
@@ -150,10 +141,10 @@ unsafe fn blank_slots_from(first: usize) {
             };
 
             let y = (slot / 2) as i32 * ROW_HEIGHT + FIRST_ROW_Y;
-            Move(&raw mut the_screen.rp_text2, x, y);
-            Text(
+            move_pen(&raw mut the_screen.rp_text2, x, y);
+            text_out(
                 &raw mut the_screen.rp_text2,
-                c"      ".as_ptr(),
+                c"      ".as_ptr().cast(),
                 ENTRY_WIDTH,
             );
 
@@ -201,8 +192,8 @@ pub fn print_menu_entry(j: i16, pena: i16) {
     unsafe {
         let r = &raw mut the_screen.rp_text2;
         let entry = the_ui.slot_entries[j as usize] as i32;
-        SetAPen(r, pena as u32);
-        SetBPen(r, entry_box_pen(entry));
+        set_a_pen(r, pena as u32);
+        set_b_pen(r, entry_box_pen(entry));
 
         let offset = entry * LABEL_LEN;
 
@@ -214,10 +205,10 @@ pub fn print_menu_entry(j: i16, pena: i16) {
         };
 
         let y = (j as i32 / 2) * ROW_HEIGHT + FIRST_ROW_Y;
-        Move(r, x, y);
-        Text(r, BOX.as_ptr().cast(), BOX.len() as i32);
-        Move(r, x + TEXT_INSET, y);
-        Text(r, entry_label(offset), LABEL_LEN);
+        move_pen(r, x, y);
+        text_out(r, BOX.as_ptr().cast(), BOX.len() as i32);
+        move_pen(r, x + TEXT_INSET, y);
+        text_out(r, entry_label(offset).cast(), LABEL_LEN);
     }
 }
 

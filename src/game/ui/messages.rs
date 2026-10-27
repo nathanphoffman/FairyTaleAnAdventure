@@ -6,24 +6,13 @@
 //! line that is already there. `print_wrapped` is the general routine: it takes a message string from the
 //! story tables, breaks it into lines that fit the panel and prints each one.
 
-use crate::amiga::RastPort;
 use crate::game::data::state::the_hero;
 use crate::game::data::state::the_screen;
 use crate::game::data::tables::brother_names;
 use crate::game::ui::text::{draw_text, move_to};
 use std::ffi::{CStr, c_char};
 
-unsafe extern "C" {
-    fn ScrollRaster(
-        current_rastport: *mut RastPort,
-        dx: i32,
-        dy: i32,
-        x0: i32,
-        y0: i32,
-        x1: i32,
-        y1: i32,
-    );
-}
+use crate::platform::gfx::scroll_raster;
 
 // The scrolling message area of the text panel.
 const TEXT_X_MIN: i32 = 16;
@@ -65,7 +54,7 @@ unsafe fn brother_name() -> *const c_char {
 /// The old lines scroll up by one text line (10 pixels) inside the message area.
 pub fn print(s: *const c_char) {
     unsafe {
-        ScrollRaster(
+        scroll_raster(
             the_screen.current_rastport,
             0,
             LINE_HEIGHT,

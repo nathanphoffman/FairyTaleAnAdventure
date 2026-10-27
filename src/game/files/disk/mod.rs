@@ -19,7 +19,7 @@ pub use self::reads::{
 
 use crate::amiga::BPTR;
 use crate::game::data::globals::open_flags;
-use std::ffi::{c_char, c_void};
+use std::ffi::c_void;
 
 /// Mirror of `struct IOExtTD` in csrc/amiga.h: an Amiga trackdisk I/O request (a standard I/O
 /// request plus two trackdisk fields). Only the trackdisk path uses it.
@@ -55,39 +55,10 @@ const ZERO_REQUEST: IoExtTd = IoExtTd {
     sec_label: 0,
 };
 
-unsafe extern "C" {
-    fn Lock(name: *const c_char, mode: i32) -> BPTR;
-
-    fn UnLock(lock: BPTR);
-
-    fn Open(name: *const c_char, mode: i32) -> BPTR;
-
-    fn Close(file: BPTR);
-
-    fn Read(file: BPTR, buf: *mut u8, len: i32) -> i32;
-
-    fn Seek(file: BPTR, pos: i32, mode: i32) -> i32;
-
-    fn CreatePort(name: *const c_char, pri: i32) -> *mut c_void;
-
-    fn DeletePort(port: *mut c_void);
-
-    fn CreateExtIO(port: *mut c_void, size: i32) -> *mut c_void;
-
-    fn DeleteExtIO(io: *mut c_void);
-
-    fn OpenDevice(name: *const c_char, unit: u32, io: *mut c_void, flags: u32) -> i32;
-
-    fn CloseDevice(io: *mut c_void);
-
-    fn DoIO(io: *mut c_void) -> i32;
-
-    fn SendIO(io: *mut c_void);
-
-    fn WaitIO(io: *mut c_void) -> i32;
-
-    fn CheckIO(io: *mut c_void) -> i32;
-}
+use crate::platform::dos::{close_file, lock_path, open_file, unlock_path};
+use crate::platform::exec::{
+    close_device, create_ext_io, create_port, delete_ext_io, delete_port, open_device,
+};
 
 // Bits in `openflags` recording what has been set up, so it can be undone on exit.
 const AL_PORT: u16 = 0x0800;
@@ -128,24 +99,24 @@ fn has_flag(flag: u16) -> bool {
 /// (30 no file or port, 31 no request, 32 no device).
 pub fn open_disk() -> i32 {
     unsafe {
-        let lock = Lock(IMAGE_FILE.as_ptr().cast(), ACCESS_READ);
+        let lock = lock_path(IMAGE_FILE.as_ptr().cast(), ACCESS_READ);
 
         if lock != 0 {
             FROM_FILE = true;
-            UnLock(lock);
-            IMAGE = Open(IMAGE_FILE.as_ptr().cast(), MODE_OLDFILE);
+            unlock_path(lock);
+            IMAGE = open_file(IMAGE_FILE.as_ptr().cast(), MODE_OLDFILE);
 
             return if IMAGE == 0 { ERR_NO_FILE } else { 0 };
         }
 
-        DISKPORT = CreatePort(std::ptr::null(), 0);
+        DISKPORT = create_port(std::ptr::null(), 0);
 
         if DISKPORT.is_null() {
             return ERR_NO_FILE;
         }
 
         set_flag(AL_PORT);
-        DISKREQ1 = CreateExtIO(DISKPORT, size_of::<IoExtTd>() as i32).cast();
+        DISKREQ1 = create_ext_io(DISKPORT, size_of::<IoExtTd>() as i32).cast();
 
         if DISKREQ1.is_null() {
             return ERR_NO_REQUEST;
@@ -153,7 +124,7 @@ pub fn open_disk() -> i32 {
 
         set_flag(AL_IOREQ);
 
-        if OpenDevice(TD_NAME.as_ptr().cast(), 0, DISKREQ1.cast(), 0) != 0 {
+        if open_device(TD_NAME.as_ptr().cast(), 0, DISKREQ1.cast(), 0) != 0 {
             return ERR_NO_DEVICE;
         }
 
@@ -171,19 +142,19 @@ pub fn open_disk() -> i32 {
 pub fn close_disk() {
     unsafe {
         if IMAGE != 0 {
-            Close(IMAGE);
+            close_file(IMAGE);
         }
 
         if has_flag(AL_TDISK) {
-            CloseDevice(DISKREQ1.cast());
+            close_device(DISKREQ1.cast());
         }
 
         if has_flag(AL_IOREQ) {
-            DeleteExtIO(DISKREQ1.cast());
+            delete_ext_io(DISKREQ1.cast());
         }
 
         if has_flag(AL_PORT) {
-            DeletePort(DISKPORT);
+            delete_port(DISKPORT);
         }
     }
 }

@@ -5,9 +5,10 @@ use super::containers::container_contents;
 use super::item_list::VIEW_GAME_OVER;
 use super::search_body::search_body;
 use super::{
-    ARROWBASE, ARROWS, CHEST, FRUIT_SLOT, GOLDBASE, OBJECTS, PRQ_VITALITY, SACKS, SetFont,
-    TALISMAN, URN, add_stuff, item_name,
+    ARROWBASE, ARROWS, CHEST, FRUIT_SLOT, GOLDBASE, OBJECTS, PRQ_VITALITY, SACKS, TALISMAN, URN,
+    add_stuff, item_name,
 };
+use crate::platform::gfx::set_font;
 
 use crate::game::actors::interaction::{eat_food, find_nearest_figure};
 use crate::game::data::globals::story_font;
@@ -94,7 +95,7 @@ unsafe fn finish_pickup() {
             the_ui.quit_requested = 1;
             the_screen.view_status = VIEW_GAME_OVER;
             map_message();
-            SetFont(the_screen.current_rastport, story_font);
+            set_font(the_screen.current_rastport, story_font);
             win_colors();
         }
     }
@@ -135,7 +136,7 @@ unsafe fn take_object() -> bool {
 }
 
 /// Reads the scrap of paper; what it says depends on being indoors.
-unsafe fn read_paper(indoors: bool) -> bool {
+fn read_paper(indoors: bool) -> bool {
     show_event(EVENT_PAPER);
     show_event(if indoors {
         EVENT_PAPER_INDOORS

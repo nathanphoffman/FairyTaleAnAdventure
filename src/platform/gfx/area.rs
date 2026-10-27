@@ -9,16 +9,13 @@ thread_local! {
     static AREA: RefCell<Vec<(i32, i32)>> = const { RefCell::new(Vec::new()) };
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn InitArea(_a: *mut AreaInfo, _buf: *mut c_void, _max: LONG) {}
+pub fn init_area(_a: *mut AreaInfo, _buf: *mut c_void, _max: LONG) {}
 
-#[unsafe(no_mangle)]
-pub extern "C" fn InitTmpRas(t: *mut TmpRas, _buf: PLANEPTR, _size: LONG) -> *mut TmpRas {
+pub fn init_tmp_ras(t: *mut TmpRas, _buf: PLANEPTR, _size: LONG) -> *mut TmpRas {
     t
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn AreaMove(_rp: *mut RastPort, x: LONG, y: LONG) -> LONG {
+pub fn area_move(_rp: *mut RastPort, x: LONG, y: LONG) -> LONG {
     AREA.with(|a| {
         let mut a = a.borrow_mut();
         a.clear();
@@ -28,8 +25,7 @@ pub extern "C" fn AreaMove(_rp: *mut RastPort, x: LONG, y: LONG) -> LONG {
     0
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn AreaDraw(_rp: *mut RastPort, x: LONG, y: LONG) -> LONG {
+pub fn area_draw(_rp: *mut RastPort, x: LONG, y: LONG) -> LONG {
     AREA.with(|a| a.borrow_mut().push((x, y)));
 
     0
@@ -53,8 +49,7 @@ fn crossings(pts: &[(i32, i32)], y: i32) -> Vec<i32> {
 }
 
 /// Fills the polygon collected so far (even-odd rule).
-#[unsafe(no_mangle)]
-pub extern "C" fn AreaEnd(rp: *mut RastPort) -> LONG {
+pub fn area_end(rp: *mut RastPort) -> LONG {
     let rp = unsafe { &*rp };
     let pts = AREA.with(|a| std::mem::take(&mut *a.borrow_mut()));
 
@@ -94,18 +89,16 @@ pub extern "C" fn AreaEnd(rp: *mut RastPort) -> LONG {
 
 // ---- layers (only used to clip the witch's polygon to the map area) ----
 
-#[unsafe(no_mangle)]
-pub extern "C" fn NewLayerInfo() -> *mut c_void {
+pub fn new_layer_info() -> *mut c_void {
     unsafe { libc::calloc(1, 64) }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn DisposeLayerInfo(li: *mut c_void) {
+pub fn dispose_layer_info(li: *mut c_void) {
     unsafe { libc::free(li) }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn CreateUpfrontLayer(
+#[allow(clippy::too_many_arguments)] // the argument list of the Amiga call it replaces
+pub fn create_upfront_layer(
     _li: *mut c_void,
     bm: *mut BitMap,
     x0: LONG,
@@ -129,8 +122,7 @@ pub extern "C" fn CreateUpfrontLayer(
     layer
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn DeleteLayer(_dummy: *mut c_void, layer: *mut Layer) -> LONG {
+pub fn delete_layer(_dummy: *mut c_void, layer: *mut Layer) -> LONG {
     unsafe { libc::free(layer as *mut c_void) };
 
     1

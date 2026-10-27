@@ -70,8 +70,7 @@ fn draw_bitmap_glyph(rp: &RastPort, bm: &BitMap, f: &BitmapFont, ch: u8) -> WORD
 }
 
 /// Draws `len` characters at the pen position (the pen sits on the baseline).
-#[unsafe(no_mangle)]
-pub extern "C" fn Text(rp: *mut RastPort, s: *const u8, len: LONG) -> LONG {
+pub fn text_out(rp: *mut RastPort, s: *const u8, len: LONG) -> LONG {
     let rp = unsafe { &mut *rp };
 
     if rp.BitMap.is_null() || rp.Font.is_null() || len <= 0 {

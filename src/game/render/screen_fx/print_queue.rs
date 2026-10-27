@@ -1,11 +1,12 @@
 //! The print queue: requests for the text panel (stats, vitality, menu, debug information).
 
-use super::{AvailMem, Delay};
 use crate::game::data::object_tables::{pplay, prec, print_que};
 use crate::game::data::state::{the_actors, the_hero, the_world};
 use crate::game::ui::menus::print_options;
 use crate::game::ui::messages::print;
 use crate::game::ui::text::{draw_text, move_to, print_number};
+use crate::platform::display::delay;
+use crate::platform::exec::avail_mem;
 
 // Field widths for printed numbers, and the map-coordinate shift (256 pixels to a sector).
 const COORD_DIGITS: i32 = 6;
@@ -38,7 +39,7 @@ const WEALTH_X: i32 = 321;
 pub fn handle_print_request() {
     unsafe {
         if prec == pplay {
-            Delay(1);
+            delay(1);
 
             return;
         }
@@ -67,7 +68,7 @@ unsafe fn show_debug_coords() {
         print_number(the_hero.x as i32, COORD_DIGITS);
         print_number(the_hero.y as i32, COORD_DIGITS);
         print(c"Memory Available: ".as_ptr());
-        print_number(AvailMem(0) as i32, COORD_DIGITS);
+        print_number(avail_mem(0) as i32, COORD_DIGITS);
     }
 }
 

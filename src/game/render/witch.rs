@@ -6,42 +6,16 @@
 //! second time erases it. It also records, in `s1` and `s2`, on which side of each edge the hero
 //! stands, which csrc/fmain.c uses to decide whether the beam hits the hero.
 
-use crate::amiga::{AreaInfo, BitMap, Layer, RastPort, TmpRas};
+use crate::amiga::{AreaInfo, Layer, RastPort, TmpRas};
 use crate::game::data::globals::layer_info;
 use crate::game::data::object_tables::witchpoints;
 use crate::game::data::state::{the_hero, the_screen, the_world};
 use crate::game::data::types::FPage;
 
-unsafe extern "C" {
-    fn CreateUpfrontLayer(
-        li: *mut std::ffi::c_void,
-        bm: *mut BitMap,
-        x0: i32,
-        y0: i32,
-        x1: i32,
-        y1: i32,
-        flags: i32,
-        super_bitmap: *mut BitMap,
-    ) -> *mut Layer;
-
-    fn DeleteLayer(dummy: *mut std::ffi::c_void, layer: *mut Layer) -> i32;
-
-    fn AllocRaster(w: u32, h: u32) -> *mut u8;
-
-    fn FreeRaster(p: *mut u8, w: u32, h: u32);
-
-    fn InitTmpRas(t: *mut TmpRas, buf: *mut u8, size: i32) -> *mut TmpRas;
-
-    fn InitArea(a: *mut AreaInfo, buf: *mut i16, max_vectors: i32);
-
-    fn AreaMove(current_rastport: *mut RastPort, x: i32, y: i32) -> i32;
-
-    fn AreaDraw(current_rastport: *mut RastPort, x: i32, y: i32) -> i32;
-
-    fn AreaEnd(current_rastport: *mut RastPort) -> i32;
-
-    fn SetDrMd(current_rastport: *mut RastPort, mode: u32);
-}
+use crate::platform::gfx::{
+    alloc_raster, area_draw, area_end, area_move, create_upfront_layer, delete_layer, free_raster,
+    init_area, init_tmp_ras, set_draw_mode,
+};
 
 /// Which side of each beam edge the hero is on (the cross product and whether it is not negative).
 /// Read by the witch's steering in csrc/fmain.c under the names `s1` and `s2`.
@@ -141,7 +115,7 @@ pub fn witch_fx(fp: *mut FPage) {
         // Masks with TILE_Y_MASK, keeping only the bits that matter here.
         let yh = the_hero.y.wrapping_sub(the_world.map_y & TILE_Y_MASK) as i16;
 
-        LAYER = CreateUpfrontLayer(
+        LAYER = create_upfront_layer(
             layer_info,
             the_screen.rp_map.BitMap,
             0,
@@ -164,7 +138,7 @@ pub fn witch_fx(fp: *mut FPage) {
         paint_beam(r, [p1, p2, p4, p3]);
 
         (*r).Layer = OLD_LAYER;
-        DeleteLayer(std::ptr::null_mut(), LAYER);
+        delete_layer(std::ptr::null_mut(), LAYER);
     }
 }
 
@@ -172,19 +146,19 @@ pub fn witch_fx(fp: *mut FPage) {
 /// and area buffer that are given back afterwards.
 unsafe fn paint_beam(r: *mut RastPort, p: [(i16, i16); BEAM_CORNERS]) {
     unsafe {
-        SetDrMd(r, COMPLEMENT);
-        MY_RAS = AllocRaster(RASTER_SIZE, RASTER_SIZE);
+        set_draw_mode(r, COMPLEMENT);
+        MY_RAS = alloc_raster(RASTER_SIZE, RASTER_SIZE);
 
         if !MY_RAS.is_null() {
             let old_tmp = (*r).TmpRas;
             let old_area = (*r).AreaInfo;
-            (*r).TmpRas = InitTmpRas(
+            (*r).TmpRas = init_tmp_ras(
                 &raw mut MY_TMP,
                 MY_RAS,
                 raster_bytes(RASTER_SIZE, RASTER_SIZE),
             );
 
-            InitArea(
+            init_area(
                 &raw mut MY_AREA_INFO,
                 (&raw mut AREA_BUFFER).cast(),
                 AREA_MAX_VECTORS,
@@ -192,7 +166,7 @@ unsafe fn paint_beam(r: *mut RastPort, p: [(i16, i16); BEAM_CORNERS]) {
 
             (*r).AreaInfo = &raw mut MY_AREA_INFO;
             fill_beam(r, p);
-            FreeRaster(MY_RAS, RASTER_SIZE, RASTER_SIZE);
+            free_raster(MY_RAS, RASTER_SIZE, RASTER_SIZE);
             (*r).TmpRas = old_tmp;
             (*r).AreaInfo = old_area;
         }
@@ -200,16 +174,14 @@ unsafe fn paint_beam(r: *mut RastPort, p: [(i16, i16); BEAM_CORNERS]) {
 }
 
 /// Fills the quadrilateral with corners `p` (in drawing order) on the map rastport `r`.
-unsafe fn fill_beam(r: *mut RastPort, p: [(i16, i16); BEAM_CORNERS]) {
-    unsafe {
-        AreaMove(r, p[0].0 as i32, p[0].1 as i32);
+fn fill_beam(r: *mut RastPort, p: [(i16, i16); BEAM_CORNERS]) {
+    area_move(r, p[0].0 as i32, p[0].1 as i32);
 
-        for corner in &p[1..] {
-            AreaDraw(r, corner.0 as i32, corner.1 as i32);
-        }
-
-        AreaEnd(r);
+    for corner in &p[1..] {
+        area_draw(r, corner.0 as i32, corner.1 as i32);
     }
+
+    area_end(r);
 }
 
 #[cfg(test)]

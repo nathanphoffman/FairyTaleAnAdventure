@@ -16,29 +16,7 @@ mod slots;
 
 pub use self::slots::savegame;
 
-use crate::amiga::{BPTR, RastPort, TextFont};
-
-use std::ffi::{c_char, c_void};
-
-unsafe extern "C" {
-    fn Lock(name: *const c_char, mode: i32) -> BPTR;
-
-    fn UnLock(lock: BPTR);
-
-    fn Open(name: *const c_char, mode: i32) -> BPTR;
-
-    fn Close(file: BPTR);
-
-    fn Read(file: BPTR, buf: *mut u8, len: i32) -> i32;
-
-    fn Write(file: BPTR, buf: *const c_void, len: i32) -> i32;
-
-    fn IoErr() -> i32;
-
-    fn Delay(ticks: i32);
-
-    fn SetFont(current_rastport: *mut RastPort, font: *mut TextFont);
-}
+use crate::amiga::BPTR;
 
 /// Set when saving, clear when loading.
 pub static mut is_saving: i8 = 0;

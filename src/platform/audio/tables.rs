@@ -103,7 +103,6 @@ pub(super) const FALLBACK_NOTE: (u16, u16) = (508, 0);
 pub(super) const VOICE_COUNT: usize = 4;
 pub(super) const MAX_VOLUME: u8 = 64;
 pub(super) const DEFAULT_TEMPO: i32 = 150;
-pub(super) const TEMPO_MASK: i32 = 0xffff;
 
 /// The voice that sound effects take over.
 pub(super) const EFFECT_VOICE: usize = 1;

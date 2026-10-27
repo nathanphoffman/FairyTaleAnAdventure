@@ -1,7 +1,7 @@
 //! The title screen, the intro and getting the first brother started (from csrc/fmain.c), up to the
 //! first frame of the game.
 
-use crate::amiga::{BitMap, RastPort, TextFont, View, ViewPort};
+use crate::amiga::BitMap;
 use crate::game::files::loading::intro_skip_requested;
 use crate::game::ui::menus::print_options;
 use std::ffi::CStr;
@@ -22,42 +22,11 @@ use crate::game::render::display::flip_pages;
 use crate::game::render::screen_fx::{set_intro_zoom, show_still_screen};
 use crate::game::ui::text::{placard_text, print_positioned};
 
-unsafe extern "C" {
-
-    // AmigaOS calls the platform layer provides.
-    fn SetBPen(current_rastport: *mut RastPort, pen: u32);
-
-    fn SetAPen(current_rastport: *mut RastPort, pen: u32);
-
-    fn SetRast(current_rastport: *mut RastPort, pen: u32);
-
-    fn SetFont(current_rastport: *mut RastPort, f: *mut TextFont);
-
-    fn MakeVPort(v: *mut View, current_viewport: *mut ViewPort) -> i32;
-
-    fn Delay(ticks: i32);
-
-    fn SetRGB4(current_viewport: *mut ViewPort, n: i32, r: u32, g: u32, b: u32);
-
-    fn LoadRGB4(current_viewport: *mut ViewPort, colors: *const u16, count: i32);
-
-    fn BltBitMap(
-        src: *mut BitMap,
-        sx: i32,
-        sy: i32,
-        dst: *mut BitMap,
-        dx: i32,
-        dy: i32,
-        w: i32,
-        h: i32,
-        minterm: u32,
-        mask: u32,
-        temp: *mut u8,
-    ) -> i32;
-
-    // The game's own code that is still C, or lives in other files.
-    fn stopscore();
-}
+use crate::platform::audio::{playscore, stopscore};
+use crate::platform::display::delay;
+use crate::platform::gfx::{
+    blt_bit_map, load_rgb4, make_vport, set_a_pen, set_b_pen, set_font, set_rast, set_rgb4,
+};
 
 // Memory the game allocates (csrc/fmain.c).
 const PAGE_HEIGHT: i16 = 143;
@@ -65,10 +34,6 @@ const TEXT_HEIGHT: i32 = 57;
 const LOWRES_WIDTH: i16 = 288;
 const PAGE_VIEW_HEIGHT: i16 = 140;
 const PAGE_VIEW_X: i16 = 16;
-
-unsafe extern "C" {
-    fn playscore(t1: *const u8, t2: *const u8, t3: *const u8, t4: *const u8);
-}
 
 // Screen modes (`view_status`).
 const VIEW_REDRAW: i8 = 99;
@@ -149,7 +114,7 @@ pub(super) unsafe fn start_up() -> bool {
             return false;
         }
 
-        Delay(PLACARD_WAIT);
+        delay(PLACARD_WAIT);
         start_first_brother();
 
         true
@@ -160,15 +125,15 @@ pub(super) unsafe fn start_up() -> bool {
 unsafe fn clear_both_pages() {
     unsafe {
         the_screen.rp_map.BitMap = (*(*the_screen.viewing_page).ri_page).BitMap;
-        SetRast(&raw mut the_screen.rp_map, 0);
+        set_rast(&raw mut the_screen.rp_map, 0);
         the_screen.rp_map.BitMap = (*(*the_screen.drawing_page).ri_page).BitMap;
-        SetRast(&raw mut the_screen.rp_map, 0);
+        set_rast(&raw mut the_screen.rp_map, 0);
     }
 }
 
 /// Sets a colour of the page palette from 4-bit red, green and blue.
 unsafe fn set_page_color(color: i32, (r, g, b): (u32, u32, u32)) {
-    unsafe { SetRGB4(&raw mut the_screen.vp_page, color, r, g, b) };
+    unsafe { set_rgb4(&raw mut the_screen.vp_page, color, r, g, b) };
 }
 
 /// The legal title text on a blue page, then the music and the sound effects are read in.
@@ -183,22 +148,22 @@ unsafe fn show_title_screen() {
         set_page_color(TEXT_COLOR, WHITE_RGB);
 
         let pen = (*the_screen.current_rastport).FgPen as u32;
-        SetAPen(the_screen.current_rastport, TITLE_PEN);
+        set_a_pen(the_screen.current_rastport, TITLE_PEN);
         print_positioned(TITLE_TEXT.as_ptr());
-        SetAPen(the_screen.current_rastport, pen);
+        set_a_pen(the_screen.current_rastport, pen);
 
-        Delay(TITLE_WAIT);
+        delay(TITLE_WAIT);
 
         the_screen.current_rastport = &raw mut the_screen.rp_text;
         the_screen.rp_text.BitMap = &raw mut the_screen.bm_scroll;
-        SetFont(the_screen.current_rastport, story_font);
-        SetAPen(the_screen.current_rastport, STORY_PEN);
-        SetBPen(the_screen.current_rastport, STORY_BACKGROUND_PEN);
+        set_font(the_screen.current_rastport, story_font);
+        set_a_pen(the_screen.current_rastport, STORY_PEN);
+        set_b_pen(the_screen.current_rastport, STORY_BACKGROUND_PEN);
 
         read_score();
         read_sample();
 
-        Delay(TITLE_WAIT);
+        delay(TITLE_WAIT);
     }
 }
 
@@ -223,7 +188,7 @@ unsafe fn prepare_intro() {
             the_memory.track[INTRO_TRACKS[3]],
         );
 
-        LoadRGB4(
+        load_rgb4(
             &raw mut the_screen.vp_text,
             (&raw const black_colors).cast(),
             PAGE_COLORS,
@@ -244,7 +209,7 @@ unsafe fn show_play_screen_background() {
         the_screen.fp_page2.ri_page = &raw mut the_screen.ri_page2;
         clear_both_pages();
 
-        LoadRGB4(
+        load_rgb4(
             &raw mut the_screen.vp_text,
             (&raw const black_colors).cast(),
             PAGE_COLORS,
@@ -270,7 +235,7 @@ unsafe fn show_play_screen_background() {
         the_screen.current_rastport = &raw mut the_screen.rp_map;
         the_screen.rp_map.BitMap = (*(*the_screen.drawing_page).ri_page).BitMap;
         show_still_screen();
-        SetAPen(the_screen.current_rastport, TITLE_PEN);
+        set_a_pen(the_screen.current_rastport, TITLE_PEN);
         placard_text(PLACARD_COPYRIGHT);
         the_ui.handler_data.laydown = 0;
         the_ui.handler_data.pickup = 0;
@@ -295,8 +260,8 @@ unsafe fn start_first_brother() {
         the_screen.vp_page.DxOffset = PAGE_VIEW_X;
         the_screen.vp_page.DWidth = LOWRES_WIDTH;
         the_screen.vp_page.DyOffset = 0;
-        MakeVPort(&raw mut main_view, &raw mut the_screen.vp_text);
-        LoadRGB4(
+        make_vport(&raw mut main_view, &raw mut the_screen.vp_text);
+        load_rgb4(
             &raw mut the_screen.vp_text,
             (&raw const text_colors).cast(),
             TEXT_COLORS,
@@ -337,7 +302,7 @@ unsafe fn play_intro() {
             }
 
             if intro_skip_requested == 0 {
-                Delay(INTRO_PAGES_WAIT);
+                delay(INTRO_PAGES_WAIT);
             }
         }
 
@@ -352,7 +317,7 @@ unsafe fn play_intro() {
 /// Copies the whole title picture (loaded into `pageb`) onto the bitmap of a display page.
 unsafe fn copy_title_picture_to(bitmap: *mut BitMap) {
     unsafe {
-        BltBitMap(
+        blt_bit_map(
             &raw mut the_screen.pageb,
             0,
             0,

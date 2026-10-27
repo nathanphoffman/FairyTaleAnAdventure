@@ -3,10 +3,11 @@
 use super::records::{
     save_variables, transfer_actor, transfer_extent, transfer_object, transfer_party, transfer_u16,
 };
+use crate::platform::display::delay;
+use crate::platform::dos::{close_file, io_error, lock_path, open_file, unlock_path};
+use crate::platform::gfx::set_font;
 
-use super::{
-    Close, Delay, FLOCK, IoErr, Lock, Open, SAVENAME, SVERR, SVFILE, SetFont, UnLock, is_saving,
-};
+use super::{FLOCK, SAVENAME, SVERR, SVFILE, is_saving};
 
 use crate::amiga::BPTR;
 use crate::game::data::globals::{panel_font, story_font};
@@ -49,10 +50,10 @@ const PRINT_STATS: i32 = 7;
 /// Non-zero if `name` can be locked with the given access (AmigaDOS's way of asking "does this exist / is it writable").
 pub fn can_lock(name: *const c_char, access: i32) -> i32 {
     unsafe {
-        FLOCK = Lock(name, access);
+        FLOCK = lock_path(name, access);
 
         if FLOCK != 0 {
-            UnLock(FLOCK);
+            unlock_path(FLOCK);
         }
 
         FLOCK as i32
@@ -66,7 +67,7 @@ pub fn wait_for_disk() -> i32 {
             return 1;
         }
 
-        unsafe { Delay(DISK_POLL_TICKS) };
+        delay(DISK_POLL_TICKS);
     }
 
     0
@@ -149,10 +150,10 @@ pub(super) unsafe fn save_all() {
 pub fn savegame(chosen_entry: i16) {
     unsafe {
         SVERR = 0;
-        SetFont(the_screen.current_rastport, panel_font);
+        set_font(the_screen.current_rastport, panel_font);
 
         let Some((name_offset, on_floppy)) = find_save_place() else {
-            SetFont(the_screen.current_rastport, story_font);
+            set_font(the_screen.current_rastport, story_font);
 
             return;
         };
@@ -175,7 +176,7 @@ pub fn savegame(chosen_entry: i16) {
             reset_after_load();
         }
 
-        SetFont(the_screen.current_rastport, story_font);
+        set_font(the_screen.current_rastport, story_font);
     }
 }
 
@@ -206,7 +207,7 @@ unsafe fn transfer_file(chosen_entry: i16, name_offset: usize) {
     unsafe {
         SAVENAME[SLOT_LETTER_INDEX] = b'A'.wrapping_add(chosen_entry as u8);
         let name = (&raw const SAVENAME).cast::<c_char>().add(name_offset);
-        SVFILE = Open(
+        SVFILE = open_file(
             name,
             if is_saving != 0 {
                 MODE_NEWFILE
@@ -217,9 +218,9 @@ unsafe fn transfer_file(chosen_entry: i16, name_offset: usize) {
 
         if SVFILE != 0 {
             save_all();
-            Close(SVFILE as BPTR);
+            close_file(SVFILE as BPTR);
         } else {
-            SVERR = IoErr();
+            SVERR = io_error();
         }
     }
 }
@@ -228,10 +229,10 @@ unsafe fn transfer_file(chosen_entry: i16, name_offset: usize) {
 unsafe fn wait_for_game_disk() {
     unsafe {
         loop {
-            FLOCK = Lock(c"df0:winpic".as_ptr(), ACCESS_READ);
+            FLOCK = lock_path(c"df0:winpic".as_ptr(), ACCESS_READ);
 
             if FLOCK != 0 {
-                UnLock(FLOCK);
+                unlock_path(FLOCK);
 
                 return;
             }

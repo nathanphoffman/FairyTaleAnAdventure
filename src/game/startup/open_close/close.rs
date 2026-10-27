@@ -2,11 +2,16 @@
 
 use super::{
     AL_BMAP, AL_FONT, AL_GBASE, AL_HANDLE, AL_IMAGE, AL_MUSIC, AL_SAMPLE, AL_SECTOR, AL_SHADOW,
-    AL_SHAPE, AL_TERR, BITMAP_COUNT, CloseDevice, CloseFont, CloseLibrary, CurrentDir, DeleteExtIO,
-    DeletePort, DisposeLayerInfo, FreeColorMap, FreeCprList, FreeMem, FreeRaster, FreeSprite,
-    FreeVPortCopLists, IMAGE_SZ, LoadView, NORM_HIGH_SZ, PAGE_DEPTH, PHANTA_WIDTH, RAST_HEIGHT,
-    SAMPLE_SZ, SCORE_SZ, SECTOR_SZ, SHADOW_SZ, SHAPE_SZ, SPRITE_DATA_SZ, TERRA_SZ, UnLoadSeg,
-    UnMakeBitMap, VOICE_SZ, exit, has_flag, wrap_music,
+    AL_SHAPE, AL_TERR, BITMAP_COUNT, IMAGE_SZ, NORM_HIGH_SZ, PAGE_DEPTH, PHANTA_WIDTH, RAST_HEIGHT,
+    SAMPLE_SZ, SCORE_SZ, SECTOR_SZ, SHADOW_SZ, SHAPE_SZ, SPRITE_DATA_SZ, TERRA_SZ, VOICE_SZ,
+    has_flag,
+};
+use crate::platform::audio::wrap_music;
+use crate::platform::dos::set_current_dir;
+use crate::platform::exec::{close_device, close_library, delete_ext_io, delete_port, free_mem};
+use crate::platform::gfx::{
+    close_font, dispose_layer_info, free_color_map, free_cpr_list, free_raster, free_sprite,
+    free_vport_cop_lists, load_view, unload_seg, unmake_bit_map,
 };
 
 use crate::amiga::BitMap;
@@ -35,10 +40,10 @@ pub fn close_all() {
         open_flags = 0;
 
         if original_dir != 0 {
-            CurrentDir(original_dir);
+            set_current_dir(original_dir);
         }
 
-        exit(0);
+        std::process::exit(0);
     }
 }
 
@@ -56,14 +61,14 @@ pub(super) unsafe fn free_game_memory() {
 
         for (flag, area, size) in areas {
             if has_flag(flag) {
-                FreeMem(area.cast(), size);
+                free_mem(area.cast(), size);
             }
         }
 
         if has_flag(AL_MUSIC) {
             wrap_music();
-            FreeMem(the_memory.wavmem.cast(), VOICE_SZ);
-            FreeMem(the_memory.scoremem.cast(), SCORE_SZ);
+            free_mem(the_memory.wavmem.cast(), VOICE_SZ);
+            free_mem(the_memory.scoremem.cast(), SCORE_SZ);
         }
     }
 }
@@ -94,19 +99,19 @@ pub(super) unsafe fn free_panel_data() {
 /// Puts the old view back and frees the view ports' copper lists and colour maps.
 pub(super) unsafe fn free_view_resources() {
     unsafe {
-        LoadView(the_screen.old_view);
-        FreeVPortCopLists(&raw mut the_screen.vp_page);
-        FreeVPortCopLists(&raw mut the_screen.vp_text);
-        FreeCprList(the_screen.fp_page1.savecop);
-        FreeCprList(the_screen.fp_page2.savecop);
-        FreeCprList(main_view.SHFCprList);
+        load_view(the_screen.old_view);
+        free_vport_cop_lists(&raw mut the_screen.vp_page);
+        free_vport_cop_lists(&raw mut the_screen.vp_text);
+        free_cpr_list(the_screen.fp_page1.savecop);
+        free_cpr_list(the_screen.fp_page2.savecop);
+        free_cpr_list(main_view.SHFCprList);
 
         if !the_screen.vp_page.ColorMap.is_null() {
-            FreeColorMap(the_screen.vp_page.ColorMap);
+            free_color_map(the_screen.vp_page.ColorMap);
         }
 
         if !the_screen.vp_text.ColorMap.is_null() {
-            FreeColorMap(the_screen.vp_text.ColorMap);
+            free_color_map(the_screen.vp_text.ColorMap);
         }
     }
 }
@@ -117,7 +122,7 @@ pub(super) unsafe fn free_page_planes() {
         for bm in [the_screen.bm_page1, the_screen.bm_page2] {
             for i in 0..PAGE_DEPTH as usize {
                 if !(*bm).Planes[i].is_null() {
-                    FreeRaster((*bm).Planes[i], PHANTA_WIDTH as u32, RAST_HEIGHT as u32);
+                    free_raster((*bm).Planes[i], PHANTA_WIDTH as u32, RAST_HEIGHT as u32);
                 }
             }
         }
@@ -128,15 +133,15 @@ pub(super) unsafe fn free_page_planes() {
 pub(super) unsafe fn close_audio() {
     unsafe {
         if audio_is_open != 0 {
-            CloseDevice((&raw mut (*audio_request).ioa_request).cast());
+            close_device((&raw mut (*audio_request).ioa_request).cast());
         }
 
         if !audio_request.is_null() {
-            DeleteExtIO((&raw mut (*audio_request).ioa_request).cast());
+            delete_ext_io((&raw mut (*audio_request).ioa_request).cast());
         }
 
         if !audio_port.is_null() {
-            DeletePort(audio_port);
+            delete_port(audio_port);
         }
     }
 }
@@ -149,8 +154,8 @@ pub(super) unsafe fn close_input_fonts() {
         }
 
         if has_flag(AL_FONT) {
-            UnLoadSeg(font_segment);
-            CloseFont(panel_font);
+            unload_seg(font_segment);
+            close_font(panel_font);
         }
     }
 }
@@ -159,29 +164,27 @@ pub(super) unsafe fn close_input_fonts() {
 pub(super) unsafe fn close_graphics() {
     unsafe {
         if has_flag(AL_GBASE) {
-            CloseLibrary(gfx_base.cast());
-            CloseLibrary(layers_base);
+            close_library(gfx_base.cast());
+            close_library(layers_base);
         }
 
         if has_flag(AL_BMAP) {
-            FreeMem(
+            free_mem(
                 the_screen.bm_page1.cast(),
                 BITMAP_COUNT * size_of::<BitMap>() as u32,
             );
 
-            UnMakeBitMap(&raw mut the_screen.work_bm);
+            unmake_bit_map(&raw mut the_screen.work_bm);
         }
 
-        DisposeLayerInfo(layer_info);
-        FreeSprite(0);
+        dispose_layer_info(layer_info);
+        free_sprite(0);
     }
 }
 
 /// Frees `new` unless it is just the original `old`.
-pub(super) unsafe fn free_chip(new: *mut u8, old: *mut u8, size: u32) {
-    unsafe {
-        if new != old {
-            FreeMem(new.cast(), size);
-        }
+pub(super) fn free_chip(new: *mut u8, old: *mut u8, size: u32) {
+    if new != old {
+        free_mem(new.cast(), size);
     }
 }

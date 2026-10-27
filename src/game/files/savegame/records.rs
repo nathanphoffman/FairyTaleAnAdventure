@@ -1,10 +1,11 @@
 //! Reading or writing each part of the game state in the save file's fixed order.
 
-use super::{IoErr, Read, SVERR, SVFILE, Write, is_saving};
+use super::{SVERR, SVFILE, is_saving};
 use crate::amiga::BPTR;
 use crate::game::data::globals::{
     princesses_rescued, save_padding_1, save_padding_2, save_padding_3,
 };
+use crate::platform::dos::{io_error, read_file, write_file};
 
 use crate::game::data::state::{the_actors, the_encounter, the_hero, the_ui, the_world};
 use crate::game::data::tables::brother_stats;
@@ -17,14 +18,14 @@ const MISC_VARIABLES: usize = 40;
 pub fn transfer_bytes(buffer: *mut c_void, length: i32) {
     unsafe {
         let result = if is_saving != 0 {
-            Write(SVFILE as BPTR, buffer, length)
+            write_file(SVFILE as BPTR, buffer.cast(), length)
         } else {
-            Read(SVFILE as BPTR, buffer.cast(), length)
+            read_file(SVFILE as BPTR, buffer.cast(), length)
         };
 
         // the original kept the result in a 16 bit variable
         if (result as i16) < 0 {
-            SVERR = IoErr();
+            SVERR = io_error();
         }
     }
 }

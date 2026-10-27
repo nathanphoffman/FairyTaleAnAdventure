@@ -1,7 +1,9 @@
 //! The intro's zoom: the picture grows from the middle of the screen.
 
 use super::fading::fade_page;
-use super::{Delay, MakeVPort};
+use crate::platform::display::delay;
+use crate::platform::gfx::make_vport;
+
 use crate::game::data::globals::main_view;
 use crate::game::data::state::the_screen;
 use crate::game::data::tables::intro_colors;
@@ -21,7 +23,7 @@ pub fn set_intro_zoom(x: i32) {
     unsafe {
         let y = (x * ZOOM_ASPECT.0) / ZOOM_ASPECT.1;
 
-        Delay(2);
+        delay(2);
 
         let left = (SCREEN_CENTER_X - x) as i16;
         the_screen.ri_page2.RxOffset = left;
@@ -48,7 +50,7 @@ pub fn set_intro_zoom(x: i32) {
             colors,
         );
 
-        MakeVPort(&raw mut main_view, &raw mut the_screen.vp_text);
+        make_vport(&raw mut main_view, &raw mut the_screen.vp_text);
         flip_pages();
     }
 }

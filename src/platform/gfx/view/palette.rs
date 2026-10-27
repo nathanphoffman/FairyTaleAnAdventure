@@ -3,8 +3,7 @@
 use crate::amiga::*;
 use std::os::raw::c_void;
 
-#[unsafe(no_mangle)]
-pub extern "C" fn GetColorMap(n: LONG) -> *mut ColorMap {
+pub fn get_color_map(n: LONG) -> *mut ColorMap {
     unsafe {
         let cm = libc::calloc(1, std::mem::size_of::<ColorMap>()) as *mut ColorMap;
         (*cm).Count = n as UWORD;
@@ -14,8 +13,7 @@ pub extern "C" fn GetColorMap(n: LONG) -> *mut ColorMap {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn FreeColorMap(cm: *mut ColorMap) {
+pub fn free_color_map(cm: *mut ColorMap) {
     if !cm.is_null() {
         unsafe {
             libc::free((*cm).ColorTable as *mut c_void);
@@ -30,8 +28,7 @@ const RED_SHIFT: u32 = 8;
 const GREEN_SHIFT: u32 = 4;
 
 /// Colours are 12 bit: 0x0RGB with 4 bits per channel.
-#[unsafe(no_mangle)]
-pub extern "C" fn SetRGB4(vp: *mut ViewPort, n: LONG, r: ULONG, g: ULONG, b: ULONG) {
+pub fn set_rgb4(vp: *mut ViewPort, n: LONG, r: ULONG, g: ULONG, b: ULONG) {
     let cm = unsafe { (*vp).ColorMap };
 
     if cm.is_null() || n < 0 || n >= unsafe { (*cm).Count } as i32 {
@@ -48,8 +45,7 @@ pub extern "C" fn SetRGB4(vp: *mut ViewPort, n: LONG, r: ULONG, g: ULONG, b: ULO
     };
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn LoadRGB4(vp: *mut ViewPort, colors: *const UWORD, count: LONG) {
+pub fn load_rgb4(vp: *mut ViewPort, colors: *const UWORD, count: LONG) {
     let cm = unsafe { (*vp).ColorMap };
 
     if cm.is_null() {
@@ -59,14 +55,4 @@ pub extern "C" fn LoadRGB4(vp: *mut ViewPort, colors: *const UWORD, count: LONG)
     let n = count.min(unsafe { (*cm).Count } as i32).max(0) as usize;
 
     unsafe { std::ptr::copy_nonoverlapping(colors, (*cm).ColorTable, n) };
-}
-
-/// The Amiga `GetRGB4`: the 12-bit colour at entry `n` of a colour map, or all ones if there is none.
-#[unsafe(no_mangle)]
-pub extern "C" fn GetRGB4(cm: *mut ColorMap, n: LONG) -> ULONG {
-    if cm.is_null() || n < 0 || n >= unsafe { (*cm).Count } as i32 {
-        return u32::MAX;
-    }
-
-    unsafe { *(*cm).ColorTable.add(n as usize) as ULONG }
 }

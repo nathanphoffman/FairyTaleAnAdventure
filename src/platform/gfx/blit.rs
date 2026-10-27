@@ -42,8 +42,8 @@ fn copy_plane(src: &BitMap, dst: &BitMap, plane: usize, rect: &BlitRect) {
 /// Copies the rectangle from src to dst for the planes selected by `mask`.
 /// The argument list is fixed by the Amiga ABI the C code calls; it is grouped into a `BlitRect`
 /// straight away.
-#[unsafe(no_mangle)]
-pub extern "C" fn BltBitMap(
+#[allow(clippy::too_many_arguments)] // the argument list of the Amiga call it replaces
+pub fn blt_bit_map(
     src: *mut BitMap,
     sx: LONG,
     sy: LONG,
@@ -102,8 +102,8 @@ fn read_pixels(bm: &BitMap, x0: i32, y0: i32, w: i32, h: i32) -> Vec<u8> {
 }
 
 /// Scrolls the rectangle's contents; the exposed strip is filled with the background pen.
-#[unsafe(no_mangle)]
-pub extern "C" fn ScrollRaster(
+#[allow(clippy::too_many_arguments)] // the argument list of the Amiga call it replaces
+pub fn scroll_raster(
     rp: *mut RastPort,
     dx: LONG,
     dy: LONG,

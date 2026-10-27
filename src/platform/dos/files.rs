@@ -41,8 +41,7 @@ fn store_file(f: File) -> BPTR {
 }
 
 /// The Amiga `Open`: opens an existing file, or creates a new one in write mode. Returns 0 on failure.
-#[unsafe(no_mangle)]
-pub extern "C" fn Open(name: *const c_char, mode: LONG) -> BPTR {
+pub fn open_file(name: *const c_char, mode: LONG) -> BPTR {
     let name = unsafe { cstr(name) };
     let write = mode == MODE_NEWFILE;
     let Some(path) = resolve(name, write) else {
@@ -69,8 +68,7 @@ pub extern "C" fn Open(name: *const c_char, mode: LONG) -> BPTR {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Close(f: BPTR) {
+pub fn close_file(f: BPTR) {
     FILES.with(|files| {
         if let Some(slot) = files.borrow_mut().get_mut((f - 1) as usize) {
             *slot = None;
@@ -105,8 +103,7 @@ fn read_fully(file: &mut File, buf: &mut [u8]) -> LONG {
     total as LONG
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Read(f: BPTR, buf: *mut u8, len: LONG) -> LONG {
+pub fn read_file(f: BPTR, buf: *mut u8, len: LONG) -> LONG {
     if len <= 0 {
         return 0;
     }
@@ -117,8 +114,7 @@ pub extern "C" fn Read(f: BPTR, buf: *mut u8, len: LONG) -> LONG {
 }
 
 /// The Amiga `Write`: writes `len` bytes to an open file. Returns the number written, or -1.
-#[unsafe(no_mangle)]
-pub extern "C" fn Write(f: BPTR, buf: *const u8, len: LONG) -> LONG {
+pub fn write_file(f: BPTR, buf: *const u8, len: LONG) -> LONG {
     if len <= 0 {
         return 0;
     }
@@ -137,8 +133,7 @@ pub extern "C" fn Write(f: BPTR, buf: *const u8, len: LONG) -> LONG {
 }
 
 /// mode: -1 from start, 0 from current position, 1 from end. Returns the old position.
-#[unsafe(no_mangle)]
-pub extern "C" fn Seek(f: BPTR, pos: LONG, mode: LONG) -> LONG {
+pub fn seek_file(f: BPTR, pos: LONG, mode: LONG) -> LONG {
     with_file(f, |file| {
         let old = file.stream_position().unwrap_or(0);
         let target = match mode {

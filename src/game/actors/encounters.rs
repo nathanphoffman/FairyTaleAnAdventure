@@ -198,7 +198,7 @@ unsafe fn encounter_race() -> i32 {
 /// DYING, the hero gains bravery for a kill, and killing a person (not the lasso keeper) costs
 /// 3 kindness. If it is the hero, `dtype` is the death message, luck drops by 5 and the music
 /// changes. The hero's stats are always refreshed on screen.
-pub extern "C" fn check_death(i: i32, dtype: i32) {
+pub fn check_death(i: i32, dtype: i32) {
     unsafe {
         let actor = (&raw mut the_actors.list).cast::<Shape>().add(i as usize);
 

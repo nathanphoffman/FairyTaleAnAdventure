@@ -1,10 +1,11 @@
 //! Loading the music scores and sound effects from disk, and playing a sound effect.
 
-use super::{Close, Open, Read, playsample};
 use crate::amiga::BPTR;
 use crate::game::data::state::the_memory;
 use crate::game::data::tables::menus;
 use crate::game::files::disk::{load_track_range, mark_read_unused, wait_for_read};
+use crate::platform::audio::playsample;
+use crate::platform::dos::{close_file, open_file, read_file};
 
 const MODE_OLDFILE: i32 = 1005;
 
@@ -19,7 +20,7 @@ const SCORE_MEMORY: i32 = 5900;
 /// if they would not fit in the 5900 bytes of score memory.
 pub fn read_score() {
     unsafe {
-        let file = Open(c"songs".as_ptr(), MODE_OLDFILE) as i32;
+        let file = open_file(c"songs".as_ptr(), MODE_OLDFILE) as i32;
 
         if file == 0 {
             return;
@@ -29,7 +30,7 @@ pub fn read_score() {
 
         for _ in 0..TRACK_COUNT {
             let mut length = 0i32;
-            Read(file as BPTR, (&raw mut length).cast(), LENGTH_BYTES);
+            read_file(file as BPTR, (&raw mut length).cast(), LENGTH_BYTES);
             length = length.swap_bytes(); // the length is stored big-endian
 
             if length * 2 + loaded > SCORE_MEMORY {
@@ -38,7 +39,7 @@ pub fn read_score() {
 
             the_memory.track[tracks] = the_memory.scoremem.offset(loaded as isize);
             tracks += 1;
-            Read(
+            read_file(
                 file as BPTR,
                 the_memory.scoremem.offset(loaded as isize),
                 length * 2,
@@ -47,7 +48,7 @@ pub fn read_score() {
             loaded += length * 2;
         }
 
-        Close(file as BPTR);
+        close_file(file as BPTR);
     }
 }
 
@@ -101,7 +102,7 @@ pub fn play_effect(num: i16, speed: i32) {
         if menus[GAME_MENU].enabled[SOUND_ENTRY] & 1 != 0 {
             let n = num as usize;
             playsample(
-                the_memory.sample[n],
+                the_memory.sample[n].cast(),
                 (the_memory.sample_size[n] / 2) as i32,
                 speed,
             );

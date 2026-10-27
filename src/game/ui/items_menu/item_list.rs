@@ -1,12 +1,13 @@
 //! Showing the list of the things the hero carries, with their pictures.
 
-use super::{BltBitMap, GOLDBASE, InitBitMap, LoadRGB4, OBJECTS, SetRGB4, SetRast, item};
+use super::{GOLDBASE, OBJECTS, item};
 use crate::amiga::BitMap;
 use crate::game::data::object_tables::page_colors;
 use crate::game::data::state::{the_hero, the_memory, the_screen};
 use crate::game::data::types::SeqInfo;
 use crate::game::render::screen_fx::show_still_screen;
 use crate::game::ui::text::queue_print;
+use crate::platform::gfx::{blt_bit_map, init_bit_map, load_rgb4, set_rast, set_rgb4};
 
 // Print queue entries and events.
 const PRQ_LIST: i32 = 5;
@@ -32,9 +33,9 @@ pub(super) unsafe fn show_item_list() {
     unsafe {
         let bm = (*(*the_screen.drawing_page).ri_page).BitMap;
         the_screen.rp_map.BitMap = bm;
-        SetRast(&raw mut the_screen.rp_map, 0);
+        set_rast(&raw mut the_screen.rp_map, 0);
 
-        InitBitMap(
+        init_bit_map(
             &raw mut the_screen.pagea,
             ITEM_IMAGE_PLANES,
             ITEM_IMAGE_WIDTH,
@@ -52,9 +53,9 @@ pub(super) unsafe fn show_item_list() {
 
         draw_item_icons(bm);
 
-        SetRGB4(&raw mut the_screen.vp_page, BACKGROUND_PEN as i32, 0, 0, 0);
+        set_rgb4(&raw mut the_screen.vp_page, BACKGROUND_PEN as i32, 0, 0, 0);
         show_still_screen();
-        LoadRGB4(
+        load_rgb4(
             &raw mut the_screen.vp_page,
             (&raw const page_colors).cast(),
             COLOURS_SHOWN,
@@ -77,7 +78,7 @@ unsafe fn draw_item_icons(bm: *mut BitMap) {
             let source_row = it.image_number as i32 * ITEM_ROW_HEIGHT + it.img_off as i32;
 
             for _ in 0..shown {
-                BltBitMap(
+                blt_bit_map(
                     &raw mut the_screen.pagea,
                     0,
                     source_row,

@@ -23,8 +23,7 @@ static mut THIS_TASK: Process = Process {
     pr_WindowPtr: null_mut(),
 };
 
-#[unsafe(no_mangle)]
-pub extern "C" fn OpenLibrary(name: *const c_char, _version: ULONG) -> *mut c_void {
+pub fn open_library(name: *const c_char, _version: ULONG) -> *mut c_void {
     let name = unsafe { CStr::from_ptr(name) }.to_string_lossy();
     {
         if name == GRAPHICS_LIBRARY {
@@ -35,10 +34,8 @@ pub extern "C" fn OpenLibrary(name: *const c_char, _version: ULONG) -> *mut c_vo
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn CloseLibrary(_lib: *mut c_void) {}
+pub fn close_library(_lib: *mut c_void) {}
 
-#[unsafe(no_mangle)]
-pub extern "C" fn FindTask(_name: *const c_char) -> *mut Process {
+pub fn find_task(_name: *const c_char) -> *mut Process {
     addr_of_mut!(THIS_TASK)
 }

@@ -1,9 +1,8 @@
 //! Reading blocks: asking for a range of tracks, waiting for a read to finish and the motor.
 
-use super::{
-    CheckIO, DISKREQ1, DISKREQS, DoIO, FROM_FILE, IMAGE, IoExtTd, LASTREQ, Read, Seek, SendIO,
-    WaitIO,
-};
+use super::{DISKREQ1, DISKREQS, FROM_FILE, IMAGE, IoExtTd, LASTREQ};
+use crate::platform::dos::{read_file, seek_file};
+use crate::platform::exec::{check_io, do_io, send_io, wait_io};
 
 use std::ffi::c_void;
 
@@ -29,7 +28,7 @@ pub(super) fn request(num: usize) -> *mut IoExtTd {
 /// Waits for read request `num` to finish. Nothing to wait for when reading from the file.
 pub fn wait_for_read(num: i32) {
     if !from_file() {
-        unsafe { WaitIO(request(num as usize).cast()) };
+        wait_io(request(num as usize).cast());
     }
 }
 
@@ -46,7 +45,7 @@ pub fn read_finished(num: i32) -> i32 {
         return 1;
     }
 
-    unsafe { CheckIO(request(num as usize).cast()) }
+    check_io(request(num as usize).cast())
 }
 
 /// Whether request `num` is a read in progress (never, for the file).
@@ -57,7 +56,7 @@ pub fn is_read_pending(num: i32) -> i32 {
 /// Waits for the most recently started read.
 pub fn wait_for_last_read() {
     if !from_file() {
-        unsafe { WaitIO(LASTREQ.cast()) };
+        unsafe { wait_io(LASTREQ.cast()) };
     }
 }
 
@@ -74,7 +73,7 @@ pub fn last_read_finished() -> i32 {
         return 1;
     }
 
-    unsafe { CheckIO(LASTREQ.cast()) }
+    unsafe { check_io(LASTREQ.cast()) }
 }
 
 /// Whether the most recent request is a read in progress (never, for the file).
@@ -91,8 +90,8 @@ pub fn is_last_read_pending() -> i32 {
 pub fn load_track_range(f_block: i16, b_count: i16, buffer: *mut c_void, dr: i16) {
     unsafe {
         if from_file() {
-            Seek(IMAGE, f_block as i32 * BLOCK_SIZE, OFFSET_BEGINNING);
-            Read(IMAGE, buffer.cast(), b_count as i32 * BLOCK_SIZE);
+            seek_file(IMAGE, f_block as i32 * BLOCK_SIZE, OFFSET_BEGINNING);
+            read_file(IMAGE, buffer.cast(), b_count as i32 * BLOCK_SIZE);
 
             return;
         }
@@ -100,7 +99,7 @@ pub fn load_track_range(f_block: i16, b_count: i16, buffer: *mut c_void, dr: i16
         LASTREQ = request(dr as usize);
 
         if (*LASTREQ).command == CMD_READ {
-            WaitIO(LASTREQ.cast());
+            wait_io(LASTREQ.cast());
         }
 
         *LASTREQ = *DISKREQ1;
@@ -108,7 +107,7 @@ pub fn load_track_range(f_block: i16, b_count: i16, buffer: *mut c_void, dr: i16
         (*LASTREQ).data = buffer;
         (*LASTREQ).command = CMD_READ;
         (*LASTREQ).offset = (f_block as i32 * BLOCK_SIZE) as u32;
-        SendIO(LASTREQ.cast());
+        send_io(LASTREQ.cast());
     }
 }
 
@@ -123,6 +122,6 @@ pub fn motor_off() {
         *req = *DISKREQ1;
         (*req).length = 0;
         (*req).command = TD_MOTOR;
-        DoIO(req.cast());
+        do_io(req.cast());
     }
 }

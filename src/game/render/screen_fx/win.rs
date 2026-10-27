@@ -1,13 +1,15 @@
 //! The win sequence: a sunrise over the winning picture.
 
 use super::zoom::set_intro_zoom;
-use super::{COLOR_COUNT, Delay, HIRES, LoadRGB4, SPRITES, VP_HIDE};
+use super::{COLOR_COUNT, HIRES, SPRITES, VP_HIDE};
 use crate::game::data::object_tables::{fader, sun_colors};
 use crate::game::data::state::the_screen;
 use crate::game::data::tables::black_colors;
 use crate::game::files::iff_picture::load_picture;
 use crate::game::ui::messages::name;
 use crate::game::ui::text::{draw_placard_border, placard_text};
+use crate::platform::display::delay;
+use crate::platform::gfx::load_rgb4;
 
 // The win sequence: a sunrise over the winning picture.
 const WIN_MESSAGE_FIRST: i32 = 6;
@@ -41,12 +43,12 @@ pub fn win_colors() {
         name();
         placard_text(WIN_MESSAGE_SECOND);
         draw_placard_border();
-        Delay(WIN_MESSAGE_PAUSE);
+        delay(WIN_MESSAGE_PAUSE);
         show_win_picture_in_black();
         rise_sun();
 
-        Delay(SUNRISE_END_PAUSE);
-        LoadRGB4(
+        delay(SUNRISE_END_PAUSE);
+        load_rgb4(
             &raw mut the_screen.vp_page,
             (&raw const black_colors).cast::<u16>(),
             COLOR_COUNT as i32,
@@ -59,13 +61,13 @@ unsafe fn show_win_picture_in_black() {
     unsafe {
         the_screen.bm_draw = (*(*the_screen.drawing_page).ri_page).BitMap;
         load_picture(c"winpic".as_ptr(), the_screen.bm_draw, 0, 0);
-        LoadRGB4(
+        load_rgb4(
             &raw mut the_screen.vp_page,
             (&raw const black_colors).cast::<u16>(),
             COLOR_COUNT as i32,
         );
 
-        LoadRGB4(
+        load_rgb4(
             &raw mut the_screen.vp_text,
             (&raw const black_colors).cast::<u16>(),
             COLOR_COUNT as i32,
@@ -81,17 +83,17 @@ unsafe fn rise_sun() {
     unsafe {
         for i in (SUNRISE_END + 1..=SUNRISE_START).rev() {
             fader = sunrise_palette(i);
-            LoadRGB4(
+            load_rgb4(
                 &raw mut the_screen.vp_page,
                 (&raw const fader).cast(),
                 COLOR_COUNT as i32,
             );
 
             if i == SUNRISE_START {
-                Delay(SUNRISE_FIRST_PAUSE);
+                delay(SUNRISE_FIRST_PAUSE);
             }
 
-            Delay(SUNRISE_STEP_PAUSE);
+            delay(SUNRISE_STEP_PAUSE);
         }
     }
 }

@@ -91,3 +91,5 @@ fn with_sound(f: impl FnOnce(&mut Sound)) {
         f(&mut s);
     }
 }
+
+pub use self::calls::{init_music, playsample, playscore, setscore, stopscore, wrap_music};

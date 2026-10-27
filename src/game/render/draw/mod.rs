@@ -31,13 +31,7 @@ use crate::game::data::state::{the_actors, the_screen, the_world};
 use crate::game::data::types::Shape;
 use crate::game::render::blit::{combine_masks, draw_shape, save_background};
 
-unsafe extern "C" {
-    fn OwnBlitter();
-
-    fn DisownBlitter();
-
-    fn WaitBlit();
-}
+use crate::platform::gfx::{disown_blitter, own_blitter};
 
 // Actor kinds and states (csrc/ftale.h).
 const PHIL: i16 = 0;
@@ -222,7 +216,7 @@ unsafe fn blit_sprite(
             return Drawn::OutOfRoom; // no more blits if no room
         }
 
-        OwnBlitter();
+        own_blitter();
         save_background((*current_sshape).backsave);
 
         if !drawn_in_front(actor, i, sprite.atype, sprite.inum) {
@@ -240,7 +234,7 @@ unsafe fn blit_sprite(
         combine_masks();
         draw_shape();
         (*actor).visible = 1;
-        DisownBlitter();
+        disown_blitter();
         (*the_screen.drawing_page).obcount += 1;
 
         Drawn::Done

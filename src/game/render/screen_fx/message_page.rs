@@ -1,10 +1,11 @@
 //! Switching between the play view and the map page that shows messages.
 
 use super::fading::fade_down;
-use super::{COLOR_COUNT, HIRES, LoadRGB4, SPRITES, SetAPen, SetDrMd, SetRast, VP_HIDE};
+use super::{COLOR_COUNT, HIRES, SPRITES, VP_HIDE};
 use crate::game::data::object_tables::page_colors;
 use crate::game::data::state::the_screen;
 use crate::game::render::display::flip_pages;
+use crate::platform::gfx::{load_rgb4, set_a_pen, set_draw_mode, set_rast};
 
 const MAP_PEN: u32 = 24;
 const JAM1: u32 = 0;
@@ -29,13 +30,13 @@ pub fn map_message() {
         fade_down();
         the_screen.current_rastport = &raw mut the_screen.rp_map;
         the_screen.rp_map.BitMap = (*(*the_screen.drawing_page).ri_page).BitMap;
-        SetDrMd(the_screen.current_rastport, JAM1);
-        SetAPen(the_screen.current_rastport, MAP_PEN);
-        SetRast(the_screen.current_rastport, 0);
+        set_draw_mode(the_screen.current_rastport, JAM1);
+        set_a_pen(the_screen.current_rastport, MAP_PEN);
+        set_rast(the_screen.current_rastport, 0);
 
         the_screen.vp_text.Modes = HIRES | SPRITES | VP_HIDE;
         show_still_screen();
-        LoadRGB4(
+        load_rgb4(
             &raw mut the_screen.vp_page,
             (&raw const page_colors).cast(),
             COLOR_COUNT as i32,

@@ -6,13 +6,7 @@
 use crate::game::data::state::{the_actors, the_hero, the_memory, the_world};
 use crate::game::data::tables::{instrument_waves, menus};
 
-unsafe extern "C" {
-    fn playscore(t1: *const u8, t2: *const u8, t3: *const u8, t4: *const u8);
-
-    fn setscore(t1: *const u8, t2: *const u8, t3: *const u8, t4: *const u8);
-
-    fn stopscore();
-}
+use crate::platform::audio::{playscore, setscore, stopscore};
 
 /// Each tune uses four tracks.
 const TRACKS_PER_TUNE: usize = 4;

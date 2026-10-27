@@ -14,15 +14,7 @@ use std::ffi::c_char;
 use crate::game::data::state::the_memory;
 use crate::game::files::iff_chunks::{read_chunk_id, read_chunk_length, unpack_line};
 
-unsafe extern "C" {
-    fn Open(name: *const c_char, mode: i32) -> BPTR;
-
-    fn Close(file: BPTR);
-
-    fn Read(file: BPTR, buf: *mut u8, len: i32) -> i32;
-
-    fn Seek(file: BPTR, pos: i32, mode: i32) -> i32;
-}
+use crate::platform::dos::{close_file, open_file, read_file, seek_file};
 
 // State shared with iff_helpers; the names are the C ones (the C code and iff_helpers use them).
 /// Bytes left in the FORM being read.
@@ -95,7 +87,7 @@ unsafe fn read_bitmap_header() -> BitMapHeader {
     let mut bmhd = BitMapHeader::default();
     unsafe {
         let len = chunk_length.clamp(0, size_of::<BitMapHeader>() as i32);
-        Read(picture_file as BPTR, (&raw mut bmhd).cast(), len);
+        read_file(picture_file as BPTR, (&raw mut bmhd).cast(), len);
     }
 
     bmhd.width = bmhd.width.swap_bytes();
@@ -120,7 +112,7 @@ unsafe fn read_body(bmhd: &BitMapHeader, bitmap: &BitMap, offset: usize) {
         // Masks with WORD_ROUNDING, keeping only the bits that matter here.
         row_byte_count = ((bmhd.width as i32 + WORD_ROUNDING) / PIXELS_PER_BYTE) & EVEN_BYTES_MASK;
         read_chunk_length();
-        Read(
+        read_file(
             picture_file as BPTR,
             the_memory.shape_mem.cast(),
             chunk_length,
@@ -149,7 +141,7 @@ pub fn load_picture(filename: *const c_char, bitmap: *mut BitMap, x: i16, y: i16
         let bitmap = &*bitmap;
         let offset = (x as i32 + bitmap.BytesPerRow as i32 * y as i32) as usize;
 
-        picture_file = Open(filename, MODE_OLDFILE) as i32;
+        picture_file = open_file(filename, MODE_OLDFILE) as i32;
 
         if picture_file == 0 {
             return FALSE;
@@ -157,7 +149,7 @@ pub fn load_picture(filename: *const c_char, bitmap: *mut BitMap, x: i16, y: i16
 
         let read_ok = read_form(bitmap, offset);
 
-        Close(picture_file as BPTR);
+        close_file(picture_file as BPTR);
 
         if read_ok { TRUE } else { FALSE }
     }
@@ -188,7 +180,7 @@ unsafe fn read_form(bitmap: &BitMap, offset: usize) -> bool {
                 bmhd = read_bitmap_header();
             } else if SKIPPED_CHUNKS.contains(&{ current_chunk_id }) {
                 read_chunk_length();
-                Seek(picture_file as BPTR, chunk_length, OFFSET_CURRENT);
+                seek_file(picture_file as BPTR, chunk_length, OFFSET_CURRENT);
             } else if current_chunk_id == BODY {
                 read_body(&bmhd, bitmap, offset);
 

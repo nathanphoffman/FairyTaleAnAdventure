@@ -25,20 +25,9 @@ pub use self::nearest::{actor_distance, find_nearest_figure};
 pub use self::rescue::rescue_princess;
 pub use self::tactics::run_tactic;
 
-use crate::amiga::{RastPort, TextFont};
 use crate::game::data::state::the_hero;
 use crate::game::ui::messages::print;
 use crate::game::ui::text::show_event;
-
-unsafe extern "C" {
-    fn SetFont(current_rastport: *mut RastPort, font: *mut TextFont);
-
-    fn SetAPen(current_rastport: *mut RastPort, pen: u32);
-
-    fn RectFill(current_rastport: *mut RastPort, x0: i32, y0: i32, x1: i32, y1: i32);
-
-    fn Delay(ticks: i32);
-}
 
 // Actor kinds (csrc/ftale.h `enum sequences`, used for the `type` field).
 const OBJECTS: i8 = 1;

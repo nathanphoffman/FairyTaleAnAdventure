@@ -23,14 +23,7 @@ use sdl2::mouse::MouseButton;
 use std::cell::Cell;
 use std::os::raw::c_int;
 
-unsafe extern "C" {
-    fn fta_key(code: c_int);
-
-    fn fta_mouse_move(x: c_int, y: c_int);
-
-    fn fta_mouse_button(left: c_int, right: c_int);
-    static mut fta_pia: u8;
-}
+use crate::game::input::handler::{fta_key, fta_mouse_button, fta_mouse_move, fta_pia};
 
 /// Added to a key code to say the key was released.
 const RELEASED: c_int = 0x80;
@@ -66,7 +59,7 @@ thread_local! {
 fn send_key(code: u8, down: bool) {
     let flag = if down { 0 } else { RELEASED };
 
-    unsafe { fta_key(code as c_int | flag) };
+    fta_key(code as c_int | flag);
 }
 
 /// Presses or releases the joystick fire button.
@@ -136,7 +129,7 @@ pub fn mouse_move(frame_x: i32, frame_y: i32) {
     record::record(format_args!("move {frame_x} {frame_y}"));
     let (x, y) = (frame_x / FRAME_TO_LORES, frame_y);
 
-    unsafe { fta_mouse_move(x, y) };
+    fta_mouse_move(x, y);
     let clamped = (
         x.clamp(POINTER_X_RANGE.0, POINTER_X_RANGE.1),
         y.clamp(POINTER_Y_RANGE.0, POINTER_Y_RANGE.1),
@@ -164,7 +157,7 @@ pub fn mouse_button(button: MouseButton, down: bool) {
     record::record(format_args!("button {name} {}", down as u8));
     BUTTONS.with(|b| b.set((l, r)));
 
-    unsafe { fta_mouse_button(l as c_int, r as c_int) };
+    fta_mouse_button(l as c_int, r as c_int);
 }
 
 /// Pointer position for drawing the cursor.

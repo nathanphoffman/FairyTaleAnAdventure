@@ -257,8 +257,7 @@ pub fn wait_frame() {
 }
 
 /// AmigaDOS `Delay`: n ticks of 1/50 second.
-#[unsafe(no_mangle)]
-pub extern "C" fn Delay(ticks: LONG) {
+pub fn delay(ticks: LONG) {
     for _ in 0..ticks.max(1) {
         wait_frame();
     }

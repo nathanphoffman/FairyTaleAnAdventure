@@ -11,9 +11,7 @@ use crate::game::files::iff_picture::{
     picture_file, row_byte_count,
 };
 
-unsafe extern "C" {
-    fn Read(file: BPTR, buf: *mut u8, len: i32) -> i32;
-}
+use crate::platform::dos::read_file;
 
 /// Bytes in a chunk id and in a chunk length.
 const CHUNK_FIELD_BYTES: i32 = 4;
@@ -21,7 +19,7 @@ const CHUNK_FIELD_BYTES: i32 = 4;
 /// Reads a 4 byte chunk id; compared against the id string in memory, so no byte swap.
 pub fn read_chunk_id() {
     unsafe {
-        Read(
+        read_file(
             picture_file as BPTR,
             (&raw mut current_chunk_id).cast(),
             CHUNK_FIELD_BYTES,
@@ -34,7 +32,7 @@ pub fn read_chunk_id() {
 /// Reads a big-endian chunk length and updates how many bytes of the file are left.
 pub fn read_chunk_length() {
     unsafe {
-        Read(
+        read_file(
             picture_file as BPTR,
             (&raw mut chunk_length).cast(),
             CHUNK_FIELD_BYTES,

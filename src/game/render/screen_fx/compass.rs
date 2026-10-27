@@ -1,8 +1,8 @@
 //! The compass on the text panel: which direction is lit.
 
-use super::BltBitMap;
 use crate::game::data::object_tables::comptable;
 use crate::game::data::state::{the_memory, the_screen};
+use crate::platform::gfx::blt_bit_map;
 
 const BLIT_COPY: u32 = 0xC0;
 
@@ -24,7 +24,7 @@ pub fn draw_compass(dir: i16) {
         let part = &comptable[dir as usize];
         let (xr, yr) = (part.xrect as i32, part.yrect as i32);
         (*the_screen.bm_source).Planes[COMPASS_PLANE] = the_memory.nhinor;
-        BltBitMap(
+        blt_bit_map(
             the_screen.bm_source,
             0,
             0,
@@ -40,7 +40,7 @@ pub fn draw_compass(dir: i16) {
 
         if dir < COMPASS_DIRECTIONS {
             (*the_screen.bm_source).Planes[COMPASS_PLANE] = the_memory.nhivar;
-            BltBitMap(
+            blt_bit_map(
                 the_screen.bm_source,
                 xr,
                 yr,

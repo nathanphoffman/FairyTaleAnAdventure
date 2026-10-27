@@ -133,21 +133,13 @@ fn new_font(data: FontData, width: i32, height: i32, baseline: i32) -> *mut Text
     }))
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn OpenFont(_attr: *mut TextAttr) -> *mut TextFont {
+pub fn open_font(_attr: *mut TextAttr) -> *mut TextFont {
     new_font(FontData::Builtin, TOPAZ.0, TOPAZ.1, TOPAZ.2)
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn OpenDiskFont(_attr: *mut TextAttr) -> *mut TextFont {
-    new_font(FontData::Builtin, TOPAZ.0, TOPAZ.1, TOPAZ.2)
-}
+pub fn close_font(_f: *mut TextFont) {}
 
-#[unsafe(no_mangle)]
-pub extern "C" fn CloseFont(_f: *mut TextFont) {}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SetFont(rp: *mut RastPort, f: *mut TextFont) {
+pub fn set_font(rp: *mut RastPort, f: *mut TextFont) {
     unsafe { (*rp).Font = f }
 }
 
@@ -157,8 +149,7 @@ const SEG_HEADER_BYTES: isize = 8;
 /// The game finds its story font with `font = (seg << 2) + 8` and `afont = &font->dfh_TF`, an
 /// Amiga trick for turning a loaded segment into a pointer. We hand back a segment value that
 /// makes that arithmetic land on a DiskFontHeader we allocated.
-#[unsafe(no_mangle)]
-pub extern "C" fn LoadSeg(name: *const c_char) -> BPTR {
+pub fn load_seg(name: *const c_char) -> BPTR {
     let name = unsafe { CStr::from_ptr(name) }.to_string_lossy();
     let Some(path) = crate::platform::dos::resolve(&name, false) else {
         return 0;
@@ -187,8 +178,7 @@ pub extern "C" fn LoadSeg(name: *const c_char) -> BPTR {
     ((header as isize) - SEG_HEADER_BYTES) >> 2
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn UnLoadSeg(_seg: BPTR) {}
+pub fn unload_seg(_seg: BPTR) {}
 
 #[cfg(test)]
 mod tests {

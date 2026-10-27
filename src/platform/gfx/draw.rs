@@ -4,8 +4,7 @@ use super::bitmap::plot;
 use crate::amiga::*;
 use std::ptr::null_mut;
 
-#[unsafe(no_mangle)]
-pub extern "C" fn InitRastPort(rp: *mut RastPort) {
+pub fn init_rast_port(rp: *mut RastPort) {
     let rp = unsafe { &mut *rp };
     rp.Layer = null_mut();
     rp.BitMap = null_mut();
@@ -19,24 +18,20 @@ pub extern "C" fn InitRastPort(rp: *mut RastPort) {
     rp.Font = null_mut();
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn SetAPen(rp: *mut RastPort, pen: ULONG) {
+pub fn set_a_pen(rp: *mut RastPort, pen: ULONG) {
     unsafe { (*rp).FgPen = pen as u8 }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn SetBPen(rp: *mut RastPort, pen: ULONG) {
+pub fn set_b_pen(rp: *mut RastPort, pen: ULONG) {
     unsafe { (*rp).BgPen = pen as u8 }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn SetDrMd(rp: *mut RastPort, mode: ULONG) {
+pub fn set_draw_mode(rp: *mut RastPort, mode: ULONG) {
     unsafe { (*rp).DrawMode = mode as u8 }
 }
 
 /// Fills the whole bitmap with one pen.
-#[unsafe(no_mangle)]
-pub extern "C" fn SetRast(rp: *mut RastPort, pen: ULONG) {
+pub fn set_rast(rp: *mut RastPort, pen: ULONG) {
     let rp = unsafe { &*rp };
 
     if rp.BitMap.is_null() {
@@ -58,8 +53,7 @@ pub extern "C" fn SetRast(rp: *mut RastPort, pen: ULONG) {
 
 /// The Amiga `RectFill`: fills a rectangle with the pen colour (or flips it, in COMPLEMENT mode),
 /// cut to the bitmap.
-#[unsafe(no_mangle)]
-pub extern "C" fn RectFill(rp: *mut RastPort, x0: LONG, y0: LONG, x1: LONG, y1: LONG) {
+pub fn rect_fill(rp: *mut RastPort, x0: LONG, y0: LONG, x1: LONG, y1: LONG) {
     let rp = unsafe { &*rp };
 
     if rp.BitMap.is_null() {
@@ -78,16 +72,14 @@ pub extern "C" fn RectFill(rp: *mut RastPort, x0: LONG, y0: LONG, x1: LONG, y1: 
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Move(rp: *mut RastPort, x: LONG, y: LONG) {
+pub fn move_pen(rp: *mut RastPort, x: LONG, y: LONG) {
     let rp = unsafe { &mut *rp };
     rp.cp_x = x as WORD;
     rp.cp_y = y as WORD;
 }
 
 /// Line from the current pen position to (x, y), then moves the pen there.
-#[unsafe(no_mangle)]
-pub extern "C" fn Draw(rp: *mut RastPort, x: LONG, y: LONG) {
+pub fn draw_line(rp: *mut RastPort, x: LONG, y: LONG) {
     let rp = unsafe { &mut *rp };
 
     if !rp.BitMap.is_null() {

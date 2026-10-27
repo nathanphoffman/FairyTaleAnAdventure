@@ -89,7 +89,7 @@ const SPIDER_ENCOUNTER: u16 = 8;
 /// Moves the hero to the world position (x, y) and reloads what is needed there. With `flag`
 /// set the region is worked out from the position (like walking through a door); otherwise
 /// `new_region` must already be set. If the spot is blocked the hero is moved down until it is free.
-pub extern "C" fn transfer_hero(xtest: u16, ytest: u16, flag: u16) -> i32 {
+pub fn transfer_hero(xtest: u16, ytest: u16, flag: u16) -> i32 {
     unsafe {
         the_world.map_x = the_world.map_x.wrapping_add(xtest.wrapping_sub(the_hero.x));
         the_world.map_y = the_world.map_y.wrapping_add(ytest.wrapping_sub(the_hero.y));

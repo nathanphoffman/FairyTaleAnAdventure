@@ -1,7 +1,9 @@
 //! Rescuing the princess: the story page, the reward and the keys.
 
 use super::extents::center_extent_on;
-use super::{Delay, RectFill, SetAPen, SetFont};
+use crate::platform::display::delay;
+use crate::platform::gfx::{rect_fill, set_a_pen, set_font};
+
 use crate::game::data::globals::{princesses_rescued, story_font};
 use crate::game::data::object_tables::ob_list8;
 use crate::game::data::state::{the_hero, the_screen};
@@ -44,7 +46,7 @@ const REWARD_GOLD: i16 = 100;
 pub fn rescue_princess() {
     unsafe {
         map_message();
-        SetFont(the_screen.current_rastport, story_font);
+        set_font(the_screen.current_rastport, story_font);
         let line = princesses_rescued as i32 * RESCUE_PLACARDS_EACH;
         placard_text(RESCUE_PLACARD_BASE + line);
         name();
@@ -52,16 +54,16 @@ pub fn rescue_princess() {
         name();
         placard_text(RESCUE_PLACARD_BASE + 2 + line);
         draw_placard_border();
-        Delay(RESCUE_PAUSE);
-        SetAPen(the_screen.current_rastport, 0);
+        delay(RESCUE_PAUSE);
+        set_a_pen(the_screen.current_rastport, 0);
         let (x0, y0, x1, y1) = PLACARD_AREA;
-        RectFill(the_screen.current_rastport, x0, y0, x1, y1);
-        Delay(CLEAR_PAUSE);
-        SetAPen(the_screen.current_rastport, PLACARD_PEN);
+        rect_fill(the_screen.current_rastport, x0, y0, x1, y1);
+        delay(CLEAR_PAUSE);
+        set_a_pen(the_screen.current_rastport, PLACARD_PEN);
         placard_text(AFTER_RESCUE_PLACARDS.0);
         name();
         placard_text(AFTER_RESCUE_PLACARDS.1);
-        Delay(RESCUE_PAUSE);
+        delay(RESCUE_PAUSE);
         message_off();
 
         princesses_rescued += 1;

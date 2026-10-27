@@ -45,7 +45,6 @@ pub struct InWork {
 }
 
 /// Stand-in for the CIA port A register the game peeks at (0xbfe001). Bit 7 low = joystick fire.
-#[unsafe(no_mangle)]
 pub static mut fta_pia: u8 = 0xff;
 
 const KEY_BUFFER_SIZE: usize = 128;
@@ -104,8 +103,7 @@ fn push_key(code: i32) {
 }
 
 /// Key event from the platform layer. `code` is the game's key code, bit 7 set = key released.
-#[unsafe(no_mangle)]
-pub extern "C" fn fta_key(code: i32) {
+pub fn fta_key(code: i32) {
     push_key(code);
 }
 
@@ -151,8 +149,7 @@ pub fn next_key() -> i32 {
 /// Pointer position in lores pixels (x 0-319) and screen lines (y 0-199).
 /// The pointer is kept inside the text panel (the bottom of the screen), where the menus and
 /// the compass are, because that is the only place the mouse is used.
-#[unsafe(no_mangle)]
-pub extern "C" fn fta_mouse_move(x: i32, y: i32) {
+pub fn fta_mouse_move(x: i32, y: i32) {
     unsafe {
         let data = &mut *(&raw mut the_ui.handler_data);
         data.xsprite = x.clamp(POINTER_MIN_X, POINTER_MAX_X) as i16;
@@ -176,8 +173,7 @@ fn menu_key_at(x: i32, y: i32) -> Option<i32> {
 /// Mouse button change. A left click in the menu column becomes a menu key on press and the same
 /// key with bit 7 set on release, as if it had been typed. The right button only sets a flag
 /// (it makes the hero fight, see `read_walk_direction`).
-#[unsafe(no_mangle)]
-pub extern "C" fn fta_mouse_button(left: i32, right: i32) {
+pub fn fta_mouse_button(left: i32, right: i32) {
     let new_qualifier =
         (if left != 0 { LEFT_BUTTON } else { 0 }) | (if right != 0 { RIGHT_BUTTON } else { 0 });
     unsafe {

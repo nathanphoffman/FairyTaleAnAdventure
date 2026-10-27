@@ -5,21 +5,9 @@ mod effects;
 
 use self::effects::{heal, scare_enemies, show_map, stone_jump};
 
-use crate::amiga::RastPort;
 use crate::game::data::state::{the_hero, the_ui, the_world};
 use crate::game::ui::menus::update_menu_availability;
 use crate::game::ui::text::{show_event, speak};
-use std::ffi::c_char;
-
-unsafe extern "C" {
-    fn SetDrMd(current_rastport: *mut RastPort, mode: u32);
-
-    fn SetAPen(current_rastport: *mut RastPort, pen: u32);
-
-    fn Move(current_rastport: *mut RastPort, x: i32, y: i32);
-
-    fn Text(current_rastport: *mut RastPort, s: *const c_char, len: i32) -> i32;
-}
 
 const SPELL_STONE: i16 = 5;
 const SPELL_LIGHT: i16 = 6;

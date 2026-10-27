@@ -1,9 +1,11 @@
 //! Fading the page colours: with the time of day, to and from black, and the teleport flicker.
 
-use super::{COLOR_COUNT, Delay, LoadRGB4};
+use super::COLOR_COUNT;
 use crate::game::data::object_tables::{fader, page_colors};
 use crate::game::data::random::bitrand;
 use crate::game::data::state::{the_screen, the_world};
+use crate::platform::display::delay;
+use crate::platform::gfx::load_rgb4;
 
 // Colour 31 of the page changes with where the hero is.
 const COLOR_31: usize = 31;
@@ -61,7 +63,7 @@ pub fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: *const u16) {
             );
         }
 
-        LoadRGB4(
+        load_rgb4(
             &raw mut the_screen.vp_page,
             (&raw const fader).cast(),
             COLOR_COUNT as i32,
@@ -149,13 +151,13 @@ pub fn flicker_colors() {
                 *slot = bitrand(RANDOM_COLOR_MASK) as u16;
             }
 
-            LoadRGB4(
+            load_rgb4(
                 &raw mut the_screen.vp_page,
                 (&raw const fader).cast(),
                 COLOR_COUNT as i32,
             );
 
-            Delay(1);
+            delay(1);
         }
     }
 }
@@ -174,7 +176,7 @@ pub fn fade_down() {
             (&raw const page_colors).cast(),
         );
 
-        unsafe { Delay(1) };
+        delay(1);
     }
 }
 
@@ -189,7 +191,7 @@ pub fn fade_normal() {
             (&raw const page_colors).cast(),
         );
 
-        unsafe { Delay(1) };
+        delay(1);
     }
 }
 
