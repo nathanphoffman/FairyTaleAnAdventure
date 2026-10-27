@@ -89,7 +89,7 @@ pub(super) unsafe fn enter_door(xtest: u16, ytest: u16) {
                 FADE_WHITE,
                 FADE_WHITE,
                 1,
-                (&raw const page_colors).cast(),
+                &*(&raw const page_colors),
             );
         }
     }

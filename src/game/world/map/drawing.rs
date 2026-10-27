@@ -1,7 +1,8 @@
 //! Drawing the map into the play field: single tiles, whole screens, new edges and scrolling.
 
 use crate::game::data::object_tables::minimap;
-use crate::game::data::state::{the_memory, the_screen};
+use crate::game::data::state::the_memory;
+use crate::game::render::screen::screen;
 
 /// One bitplane of 256 tiles, 64 bytes per tile.
 pub(super) const IMAGE_PLANE_SIZE: usize = 16384;
@@ -24,13 +25,14 @@ pub(super) unsafe fn draw_tile(tile: i32, dst: usize) {
                 .image_mem
                 .add(p * IMAGE_PLANE_SIZE)
                 .offset(tile as isize * TILE_BYTES as isize);
-            let mut d = (*the_screen.planes.add(p)).add(dst);
+            let plane = screen().draw_bitmap_mut().plane_mut(p);
+            let mut d = dst;
 
             for _ in 0..TILE_LINES {
-                *d = *src;
-                *d.add(1) = *src.add(1);
+                plane[d] = *src;
+                plane[d + 1] = *src.add(1);
                 src = src.add(2);
-                d = d.add(ROW_BYTES);
+                d += ROW_BYTES;
             }
         }
     }
@@ -120,24 +122,22 @@ const DIRECTION_MASK: usize = 7;
 pub fn scroll_map(dir: i32) {
     // Masks with SCROLL_MODES, keeping only the bits that matter here.
     let m = &SCROLL_MODES[dir as usize & DIRECTION_MASK];
-    unsafe {
-        for p in 0..PLANE_COUNT {
-            let plane = *the_screen.planes.add(p);
+    let bitmap = screen().draw_bitmap_mut();
 
-            for i in 0..m.lines {
-                // copy bottom-up when moving down so rows are not overwritten before being read
-                let line = if m.dst_line > m.src_line {
-                    m.lines - 1 - i
-                } else {
-                    i
-                };
+    for p in 0..PLANE_COUNT {
+        let plane = bitmap.plane_mut(p);
 
-                std::ptr::copy(
-                    plane.add((m.src_line + line) * ROW_BYTES + m.src_x),
-                    plane.add((m.dst_line + line) * ROW_BYTES + m.dst_x),
-                    m.width,
-                );
-            }
+        for i in 0..m.lines {
+            // copy bottom-up when moving down so rows are not overwritten before being read
+            let line = if m.dst_line > m.src_line {
+                m.lines - 1 - i
+            } else {
+                i
+            };
+
+            let from = (m.src_line + line) * ROW_BYTES + m.src_x;
+            let to = (m.dst_line + line) * ROW_BYTES + m.dst_x;
+            plane.copy_within(from..from + m.width, to);
         }
     }
 }

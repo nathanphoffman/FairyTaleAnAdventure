@@ -3,14 +3,13 @@
 use super::records::{
     save_variables, transfer_actor, transfer_extent, transfer_object, transfer_party, transfer_u16,
 };
-use crate::platform::display::delay;
+use crate::game::render::display::delay;
+use crate::game::render::screen::{FontKind, screen};
 use crate::platform::dos::{close_file, io_error, lock_path, open_file, unlock_path};
-use crate::platform::gfx::set_font;
 
 use super::{FLOCK, SAVENAME, SVERR, SVFILE, is_saving};
 
 use crate::amiga::BPTR;
-use crate::game::data::globals::{panel_font, story_font};
 use crate::game::data::object_tables::{dstobs, glbobs, mapobs, ob_listg, ob_table};
 use crate::game::data::state::{the_actors, the_encounter, the_screen, the_world};
 use crate::game::data::tables::extent_list;
@@ -142,6 +141,13 @@ pub(super) unsafe fn save_all() {
     }
 }
 
+/// Writes in the given font from now on.
+fn set_current_font(kind: FontKind) {
+    let screen = screen();
+    let current = screen.current_port;
+    screen.set_font_kind(current, kind);
+}
+
 /// Saves the game (`is_saving` set) or loads it into slot `chosen_entry` (0 = A ...).
 ///
 /// Steps: find a place to save (asking for a disk on a real Amiga), open the file, run `save_all`,
@@ -150,10 +156,10 @@ pub(super) unsafe fn save_all() {
 pub fn savegame(chosen_entry: i16) {
     unsafe {
         SVERR = 0;
-        set_font(the_screen.current_rastport, panel_font);
+        set_current_font(FontKind::Panel);
 
         let Some((name_offset, on_floppy)) = find_save_place() else {
-            set_font(the_screen.current_rastport, story_font);
+            set_current_font(FontKind::Story);
 
             return;
         };
@@ -176,7 +182,7 @@ pub fn savegame(chosen_entry: i16) {
             reset_after_load();
         }
 
-        set_font(the_screen.current_rastport, story_font);
+        set_current_font(FontKind::Story);
     }
 }
 

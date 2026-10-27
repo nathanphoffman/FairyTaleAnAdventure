@@ -7,12 +7,11 @@
 //! story tables, breaks it into lines that fit the panel and prints each one.
 
 use crate::game::data::state::the_hero;
-use crate::game::data::state::the_screen;
 use crate::game::data::tables::brother_names;
+use crate::game::render::screen::screen;
 use crate::game::ui::text::{draw_text, move_to};
+use crate::gfx::bitmap::Rect;
 use std::ffi::{CStr, c_char};
-
-use crate::platform::gfx::scroll_raster;
 
 // The scrolling message area of the text panel.
 const TEXT_X_MIN: i32 = 16;
@@ -54,15 +53,15 @@ unsafe fn brother_name() -> *const c_char {
 /// The old lines scroll up by one text line (10 pixels) inside the message area.
 pub fn print(s: *const c_char) {
     unsafe {
-        scroll_raster(
-            the_screen.current_rastport,
-            0,
-            LINE_HEIGHT,
-            TEXT_X_MIN,
-            TEXT_Y_MIN,
-            TEXT_X_MAX,
-            TEXT_Y_MAX,
-        );
+        let screen = screen();
+        let area = Rect {
+            x: TEXT_X_MIN,
+            y: TEXT_Y_MIN,
+            width: TEXT_X_MAX - TEXT_X_MIN + 1,
+            height: TEXT_Y_MAX - TEXT_Y_MIN + 1,
+        };
+
+        screen.scroll(screen.current_port, area, (0, LINE_HEIGHT));
 
         move_to(TEXT_X_MIN, NEW_LINE_Y);
         draw_text(s, length(s));

@@ -2,8 +2,6 @@
 //! sound and input; `close_all` gives it all back; and `run_game` (the original `main`) shows the
 //! title and intro, starts the game and runs the main loop, one pass per frame.
 
-pub mod amiga_leftovers;
-
 pub mod game_loop;
 
 pub mod intro;
@@ -14,11 +12,10 @@ use game_loop::main_loop;
 use intro::start_up;
 use open_close::{close_all, open_all};
 
-use crate::game::data::state::{the_screen, the_world};
+use crate::game::data::state::the_world;
 use crate::game::ui::text::show_error;
 
 use crate::platform::audio::stopscore;
-use crate::platform::gfx::set_rast;
 
 /// The game: the original `main`. Called once from `src/main.rs`.
 pub fn run_game() {
@@ -42,11 +39,7 @@ pub fn run_game() {
     }
 }
 
-/// The end of the program (the `quit_all` label): back to the plain text screen, then `close_all`.
-unsafe fn quit_all() {
-    unsafe {
-        the_screen.rp_text.BitMap = the_screen.wb_bmap;
-        set_rast(&raw mut the_screen.rp_text, 0);
-        close_all();
-    }
+/// The end of the program (the `quit_all` label).
+fn quit_all() {
+    close_all();
 }

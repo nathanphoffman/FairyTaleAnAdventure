@@ -1,5 +1,4 @@
-//! Loads IFF ILBM pictures ("brushes") into a bitmap (from csrc/iffsubs.c). It also holds the
-//! state shared with the chunk and line helpers in `iff_chunks`.
+//! Loads IFF ILBM pictures ("brushes") into a bitmap (from csrc/iffsubs.c).
 //!
 //! An IFF file is a `FORM` containing chunks. Each chunk is a 4-letter id, a big-endian length and
 //! the data. This loader understands `BMHD` (picture size and compression), skips `CMAP`, `GRAB`,
@@ -8,189 +7,227 @@
 //! screen memory is laid out, so each row is unpacked straight into the matching plane of the
 //! destination bitmap.
 
-use crate::amiga::{BPTR, BitMap};
-use std::ffi::c_char;
-
-use crate::game::data::state::the_memory;
-use crate::game::files::iff_chunks::{read_chunk_id, read_chunk_length, unpack_line};
-
-use crate::platform::dos::{close_file, open_file, read_file, seek_file};
-
-// State shared with iff_helpers; the names are the C ones (the C code and iff_helpers use them).
-/// Bytes left in the FORM being read.
-pub static mut bytes_left_in_file: i32 = 0;
-pub static mut picture_file: i32 = 0;
-
-/// The id of the chunk just read.
-pub static mut current_chunk_id: i32 = 0;
-pub static mut chunk_length: i32 = 0;
-
-/// Bytes in one unpacked scan line.
-pub static mut row_byte_count: i32 = 0;
-
-/// Read position in the compressed body.
-pub static mut pack_cursor: *const i8 = std::ptr::null();
-
-/// Compression type of the body: 0 = none, 1 = ByteRun1.
-pub static mut compression_type: i8 = 0;
-
-/// AmigaDOS open mode for an existing file.
-const MODE_OLDFILE: i32 = 1005;
-
-/// Seek relative to the current position.
-const OFFSET_CURRENT: i32 = 0;
-const TRUE: i32 = 1;
-const FALSE: i32 = 0;
+use crate::gfx::Bitmap;
+use crate::platform::dos::resolve;
 
 /// Planes the brush loader fills.
 const BRUSH_PLANES: usize = 5;
 
-/// A chunk id as the game compares it: the four characters in memory order.
-const fn chunk_id(name: &[u8; 4]) -> i32 {
-    i32::from_ne_bytes(*name)
-}
+const FORM: &[u8; 4] = b"FORM";
+const ILBM: &[u8; 4] = b"ILBM";
+const BMHD: &[u8; 4] = b"BMHD";
+const BODY: &[u8; 4] = b"BODY";
+const SKIPPED_CHUNKS: [&[u8; 4]; 4] = [b"CAMG", b"CRNG", b"CMAP", b"GRAB"];
 
-const FORM: i32 = chunk_id(b"FORM");
-const ILBM: i32 = chunk_id(b"ILBM");
-const BMHD: i32 = chunk_id(b"BMHD");
-const BODY: i32 = chunk_id(b"BODY");
-const SKIPPED_CHUNKS: [i32; 4] = [
-    chunk_id(b"CAMG"),
-    chunk_id(b"CRNG"),
-    chunk_id(b"CMAP"),
-    chunk_id(b"GRAB"),
-];
+/// Bytes in a chunk id and in a chunk length.
+const CHUNK_FIELD_BYTES: usize = 4;
 
-/// The ILBM bitmap header chunk; the file is big-endian. Only `width`, `height` and
-/// `compression` matter. (The C struct is 22 bytes although the IFF standard says 20; the
-/// difference is harmless because the file's own length is used when reading it.)
-#[repr(C)]
+/// A picture row is a whole number of 16 pixel words, as bytes: round up, divide by 8, make even.
+const WORD_ROUNDING: usize = 15;
+const PIXELS_PER_BYTE: usize = 8;
+
+/// What the loader needs from the ILBM bitmap header chunk (the file is big-endian).
 #[derive(Default)]
 struct BitMapHeader {
-    width: i16,
-    height: i16,
-    xpic: i16,
-    ypic: i16,
-    n_planes: u8,
-    masking: u8,
-    compression: u8,
-    pad1: u8,
-    transcolor: i16,
-    x_aspect: i16,
-    y_aspect: i16,
-    page_width: i16,
-    page_height: i16,
+    width: usize,
+    height: usize,
+    compressed: bool,
 }
 
-/// Reads the BMHD chunk whose length was just read, and converts the sizes from big-endian.
-unsafe fn read_bitmap_header() -> BitMapHeader {
-    let mut bmhd = BitMapHeader::default();
-    unsafe {
-        let len = chunk_length.clamp(0, size_of::<BitMapHeader>() as i32);
-        read_file(picture_file as BPTR, (&raw mut bmhd).cast(), len);
+impl BitMapHeader {
+    /// Reads the sizes at the start of the chunk's data: the width and height, then (after the
+    /// position, plane count and masking fields) the compression type.
+    fn read(data: &[u8]) -> BitMapHeader {
+        let be16 = |at: usize| {
+            data.get(at..at + 2)
+                .map_or(0, |b| u16::from_be_bytes([b[0], b[1]]))
+        };
+
+        BitMapHeader {
+            width: be16(0) as usize,
+            height: be16(2) as usize,
+            compressed: data.get(10).copied().unwrap_or(0) != 0,
+        }
     }
 
-    bmhd.width = bmhd.width.swap_bytes();
-    bmhd.height = bmhd.height.swap_bytes();
-
-    bmhd
+    /// Bytes in one unpacked scan line.
+    fn row_bytes(&self) -> usize {
+        ((self.width + WORD_ROUNDING) / PIXELS_PER_BYTE) & !1
+    }
 }
 
-/// Unpacks the BODY chunk into the bitmap, starting `offset` bytes into each plane.
-///
-/// The compressed body is first read into `shape_mem` (a scratch area), then each picture row is
-/// unpacked once per bitplane (up to 5, fewer if the bitmap is shallower).
-/// A picture row is a whole number of 16 pixel words, as bytes: round up, divide by 8, make even.
-const WORD_ROUNDING: i32 = 15;
-const PIXELS_PER_BYTE: i32 = 8;
-const EVEN_BYTES_MASK: i32 = 0xfffe;
+/// The compressed or plain pixel data of a BODY chunk, read row by row.
+struct Body<'a> {
+    data: &'a [u8],
+    at: usize,
+    compressed: bool,
+}
 
-unsafe fn read_body(bmhd: &BitMapHeader, bitmap: &BitMap, offset: usize) {
-    unsafe {
-        pack_cursor = the_memory.shape_mem.cast();
+impl Body<'_> {
+    /// Unpacks the next scan line (`dest.len()` bytes).
+    fn unpack_line(&mut self, dest: &mut [u8]) {
+        if self.compressed {
+            self.unpack_byte_run(dest);
+        } else {
+            let end = (self.at + dest.len()).min(self.data.len());
+            let line = &self.data[self.at.min(end)..end];
+            dest[..line.len()].copy_from_slice(line);
+            self.at = end;
+        }
+    }
 
-        // Masks with WORD_ROUNDING, keeping only the bits that matter here.
-        row_byte_count = ((bmhd.width as i32 + WORD_ROUNDING) / PIXELS_PER_BYTE) & EVEN_BYTES_MASK;
-        read_chunk_length();
-        read_file(
-            picture_file as BPTR,
-            the_memory.shape_mem.cast(),
-            chunk_length,
-        );
+    /// Unpacks one ByteRun1 scan line, stopping after `dest.len()` bytes.
+    ///
+    /// ByteRun1: a control byte `n` from 0 to 127 means the next n+1 bytes are copied as they are;
+    /// from -127 to -1 means the next byte is repeated 1-n times.
+    fn unpack_byte_run(&mut self, dest: &mut [u8]) {
+        let mut written = 0;
 
-        compression_type = bmhd.compression as i8;
-        let mut planes: [*mut u8; BRUSH_PLANES] =
-            std::array::from_fn(|p| bitmap.Planes[p].wrapping_add(offset));
+        while written < dest.len() {
+            let Some(&control) = self.data.get(self.at) else {
+                return;
+            };
 
-        for _ in 0..bmhd.height {
-            for (p, plane) in planes.iter_mut().enumerate() {
-                if bitmap.Depth as usize > p {
-                    unpack_line(*plane);
+            self.at += 1;
+            let control = control as i8;
+
+            if control >= 0 {
+                for _ in 0..=control {
+                    let byte = self.data.get(self.at).copied().unwrap_or(0);
+                    self.at += 1;
+                    put(dest, written, byte);
+                    written += 1;
                 }
-
-                *plane = plane.wrapping_add(bitmap.BytesPerRow as usize);
-            }
-        }
-    }
-}
-
-/// Loads the picture `filename` into `bitmap` at byte column `x`, row `y`. Returns TRUE/FALSE.
-/// Used for the title pages, the story pictures, the text panel background and the winning picture.
-pub fn load_picture(filename: *const c_char, bitmap: *mut BitMap, x: i16, y: i16) -> i32 {
-    unsafe {
-        let bitmap = &*bitmap;
-        let offset = (x as i32 + bitmap.BytesPerRow as i32 * y as i32) as usize;
-
-        picture_file = open_file(filename, MODE_OLDFILE) as i32;
-
-        if picture_file == 0 {
-            return FALSE;
-        }
-
-        let read_ok = read_form(bitmap, offset);
-
-        close_file(picture_file as BPTR);
-
-        if read_ok { TRUE } else { FALSE }
-    }
-}
-
-/// Reads the chunks of the open IFF file: the header, then the picture body into `bitmap` at byte
-/// `offset`. Returns false if this is not a picture file the game can read.
-unsafe fn read_form(bitmap: &BitMap, offset: usize) -> bool {
-    unsafe {
-        read_chunk_id();
-
-        if current_chunk_id != FORM {
-            return false;
-        }
-
-        read_chunk_length();
-        bytes_left_in_file = chunk_length;
-
-        let mut bmhd = BitMapHeader::default();
-
-        while bytes_left_in_file != 0 {
-            read_chunk_id();
-
-            if current_chunk_id == ILBM {
-                // just the form type, no data
-            } else if current_chunk_id == BMHD {
-                read_chunk_length();
-                bmhd = read_bitmap_header();
-            } else if SKIPPED_CHUNKS.contains(&{ current_chunk_id }) {
-                read_chunk_length();
-                seek_file(picture_file as BPTR, chunk_length, OFFSET_CURRENT);
-            } else if current_chunk_id == BODY {
-                read_body(&bmhd, bitmap, offset);
-
-                break;
             } else {
-                return false;
+                let byte = self.data.get(self.at).copied().unwrap_or(0);
+                self.at += 1;
+
+                for _ in 0..=(-(control as i32)) {
+                    put(dest, written, byte);
+                    written += 1;
+                }
             }
         }
+    }
+}
 
-        true
+/// Stores a byte unless the run has gone past the end of the line.
+fn put(dest: &mut [u8], at: usize, byte: u8) {
+    if let Some(slot) = dest.get_mut(at) {
+        *slot = byte;
+    }
+}
+
+/// Reads chunk ids and lengths from the file.
+struct Chunks<'a> {
+    data: &'a [u8],
+    at: usize,
+}
+
+impl<'a> Chunks<'a> {
+    fn id(&mut self) -> Option<[u8; 4]> {
+        let id = self
+            .data
+            .get(self.at..self.at + CHUNK_FIELD_BYTES)?
+            .try_into()
+            .ok()?;
+        self.at += CHUNK_FIELD_BYTES;
+
+        Some(id)
+    }
+
+    fn length(&mut self) -> Option<usize> {
+        let bytes = self.data.get(self.at..self.at + CHUNK_FIELD_BYTES)?;
+        self.at += CHUNK_FIELD_BYTES;
+
+        Some(u32::from_be_bytes(bytes.try_into().ok()?) as usize)
+    }
+
+    /// The next `length` bytes, which are skipped over.
+    fn take(&mut self, length: usize) -> &'a [u8] {
+        let end = (self.at + length).min(self.data.len());
+        let bytes = &self.data[self.at.min(end)..end];
+        self.at = end;
+
+        bytes
+    }
+}
+
+/// Loads the picture `name` into `bitmap` at byte column `x`, row `y`. Returns false if the file is
+/// missing or not a picture the game can read. Used for the title pages, the story pictures, the
+/// text panel background and the winning picture.
+pub fn load_picture(name: &str, bitmap: &mut Bitmap, x: usize, y: usize) -> bool {
+    let Some(file) = resolve(name, false).and_then(|path| std::fs::read(path).ok()) else {
+        return false;
+    };
+
+    read_form(&file, bitmap, x + bitmap.bytes_per_row() * y).is_some()
+}
+
+/// Reads the chunks of an IFF file: the header, then the picture body into `bitmap` at byte
+/// `offset`. Returns None if this is not a picture file the game can read.
+fn read_form(file: &[u8], bitmap: &mut Bitmap, offset: usize) -> Option<()> {
+    let mut chunks = Chunks { data: file, at: 0 };
+
+    if &chunks.id()? != FORM {
+        return None;
+    }
+
+    let mut left = chunks.length()? as i64;
+    let mut header = BitMapHeader::default();
+
+    while left != 0 {
+        let id = chunks.id()?;
+        left -= CHUNK_FIELD_BYTES as i64;
+
+        if &id == ILBM {
+            // just the form type, no data
+        } else if &id == BMHD {
+            let length = chunks.length()?;
+            left -= (length + CHUNK_FIELD_BYTES) as i64;
+            header = BitMapHeader::read(chunks.take(length));
+        } else if SKIPPED_CHUNKS.contains(&&id) {
+            let length = chunks.length()?;
+            left -= (length + CHUNK_FIELD_BYTES) as i64;
+            chunks.take(length);
+        } else if &id == BODY {
+            let length = chunks.length()?;
+            let mut body = Body {
+                data: chunks.take(length),
+                at: 0,
+                compressed: header.compressed,
+            };
+
+            unpack_body(&header, &mut body, bitmap, offset);
+
+            break;
+        } else {
+            return None;
+        }
+    }
+
+    Some(())
+}
+
+/// Unpacks the BODY into the bitmap, starting `offset` bytes into each plane: each picture row is
+/// unpacked once per bitplane (up to 5, fewer if the bitmap is shallower).
+fn unpack_body(header: &BitMapHeader, body: &mut Body, bitmap: &mut Bitmap, offset: usize) {
+    let row_bytes = header.row_bytes();
+    let bytes_per_row = bitmap.bytes_per_row();
+    let mut line = vec![0u8; row_bytes];
+
+    for row in 0..header.height {
+        let start = offset + row * bytes_per_row;
+
+        for p in 0..BRUSH_PLANES {
+            if bitmap.depth() > p {
+                body.unpack_line(&mut line);
+
+                if let Some(dest) = bitmap.plane_mut(p).get_mut(start..start + row_bytes) {
+                    dest.copy_from_slice(&line);
+                }
+            }
+        }
     }
 }
 
@@ -198,14 +235,86 @@ unsafe fn read_form(bitmap: &BitMap, offset: usize) -> bool {
 mod tests {
     use super::*;
 
-    #[test]
-    fn chunk_ids_match_the_file_bytes() {
-        assert_eq!(FORM.to_ne_bytes(), *b"FORM");
-        assert_eq!(BODY.to_ne_bytes(), *b"BODY");
+    fn body(data: &[u8], compressed: bool) -> Body<'_> {
+        Body {
+            data,
+            at: 0,
+            compressed,
+        }
     }
 
     #[test]
-    fn bitmap_header_matches_the_c_struct() {
-        assert_eq!(size_of::<BitMapHeader>(), 22);
+    fn literal_runs_are_copied() {
+        let mut out = [0u8; 3];
+        let mut b = body(&[2, 10, 20, 30], true); // 3 literal bytes
+        b.unpack_line(&mut out);
+
+        assert_eq!(out, [10, 20, 30]);
+        assert_eq!(b.at, 4);
+    }
+
+    #[test]
+    fn repeat_runs_are_expanded() {
+        let mut out = [0u8; 4];
+        let mut b = body(&[(-3i8) as u8, 7], true); // 7 repeated 4 times
+        b.unpack_line(&mut out);
+
+        assert_eq!(out, [7, 7, 7, 7]);
+        assert_eq!(b.at, 2);
+    }
+
+    #[test]
+    fn an_uncompressed_row_is_copied() {
+        let mut out = [0u8; 2];
+        let mut b = body(&[5, 6, 7, 8], false);
+        b.unpack_line(&mut out);
+        assert_eq!(out, [5, 6]);
+        b.unpack_line(&mut out);
+        assert_eq!(out, [7, 8]);
+    }
+
+    #[test]
+    fn rows_are_whole_words() {
+        let header = BitMapHeader {
+            width: 320,
+            ..Default::default()
+        };
+        assert_eq!(header.row_bytes(), 40);
+    }
+
+    /// A tiny 16 x 2 picture with 2 planes, uncompressed.
+    fn tiny_picture() -> Vec<u8> {
+        let mut bmhd = vec![0, 16, 0, 2, 0, 0, 0, 0, 2, 0, 0, 0];
+        bmhd.resize(20, 0);
+        let pixels = [0xff, 0x00, 0x00, 0xff, 0x0f, 0xf0, 0xf0, 0x0f];
+        let mut form = b"ILBM".to_vec();
+        form.extend(b"BMHD");
+        form.extend((bmhd.len() as u32).to_be_bytes());
+        form.extend(&bmhd);
+        form.extend(b"BODY");
+        form.extend((pixels.len() as u32).to_be_bytes());
+        form.extend(pixels);
+        let mut file = b"FORM".to_vec();
+        file.extend((form.len() as u32).to_be_bytes());
+        file.extend(form);
+
+        file
+    }
+
+    #[test]
+    fn a_picture_file_is_unpacked_into_the_planes() {
+        let mut bm = Bitmap::new(16, 2, 2);
+
+        assert!(read_form(&tiny_picture(), &mut bm, 0).is_some());
+        assert_eq!(bm.plane(0)[..2], [0xff, 0x00]);
+        assert_eq!(bm.plane(1)[..2], [0x00, 0xff]);
+        assert_eq!(bm.plane(0)[2..4], [0x0f, 0xf0]);
+    }
+
+    #[test]
+    fn something_else_is_refused() {
+        let mut bm = Bitmap::new(16, 2, 2);
+
+        assert!(read_form(b"JUNKJUNKJUNK", &mut bm, 0).is_none());
     }
 }

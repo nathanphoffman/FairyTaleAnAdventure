@@ -17,7 +17,3 @@ pub fn unlock_path(_lock: BPTR) {}
 pub fn io_error() -> LONG {
     0
 }
-
-pub fn set_current_dir(_lock: BPTR) -> BPTR {
-    0
-}

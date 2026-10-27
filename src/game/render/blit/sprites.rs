@@ -12,11 +12,17 @@ use crate::game::data::globals::{
     sprite_x_shift,
 };
 
-use crate::game::data::state::{the_memory, the_screen};
+use crate::game::data::state::the_memory;
+use crate::game::render::screen::screen;
 
 /// Where plane `p` of the play field starts for the current sprite.
 pub(super) unsafe fn plane_at_sprite(p: i32) -> *mut u8 {
-    unsafe { (*the_screen.planes.offset(p as isize)).offset((*current_sshape).coff as isize) }
+    unsafe {
+        screen()
+            .draw_bitmap_mut()
+            .plane_ptr(p as usize)
+            .offset((*current_sshape).coff as isize)
+    }
 }
 
 /// Zeroes a rectangle of memory, sized like a BLTSIZE value.
@@ -118,7 +124,7 @@ unsafe fn draw_shape_plane(p: i32, bit_shift: u32, (first, last): (u32, u32)) {
             .offset(shadow_mask_offset as isize);
         t.b = the_memory
             .shapedata
-            .offset(sprite_mask_offset as isize + the_screen.planesize as isize * p as isize);
+            .offset(sprite_mask_offset as isize + screen().planesize as isize * p as isize);
         t.bmod = sprite_mask_modulo as i32;
         t.c = plane_at_sprite(p);
         t.d = t.c;

@@ -1,39 +1,34 @@
 //! The title screen, the intro and getting the first brother started (from csrc/fmain.c), up to the
 //! first frame of the game.
 
-use crate::amiga::BitMap;
-use crate::game::files::loading::intro_skip_requested;
-use crate::game::ui::menus::print_options;
-use std::ffi::CStr;
-
 use crate::game::actors::revive::revive;
-use crate::game::data::globals::{main_view, story_font};
-use crate::game::data::state::{the_memory, the_screen, the_ui};
+use crate::game::data::state::{the_memory, the_ui};
 use crate::game::data::story_text::TITLE_TEXT;
-use crate::game::data::tables::{black_colors, pointer_sprite, text_colors};
-use crate::game::files::disk::{load_track_range, mark_last_read_unused, wait_for_last_read};
+use crate::game::data::tables::{black_colors, text_colors};
+use crate::game::files::disk::load_track_range;
 use crate::game::files::iff_picture::load_picture;
 use crate::game::files::loading::{
-    copy_protection_check, copy_protection_riddle, intro_skipped, read_sample, read_score,
-    show_story_page,
+    copy_protection_check, copy_protection_riddle, intro_skip_requested, intro_skipped,
+    read_sample, read_score, show_story_page,
 };
-
-use crate::game::render::display::flip_pages;
+use crate::game::render::display::{delay, flip_pages};
+use crate::game::render::screen::{BitmapId, FontKind, PortId, ViewPortId, screen};
 use crate::game::render::screen_fx::{set_intro_zoom, show_still_screen};
+use crate::game::ui::menus::print_options;
 use crate::game::ui::text::{placard_text, print_positioned};
-
+use crate::gfx::bitmap::Rect;
 use crate::platform::audio::{playscore, stopscore};
-use crate::platform::display::delay;
-use crate::platform::gfx::{
-    blt_bit_map, load_rgb4, make_vport, set_a_pen, set_b_pen, set_font, set_rast, set_rgb4,
-};
 
-// Memory the game allocates (csrc/fmain.c).
+// Where the view ports sit once the game starts.
 const PAGE_HEIGHT: i16 = 143;
-const TEXT_HEIGHT: i32 = 57;
+const TEXT_HEIGHT: i16 = 57;
 const LOWRES_WIDTH: i16 = 288;
 const PAGE_VIEW_HEIGHT: i16 = 140;
 const PAGE_VIEW_X: i16 = 16;
+
+// Size of a picture page.
+const PAGE_SIZE: (i32, i32) = (320, 200);
+const ALL_FIVE_PLANES: u32 = 0x1f;
 
 // Screen modes (`view_status`).
 const VIEW_REDRAW: i8 = 99;
@@ -43,37 +38,30 @@ const ZOOM_FULL: i32 = 160;
 const ZOOM_NORMAL: i32 = 156;
 const ZOOM_STEP: usize = 4;
 
-/// Colours `LoadRGB4` sets for the page and the text.
-const PAGE_COLORS: i32 = 32;
-const TEXT_COLORS: i32 = 20;
-
 /// Pens: the title text, and the colour of the flashing pointer.
-const TITLE_PEN: u32 = 1;
+const TITLE_PEN: u8 = 1;
 
 // The title screen's palette: a blue page background and white text; the play screen's background
 // is darker while the panel loads.
-const BACKGROUND_COLOR: i32 = 0;
-const TEXT_COLOR: i32 = 1;
+const BACKGROUND_COLOR: usize = 0;
+const TEXT_COLOR: usize = 1;
 const TITLE_BLUE: (u32, u32, u32) = (0, 0, 6);
 const WHITE_RGB: (u32, u32, u32) = (15, 15, 15);
 const LOADING_BLUE: (u32, u32, u32) = (0, 0, 3);
 
 /// Pens of the story text.
-const STORY_PEN: u32 = 10;
-const STORY_BACKGROUND_PEN: u32 = 11;
+const STORY_PEN: u8 = 10;
+const STORY_BACKGROUND_PEN: u8 = 11;
 
 /// The tracks of the intro tune.
 const INTRO_TRACKS: [usize; 4] = [12, 13, 14, 15];
 
 /// The story pages: file names and the delays in ticks before and after each is shown.
-const STORY_PAGES: [(&CStr, &CStr, i16, i16); 3] = [
-    (c"p1a", c"p1b", 21, 29),
-    (c"p2a", c"p2b", 20, 29),
-    (c"p3a", c"p3b", 20, 33),
+const STORY_PAGES: [(&str, &str, i16, i16); 3] = [
+    ("p1a", "p1b", 21, 29),
+    ("p2a", "p2b", 20, 29),
+    ("p3a", "p3b", 20, 33),
 ];
-
-/// The screen has five bit planes.
-const PLANES: usize = 5;
 
 /// Waits, in fiftieths of a second.
 const TITLE_WAIT: i32 = 50;
@@ -83,252 +71,217 @@ const PLACARD_WAIT: i32 = 20;
 /// The placard shown while the copy protection question is asked.
 const PLACARD_COPYRIGHT: i32 = 19;
 
-/// Where the picture planes in `image_mem` start: five planes, 8000 bytes apart.
-const IMAGE_PLANE_BYTES: usize = 8000;
-const PAGE_HALF_BYTES: usize = 40000;
-
 /// Disk track range holding the shadow masks.
 const SHADOW_BLOCK: (i16, i16) = (896, 24);
 
 /// Returns false if the player failed the copy protection.
-pub(super) unsafe fn start_up() -> bool {
-    unsafe {
-        stopscore();
-        show_title_screen();
-        prepare_intro();
+pub(super) fn start_up() -> bool {
+    stopscore();
+    show_title_screen();
+    prepare_intro();
 
-        if let Some(dir) = std::env::var_os("FTA_MUSIC_EXPORT") {
-            crate::game::ui::music::export_tunes(std::path::Path::new(&dir));
+    if let Some(dir) = std::env::var_os("FTA_MUSIC_EXPORT") {
+        unsafe { crate::game::ui::music::export_tunes(std::path::Path::new(&dir)) };
 
-            return false;
-        }
-
-        if intro_skipped() == 0 {
-            play_intro();
-        }
-
-        copy_protection_check();
-        show_play_screen_background();
-
-        if copy_protection_riddle() == 0 {
-            return false;
-        }
-
-        delay(PLACARD_WAIT);
-        start_first_brother();
-
-        true
+        return false;
     }
+
+    if intro_skipped() == 0 {
+        play_intro();
+    }
+
+    copy_protection_check();
+    show_play_screen_background();
+
+    if copy_protection_riddle() == 0 {
+        return false;
+    }
+
+    delay(PLACARD_WAIT);
+    start_first_brother();
+
+    true
 }
 
 /// Blanks both pages.
-unsafe fn clear_both_pages() {
-    unsafe {
-        the_screen.rp_map.BitMap = (*(*the_screen.viewing_page).ri_page).BitMap;
-        set_rast(&raw mut the_screen.rp_map, 0);
-        the_screen.rp_map.BitMap = (*(*the_screen.drawing_page).ri_page).BitMap;
-        set_rast(&raw mut the_screen.rp_map, 0);
+fn clear_both_pages() {
+    let screen = screen();
+
+    for page in [screen.viewing_bitmap_id(), screen.drawing_bitmap_id()] {
+        screen.port_mut(PortId::Map).target = Some(page);
+        screen.clear(PortId::Map, 0);
     }
 }
 
 /// Sets a colour of the page palette from 4-bit red, green and blue.
-unsafe fn set_page_color(color: i32, (r, g, b): (u32, u32, u32)) {
-    unsafe { set_rgb4(&raw mut the_screen.vp_page, color, r, g, b) };
+fn set_page_color(color: usize, rgb: (u32, u32, u32)) {
+    screen().set_color(ViewPortId::Page, color, rgb);
 }
 
 /// The legal title text on a blue page, then the music and the sound effects are read in.
-unsafe fn show_title_screen() {
-    unsafe {
-        the_screen.vp_page.RasInfo = &raw mut the_screen.ri_page1;
-        the_screen.fp_page2.ri_page = &raw mut the_screen.ri_page2;
-        clear_both_pages();
-        the_screen.current_rastport = &raw mut the_screen.rp_map;
-        set_intro_zoom(ZOOM_NORMAL);
-        set_page_color(BACKGROUND_COLOR, TITLE_BLUE);
-        set_page_color(TEXT_COLOR, WHITE_RGB);
+fn show_title_screen() {
+    let screen = screen();
+    screen.vp_page.ras = Some(0);
+    screen.pages[1].ras = 1;
+    clear_both_pages();
+    screen.current_port = PortId::Map;
+    set_intro_zoom(ZOOM_NORMAL);
+    set_page_color(BACKGROUND_COLOR, TITLE_BLUE);
+    set_page_color(TEXT_COLOR, WHITE_RGB);
 
-        let pen = (*the_screen.current_rastport).FgPen as u32;
-        set_a_pen(the_screen.current_rastport, TITLE_PEN);
-        print_positioned(TITLE_TEXT.as_ptr());
-        set_a_pen(the_screen.current_rastport, pen);
+    let pen = screen.port(PortId::Map).pen.fg;
+    screen.set_a_pen(PortId::Map, TITLE_PEN);
+    print_positioned(TITLE_TEXT.as_ptr());
+    screen.set_a_pen(PortId::Map, pen);
 
-        delay(TITLE_WAIT);
+    delay(TITLE_WAIT);
 
-        the_screen.current_rastport = &raw mut the_screen.rp_text;
-        the_screen.rp_text.BitMap = &raw mut the_screen.bm_scroll;
-        set_font(the_screen.current_rastport, story_font);
-        set_a_pen(the_screen.current_rastport, STORY_PEN);
-        set_b_pen(the_screen.current_rastport, STORY_BACKGROUND_PEN);
+    screen.current_port = PortId::Text;
+    screen.port_mut(PortId::Text).target = Some(BitmapId::TextPlane0);
+    screen.set_font_kind(PortId::Text, FontKind::Story);
+    screen.set_a_pen(PortId::Text, STORY_PEN);
+    screen.set_b_pen(PortId::Text, STORY_BACKGROUND_PEN);
 
-        read_score();
-        read_sample();
+    read_score();
+    read_sample();
 
-        delay(TITLE_WAIT);
-    }
+    delay(TITLE_WAIT);
 }
 
-/// Points the picture loader at the page memory, starts the intro tune, and flips the pages twice
-/// so both show the same thing.
-unsafe fn prepare_intro() {
+/// Starts the intro tune, and flips the pages twice so both show the same thing.
+fn prepare_intro() {
+    let screen = screen();
+    screen.vp_page.ras = Some(0);
+
     unsafe {
-        the_screen.current_viewport = &raw mut the_screen.vp_page; // so that the IFF routines can communicate
-        the_screen.vp_page.RasInfo = &raw mut the_screen.ri_page1;
-
-        for i in 0..PLANES {
-            the_screen.pageb.Planes[i] = the_memory.image_mem.add(i * IMAGE_PLANE_BYTES);
-            the_screen.pagea.Planes[i] = the_screen.pageb.Planes[i].add(PAGE_HALF_BYTES);
-        }
-
-        (*the_screen.bm_lim).Planes[0] = the_memory.sector_mem;
-
         playscore(
             the_memory.track[INTRO_TRACKS[0]],
             the_memory.track[INTRO_TRACKS[1]],
             the_memory.track[INTRO_TRACKS[2]],
             the_memory.track[INTRO_TRACKS[3]],
         );
-
-        load_rgb4(
-            &raw mut the_screen.vp_text,
-            (&raw const black_colors).cast(),
-            PAGE_COLORS,
-        );
-
-        the_screen.fp_page2.ri_page = &raw mut the_screen.ri_page2;
-        set_intro_zoom(0);
-
-        flip_pages(); // "prime the pump"
-        flip_pages();
     }
+
+    screen.load_colors(ViewPortId::Text, &black_colors);
+    screen.pages[1].ras = 1;
+    set_intro_zoom(0);
+
+    flip_pages(); // "prime the pump"
+    flip_pages();
 }
 
 /// Switches to the normal playing screen: loads the shadow masks and the panel picture, and shows
 /// the copyright placard.
-unsafe fn show_play_screen_background() {
+fn show_play_screen_background() {
+    let screen = screen();
+    screen.pages[1].ras = 1;
+    clear_both_pages();
+
+    screen.load_colors(ViewPortId::Text, &black_colors);
+
+    set_intro_zoom(ZOOM_NORMAL);
+    set_page_color(BACKGROUND_COLOR, LOADING_BLUE);
+
     unsafe {
-        the_screen.fp_page2.ri_page = &raw mut the_screen.ri_page2;
-        clear_both_pages();
-
-        load_rgb4(
-            &raw mut the_screen.vp_text,
-            (&raw const black_colors).cast(),
-            PAGE_COLORS,
-        );
-
-        set_intro_zoom(ZOOM_NORMAL);
-        set_page_color(BACKGROUND_COLOR, LOADING_BLUE);
         load_track_range(
             SHADOW_BLOCK.0,
             SHADOW_BLOCK.1,
             the_memory.shadow_mem.cast(),
             0,
         );
+    }
 
-        wait_for_last_read();
-        mark_last_read_unused();
+    set_page_color(BACKGROUND_COLOR, TITLE_BLUE);
+    load_picture("hiscreen", screen.bitmap_mut(BitmapId::Text), 0, 0);
 
-        set_page_color(BACKGROUND_COLOR, TITLE_BLUE);
-        load_picture(c"hiscreen".as_ptr(), the_screen.bm_text, 0, 0);
+    set_page_color(TEXT_COLOR, WHITE_RGB);
 
-        set_page_color(TEXT_COLOR, WHITE_RGB);
+    screen.current_port = PortId::Map;
+    screen.port_mut(PortId::Map).target = Some(screen.drawing_bitmap_id());
+    show_still_screen();
+    screen.set_a_pen(PortId::Map, TITLE_PEN);
+    placard_text(PLACARD_COPYRIGHT);
 
-        the_screen.current_rastport = &raw mut the_screen.rp_map;
-        the_screen.rp_map.BitMap = (*(*the_screen.drawing_page).ri_page).BitMap;
-        show_still_screen();
-        set_a_pen(the_screen.current_rastport, TITLE_PEN);
-        placard_text(PLACARD_COPYRIGHT);
+    unsafe {
         the_ui.handler_data.laydown = 0;
         the_ui.handler_data.pickup = 0;
     }
 }
 
 /// Starts the first brother and sets up the text page and the colours for play.
-unsafe fn start_first_brother() {
-    unsafe {
-        the_screen.ri_page1.RxOffset = 0;
-        the_screen.ri_page2.RxOffset = 0;
-        the_screen.ri_page1.RyOffset = 0;
-        the_screen.ri_page2.RyOffset = 0;
+fn start_first_brother() {
+    let screen = screen();
 
-        stopscore();
-        revive(1);
-        the_screen.rp_map.BitMap = (*(*the_screen.drawing_page).ri_page).BitMap;
-
-        the_screen.vp_text.DyOffset = PAGE_HEIGHT;
-        the_screen.vp_text.DHeight = TEXT_HEIGHT as i16;
-        the_screen.vp_page.DHeight = PAGE_VIEW_HEIGHT;
-        the_screen.vp_page.DxOffset = PAGE_VIEW_X;
-        the_screen.vp_page.DWidth = LOWRES_WIDTH;
-        the_screen.vp_page.DyOffset = 0;
-        make_vport(&raw mut main_view, &raw mut the_screen.vp_text);
-        load_rgb4(
-            &raw mut the_screen.vp_text,
-            (&raw const text_colors).cast(),
-            TEXT_COLORS,
-        );
-
-        the_ui.handler_data.pbase = (&raw mut pointer_sprite).cast();
-
-        the_screen.fp_page1.obcount = 0;
-        the_screen.fp_page2.obcount = 0;
-        the_screen.fp_page1.wflag = 0;
-        the_screen.fp_page2.wflag = 0;
-
-        the_screen.view_status = VIEW_REDRAW;
-
-        the_ui.current_menu = 0;
-        print_options();
+    for ras in &mut screen.ras[..2] {
+        ras.x = 0;
+        ras.y = 0;
     }
+
+    stopscore();
+    revive(1);
+
+    let screen = crate::game::render::screen::screen();
+    screen.port_mut(PortId::Map).target = Some(screen.drawing_bitmap_id());
+
+    screen.vp_text.y = PAGE_HEIGHT;
+    screen.vp_text.height = TEXT_HEIGHT;
+    screen.vp_page.height = PAGE_VIEW_HEIGHT;
+    screen.vp_page.x = PAGE_VIEW_X;
+    screen.vp_page.width = LOWRES_WIDTH;
+    screen.vp_page.y = 0;
+    screen.load_colors(ViewPortId::Text, &text_colors);
+
+    for page in &mut screen.pages {
+        page.obcount = 0;
+        page.wflag = 0;
+    }
+
+    screen.view_status = VIEW_REDRAW;
+
+    unsafe { the_ui.current_menu = 0 };
+    print_options();
 }
 
 /// The story pictures with the zoom in and out (skipped if the player presses Space).
-unsafe fn play_intro() {
-    unsafe {
-        load_picture(c"page0".as_ptr(), &raw mut the_screen.pageb, 0, 0);
-        copy_title_picture_to(the_screen.bm_page1);
-        copy_title_picture_to(the_screen.bm_page2);
+fn play_intro() {
+    let screen = screen();
+    load_picture("page0", screen.bitmap_mut(BitmapId::PageB), 0, 0);
+    copy_title_picture_to(BitmapId::Page1);
+    copy_title_picture_to(BitmapId::Page2);
 
-        the_screen.fp_page2.ri_page = &raw mut the_screen.ri_page1;
+    screen.pages[1].ras = 0;
 
-        for x in (0..=ZOOM_FULL).step_by(ZOOM_STEP) {
-            set_intro_zoom(x);
+    for x in (0..=ZOOM_FULL).step_by(ZOOM_STEP) {
+        set_intro_zoom(x);
+    }
+
+    screen.pages[1].ras = 1;
+
+    if intro_skipped() == 0 {
+        for (first, second, first_wait, second_wait) in STORY_PAGES {
+            show_story_page(first, second, first_wait, second_wait);
         }
 
-        the_screen.fp_page2.ri_page = &raw mut the_screen.ri_page2;
-
-        if intro_skipped() == 0 {
-            for (first, second, first_wait, second_wait) in STORY_PAGES {
-                show_story_page(first.as_ptr(), second.as_ptr(), first_wait, second_wait);
-            }
-
-            if intro_skip_requested == 0 {
-                delay(INTRO_PAGES_WAIT);
-            }
+        if unsafe { intro_skip_requested } == 0 {
+            delay(INTRO_PAGES_WAIT);
         }
+    }
 
-        the_screen.fp_page2.ri_page = &raw mut the_screen.ri_page1;
+    screen.pages[1].ras = 0;
 
-        for x in (0..=ZOOM_NORMAL).rev().step_by(ZOOM_STEP) {
-            set_intro_zoom(x);
-        }
+    for x in (0..=ZOOM_NORMAL).rev().step_by(ZOOM_STEP) {
+        set_intro_zoom(x);
     }
 }
 
-/// Copies the whole title picture (loaded into `pageb`) onto the bitmap of a display page.
-unsafe fn copy_title_picture_to(bitmap: *mut BitMap) {
-    unsafe {
-        blt_bit_map(
-            &raw mut the_screen.pageb,
-            0,
-            0,
-            bitmap,
-            0,
-            0,
-            320,
-            200,
-            0xC0,
-            0x1f,
-            std::ptr::null_mut(),
-        );
-    }
+/// Copies the whole title picture (loaded into `PageB`) onto the bitmap of a display page.
+fn copy_title_picture_to(page: BitmapId) {
+    let whole = Rect {
+        x: 0,
+        y: 0,
+        width: PAGE_SIZE.0,
+        height: PAGE_SIZE.1,
+    };
+
+    screen().copy(BitmapId::PageB, whole, page, (0, 0), ALL_FIVE_PLANES);
 }

@@ -26,8 +26,8 @@ use crate::game::world::regions::refresh_minimap;
 use crate::game::world::survival::survival_tick;
 use crate::game::world::travel_doors::check_door;
 
-use crate::platform::display::delay;
-use crate::platform::gfx::{set_a_pen, set_rgb4, wait_blit};
+use crate::game::render::display::delay;
+use crate::game::render::screen::{PortId, ViewPortId, screen};
 
 // Screen modes (`view_status`).
 const VIEW_NORMAL: i8 = 0;
@@ -47,7 +47,7 @@ const NO_REGION: u16 = 10;
 
 /// Pens: the title text, and the colour of the flashing pointer.
 const FLASH_COLOR: u32 = 15;
-const SPRITE_PEN: u32 = 31;
+const SPRITE_PEN: u8 = 31;
 
 /// Waits, in fiftieths of a second.
 const PAUSE_WAIT: i32 = 200;
@@ -76,7 +76,7 @@ const TILE_Y_MASK: i32 = 31;
 
 /// The status colour (31) flashes on and off with this bit of the flasher counter.
 const FLASH_BIT: i8 = 16;
-const STATUS_COLOR: i32 = 31;
+const STATUS_COLOR: usize = 31;
 
 /// How the map moved since the last frame, in sectors (x wraps at 10 bits).
 unsafe fn scroll_step() -> (i16, i16) {
@@ -86,8 +86,9 @@ unsafe fn scroll_step() -> (i16, i16) {
 
         // Shifts by TILE_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
         the_world.tile_y = the_world.map_y >> TILE_HEIGHT_SHIFT;
-        let dif_x = (the_world.tile_x as i32 - (*the_screen.drawing_page).isv_x) as i16;
-        let dif_y = (the_world.tile_y as i32 - (*the_screen.drawing_page).isv_y) as i16;
+        let page = screen().drawing_page();
+        let dif_x = (the_world.tile_x as i32 - page.isv_x) as i16;
+        let dif_y = (the_world.tile_y as i32 - page.isv_y) as i16;
 
         (wrap_scroll_difference(dif_x), dif_y)
     }
@@ -195,15 +196,13 @@ unsafe fn handle_view_status() -> bool {
         } else if the_screen.view_status == VIEW_BIG || the_screen.view_status == VIEW_BIG_STILL {
             // Masks with FLASH_BIT, keeping only the bits that matter here.
             if the_screen.flasher & FLASH_BIT != 0 && the_screen.view_status == VIEW_BIG {
-                set_rgb4(
-                    &raw mut the_screen.vp_page,
+                screen().set_color(
+                    ViewPortId::Page,
                     STATUS_COLOR,
-                    FLASH_COLOR,
-                    FLASH_COLOR,
-                    FLASH_COLOR,
+                    (FLASH_COLOR, FLASH_COLOR, FLASH_COLOR),
                 );
             } else {
-                set_rgb4(&raw mut the_screen.vp_page, STATUS_COLOR, 0, 0, 0);
+                screen().set_color(ViewPortId::Page, STATUS_COLOR, (0, 0, 0));
             }
 
             handle_print_request();
@@ -327,10 +326,11 @@ unsafe fn run_world_update() {
 /// Fights, missiles and drawing, then shows the page that was just drawn.
 unsafe fn draw_frame(state: &mut FrameState, scroll_x: i16, scroll_y: i16) {
     unsafe {
-        (*the_screen.drawing_page).isv_x = the_world.tile_x as i32;
-        (*the_screen.drawing_page).isv_y = the_world.tile_y as i32;
+        let page = screen().drawing_page_mut();
+        page.isv_x = the_world.tile_x as i32;
+        page.isv_y = the_world.tile_y as i32;
 
-        set_a_pen(&raw mut the_screen.rp_map, SPRITE_PEN);
+        screen().set_a_pen(PortId::Map, SPRITE_PEN);
 
         resolve_melee();
         advance_missiles();
@@ -349,13 +349,12 @@ unsafe fn draw_frame(state: &mut FrameState, scroll_x: i16, scroll_y: i16) {
 
         // The drawing loop used to leave `j` here; the next frame's actor loop reads it.
         state.last_terrain = the_actors.drawn;
-        wait_blit();
-        (*(*the_screen.drawing_page).ri_page).RxOffset =
-            // Masks with TILE_X_MASK, keeping only the bits that matter here.
-            (the_world.map_x as i32 & TILE_X_MASK) as i16;
-        (*(*the_screen.drawing_page).ri_page).RyOffset =
-            // Masks with TILE_Y_MASK, keeping only the bits that matter here.
-            (the_world.map_y as i32 & TILE_Y_MASK) as i16;
+        let screen = screen();
+        let ras = screen.drawing_page().ras;
+        // Masks with TILE_X_MASK, keeping only the bits that matter here.
+        screen.ras[ras].x = (the_world.map_x as i32 & TILE_X_MASK) as i16;
+        // Masks with TILE_Y_MASK, keeping only the bits that matter here.
+        screen.ras[ras].y = (the_world.map_y as i32 & TILE_Y_MASK) as i16;
         flip_pages();
 
         if the_screen.view_status == VIEW_CHANGED {

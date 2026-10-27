@@ -9,8 +9,9 @@ use crate::game::data::globals::{
 };
 use crate::game::data::types::SeqInfo;
 
-use crate::game::data::state::{the_memory, the_screen};
+use crate::game::data::state::the_memory;
 use crate::game::render::blit::SShape;
+use crate::game::render::screen::screen;
 
 // ---- draw_sprites ----
 /// Screen size in pixels the sprites are clipped to (the play field is 320 by 174).
@@ -83,11 +84,13 @@ pub(super) fn clip_to_screen(sprite: &mut Sprite) -> Clip {
 /// small sprites), otherwise the page's save buffer. Returns false when the buffer is full.
 pub(super) unsafe fn assign_background_save(frame: &mut Frame) -> bool {
     unsafe {
-        let page = the_screen.drawing_page;
+        let page = screen().drawing_page_mut();
 
         if (*current_sshape).savesize < SMALL_SAVE && frame.crack < SPARE_SAVES {
-            (*current_sshape).backsave =
-                (*the_screen.planes.add(frame.crack as usize)).add(SPARE_PLANE_OFFSET);
+            (*current_sshape).backsave = screen()
+                .draw_bitmap_mut()
+                .plane_ptr(frame.crack as usize)
+                .add(SPARE_PLANE_OFFSET);
             frame.crack += 1;
 
             return true;
@@ -96,9 +99,9 @@ pub(super) unsafe fn assign_background_save(frame: &mut Frame) -> bool {
         (*current_sshape).backsave = frame.backalloc;
         let bytes = PLANES * (*current_sshape).savesize as i32;
         frame.backalloc = frame.backalloc.offset(bytes as isize);
-        (*page).saveused += bytes;
+        page.saveused += bytes;
 
-        (*page).saveused < SAVE_LIMIT
+        page.saveused < SAVE_LIMIT
     }
 }
 
@@ -119,11 +122,12 @@ pub(super) unsafe fn set_up_blit(
         // The sheet is looked up again: a sunk actor is drawn from the objects sheet, but is as wide
         // and high as its own.
         let seq = sprite_sheet(sprite.atype);
-        current_sshape = (*the_screen.drawing_page)
+        let page = screen().drawing_page();
+        current_sshape = page
             .shape_queue
             .cast::<SShape>()
-            .offset((*the_screen.drawing_page).obcount as isize);
-        the_screen.planesize = seq.bytes;
+            .offset(page.obcount as isize);
+        screen().planesize = seq.bytes;
         (*current_sshape).savesize = (blitwide as i32 * blithigh as i32 * WORD_BYTES) as i16;
 
         // Blitter size word: height in the high bits, width in words in the low 6 bits.
@@ -148,10 +152,10 @@ unsafe fn locate_sprite_data(seq: &SeqInfo, inum: i16) {
     unsafe {
         the_memory.shapedata = seq
             .location
-            .offset(the_screen.planesize as isize * PLANES as isize * inum as isize);
+            .offset(screen().planesize as isize * PLANES as isize * inum as isize);
         the_memory.mask_buffer = seq
             .maskloc
-            .offset(the_screen.planesize as isize * inum as isize);
+            .offset(screen().planesize as isize * inum as isize);
     }
 }
 

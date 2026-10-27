@@ -5,14 +5,11 @@ use crate::amiga::*;
 use std::cell::RefCell;
 use std::ffi::CStr;
 use std::fs::{File, OpenOptions};
-use std::io::{Read as _, Seek as _, SeekFrom, Write as _};
+use std::io::{Read as _, Write as _};
 use std::os::raw::c_char;
 
 const MODE_NEWFILE: i32 = 1006;
 
-/// Seek modes.
-const OFFSET_BEGINNING: LONG = -1;
-const OFFSET_CURRENT: LONG = 0;
 const ERROR: LONG = -1;
 
 thread_local! {
@@ -127,28 +124,6 @@ pub fn write_file(f: BPTR, buf: *const u8, len: LONG) -> LONG {
             eprintln!("Write failed: {e}");
 
             ERROR
-        }
-    })
-    .unwrap_or(ERROR)
-}
-
-/// mode: -1 from start, 0 from current position, 1 from end. Returns the old position.
-pub fn seek_file(f: BPTR, pos: LONG, mode: LONG) -> LONG {
-    with_file(f, |file| {
-        let old = file.stream_position().unwrap_or(0);
-        let target = match mode {
-            OFFSET_BEGINNING => SeekFrom::Start(pos.max(0) as u64),
-            OFFSET_CURRENT => SeekFrom::Current(pos as i64),
-            _ => SeekFrom::End(pos as i64),
-        };
-
-        match file.seek(target) {
-            Ok(_) => old as LONG,
-            Err(e) => {
-                eprintln!("Seek failed: {e}");
-
-                ERROR
-            }
         }
     })
     .unwrap_or(ERROR)

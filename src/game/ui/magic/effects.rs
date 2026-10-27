@@ -2,15 +2,16 @@
 
 use crate::game::actors::encounters::check_death;
 use crate::game::data::random::rand8;
-use crate::game::data::state::{the_actors, the_hero, the_screen, the_world};
+use crate::game::data::state::{the_actors, the_hero, the_world};
 use crate::game::data::tables::stone_ring_sectors;
 use crate::game::data::types::Shape;
+use crate::game::render::screen::{PortId, screen};
 use crate::game::render::screen_fx::{flicker_colors, show_still_screen};
 use crate::game::ui::messages::print;
 use crate::game::ui::text::{queue_print, show_event};
 use crate::game::world::map::draw_overview_map;
 use crate::game::world::places::transfer_hero;
-use crate::platform::gfx::{move_pen, set_a_pen, set_draw_mode, text_out};
+use crate::gfx::draw::JAM1;
 
 // The menu entries: the spells are entries 5-11 and use the item slots 9-15 (`4 + entry`).
 /// A sector is 256 pixels wide and high, and a tile 16 (shifts of 8 and 4).
@@ -29,8 +30,7 @@ const STONE_ROW_HEIGHT: u16 = 64;
 const STONE_CIRCLES: usize = 11;
 
 // The overview map and where the hero's position is marked.
-const MAP_MARK_PEN: u32 = 31;
-const JAM1: u32 = 0;
+const MAP_MARK_PEN: u8 = 31;
 const MARK_X_OFFSET: i64 = 4;
 const MARK_Y_OFFSET: i64 = 3;
 const MARK_MAX: (u32, u32) = (320, 143);
@@ -49,8 +49,8 @@ const ENEMY: i8 = 2;
 /// Draws the overview map with a "+" where the hero is, and shows it.
 pub(super) unsafe fn show_map() {
     unsafe {
-        the_screen.bm_draw = (*(*the_screen.drawing_page).ri_page).BitMap;
-        the_screen.planes = (*the_screen.bm_draw).Planes.as_mut_ptr();
+        let current = screen();
+        current.draw_target = current.drawing_bitmap_id();
         draw_overview_map(the_world.map_x as i32, the_world.map_y as i32);
 
         // The hero on the overview map: his tile column minus the left edge of the shown sectors.
@@ -64,16 +64,17 @@ pub(super) unsafe fn show_map() {
             // Shifts by TILE_SHIFT, converting between pixels, tiles, sectors or bytes.
             - ((the_world.sector_y as i64 + the_world.origin_y as i64) << TILE_SHIFT)
             + MARK_Y_OFFSET) as u32;
-        the_screen.rp_map.BitMap = the_screen.bm_draw;
-        set_draw_mode(&raw mut the_screen.rp_map, JAM1);
-        set_a_pen(&raw mut the_screen.rp_map, MAP_MARK_PEN);
+        let screen = screen();
+        screen.port_mut(PortId::Map).target = Some(screen.draw_target);
+        screen.set_draw_mode(PortId::Map, JAM1);
+        screen.set_a_pen(PortId::Map, MAP_MARK_PEN);
 
         if x > 0 && x < MARK_MAX.0 && y > 0 && y < MARK_MAX.1 {
-            move_pen(&raw mut the_screen.rp_map, x as i32, y as i32);
-            text_out(&raw mut the_screen.rp_map, c"+".as_ptr().cast(), 1);
+            screen.move_to(PortId::Map, x as i32, y as i32);
+            screen.text(PortId::Map, b"+");
         }
 
-        the_screen.view_status = VIEW_MAP;
+        screen.view_status = VIEW_MAP;
         show_still_screen();
         queue_print(PRQ_MAP);
     }

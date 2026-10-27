@@ -3,7 +3,6 @@
 //! The layout must match the C exactly (`#[repr(C)]`), because the C code that is left reads and
 //! writes the same memory. The unit tests at the bottom check the sizes.
 
-use crate::amiga::RasInfo;
 use std::ffi::c_void;
 
 /// One actor (`struct shape`): the hero, a monster, a person or an object lying around.
@@ -86,10 +85,9 @@ pub struct SeqInfo {
 /// One of the two display pages being drawn and shown (`struct fpage`). The game draws on one
 /// while the other is on screen, then swaps them. It also remembers what is drawn there so it can
 /// be erased later, and the witch's beam position.
-#[repr(C)]
 pub struct FPage {
-    pub ri_page: *mut RasInfo,
-    pub savecop: *mut c_void,
+    /// Which of the screen's `ras` entries (the bitmap and its scroll offset) this page shows.
+    pub ras: usize,
     pub isv_x: i32,
     pub isv_y: i32,
     pub obcount: i16,
@@ -100,6 +98,24 @@ pub struct FPage {
     pub witchy: i16,
     pub witchdir: i16,
     pub wflag: i16,
+}
+
+impl FPage {
+    pub const fn new() -> FPage {
+        FPage {
+            ras: 0,
+            isv_x: 0,
+            isv_y: 0,
+            obcount: 0,
+            shape_queue: std::ptr::null_mut(),
+            backsave: std::ptr::null_mut(),
+            saveused: 0,
+            witchx: 0,
+            witchy: 0,
+            witchdir: 0,
+            wflag: 0,
+        }
+    }
 }
 
 /// One animation frame of an actor (`struct state`, the C table `animation_frames`): which figure image to
@@ -181,34 +197,6 @@ pub struct Letter {
     pub choice: i8,
 }
 
-#[repr(C)]
-pub struct Message {
-    pub mn_reply_port: *mut c_void,
-}
-
-/// Mirror of `pub struct IORequest` (csrc/amiga.h).
-#[repr(C)]
-pub struct IORequest {
-    pub io_message: Message,
-    pub io_device: *mut c_void,
-    pub io_unit: *mut c_void,
-    pub io_command: u16,
-    pub io_flags: u8,
-    pub io_error: i8,
-}
-
-/// Mirror of `pub struct IOAudio` (csrc/amiga.h).
-#[repr(C)]
-pub struct IOAudio {
-    pub ioa_request: IORequest,
-    pub ioa_alloc_key: i16,
-    pub ioa_data: *mut u8,
-    pub ioa_length: u32,
-    pub ioa_period: u16,
-    pub ioa_volume: u16,
-    pub ioa_cycles: u16,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -220,7 +208,6 @@ mod tests {
         assert_eq!(size_of::<WorldObject>(), 6);
         assert_eq!(size_of::<Missile>(), 10);
         assert_eq!(size_of::<SeqInfo>(), 32);
-        assert_eq!(size_of::<FPage>(), 64);
         assert_eq!(size_of::<Need>(), 18);
         assert_eq!(size_of::<Menu>(), 24);
         assert_eq!(size_of::<Bro>(), 16);

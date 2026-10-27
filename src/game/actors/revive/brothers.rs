@@ -1,17 +1,16 @@
 //! Handing over from a fallen brother to the next: his body, the placards and the new stats.
 
-use crate::game::data::globals::{panel_font, story_font};
 use crate::game::data::object_tables::{ob_list8, ob_listg};
-use crate::game::data::state::{Hero, World, the_actors, the_hero, the_screen, the_ui, the_world};
+use crate::game::data::state::{Hero, World, the_actors, the_hero, the_ui, the_world};
 use crate::game::data::tables::brother_stats;
 use crate::game::data::types::{Bro, Shape};
 use crate::game::files::loading::load_start_sprites;
+use crate::game::render::display::delay;
+use crate::game::render::screen::{FontKind, PortId, screen};
 use crate::game::render::screen_fx::{map_message, message_off};
 use crate::game::ui::messages::print_cont;
 use crate::game::ui::text::{draw_placard_border, placard_text, show_event};
 use crate::game::world::map::move_camera_to;
-use crate::platform::display::delay;
-use crate::platform::gfx::{rect_fill, set_a_pen, set_font, set_rast};
 
 const RAFT: i8 = 3;
 const SETFIG: i8 = 4;
@@ -59,8 +58,8 @@ const ON_GROUND: i8 = 1;
 const START_PLACE: u16 = 2;
 
 /// Sound/graphics: pen colours and the panel area that is cleared between messages.
-const PEN_BLACK: u32 = 0;
-const PEN_TEXT: u32 = 24;
+const PEN_BLACK: u8 = 0;
+const PEN_TEXT: u8 = 24;
 const PANEL: (i32, i32, i32, i32) = (13, 13, 271, 107);
 
 /// Delays, in 50ths of a second.
@@ -120,7 +119,7 @@ pub(super) unsafe fn take_over_next_brother(hero: *mut Shape) {
 
         reset_for_next_brother(&mut *(&raw mut the_hero), &mut *(&raw mut the_world));
         move_camera_to(the_hero.safe_x as i32, the_hero.safe_y as i32);
-        the_screen.view_status = VIEW_REDRAW;
+        screen().view_status = VIEW_REDRAW;
         the_actors.on_screen = 1;
         the_actors.loading = 0;
     }
@@ -161,13 +160,15 @@ pub(super) unsafe fn start_next_brother(hero: &mut Hero, body: &mut Shape, next:
 pub(super) unsafe fn show_brother_placards() {
     unsafe {
         map_message();
-        set_font(the_screen.current_rastport, story_font);
+        let current = screen().current_port;
+        screen().set_font_kind(current, FontKind::Story);
 
         if the_hero.brother == JULIAN {
             placard_text(PLACARD_JULIAN);
-            the_screen.rp_map.BitMap = (*(*the_screen.drawing_page).ri_page).BitMap;
-            set_rast(&raw mut the_screen.rp_map, PEN_BLACK);
-            the_screen.rp_map.BitMap = (*(*the_screen.viewing_page).ri_page).BitMap;
+            let screen = screen();
+            screen.port_mut(PortId::Map).target = Some(screen.drawing_bitmap_id());
+            screen.clear(PortId::Map, PEN_BLACK);
+            screen.port_mut(PortId::Map).target = Some(screen.viewing_bitmap_id());
         } else if the_hero.brother == PHILLIP {
             placard_text(PLACARD_PHILLIP);
         } else if the_hero.brother == KEVIN {
@@ -192,17 +193,13 @@ pub(super) unsafe fn show_brother_placards() {
 unsafe fn show_follow_up_placard() {
     unsafe {
         delay(SHORT_PAUSE);
-        set_a_pen(the_screen.current_rastport, PEN_BLACK);
-        rect_fill(
-            the_screen.current_rastport,
-            PANEL.0,
-            PANEL.1,
-            PANEL.2,
-            PANEL.3,
-        );
+        let screen = screen();
+        let current = screen.current_port;
+        screen.set_a_pen(current, PEN_BLACK);
+        screen.rect_fill(current, (PANEL.0, PANEL.1), (PANEL.2, PANEL.3));
 
         delay(TINY_PAUSE);
-        set_a_pen(the_screen.current_rastport, PEN_TEXT);
+        screen.set_a_pen(current, PEN_TEXT);
 
         placard_text(if the_hero.brother == PHILLIP {
             PLACARD_PHILLIP_FOLLOW_UP
@@ -217,8 +214,10 @@ unsafe fn show_follow_up_placard() {
 /// Loads the brother's sprites and tells where the story starts.
 pub(super) unsafe fn announce_brother() {
     unsafe {
-        set_font(the_screen.current_rastport, panel_font);
-        the_screen.current_rastport = &raw mut the_screen.rp_text;
+        let screen = screen();
+        let current = screen.current_port;
+        screen.set_font_kind(current, FontKind::Panel);
+        screen.current_port = PortId::Text;
 
         the_actors.loaded_actor_file = HERO_SPRITE_FILE;
         the_actors.loaded_setfig_file = HERO_SET_FILE;

@@ -1,5 +1,7 @@
 mod amiga;
 
+mod gfx;
+
 mod platform;
 
 // The game's tables and state are lower-case `static mut` variables named for what they hold.

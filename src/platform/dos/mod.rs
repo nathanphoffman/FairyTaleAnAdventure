@@ -12,5 +12,5 @@ mod paths;
 
 pub use paths::resolve;
 
-pub use self::files::{close_file, open_file, read_file, seek_file, write_file};
-pub use self::locks::{io_error, lock_path, set_current_dir, unlock_path};
+pub use self::files::{close_file, open_file, read_file, write_file};
+pub use self::locks::{io_error, lock_path, unlock_path};

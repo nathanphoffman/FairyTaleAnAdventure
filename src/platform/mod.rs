@@ -8,8 +8,4 @@ pub mod display;
 
 pub mod dos;
 
-pub mod exec;
-
-pub mod gfx;
-
 pub mod input;

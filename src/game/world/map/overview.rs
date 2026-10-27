@@ -2,7 +2,8 @@
 
 use super::drawing::PLANE_COUNT;
 use super::lookup::{SECTOR_BYTES, SECTOR_ROWS_IN_REGION};
-use crate::game::data::state::{the_memory, the_screen, the_world};
+use crate::game::data::state::{the_memory, the_world};
+use crate::game::render::screen::screen;
 
 // The overview map (magic spell): each sector is drawn as 16 x 16 pixels, 18 x 9 sectors.
 pub(super) const OVERVIEW_COLUMNS: i16 = 18;
@@ -96,14 +97,15 @@ unsafe fn draw_overview_sector(tiles: *const u8, offset: usize) {
             let words = overview_line_words(tiles, line);
 
             for (p, word) in words.iter().enumerate() {
-                let d = (*the_screen.planes.add(p)).add(offset + line * OVERVIEW_LINE_BYTES);
+                let plane = screen().draw_bitmap_mut().plane_mut(p);
+                let d = offset + line * OVERVIEW_LINE_BYTES;
 
                 // A 16 pixel row is two bytes, high byte first.
-                *d = (word >> BYTE_SHIFT) as u8;
+                plane[d] = (word >> BYTE_SHIFT) as u8;
                 // The second copy is for the other page.
-                *d.add(OVERVIEW_LINE_COPY) = (word >> BYTE_SHIFT) as u8;
-                *d.add(1) = *word as u8;
-                *d.add(OVERVIEW_LINE_COPY + 1) = *word as u8;
+                plane[d + OVERVIEW_LINE_COPY] = (word >> BYTE_SHIFT) as u8;
+                plane[d + 1] = *word as u8;
+                plane[d + OVERVIEW_LINE_COPY + 1] = *word as u8;
             }
         }
     }

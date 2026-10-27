@@ -22,12 +22,8 @@ pub use self::sprites::{
 
 pub use self::story_pages::{intro_skip_requested, intro_skipped, show_story_page};
 
-use crate::platform::exec::{alloc_mem, type_of_mem};
-
 const CARRIER: u8 = 5;
 const DRAGON: u8 = 6;
-const MEMF_CHIP: u32 = 2;
-
 /// Mirror of `struct cfile_info`: one loadable sprite file (a character set).
 /// `width` is in 16-pixel words, `height` in lines, `count` the number of frames.
 #[repr(C)]
@@ -69,21 +65,6 @@ pub fn copy_protection_disk_check() -> i32 {
 /// Was part of the copy protection; now just the (always passing) check.
 pub fn copy_protection_check() {
     copy_protection_disk_check();
-}
-
-/// Copies `oldpointer` into chip memory (memory the Amiga's graphics chips can see) if it is not there already.
-pub fn into_chip(oldpointer: *mut u8, size: i32) -> *mut u8 {
-    unsafe {
-        // Masks with MEMF_CHIP, keeping only the bits that matter here.
-        if type_of_mem(oldpointer.cast()) & MEMF_CHIP != 0 {
-            return oldpointer;
-        }
-
-        let newpointer = alloc_mem(size as u32, MEMF_CHIP).cast::<u8>();
-        std::ptr::copy_nonoverlapping(oldpointer, newpointer, size as usize);
-
-        newpointer
-    }
 }
 
 /// Was the manual-lookup riddle (copy protection, typing a word from the manual); it is skipped.

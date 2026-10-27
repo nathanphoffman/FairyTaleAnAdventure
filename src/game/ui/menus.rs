@@ -5,13 +5,12 @@
 //! has the matching item (`item_menu_state`).
 
 use crate::game::data::state::the_hero;
-use crate::game::data::state::{the_screen, the_ui};
+use crate::game::data::state::the_ui;
 use crate::game::data::tables::{key_colors, label1, menus};
 use crate::game::input::handler::forget_last_menu;
+use crate::game::render::screen::{PortId, screen};
 use crate::game::ui::text::item_menu_state;
 use std::ffi::c_char;
-
-use crate::platform::gfx::{move_pen, set_a_pen, set_b_pen, text_out};
 
 // Menu numbers (`enum cmodes` in csrc/fmain.c).
 const MAGIC: usize = 1;
@@ -130,7 +129,7 @@ pub fn print_options() {
 /// Blanks the slots from `first` to the last one: nothing is shown there.
 unsafe fn blank_slots_from(first: usize) {
     unsafe {
-        set_b_pen(&raw mut the_screen.rp_text2, 0);
+        screen().set_b_pen(PortId::Text2, 0);
 
         for slot in first..SLOTS {
             // Masks off the low bits (a cheap remainder or a flag test).
@@ -141,12 +140,8 @@ unsafe fn blank_slots_from(first: usize) {
             };
 
             let y = (slot / 2) as i32 * ROW_HEIGHT + FIRST_ROW_Y;
-            move_pen(&raw mut the_screen.rp_text2, x, y);
-            text_out(
-                &raw mut the_screen.rp_text2,
-                c"      ".as_ptr().cast(),
-                ENTRY_WIDTH,
-            );
+            screen().move_to(PortId::Text2, x, y);
+            screen().text(PortId::Text2, &BOX[..ENTRY_WIDTH as usize]);
 
             the_ui.slot_entries[slot] = -1;
         }
@@ -190,10 +185,9 @@ const MAIN_PEN: u32 = 4;
 /// 1 for a selected entry, 0 for a plain one. The box colour depends on the menu.
 pub fn print_menu_entry(j: i16, pena: i16) {
     unsafe {
-        let r = &raw mut the_screen.rp_text2;
         let entry = the_ui.slot_entries[j as usize] as i32;
-        set_a_pen(r, pena as u32);
-        set_b_pen(r, entry_box_pen(entry));
+        screen().set_a_pen(PortId::Text2, pena as u8);
+        screen().set_b_pen(PortId::Text2, entry_box_pen(entry) as u8);
 
         let offset = entry * LABEL_LEN;
 
@@ -205,10 +199,13 @@ pub fn print_menu_entry(j: i16, pena: i16) {
         };
 
         let y = (j as i32 / 2) * ROW_HEIGHT + FIRST_ROW_Y;
-        move_pen(r, x, y);
-        text_out(r, BOX.as_ptr().cast(), BOX.len() as i32);
-        move_pen(r, x + TEXT_INSET, y);
-        text_out(r, entry_label(offset).cast(), LABEL_LEN);
+        let label =
+            std::slice::from_raw_parts(entry_label(offset).cast::<u8>(), LABEL_LEN as usize);
+        let screen = screen();
+        screen.move_to(PortId::Text2, x, y);
+        screen.text(PortId::Text2, BOX);
+        screen.move_to(PortId::Text2, x + TEXT_INSET, y);
+        screen.text(PortId::Text2, label);
     }
 }
 

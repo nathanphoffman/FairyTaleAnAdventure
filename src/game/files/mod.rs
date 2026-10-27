@@ -2,8 +2,6 @@
 
 pub mod disk;
 
-pub mod iff_chunks;
-
 pub mod iff_picture;
 
 pub mod loading;

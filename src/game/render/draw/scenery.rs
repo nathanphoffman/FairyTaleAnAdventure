@@ -5,7 +5,6 @@ use crate::game::data::object_tables::minimap;
 use crate::game::data::state::{the_hero, the_memory, the_world};
 use crate::game::data::types::Shape;
 use crate::game::render::blit::{add_scenery_mask, clear_memory};
-use crate::platform::gfx::{disown_blitter, own_blitter, wait_blit};
 
 /// The mask buffer (`bmask_mem`) is cleared before each sprite: 96 lines of 64 words, plus 5.
 const MASK_CLEAR_SIZE: i32 = (96 << 6) + 5;
@@ -58,10 +57,7 @@ const LOW_HEIGHT: i16 = 20;
 /// Zeroes the scenery mask buffer, ready for the next sprite.
 pub(super) unsafe fn clear_scenery_mask() {
     unsafe {
-        own_blitter();
-        wait_blit();
         clear_memory(the_memory.bmask_mem, MASK_CLEAR_SIZE);
-        disown_blitter();
     }
 }
 

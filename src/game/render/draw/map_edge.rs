@@ -2,7 +2,8 @@
 
 use crate::game::actors::interaction::{actor_distance, hit_actor};
 use crate::game::data::random::{rand2, rand4};
-use crate::game::data::state::{the_actors, the_screen, the_witch, the_world};
+use crate::game::data::state::{the_actors, the_witch, the_world};
+use crate::game::render::screen::screen;
 use crate::game::render::witch::{SIDE_1 as s1, SIDE_2 as s2, witch_fx};
 use crate::game::world::map::{draw_map_column, draw_map_row};
 
@@ -41,11 +42,11 @@ pub fn repair_edges(dif_x: i16, dif_y: i16) {
         }
 
         let witch = &raw const the_actors.list[WITCH_SLOT];
-        let page = the_screen.drawing_page;
+        let page = screen().drawing_page_mut();
 
         // Masks with TILE_X_MASK, keeping only the bits that matter here.
-        (*page).witchx = ((*witch).abs_x as i32 - (the_world.map_x & TILE_X_MASK) as i32) as i16;
-        (*page).witchy = (((*witch).abs_y as i32 - WITCH_ANCHOR_Y)
+        page.witchx = ((*witch).abs_x as i32 - (the_world.map_x & TILE_X_MASK) as i32) as i16;
+        page.witchy = (((*witch).abs_y as i32 - WITCH_ANCHOR_Y)
             // Masks with TILE_Y_MASK, keeping only the bits that matter here.
             - (the_world.map_y & TILE_Y_MASK) as i32) as i16;
 
@@ -54,11 +55,11 @@ pub fn repair_edges(dif_x: i16, dif_y: i16) {
         }
 
         the_witch.angle = the_witch.angle.wrapping_add(the_witch.direction as u8);
-        (*page).witchdir = the_witch.angle as i16;
-        (*page).wflag = the_witch.on_screen as i16;
+        page.witchdir = the_witch.angle as i16;
+        page.wflag = the_witch.on_screen as i16;
 
         if the_witch.on_screen != 0 {
-            witch_fx(page);
+            witch_fx(screen().drawing);
 
             if s1 > 0 && s2 < 0 && actor_distance(WITCH_SLOT as i32, 0) < WITCH_REACH {
                 hit_actor(-1, 0, (*witch).facing as i32, (rand2() + 1) as i16);

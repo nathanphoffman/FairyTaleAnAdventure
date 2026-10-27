@@ -26,8 +26,3 @@ pub use self::win::win_colors;
 pub use self::zoom::set_intro_zoom;
 
 const COLOR_COUNT: usize = 32;
-
-// The view modes of the text panel.
-const HIRES: u16 = 0x8000;
-const SPRITES: u16 = 0x4000;
-const VP_HIDE: u16 = 0x2000;

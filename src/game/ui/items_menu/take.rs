@@ -8,12 +8,11 @@ use super::{
     ARROWBASE, ARROWS, CHEST, FRUIT_SLOT, GOLDBASE, OBJECTS, PRQ_VITALITY, SACKS, TALISMAN, URN,
     add_stuff, item_name,
 };
-use crate::platform::gfx::set_font;
+use crate::game::render::screen::{FontKind, screen};
 
 use crate::game::actors::interaction::{eat_food, find_nearest_figure};
-use crate::game::data::globals::story_font;
 use crate::game::data::object_tables::{itrans, ob_listg};
-use crate::game::data::state::{the_actors, the_hero, the_screen, the_ui, the_world};
+use crate::game::data::state::{the_actors, the_hero, the_ui, the_world};
 use crate::game::render::screen_fx::{map_message, win_colors};
 use crate::game::ui::messages::{announce_container, announce_treasure, print_cont};
 use crate::game::ui::text::{queue_print, show_event};
@@ -93,9 +92,10 @@ unsafe fn finish_pickup() {
 
         if *the_hero.stuff.add(TALISMAN) != 0 {
             the_ui.quit_requested = 1;
-            the_screen.view_status = VIEW_GAME_OVER;
+            screen().view_status = VIEW_GAME_OVER;
             map_message();
-            set_font(the_screen.current_rastport, story_font);
+            let current = screen().current_port;
+            screen().set_font_kind(current, FontKind::Story);
             win_colors();
         }
     }

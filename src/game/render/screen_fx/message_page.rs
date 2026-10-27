@@ -1,14 +1,12 @@
 //! Switching between the play view and the map page that shows messages.
 
 use super::fading::fade_down;
-use super::{COLOR_COUNT, HIRES, SPRITES, VP_HIDE};
 use crate::game::data::object_tables::page_colors;
-use crate::game::data::state::the_screen;
 use crate::game::render::display::flip_pages;
-use crate::platform::gfx::{load_rgb4, set_a_pen, set_draw_mode, set_rast};
+use crate::game::render::screen::{HIRES, PortId, SPRITES, VP_HIDE, ViewPortId, screen};
+use crate::gfx::draw::JAM1;
 
-const MAP_PEN: u32 = 24;
-const JAM1: u32 = 0;
+const MAP_PEN: u8 = 24;
 
 /// `view_status` values: showing a map message, and showing the normal view again.
 const VIEW_MESSAGE: i8 = 2;
@@ -16,43 +14,39 @@ const VIEW_NORMAL_AGAIN: i8 = 3;
 
 /// Shows the page without scrolling.
 pub fn show_still_screen() {
-    unsafe {
-        let page = (*the_screen.drawing_page).ri_page;
-        (*page).RxOffset = 0;
-        (*page).RyOffset = 0;
-        flip_pages();
-    }
+    let screen = screen();
+    let ras = screen.drawing_page().ras;
+    screen.ras[ras].x = 0;
+    screen.ras[ras].y = 0;
+
+    flip_pages();
 }
 
 /// Switches to the map page for a message (the text panel is hidden) and fades in.
 pub fn map_message() {
-    unsafe {
-        fade_down();
-        the_screen.current_rastport = &raw mut the_screen.rp_map;
-        the_screen.rp_map.BitMap = (*(*the_screen.drawing_page).ri_page).BitMap;
-        set_draw_mode(the_screen.current_rastport, JAM1);
-        set_a_pen(the_screen.current_rastport, MAP_PEN);
-        set_rast(the_screen.current_rastport, 0);
+    fade_down();
 
-        the_screen.vp_text.Modes = HIRES | SPRITES | VP_HIDE;
-        show_still_screen();
-        load_rgb4(
-            &raw mut the_screen.vp_page,
-            (&raw const page_colors).cast(),
-            COLOR_COUNT as i32,
-        );
+    let screen = screen();
+    screen.current_port = PortId::Map;
+    screen.port_mut(PortId::Map).target = Some(screen.drawing_bitmap_id());
+    screen.set_draw_mode(PortId::Map, JAM1);
+    screen.set_a_pen(PortId::Map, MAP_PEN);
+    screen.clear(PortId::Map, 0);
 
-        the_screen.view_status = VIEW_MESSAGE;
-    }
+    screen.vp_text.modes = HIRES | SPRITES | VP_HIDE;
+    show_still_screen();
+    screen.load_colors(ViewPortId::Page, unsafe { &*(&raw const page_colors) });
+
+    screen.view_status = VIEW_MESSAGE;
 }
 
 /// Goes back from the map message to the normal view.
 pub fn message_off() {
-    unsafe {
-        fade_down();
-        the_screen.current_rastport = &raw mut the_screen.rp_text;
-        the_screen.vp_text.Modes = HIRES | SPRITES;
-        flip_pages();
-        the_screen.view_status = VIEW_NORMAL_AGAIN;
-    }
+    fade_down();
+
+    let screen = screen();
+    screen.current_port = PortId::Text;
+    screen.vp_text.modes = HIRES | SPRITES;
+    flip_pages();
+    screen.view_status = VIEW_NORMAL_AGAIN;
 }

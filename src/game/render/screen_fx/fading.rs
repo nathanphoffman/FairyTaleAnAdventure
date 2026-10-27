@@ -1,11 +1,11 @@
 //! Fading the page colours: with the time of day, to and from black, and the teleport flicker.
 
 use super::COLOR_COUNT;
-use crate::game::data::object_tables::{fader, page_colors};
+use crate::game::data::object_tables::page_colors;
 use crate::game::data::random::bitrand;
-use crate::game::data::state::{the_screen, the_world};
-use crate::platform::display::delay;
-use crate::platform::gfx::load_rgb4;
+use crate::game::data::state::the_world;
+use crate::game::render::display::delay;
+use crate::game::render::screen::{ViewPortId, screen};
 
 // Colour 31 of the page changes with where the hero is.
 const COLOR_31: usize = 31;
@@ -46,16 +46,18 @@ const RANDOM_COLOR_MASK: i32 = 0xfff;
 /// apply (red never below 10%, green 25%, blue 60%) and some blue is mixed in from green, which gives
 /// the bluish moonlight. The light spell (`light_timer`) makes reds as bright as greens.
 /// Colour 31 is changed first because it depends on where the hero is (swamp, secret room).
-pub fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: *const u16) {
+pub fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: &[u16]) {
     unsafe {
         page_colors[COLOR_31] = color_31_here();
 
         let ((r, g, b), g2) = clamp_levels((r as i32, g as i32, b as i32), limit != 0);
 
-        for (i, slot) in (*(&raw mut fader)).iter_mut().take(COLOR_COUNT).enumerate() {
+        let mut faded = [0u16; COLOR_COUNT];
+
+        for (i, slot) in faded.iter_mut().enumerate() {
             *slot = faded_color(
                 i,
-                *colors.add(i),
+                colors[i],
                 (r, g, b),
                 g2,
                 limit != 0,
@@ -63,11 +65,7 @@ pub fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: *const u16) {
             );
         }
 
-        load_rgb4(
-            &raw mut the_screen.vp_page,
-            (&raw const fader).cast(),
-            COLOR_COUNT as i32,
-        );
+        screen().load_colors(ViewPortId::Page, &faded);
     }
 }
 
@@ -145,20 +143,16 @@ fn faded_color(
 
 /// The teleport effect: random colours flicker for a moment (32 flashes).
 pub fn flicker_colors() {
-    unsafe {
-        for _ in 0..COLOR_COUNT {
-            for slot in (*(&raw mut fader)).iter_mut().take(COLOR_COUNT).skip(1) {
-                *slot = bitrand(RANDOM_COLOR_MASK) as u16;
-            }
+    for _ in 0..COLOR_COUNT {
+        let mut flash = [0u16; COLOR_COUNT];
 
-            load_rgb4(
-                &raw mut the_screen.vp_page,
-                (&raw const fader).cast(),
-                COLOR_COUNT as i32,
-            );
-
-            delay(1);
+        for slot in flash.iter_mut().skip(1) {
+            *slot = bitrand(RANDOM_COLOR_MASK) as u16;
         }
+
+        screen().load_colors(ViewPortId::Page, &flash);
+
+        delay(1);
     }
 }
 
@@ -168,13 +162,9 @@ const FADE_STEP: usize = 5;
 /// Fades the page out to black.
 pub fn fade_down() {
     for level in (0..=FULL_LEVEL).rev().step_by(FADE_STEP) {
-        fade_page(
-            level as i16,
-            level as i16,
-            level as i16,
-            0,
-            (&raw const page_colors).cast(),
-        );
+        fade_page(level as i16, level as i16, level as i16, 0, unsafe {
+            &*(&raw const page_colors)
+        });
 
         delay(1);
     }
@@ -183,13 +173,9 @@ pub fn fade_down() {
 /// Fades the page back in from black.
 pub fn fade_normal() {
     for level in (0..=FULL_LEVEL).step_by(FADE_STEP) {
-        fade_page(
-            level as i16,
-            level as i16,
-            level as i16,
-            0,
-            (&raw const page_colors).cast(),
-        );
+        fade_page(level as i16, level as i16, level as i16, 0, unsafe {
+            &*(&raw const page_colors)
+        });
 
         delay(1);
     }
@@ -219,8 +205,8 @@ pub fn day_fade() {
         };
 
         // Masks with FADE_TICK_MASK, keeping only the bits that matter here.
-        if the_world.day_clock & FADE_TICK_MASK == 0 || the_screen.view_status > VIEW_REBUILD {
-            let colors = (&raw const page_colors).cast();
+        if the_world.day_clock & FADE_TICK_MASK == 0 || screen().view_status > VIEW_REBUILD {
+            let colors = &*(&raw const page_colors);
 
             if the_world.region < FIRST_INDOOR_REGION {
                 let level = the_world.light_level as i32;

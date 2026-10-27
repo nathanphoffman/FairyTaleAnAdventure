@@ -1,12 +1,12 @@
 //! Rescuing the princess: the story page, the reward and the keys.
 
 use super::extents::center_extent_on;
-use crate::platform::display::delay;
-use crate::platform::gfx::{rect_fill, set_a_pen, set_font};
+use crate::game::render::display::delay;
+use crate::game::render::screen::{FontKind, screen};
 
-use crate::game::data::globals::{princesses_rescued, story_font};
+use crate::game::data::globals::princesses_rescued;
 use crate::game::data::object_tables::ob_list8;
-use crate::game::data::state::{the_hero, the_screen};
+use crate::game::data::state::the_hero;
 use crate::game::data::types::WorldObject;
 use crate::game::render::screen_fx::{map_message, message_off};
 use crate::game::ui::messages::name;
@@ -14,7 +14,7 @@ use crate::game::ui::text::{draw_placard_border, placard_text, speak};
 use crate::game::world::places::transfer_hero;
 
 // The rescue scene.
-const PLACARD_PEN: u32 = 24;
+const PLACARD_PEN: u8 = 24;
 
 /// Each princess has three story placards, starting at 8 for the first; the closing two follow.
 const RESCUE_PLACARD_BASE: i32 = 8;
@@ -46,7 +46,8 @@ const REWARD_GOLD: i16 = 100;
 pub fn rescue_princess() {
     unsafe {
         map_message();
-        set_font(the_screen.current_rastport, story_font);
+        let current = screen().current_port;
+        screen().set_font_kind(current, FontKind::Story);
         let line = princesses_rescued as i32 * RESCUE_PLACARDS_EACH;
         placard_text(RESCUE_PLACARD_BASE + line);
         name();
@@ -55,11 +56,11 @@ pub fn rescue_princess() {
         placard_text(RESCUE_PLACARD_BASE + 2 + line);
         draw_placard_border();
         delay(RESCUE_PAUSE);
-        set_a_pen(the_screen.current_rastport, 0);
+        screen().set_a_pen(current, 0);
         let (x0, y0, x1, y1) = PLACARD_AREA;
-        rect_fill(the_screen.current_rastport, x0, y0, x1, y1);
+        screen().rect_fill(current, (x0, y0), (x1, y1));
         delay(CLEAR_PAUSE);
-        set_a_pen(the_screen.current_rastport, PLACARD_PEN);
+        screen().set_a_pen(current, PLACARD_PEN);
         placard_text(AFTER_RESCUE_PLACARDS.0);
         name();
         placard_text(AFTER_RESCUE_PLACARDS.1);

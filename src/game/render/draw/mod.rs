@@ -27,11 +27,10 @@ use self::weapons::weapon_passmode;
 
 use crate::game::data::globals::current_sshape;
 
-use crate::game::data::state::{the_actors, the_screen, the_world};
+use crate::game::data::state::{the_actors, the_world};
 use crate::game::data::types::Shape;
 use crate::game::render::blit::{combine_masks, draw_shape, save_background};
-
-use crate::platform::gfx::{disown_blitter, own_blitter};
+use crate::game::render::screen::screen;
 
 // Actor kinds and states (csrc/ftale.h).
 const PHIL: i16 = 0;
@@ -65,12 +64,12 @@ enum Drawn {
 /// (`backsave`) so it can be undone next frame. `cycle` is the frame counter.
 pub fn draw_sprites(cycle: i16) {
     unsafe {
-        let page = the_screen.drawing_page;
-        (*page).obcount = 0;
-        (*page).saveused = 0;
+        let page = screen().drawing_page_mut();
+        page.obcount = 0;
+        page.saveused = 0;
         let mut frame = Frame {
             crack: 0,
-            backalloc: (*page).backsave,
+            backalloc: page.backsave,
         };
 
         for j in 0..the_actors.drawn {
@@ -215,8 +214,6 @@ unsafe fn blit_sprite(
         if !set_up_blit(frame, sprite, clip, bytes_wide, xbw, blitwide, blithigh) {
             return Drawn::OutOfRoom; // no more blits if no room
         }
-
-        own_blitter();
         save_background((*current_sshape).backsave);
 
         if !drawn_in_front(actor, i, sprite.atype, sprite.inum) {
@@ -234,8 +231,7 @@ unsafe fn blit_sprite(
         combine_masks();
         draw_shape();
         (*actor).visible = 1;
-        disown_blitter();
-        (*the_screen.drawing_page).obcount += 1;
+        screen().drawing_page_mut().obcount += 1;
 
         Drawn::Done
     }

@@ -2,9 +2,9 @@
 //!
 //! Each struct has one `static mut` instance (`the_hero`, `the_world`, ...).
 //! They start out zero apart from the few values listed below.
-use crate::amiga::{BitMap, RasInfo, RastPort, View, ViewPort};
-use crate::game::data::types::{Extent, FPage, Missile, SeqInfo, Shape};
+use crate::game::data::types::{Extent, Missile, SeqInfo, Shape};
 use crate::game::input::handler::InWork;
+use crate::game::render::screen::Screen;
 
 /// How many items a brother can carry (the size of the `stuff` list).
 pub const STUFF_SLOTS: usize = 35;
@@ -125,41 +125,8 @@ pub struct Actors {
 
 pub static mut the_actors: Actors = unsafe { std::mem::zeroed() };
 
-/// The screen: bitmaps, display pages, rastports and view ports, and what is shown.
-pub struct Screen {
-    pub bm_draw: *mut BitMap,
-    pub bm_lim: *mut BitMap,
-    pub bm_page1: *mut BitMap,
-    pub bm_page2: *mut BitMap,
-    pub bm_scroll: BitMap,
-    pub bm_source: *mut BitMap,
-    pub bm_text: *mut BitMap,
-    pub pagea: BitMap,
-    pub pageb: BitMap,
-    pub fp_page1: FPage,
-    pub fp_page2: FPage,
-    pub drawing_page: *mut FPage,
-    pub viewing_page: *mut FPage,
-    pub ri_page1: RasInfo,
-    pub ri_page2: RasInfo,
-    pub ri_text: RasInfo,
-    pub rp_map: RastPort,
-    pub rp_text: RastPort,
-    pub rp_text2: RastPort,
-    pub vp_page: ViewPort,
-    pub vp_text: ViewPort,
-    pub work_bm: BitMap,
-    pub old_view: *mut View,
-    pub current_rastport: *mut RastPort,
-    pub current_viewport: *mut ViewPort,
-    pub view_status: i8,
-    pub planes: *mut *mut u8,
-    pub planesize: i16,
-    pub wb_bmap: *mut BitMap,
-    pub flasher: i8,
-}
-
-pub static mut the_screen: Screen = unsafe { std::mem::zeroed() };
+/// The screen: bitmaps, display pages, pens and view ports, and what is shown.
+pub static mut the_screen: Screen = Screen::new();
 
 /// The big memory areas the game loads its data into.
 pub struct Memory {
@@ -170,7 +137,6 @@ pub struct Memory {
     pub shadow_mem: *mut u8,
     pub shape_mem: *mut u8,
     pub shapedata: *mut u8,
-    pub sprite_data: *mut u8,
     pub mask_buffer: *mut u8,
     pub bmask_mem: *mut u8,
     pub queue_mem: *mut u8,
@@ -182,8 +148,6 @@ pub struct Memory {
     pub sample_size: [u32; SAMPLE_SLOTS],
     pub track: [*mut u8; TRACK_SLOTS],
     pub nextshape: *mut u8,
-    pub nhinor: *mut u8,
-    pub nhivar: *mut u8,
     pub seq_list: [SeqInfo; SPRITE_SHEETS],
 }
 

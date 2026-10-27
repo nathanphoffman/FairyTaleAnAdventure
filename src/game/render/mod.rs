@@ -8,6 +8,8 @@ pub mod draw;
 
 pub mod restore;
 
+pub mod screen;
+
 pub mod screen_fx;
 
 pub mod sprite_order;

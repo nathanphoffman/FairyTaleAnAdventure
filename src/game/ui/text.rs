@@ -9,15 +9,13 @@
 //! Message lists are zero-terminated strings stored one after another; picking message `n` means
 //! skipping `n` zero bytes.
 
-use crate::amiga::RastPort;
 use crate::game::data::object_tables::{pplay, prec, print_que};
-use crate::game::data::state::{the_hero, the_screen};
+use crate::game::data::state::the_hero;
 use crate::game::data::story_text::{EVENT_MSG, PLACARD_MSGS, SPEECHES};
 use crate::game::data::tables::number_buffer;
+use crate::game::render::screen::{PortId, screen};
 use crate::game::ui::messages::print_wrapped;
 use std::ffi::c_char;
-
-use crate::platform::gfx::{draw_line, move_pen, set_a_pen, text_out};
 
 /// In a string: followed by x/2 and y, moves the text position.
 const XY: u8 = 128;
@@ -61,13 +59,11 @@ pub fn format_number(mut value: u32) -> i32 {
 pub fn print_number(value: i32, len: i32) {
     format_number(value as u32);
     unsafe {
-        text_out(
-            the_screen.current_rastport,
+        draw_text(
             (&raw const number_buffer)
                 .cast::<c_char>()
                 .add(NUMBER_DIGITS)
-                .offset(-(len as isize))
-                .cast(),
+                .offset(-(len as isize)),
             len + 1,
         )
     };
@@ -76,12 +72,15 @@ pub fn print_number(value: i32, len: i32) {
 // `move` is a Rust keyword, so this one is exported under the C name.
 /// Moves the text position (the C name is `move`, a keyword in Rust).
 pub fn move_to(x: i32, y: i32) {
-    unsafe { move_pen(the_screen.current_rastport, x, y) };
+    let screen = screen();
+    screen.move_to(screen.current_port, x, y);
 }
 
 /// Prints `len` characters at the text position.
 pub fn draw_text(s: *const c_char, len: i32) {
-    unsafe { text_out(the_screen.current_rastport, s.cast(), len) };
+    let bytes = unsafe { std::slice::from_raw_parts(s.cast::<u8>(), len.max(0) as usize) };
+    let screen = screen();
+    screen.text(screen.current_port, bytes);
 }
 
 /// Prints a string that may hold XY escapes (128, x/2, y) to move the text position. A string
@@ -91,11 +90,7 @@ pub fn print_positioned(mut s: *const u8) {
     unsafe {
         while *s != 0 {
             if *s == XY {
-                move_pen(
-                    the_screen.current_rastport,
-                    *s.add(1) as i32 * XY_X_SCALE,
-                    *s.add(2) as i32,
-                );
+                move_to(*s.add(1) as i32 * XY_X_SCALE, *s.add(2) as i32);
 
                 s = s.add(XY_BYTES);
             } else {
@@ -105,7 +100,7 @@ pub fn print_positioned(mut s: *const u8) {
                     n += 1;
                 }
 
-                text_out(the_screen.current_rastport, s.cast(), n as i32);
+                draw_text(s.cast(), n as i32);
                 s = s.add(n);
 
                 if n == 0 {
@@ -181,60 +176,52 @@ const SHORT_EDGE_FAR: (i32, i32) = (268, 112);
 
 /// Passes numbered above this also draw the long (top and bottom) edges.
 const LONG_EDGE_ABOVE_PASS: i32 = 9;
-const BORDER_PEN: u32 = 1;
-const BORDER_HIGHLIGHT_PEN: u32 = 24;
+const BORDER_PEN: u8 = 1;
+const BORDER_HIGHLIGHT_PEN: u8 = 24;
 
 /// Strokes per step; the last one is drawn in the highlight pen.
 const STROKES_PER_STEP: i32 = 5;
 
 /// Draws a line from (x0, y0) to (x1, y1).
-fn line(r: *mut RastPort, x0: i32, y0: i32, x1: i32, y1: i32) {
-    move_pen(r, x0, y0);
-    draw_line(r, x1, y1);
+fn line(x0: i32, y0: i32, x1: i32, y1: i32) {
+    let screen = screen();
+    screen.move_to(PortId::Map, x0, y0);
+    screen.line_to(PortId::Map, x1, y1);
 }
 
 /// Draws the decorative border around a story page: many short strokes, five each with the last in
 /// a highlight colour, winding around the four edges. The first passes also draw the top and bottom.
 pub fn draw_placard_border() {
-    unsafe {
-        let r = &raw mut the_screen.rp_map;
-        let (mut xorg, mut yorg) = (BORDER_START_X, 0);
+    let (mut xorg, mut yorg) = (BORDER_START_X, 0);
 
-        for pass in (0..BORDER_PASSES).rev() {
-            for step in 0..BORDER_STEPS {
-                let dx = xorg + BORDER_X_STEPS[step];
-                let dy = yorg + BORDER_Y_STEPS[step];
+    for pass in (0..BORDER_PASSES).rev() {
+        for step in 0..BORDER_STEPS {
+            let dx = xorg + BORDER_X_STEPS[step];
+            let dy = yorg + BORDER_Y_STEPS[step];
 
-                for stroke in (0..STROKES_PER_STEP).rev() {
-                    let pen = if stroke == 0 {
-                        BORDER_HIGHLIGHT_PEN
-                    } else {
-                        BORDER_PEN
-                    };
+            for stroke in (0..STROKES_PER_STEP).rev() {
+                let pen = if stroke == 0 {
+                    BORDER_HIGHLIGHT_PEN
+                } else {
+                    BORDER_PEN
+                };
 
-                    set_a_pen(r, pen);
-                    draw_border_stroke(r, pass > LONG_EDGE_ABOVE_PASS, (xorg, yorg), (dx, dy));
-                }
-
-                xorg = dx;
-                yorg = dy;
+                screen().set_a_pen(PortId::Map, pen);
+                draw_border_stroke(pass > LONG_EDGE_ABOVE_PASS, (xorg, yorg), (dx, dy));
             }
+
+            xorg = dx;
+            yorg = dy;
         }
     }
 }
 
 /// One stroke of the border from `from` to `to`, repeated on the opposite edge, and on the short
 /// edges (turned a quarter) with the x and y swapped.
-fn draw_border_stroke(
-    r: *mut RastPort,
-    long_edges: bool,
-    (xorg, yorg): (i32, i32),
-    (dx, dy): (i32, i32),
-) {
+fn draw_border_stroke(long_edges: bool, (xorg, yorg): (i32, i32), (dx, dy): (i32, i32)) {
     if long_edges {
-        line(r, xorg, yorg, dx, dy);
+        line(xorg, yorg, dx, dy);
         line(
-            r,
             LONG_EDGE_FAR.0 - xorg,
             LONG_EDGE_FAR.1 - yorg,
             LONG_EDGE_FAR.0 - dx,
@@ -243,7 +230,6 @@ fn draw_border_stroke(
     }
 
     line(
-        r,
         SHORT_EDGE_NEAR.0 + yorg,
         SHORT_EDGE_NEAR.1 - xorg,
         SHORT_EDGE_NEAR.0 + dy,
@@ -251,7 +237,6 @@ fn draw_border_stroke(
     );
 
     line(
-        r,
         SHORT_EDGE_FAR.0 - yorg,
         SHORT_EDGE_FAR.1 + xorg,
         SHORT_EDGE_FAR.0 - dy,

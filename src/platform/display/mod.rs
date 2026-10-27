@@ -5,15 +5,13 @@
 //! on top and the text panel (hires, 4 bitplanes) below. Output is 640x200; lores pixels are
 //! doubled horizontally.
 
-mod compose;
-
 mod events;
 
 mod hooks;
 
 mod scripting;
 
-use crate::amiga::*;
+use crate::gfx::scene::{FRAME_HEIGHT, FRAME_WIDTH, Scene, compose};
 use sdl2::EventPump;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::render::{Canvas, TextureCreator};
@@ -32,8 +30,8 @@ pub fn set_skip_intro(skip: bool) {
     SKIP_INTRO.store(skip, Ordering::Relaxed);
 }
 
-pub const WIDTH: u32 = 640;
-pub const HEIGHT: u32 = 200;
+pub const WIDTH: u32 = FRAME_WIDTH as u32;
+pub const HEIGHT: u32 = FRAME_HEIGHT as u32;
 const TICK: Duration = Duration::from_millis(20); // 50 Hz
 /// If the game falls this many ticks behind, pacing restarts instead of catching up.
 const MAX_LAG_TICKS: u32 = 4;
@@ -70,10 +68,6 @@ struct Display {
 
 thread_local! {
     static DISPLAY: RefCell<Option<Display>> = const { RefCell::new(None) };
-    static VIEW: RefCell<*mut View> = const { RefCell::new(std::ptr::null_mut()) };
-
-    /// mouse pointer sprite data (Amiga sprite format), set by ChangeSprite
-    static SPRITE: RefCell<*const u32> = const { RefCell::new(std::ptr::null()) };
 }
 
 /// Opens every gamepad that is already plugged in.
@@ -152,17 +146,9 @@ pub fn init() -> Result<(), String> {
     Ok(())
 }
 
-pub fn set_sprite(data: *const u32) {
-    SPRITE.with(|c| *c.borrow_mut() = data);
-}
-
-pub fn set_view(v: *mut View) {
-    VIEW.with(|c| *c.borrow_mut() = v);
-}
-
-/// Converts the current view to RGB and shows it.
-fn draw(d: &mut Display, view: *mut View) {
-    compose::compose(view, &mut d.frame);
+/// Converts the scene to RGB and shows it.
+fn draw(d: &mut Display, scene: &Scene) {
+    compose(scene, &mut d.frame);
     let bytes: &[u8] = unsafe {
         std::slice::from_raw_parts(
             d.frame.as_ptr() as *const u8,
@@ -193,15 +179,14 @@ fn draw(d: &mut Display, view: *mut View) {
     }
 }
 
-/// Shows the current view on screen (the game calls this when it flips pages).
-pub fn present() {
+/// Shows the scene on screen (the game calls this when it flips pages).
+pub fn present(scene: &Scene) {
     BEAT.fetch_add(1, Ordering::Relaxed);
-    let view = VIEW.with(|c| *c.borrow());
     DISPLAY.with(|d| {
         let mut d = d.borrow_mut();
 
         let Some(d) = d.as_mut() else { return };
-        draw(d, view);
+        draw(d, scene);
         d.presents += 1;
         events::handle_events(d);
         hooks::test_hooks(d);
@@ -210,11 +195,10 @@ pub fn present() {
 
 /// Redraws every tick. Some screens (the item list, story pages) never flip pages, but the pointer
 /// still moves and text is still printed into the bitmaps.
-fn redraw() {
-    let view = VIEW.with(|c| *c.borrow());
+fn redraw(scene: &Scene) {
     DISPLAY.with(|d| {
         if let Some(d) = d.borrow_mut().as_mut() {
-            draw(d, view);
+            draw(d, scene);
         }
     });
 }
@@ -233,7 +217,7 @@ fn pace(d: &mut Display) -> Duration {
 }
 
 /// Waits for the next 50 Hz tick (the Amiga's vertical blank), keeping the window alive.
-pub fn wait_frame() {
+pub fn wait_frame(scene: &Scene) {
     BEAT.fetch_add(1, Ordering::Relaxed);
     let wait = DISPLAY.with(|d| {
         let mut d = d.borrow_mut();
@@ -252,13 +236,13 @@ pub fn wait_frame() {
             std::thread::sleep(w);
         }
 
-        redraw();
+        redraw(scene);
     }
 }
 
-/// AmigaDOS `Delay`: n ticks of 1/50 second.
-pub fn delay(ticks: LONG) {
+/// Waits n ticks of 1/50 second, showing the scene.
+pub fn delay(scene: &Scene, ticks: i32) {
     for _ in 0..ticks.max(1) {
-        wait_frame();
+        wait_frame(scene);
     }
 }
