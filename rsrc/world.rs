@@ -151,6 +151,38 @@ fn outside_spot(d: &Door) -> (u16, u16) {
     }
 }
 
+/// The hero can go in when lined up with the door (horizontal doors by y, vertical ones by x), and
+/// the desert door needs the gold statues.
+fn may_enter(d: &Door, hero_x: u16, hero_y: u16, statues: u8) -> bool {
+    let lined_up = if d.kind & 1 != 0 {
+        hero_y & 0x10 == 0
+    } else {
+        hero_x & 15 <= 6
+    };
+    lined_up && (d.kind != DESERT || statues >= STATUES_NEEDED)
+}
+
+/// Which indoor region a door leads to.
+fn region_inside(d: &Door) -> u16 {
+    if d.secs == 1 { REGION_INSIDE } else { REGION_INSIDE_OTHER }
+}
+
+/// Whether a door's inside entrance is where the hero stands (`xtest`, `ytest`: the hero's position
+/// rounded to a tile). Horizontal doors are also found one tile to the right.
+fn is_exit_here(d: &Door, xtest: u16, ytest: u16) -> bool {
+    let horizontal = d.kind & 1 != 0;
+    d.yc2 == ytest && (d.xc2 == xtest || (d.xc2 as i32 == xtest as i32 - 16 && horizontal))
+}
+
+/// The hero can go out when lined up with the door the other way round to `may_enter`.
+fn may_leave(d: &Door, hero_x: u16, hero_y: u16) -> bool {
+    if d.kind & 1 != 0 {
+        hero_y & 0x10 != 0
+    } else {
+        hero_x & 15 >= 2
+    }
+}
+
 unsafe fn door_at(j: i32) -> &'static Door {
     unsafe { &*(&raw const door_list).cast::<Door>().add(j as usize) }
 }
@@ -179,20 +211,10 @@ unsafe fn enter_door(xtest: u16, ytest: u16) {
             return;
         };
         let d = door_at(index);
-        let horizontal = d.kind & 1 != 0;
-        let lined_up = if horizontal {
-            the_hero.y & 0x10 == 0
-        } else {
-            the_hero.x & 15 <= 6
-        };
-        let allowed = d.kind != DESERT || *the_hero.stuff.add(STATBASE) >= STATUES_NEEDED;
-        if lined_up && allowed {
+        let statues = *the_hero.stuff.add(STATBASE);
+        if may_enter(d, the_hero.x, the_hero.y, statues) {
             let (x, y) = inside_spot(d);
-            the_world.new_region = if d.secs == 1 {
-                REGION_INSIDE
-            } else {
-                REGION_INSIDE_OTHER
-            };
+            the_world.new_region = region_inside(d);
             transfer_hero(x, y, 0);
             find_place(2);
             fade_page(
@@ -240,16 +262,8 @@ unsafe fn leave_door(xtest: u16, ytest: u16) {
     unsafe {
         for j in 0..DOORCOUNT {
             let d = door_at(j);
-            let horizontal = d.kind & 1 != 0;
-            if d.yc2 == ytest
-                && (d.xc2 == xtest || (d.xc2 as i32 == xtest as i32 - 16 && horizontal))
-            {
-                let lined_up = if horizontal {
-                    the_hero.y & 0x10 != 0
-                } else {
-                    the_hero.x & 15 >= 2
-                };
-                if lined_up {
+            if is_exit_here(d, xtest, ytest) {
+                if may_leave(d, the_hero.x, the_hero.y) {
                     let (x, y) = outside_spot(d);
                     transfer_hero(x, y, 1);
                     find_place(0);
@@ -345,27 +359,63 @@ pub fn day_night_tick() {
         if (*hero).state == SLEEP {
             sleep_tick(hero);
         }
-        the_world.day_clock = clock_step(the_world.day_clock, the_world.freeze_timer != 0);
-        the_world.light_level = light_level(the_world.day_clock);
-        ob_listg[LAMP_SLOT].ob_stat = if lamp_is_on(the_world.light_level) {
-            LAMP_ON
-        } else {
-            LAMP_OFF
-        };
-        let period = day_period(the_world.day_clock);
-        if period != the_world.day_period {
-            the_world.day_period = period;
-            if let Some(e) = period_event(period) {
-                show_event(e);
-            }
+        let tick = day_step(
+            the_world.day_clock,
+            the_world.freeze_timer != 0,
+            the_world.day_period,
+            (*hero).vitality,
+            the_hero.brave,
+            (*hero).state,
+        );
+        the_world.day_clock = tick.clock;
+        the_world.light_level = tick.light;
+        ob_listg[LAMP_SLOT].ob_stat = if tick.lamp_on { LAMP_ON } else { LAMP_OFF };
+        the_world.day_period = tick.period;
+        if let Some(e) = tick.period_event {
+            show_event(e);
         }
 
         day_fade();
 
-        if heal_due(the_world.day_clock, (*hero).vitality, the_hero.brave, (*hero).state) {
+        if tick.heal {
             (*hero).vitality += 1;
             queue_print(PRQ_STATS);
         }
+    }
+}
+
+/// What one frame of the day clock changes.
+#[derive(Debug, PartialEq, Eq)]
+struct DayTick {
+    clock: u16,
+    light: u16,
+    lamp_on: bool,
+    period: i16,
+    /// The message for a new part of the day, if one started this frame and has one.
+    period_event: Option<i32>,
+    /// The hero heals one point.
+    heal: bool,
+}
+
+/// The day clock, light, lamp, part of the day and slow healing after one frame.
+fn day_step(
+    clock: u16,
+    frozen: bool,
+    old_period: i16,
+    vitality: i16,
+    bravery: i16,
+    state: i8,
+) -> DayTick {
+    let clock = clock_step(clock, frozen);
+    let light = light_level(clock);
+    let period = day_period(clock);
+    DayTick {
+        clock,
+        light,
+        lamp_on: lamp_is_on(light),
+        period,
+        period_event: if period != old_period { period_event(period) } else { None },
+        heal: heal_due(clock, vitality, bravery, state),
     }
 }
 
@@ -573,44 +623,87 @@ fn eats_fruit(hungry: i16, fruit: u8) -> bool {
 /// Notes a safe spot, picks the music, and makes the hero hungrier and more tired.
 pub fn survival_tick() {
     unsafe {
-        let hero = &raw mut the_actors.list[0];
-        if safe_check_due(the_world.day_clock)
-            && the_actors.on_screen == 0
-            && the_actors.loading == 0
-            && the_witch.on_screen == 0
-            && (*hero).environ == 0
-            && the_hero.safe_flag == 0
-            && (*hero).state != DEAD
-        {
-            the_hero.safe_r = the_world.region;
-            the_hero.safe_x = the_hero.x;
-            the_hero.safe_y = the_hero.y;
-            if eats_fruit(the_hero.hunger, *the_hero.stuff.add(FRUIT_SLOT)) {
-                *the_hero.stuff.add(FRUIT_SLOT) -= 1;
-                the_hero.hunger -= FRUIT_FOOD;
-                show_event(EVENT_ATE_FRUIT);
-            }
-        }
-        if mood_due(the_world.day_clock, the_actors.battle_flag != 0) {
-            set_mood(0);
-        }
-        if hunger_due(the_world.day_clock, (*hero).vitality, (*hero).state) {
-            the_hero.hunger += 1;
-            the_hero.fatigue += 1;
-            let report = hunger_effects(&mut *(&raw mut the_hero), &mut *hero);
-            if report.redraw_stats {
-                queue_print(PRQ_STATS);
-            }
-            for event in report.events {
-                show_event(event);
-            }
-            if the_hero.fatigue == TIRED_AT {
-                show_event(3);
-            } else if the_hero.hunger == STARVING_AT {
-                show_event(4);
+        let facts = SurvivalFacts {
+            clock: the_world.day_clock,
+            region: the_world.region,
+            actors_on_screen: the_actors.on_screen != 0,
+            actors_loading: the_actors.loading != 0,
+            witch_on_screen: the_witch.on_screen != 0,
+            battle: the_actors.battle_flag != 0,
+        };
+        let steps = survival_step(
+            &facts,
+            &mut *(&raw mut the_hero),
+            &mut *(&raw mut the_actors.list[0]),
+        );
+        for step in steps {
+            match step {
+                SurvivalStep::Event(e) => show_event(e),
+                SurvivalStep::RedrawStats => queue_print(PRQ_STATS),
+                SurvivalStep::PickMusic => set_mood(0),
             }
         }
     }
+}
+
+/// What `survival_step` needs to know about the world.
+struct SurvivalFacts {
+    clock: u16,
+    region: u16,
+    actors_on_screen: bool,
+    actors_loading: bool,
+    witch_on_screen: bool,
+    battle: bool,
+}
+
+/// What the survival tick wants done, in order.
+#[derive(Debug, PartialEq, Eq)]
+enum SurvivalStep {
+    Event(i32),
+    RedrawStats,
+    PickMusic,
+}
+
+/// One frame of the survival rules: remembers a safe spot (eating fruit if hungry), then picks the
+/// music, then makes the hero hungrier and more tired. `body` is the hero's actor.
+fn survival_step(facts: &SurvivalFacts, hero: &mut Hero, body: &mut Shape) -> Vec<SurvivalStep> {
+    let mut steps = Vec::new();
+    if safe_check_due(facts.clock)
+        && !facts.actors_on_screen
+        && !facts.actors_loading
+        && !facts.witch_on_screen
+        && body.environ == 0
+        && hero.safe_flag == 0
+        && body.state != DEAD
+    {
+        hero.safe_r = facts.region;
+        hero.safe_x = hero.x;
+        hero.safe_y = hero.y;
+        let fruit = unsafe { hero.stuff.add(FRUIT_SLOT) };
+        if eats_fruit(hero.hunger, unsafe { *fruit }) {
+            unsafe { *fruit -= 1 };
+            hero.hunger -= FRUIT_FOOD;
+            steps.push(SurvivalStep::Event(EVENT_ATE_FRUIT));
+        }
+    }
+    if mood_due(facts.clock, facts.battle) {
+        steps.push(SurvivalStep::PickMusic);
+    }
+    if hunger_due(facts.clock, body.vitality, body.state) {
+        hero.hunger += 1;
+        hero.fatigue += 1;
+        let report = hunger_effects(hero, body);
+        if report.redraw_stats {
+            steps.push(SurvivalStep::RedrawStats);
+        }
+        steps.extend(report.events.into_iter().map(SurvivalStep::Event));
+        if hero.fatigue == TIRED_AT {
+            steps.push(SurvivalStep::Event(3));
+        } else if hero.hunger == STARVING_AT {
+            steps.push(SurvivalStep::Event(4));
+        }
+    }
+    steps
 }
 
 /// What hunger and fatigue did this time: the event messages to show (in order) and whether the
@@ -723,6 +816,178 @@ mod tests {
         hero.fatigue = fatigue;
         body.vitality = vitality;
         (hero, body)
+    }
+
+    fn door(kind: i8, secs: i8) -> Door {
+        Door { xc1: 100, yc1: 200, xc2: 300, yc2: 400, kind, secs }
+    }
+
+    #[test]
+    fn entering_needs_the_hero_lined_up() {
+        // horizontal doors (odd kind) go by y, vertical ones by x
+        assert!(may_enter(&door(1, 1), 0, 0x00, 0));
+        assert!(!may_enter(&door(1, 1), 0, 0x10, 0));
+        assert!(may_enter(&door(2, 1), 6, 0, 0));
+        assert!(!may_enter(&door(2, 1), 7, 0, 0));
+    }
+
+    #[test]
+    fn the_desert_door_needs_five_statues() {
+        assert!(!may_enter(&door(DESERT, 1), 0, 0, STATUES_NEEDED - 1));
+        assert!(may_enter(&door(DESERT, 1), 0, 0, STATUES_NEEDED));
+        assert!(may_enter(&door(2, 1), 0, 0, 0));
+    }
+
+    #[test]
+    fn leaving_is_the_mirror_of_entering() {
+        assert!(may_leave(&door(1, 1), 0, 0x10));
+        assert!(!may_leave(&door(1, 1), 0, 0));
+        assert!(may_leave(&door(2, 1), 2, 0));
+        assert!(!may_leave(&door(2, 1), 1, 0));
+    }
+
+    #[test]
+    fn exits_are_found_by_tile() {
+        assert!(is_exit_here(&door(2, 1), 300, 400));
+        assert!(!is_exit_here(&door(2, 1), 316, 400));
+        assert!(is_exit_here(&door(1, 1), 316, 400)); // horizontal: also one tile right
+        assert!(!is_exit_here(&door(1, 1), 300, 416));
+    }
+
+    #[test]
+    fn doors_lead_to_two_indoor_regions() {
+        assert_eq!(region_inside(&door(1, 1)), REGION_INSIDE);
+        assert_eq!(region_inside(&door(1, 2)), REGION_INSIDE_OTHER);
+    }
+
+    #[test]
+    fn arrival_spots_depend_on_the_door_kind() {
+        assert_eq!(inside_spot(&door(CAVE, 1)), (324, 416));
+        assert_eq!(inside_spot(&door(1, 1)), (316, 400));
+        assert_eq!(inside_spot(&door(2, 1)), (299, 416));
+        assert_eq!(outside_spot(&door(CAVE, 1)), (96, 216));
+        assert_eq!(outside_spot(&door(1, 1)), (116, 234));
+        assert_eq!(outside_spot(&door(2, 1)), (120, 216));
+    }
+
+    /// A hero with a pack the test controls, standing in a calm place on a safe-check frame.
+    fn calm_hero(pack: &mut [u8; 40]) -> (SurvivalFacts, Hero, Shape) {
+        let mut hero: Hero = unsafe { std::mem::zeroed() };
+        let mut body: Shape = unsafe { std::mem::zeroed() };
+        hero.stuff = pack.as_mut_ptr();
+        hero.x = 1234;
+        hero.y = 5678;
+        body.vitality = 50;
+        body.state = STILL;
+        let facts = SurvivalFacts {
+            clock: 128,
+            region: 3,
+            actors_on_screen: false,
+            actors_loading: false,
+            witch_on_screen: false,
+            battle: true,
+        };
+        (facts, hero, body)
+    }
+
+    #[test]
+    fn a_calm_frame_notes_the_safe_spot_and_adds_hunger() {
+        let mut pack = [0u8; 40];
+        let (facts, mut hero, mut body) = calm_hero(&mut pack);
+        let steps = survival_step(&facts, &mut hero, &mut body);
+        assert_eq!((hero.safe_r, hero.safe_x, hero.safe_y), (3, 1234, 5678));
+        assert_eq!((hero.hunger, hero.fatigue), (1, 1));
+        assert!(steps.is_empty());
+    }
+
+    #[test]
+    fn danger_stops_the_safe_spot_but_not_the_hunger() {
+        let mut pack = [0u8; 40];
+        for danger in 0..4 {
+            let (mut facts, mut hero, mut body) = calm_hero(&mut pack);
+            match danger {
+                0 => facts.actors_on_screen = true,
+                1 => facts.actors_loading = true,
+                2 => facts.witch_on_screen = true,
+                _ => hero.safe_flag = 1,
+            }
+            survival_step(&facts, &mut hero, &mut body);
+            assert_eq!(hero.safe_r, 0);
+            assert_eq!(hero.hunger, 1);
+        }
+    }
+
+    #[test]
+    fn a_hungry_hero_eats_fruit_at_the_safe_spot() {
+        let mut pack = [0u8; 40];
+        pack[FRUIT_SLOT] = 2;
+        let (facts, mut hero, mut body) = calm_hero(&mut pack);
+        hero.hunger = 40;
+        let steps = survival_step(&facts, &mut hero, &mut body);
+        assert_eq!(steps, vec![SurvivalStep::Event(EVENT_ATE_FRUIT)]);
+        assert_eq!(hero.hunger, 40 - FRUIT_FOOD + 1);
+        assert_eq!(pack[FRUIT_SLOT], 1);
+    }
+
+    #[test]
+    fn music_is_picked_every_eighth_frame_outside_battle() {
+        let mut pack = [0u8; 40];
+        let (mut facts, mut hero, mut body) = calm_hero(&mut pack);
+        facts.clock = 8;
+        facts.battle = false;
+        assert_eq!(survival_step(&facts, &mut hero, &mut body), vec![SurvivalStep::PickMusic]);
+        facts.battle = true;
+        assert!(survival_step(&facts, &mut hero, &mut body).is_empty());
+    }
+
+    #[test]
+    fn hunger_messages_come_in_the_original_order() {
+        let mut pack = [0u8; 40];
+        let (mut facts, mut hero, mut body) = calm_hero(&mut pack);
+        facts.clock = 0; // also a music frame; battle suppresses it
+        hero.hunger = HUNGRY - 1;
+        assert_eq!(survival_step(&facts, &mut hero, &mut body), vec![SurvivalStep::Event(0)]);
+        // damage is shown (stats) before the starving messages, and the tired one comes last
+        hero.hunger = 103;
+        hero.fatigue = TIRED_AT - 1;
+        let steps = survival_step(&facts, &mut hero, &mut body);
+        assert_eq!(
+            steps,
+            vec![SurvivalStep::RedrawStats, SurvivalStep::Event(2), SurvivalStep::Event(3)]
+        );
+        assert_eq!(body.vitality, 48);
+    }
+
+    #[test]
+    fn no_hunger_while_asleep_or_dead() {
+        let mut pack = [0u8; 40];
+        let (facts, mut hero, mut body) = calm_hero(&mut pack);
+        body.state = SLEEP;
+        survival_step(&facts, &mut hero, &mut body);
+        assert_eq!(hero.hunger, 0);
+        body.state = STILL;
+        body.vitality = 0;
+        survival_step(&facts, &mut hero, &mut body);
+        assert_eq!(hero.hunger, 0);
+    }
+
+    #[test]
+    fn a_frame_of_the_day() {
+        let t = day_step(1999, false, 0, 50, 0, STILL);
+        assert_eq!((t.clock, t.light, t.lamp_on, t.period, t.period_event, t.heal), (2000, 50, false, 1, None, false));
+        // a new period with a message
+        let t = day_step(7999, false, 3, 50, 0, STILL);
+        assert_eq!((t.period, t.period_event), (4, Some(29)));
+        // the same period again says nothing
+        assert_eq!(day_step(8000, false, 4, 50, 0, STILL).period_event, None);
+        // night: the lamp is on
+        assert!(day_step(100, false, 0, 50, 0, STILL).lamp_on);
+        // frozen time stands still
+        assert_eq!(day_step(500, true, 0, 50, 0, STILL).clock, 500);
+        // healing lands on multiples of 1024 for a hurt hero
+        assert!(day_step(1023, false, 0, 10, 0, STILL).heal);
+        assert!(!day_step(1023, false, 0, 10, 0, DEAD).heal);
+        assert!(!day_step(1024, false, 0, 10, 0, STILL).heal);
     }
 
     #[test]
@@ -890,3 +1155,4 @@ mod tests {
         }
     }
 }
+

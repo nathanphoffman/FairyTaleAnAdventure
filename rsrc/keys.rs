@@ -474,13 +474,12 @@ unsafe fn walking_state(state: i8) -> i8 {
         if compass_lit_direction >= NOT_WALKING {
             return STILL;
         }
-        if the_hero.hunger > STUMBLE_HUNGER && rand4() == 0 {
-            compass_lit_direction = if fta_rand() & 1 != 0 {
-                (compass_lit_direction + 1) & 7
-            } else {
-                (compass_lit_direction - 1) & 7
-            };
-        }
+        compass_lit_direction = stumble(
+            compass_lit_direction,
+            the_hero.hunger,
+            || rand4() == 0,
+            || fta_rand() & 1 != 0,
+        );
         the_actors.list[0].facing = compass_lit_direction as i8;
         if mouse_buttons() & LEFT_BUTTON != 0 || the_ui.held_direction != 0 {
             return WALKING;
@@ -489,9 +488,48 @@ unsafe fn walking_state(state: i8) -> i8 {
     }
 }
 
+/// A starving hero sometimes stumbles one step off the direction walked. `trips` and `turns_right`
+/// are random draws, taken in that order and only when needed.
+fn stumble(
+    direction: i16,
+    hunger: i16,
+    trips: impl FnOnce() -> bool,
+    turns_right: impl FnOnce() -> bool,
+) -> i16 {
+    if hunger > STUMBLE_HUNGER && trips() {
+        if turns_right() {
+            (direction + 1) & 7
+        } else {
+            (direction - 1) & 7
+        }
+    } else {
+        direction
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_a_starving_hero_stumbles() {
+        let mut drawn = 0;
+        let dir = stumble(3, STUMBLE_HUNGER, || { drawn += 1; true }, || true);
+        assert_eq!((dir, drawn), (3, 0));
+        assert_eq!(stumble(3, STUMBLE_HUNGER + 1, || false, || true), 3);
+        assert_eq!(stumble(3, STUMBLE_HUNGER + 1, || true, || true), 4);
+        assert_eq!(stumble(3, STUMBLE_HUNGER + 1, || true, || false), 2);
+        // the compass wraps around
+        assert_eq!(stumble(7, STUMBLE_HUNGER + 1, || true, || true), 0);
+        assert_eq!(stumble(0, STUMBLE_HUNGER + 1, || true, || false), 7);
+    }
+
+    #[test]
+    fn the_turn_is_only_drawn_after_a_trip() {
+        let mut drawn = 0;
+        stumble(3, STUMBLE_HUNGER + 1, || false, || { drawn += 1; true });
+        assert_eq!(drawn, 0);
+    }
 
     #[test]
     fn timers_count_down_and_stop_at_zero() {

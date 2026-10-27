@@ -15,6 +15,8 @@ pub(super) struct Voice {
     pub(super) event_start: i32,
     pub(super) event_stop: i32,
     pub(super) vol_list: *const u8,
+    /// how many times the track has looped back to its start
+    pub(super) loops: u32,
 }
 
 impl Voice {
@@ -29,6 +31,7 @@ impl Voice {
             event_start: 0,
             event_stop: 0,
             vol_list: std::ptr::null(),
+            loops: 0,
         }
     }
 }
@@ -69,6 +72,36 @@ impl Sound {
             rate,
             tick_acc: 0.0,
         }
+    }
+
+    /// Starts playing four tracks from the beginning.
+    pub(super) fn play(&mut self, tracks: [*const u8; VOICE_COUNT]) {
+        if self.ins.is_null() || self.wav.is_null() || self.vol.is_null() {
+            return;
+        }
+        for (v, t) in tracks.into_iter().enumerate() {
+            let word = unsafe { *self.ins.add(v) };
+            let ch = &mut self.chans[v];
+            ch.volume = 0;
+            ch.active = false;
+            self.voices[v] = Voice {
+                trak_ptr: t,
+                trak_beg: t,
+                wave_num: (word >> 8) as u8,
+                vol_num: word as u8,
+                vol_delay: -1,
+                ..Voice::new()
+            };
+        }
+        self.timeclock = 0;
+        self.nosound = false;
+    }
+
+    /// True once every voice has either ended or played its track through once.
+    pub(super) fn played_through(&self) -> bool {
+        self.voices
+            .iter()
+            .all(|v| v.trak_ptr.is_null() || v.loops >= 1)
     }
 
     pub(super) fn set_period(&mut self, ch: usize, period: u32) {
@@ -153,6 +186,7 @@ impl Sound {
     /// Loops back to the start when asked to, otherwise stops the voice. False when stopped.
     fn end_of_track(&mut self, v: usize, looping: bool) -> bool {
         if looping && !self.voices[v].trak_beg.is_null() {
+            self.voices[v].loops += 1;
             self.voices[v].trak_ptr = self.voices[v].trak_beg;
             return true;
         }

@@ -14,9 +14,11 @@ mod calls;
 mod channel;
 mod dump;
 mod sequencer;
+mod export;
 mod tables;
 
 pub use dump::dump;
+pub use export::export_tunes;
 
 use sdl2::AudioSubsystem;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired};

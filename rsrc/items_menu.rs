@@ -451,22 +451,16 @@ unsafe fn three_things() {
 unsafe fn search_body() {
     unsafe {
         const ARCHER_WEAPON: u32 = 4;
-        const MAX_WEAPON: u32 = 5;
         const EXTRA_ARROWS_MIN: i32 = 2;
         let an = &raw mut the_actors.list[the_actors.nearest_object as usize];
         print_wrapped(c"% searched the body and found".as_ptr());
         print(c"".as_ptr());
-        let mut weapon = (*an).weapon as u32;
-        if weapon > MAX_WEAPON {
-            weapon = 0;
-        }
+        let weapon = body_weapon((*an).weapon);
         if weapon != 0 {
             print_cont(c"a ".as_ptr());
             print_cont(item_name(weapon as usize - 1));
             add_stuff(weapon as usize - 1, 1);
-            if weapon as i8 > the_actors.list[0].weapon {
-                the_actors.list[0].weapon = weapon as i8;
-            }
+            the_actors.list[0].weapon = better_weapon(the_actors.list[0].weapon, weapon);
             if weapon == ARCHER_WEAPON {
                 print_cont(c" and ".as_ptr());
                 let arrows = rand8() + EXTRA_ARROWS_MIN;
@@ -497,6 +491,19 @@ unsafe fn search_body() {
         }
         print_cont(c".".as_ptr());
     }
+}
+
+/// The heaviest weapon an enemy can carry and be searched for.
+const MAX_BODY_WEAPON: i8 = 5;
+
+/// The weapon a body yields (0 for none): the unarmed and odd values count as nothing.
+fn body_weapon(raw: i8) -> u32 {
+    if raw as u8 as u32 > MAX_BODY_WEAPON as u32 { 0 } else { raw as u8 as u32 }
+}
+
+/// The hero keeps a better weapon in hand and only takes up a found one that is better.
+fn better_weapon(current: i8, found: u32) -> i8 {
+    if found as i8 > current { found as i8 } else { current }
 }
 
 /// Picks what a dead enemy carries besides its weapon, from the treasure table for its race.
@@ -538,6 +545,22 @@ unsafe fn look_around() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bodies_yield_only_real_weapons() {
+        assert_eq!(body_weapon(0), 0);
+        assert_eq!(body_weapon(1), 1);
+        assert_eq!(body_weapon(5), 5);
+        assert_eq!(body_weapon(6), 0);
+        assert_eq!(body_weapon(-1), 0); // already searched
+    }
+
+    #[test]
+    fn a_found_weapon_is_only_taken_up_if_better() {
+        assert_eq!(better_weapon(1, 3), 3);
+        assert_eq!(better_weapon(4, 3), 4);
+        assert_eq!(better_weapon(3, 3), 3);
+    }
 
     #[test]
     fn take_classes() {

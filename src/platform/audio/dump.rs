@@ -26,7 +26,7 @@ pub(super) fn capture(out: &[f32]) {
 }
 
 /// The 44 byte header of a 16 bit stereo PCM WAV holding `data_len` bytes of samples.
-fn wav_header(data_len: u32) -> Vec<u8> {
+pub(super) fn wav_header(data_len: u32) -> Vec<u8> {
     let rate = SAMPLE_RATE as u32;
     let mut out = Vec::new();
     out.extend_from_slice(b"RIFF");

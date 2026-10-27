@@ -1,6 +1,5 @@
 //! The calls the game makes (formerly gdriver.asm).
 
-use super::sequencer::Voice;
 use super::tables::*;
 use super::with_sound;
 
@@ -41,25 +40,7 @@ pub extern "C" fn setscore(t1: *const u8, t2: *const u8, t3: *const u8, t4: *con
 #[unsafe(no_mangle)]
 pub extern "C" fn playscore(t1: *const u8, t2: *const u8, t3: *const u8, t4: *const u8) {
     with_sound(|s| {
-        if s.ins.is_null() || s.wav.is_null() || s.vol.is_null() {
-            return;
-        }
-        for (v, t) in [t1, t2, t3, t4].into_iter().enumerate() {
-            let word = unsafe { *s.ins.add(v) };
-            let ch = &mut s.chans[v];
-            ch.volume = 0;
-            ch.active = false;
-            s.voices[v] = Voice {
-                trak_ptr: t,
-                trak_beg: t,
-                wave_num: (word >> 8) as u8,
-                vol_num: word as u8,
-                vol_delay: -1,
-                ..Voice::new()
-            };
-        }
-        s.timeclock = 0;
-        s.nosound = false;
+        s.play([t1, t2, t3, t4]);
     });
 }
 

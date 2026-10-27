@@ -36,6 +36,33 @@ const NIGHT_LIGHT: u16 = 120;
 const GAME_MENU: usize = 4;
 const MUSIC_ENTRY: usize = 6;
 
+/// The tunes in order of their number, with the intro (3) where the game plays it at the start.
+const TUNE_NAMES: [&str; 7] = ["day", "battle", "night", "intro", "astral", "indoors", "death"];
+
+/// Writes every tune as a WAV file into `dir` (the indoors tune twice: with the house and the cave
+/// instrument). A tool for listening to the music; the game then ends.
+pub unsafe fn export_tunes(dir: &std::path::Path) {
+    unsafe {
+        let tracks = |n: usize| {
+            let at = n * TRACKS_PER_TUNE;
+            [0, 1, 2, 3].map(|i| the_memory.track[at + i] as *const u8)
+        };
+        let mut tunes: Vec<(&str, [*const u8; TRACKS_PER_TUNE])> = Vec::new();
+        for (n, name) in TUNE_NAMES.iter().enumerate() {
+            tunes.push((name, tracks(n)));
+        }
+        tunes.push(("cave", tracks(TUNE_INDOORS)));
+        crate::platform::audio::export_tunes(dir, &tunes, |name| {
+            let wave = (&raw mut instrument_waves).cast::<i16>().add(WAVE_SLOT);
+            match name {
+                "cave" => *wave = WAVE_CAVE,
+                "indoors" => *wave = WAVE_INDOORS,
+                _ => {}
+            }
+        });
+    }
+}
+
 /// Picks the tune for the situation and plays it right away if `now` is set, otherwise changes
 /// to it at the end of the current one. If music is switched off, stops the music.
 pub fn set_mood(now: i8) {

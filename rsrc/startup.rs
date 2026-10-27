@@ -797,6 +797,10 @@ unsafe fn start_up() -> bool {
         stopscore();
         show_title_screen();
         prepare_intro_pages_and_music();
+        if let Some(dir) = std::env::var_os("FTA_MUSIC_EXPORT") {
+            super::mood::export_tunes(std::path::Path::new(&dir));
+            return false;
+        }
 
         if intro_skipped() == 0 {
             play_intro();
