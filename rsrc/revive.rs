@@ -15,7 +15,7 @@ use super::messages::print_cont;
 use super::mood::set_mood;
 use super::regions::load_region_now;
 use super::screen_fx::{fade_down, map_message, message_off};
-use super::state::{Hero, the_actors, the_hero, the_screen, the_ui, the_world};
+use super::state::{Hero, World, the_actors, the_hero, the_screen, the_ui, the_world};
 use super::tables::{ob_list8, ob_listg};
 use super::types::{Bro, Shape};
 use crate::amiga::{RastPort, TextFont};
@@ -164,18 +164,23 @@ unsafe fn take_over_next_brother(hero: *mut Shape) {
             &brother_stats[the_hero.brother as usize],
         );
 
-        the_world.secret_timer = 0;
-        the_world.light_timer = 0;
-        the_world.freeze_timer = 0;
-        the_hero.safe_x = FIRST_SAFE_SPOT.0;
-        the_hero.safe_y = FIRST_SAFE_SPOT.1;
-        the_hero.safe_r = FIRST_REGION;
-        the_world.region = FIRST_REGION;
+        reset_for_next_brother(&mut *(&raw mut the_hero), &mut *(&raw mut the_world));
         move_camera_to(the_hero.safe_x as i32, the_hero.safe_y as i32);
         the_screen.view_status = VIEW_REDRAW;
         the_actors.on_screen = 1;
         the_actors.loading = 0;
     }
+}
+
+/// No spells running, and the next brother starts from the first safe spot in the first region.
+fn reset_for_next_brother(hero: &mut Hero, world: &mut World) {
+    world.secret_timer = 0;
+    world.light_timer = 0;
+    world.freeze_timer = 0;
+    hero.safe_x = FIRST_SAFE_SPOT.0;
+    hero.safe_y = FIRST_SAFE_SPOT.1;
+    hero.safe_r = FIRST_REGION;
+    world.region = FIRST_REGION;
 }
 
 /// The next brother takes over: his starting stats, an empty pack except for a dirk (inventory
@@ -266,28 +271,35 @@ unsafe fn announce_brother() {
 /// The hero (re)appears at the last safe spot, and the region there is loaded.
 unsafe fn put_hero_at_safe_spot(hero: *mut Shape) {
     unsafe {
-        the_hero.x = the_hero.safe_x;
-        (*hero).abs_x = the_hero.safe_x;
-        the_hero.y = the_hero.safe_y;
-        (*hero).abs_y = the_hero.safe_y;
-        the_world.map_x = the_hero.x.wrapping_sub(CAMERA_OFFSET.0);
-        the_world.map_y = the_hero.y.wrapping_sub(CAMERA_OFFSET.1);
-        the_world.new_region = the_hero.safe_r;
+        move_to_safe_spot(
+            &mut *(&raw mut the_hero),
+            &mut *hero,
+            &mut *(&raw mut the_world),
+        );
         load_region_now();
     }
+}
+
+/// The hero's position becomes the safe spot, the camera is centred on it, and its region is the
+/// one to load next.
+fn move_to_safe_spot(hero: &mut Hero, body: &mut Shape, world: &mut World) {
+    hero.x = hero.safe_x;
+    body.abs_x = hero.safe_x;
+    hero.y = hero.safe_y;
+    body.abs_y = hero.safe_y;
+    world.map_x = hero.x.wrapping_sub(CAMERA_OFFSET.0);
+    world.map_y = hero.y.wrapping_sub(CAMERA_OFFSET.1);
+    world.new_region = hero.safe_r;
 }
 
 /// Fresh health, a new day, and no hunger or tiredness.
 unsafe fn restore_hero(hero: *mut Shape) {
     unsafe {
-        (*hero).vitality = 15 + the_hero.brave / 4;
-        (*hero).environ = 0;
-        (*hero).state = STILL;
-        (*hero).race = 255; // -1
-        the_world.day_clock = START_DAYNIGHT;
-        the_world.light_level = START_LIGHT;
-        the_hero.hunger = 0;
-        the_hero.fatigue = 0;
+        restore_stats(
+            &mut *(&raw mut the_hero),
+            &mut *hero,
+            &mut *(&raw mut the_world),
+        );
         the_actors.active = 3;
         update_menu_availability();
         queue_print(PRQ_VITALITY);
@@ -295,9 +307,72 @@ unsafe fn restore_hero(hero: *mut Shape) {
     }
 }
 
+/// Full health for the bravery, standing still on dry land, the morning clock, and no hunger or
+/// fatigue.
+fn restore_stats(hero: &mut Hero, body: &mut Shape, world: &mut World) {
+    body.vitality = 15 + hero.brave / 4;
+    body.environ = 0;
+    body.state = STILL;
+    body.race = 255; // -1
+    world.day_clock = START_DAYNIGHT;
+    world.light_level = START_LIGHT;
+    hero.hunger = 0;
+    hero.fatigue = 0;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn zeroed<T>() -> T {
+        unsafe { std::mem::zeroed() }
+    }
+
+    #[test]
+    fn a_new_brother_starts_clean_at_the_first_safe_spot() {
+        let (mut hero, mut world): (Hero, World) = (zeroed(), zeroed());
+        world.secret_timer = 5;
+        world.light_timer = 6;
+        world.freeze_timer = 7;
+        world.region = 9;
+        reset_for_next_brother(&mut hero, &mut world);
+        assert_eq!((world.secret_timer, world.light_timer, world.freeze_timer), (0, 0, 0));
+        assert_eq!(world.region, FIRST_REGION);
+        assert_eq!(
+            (hero.safe_x, hero.safe_y, hero.safe_r),
+            (FIRST_SAFE_SPOT.0, FIRST_SAFE_SPOT.1, FIRST_REGION)
+        );
+    }
+
+    #[test]
+    fn the_hero_reappears_at_the_safe_spot_with_the_camera_centred() {
+        let (mut hero, mut body, mut world): (Hero, Shape, World) = (zeroed(), zeroed(), zeroed());
+        hero.safe_x = 1000;
+        hero.safe_y = 2000;
+        hero.safe_r = 5;
+        move_to_safe_spot(&mut hero, &mut body, &mut world);
+        assert_eq!((hero.x, hero.y, body.abs_x, body.abs_y), (1000, 2000, 1000, 2000));
+        assert_eq!(
+            (world.map_x, world.map_y),
+            (1000 - CAMERA_OFFSET.0, 2000 - CAMERA_OFFSET.1)
+        );
+        assert_eq!(world.new_region, 5);
+    }
+
+    #[test]
+    fn revived_hero_is_healthy_rested_and_it_is_morning() {
+        let (mut hero, mut body, mut world): (Hero, Shape, World) = (zeroed(), zeroed(), zeroed());
+        hero.brave = 40;
+        hero.hunger = 90;
+        hero.fatigue = 80;
+        body.state = 15;
+        body.environ = 3;
+        world.day_clock = 100;
+        restore_stats(&mut hero, &mut body, &mut world);
+        assert_eq!((body.vitality, body.state, body.environ, body.race), (25, STILL, 0, 255));
+        assert_eq!((hero.hunger, hero.fatigue), (0, 0));
+        assert_eq!((world.day_clock, world.light_level), (START_DAYNIGHT, START_LIGHT));
+    }
 
     #[test]
     fn next_brother_starts_with_his_own_stats_and_only_a_dirk() {

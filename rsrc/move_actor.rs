@@ -117,6 +117,84 @@ const PIT_LUCK_COST: i16 = 2;
 const DEATH_LAVA: i32 = 27;
 const DEATH_DROWN: i32 = 6;
 
+/// The swan carries the hero once he is near, with the swan on its slot and the lasso in the pack.
+fn swan_carries(nearness: i16, carrier_slot: i16, has_lasso: bool) -> bool {
+    nearness != 0 && carrier_slot == CARRIER_SLOT as i16 && has_lasso
+}
+
+/// The turtle carries the hero whenever he is near and on its slot.
+fn turtle_carries(nearness: i16, carrier_slot: i16) -> bool {
+    nearness != 0 && carrier_slot == CARRIER_SLOT as i16
+}
+
+/// The turtle's direction of swimming: straight on while there is deep water ahead, otherwise one
+/// step right, then two to the left of that, then one more to the left; the last is used whether
+/// or not it is water. `water_ahead(dir)` says if the turtle could swim that way.
+fn turtle_heading(dir: i16, water_ahead: impl Fn(i16) -> bool) -> i16 {
+    if water_ahead(dir) {
+        return dir;
+    }
+    let right = (dir + 1) & 7;
+    if water_ahead(right) {
+        return right;
+    }
+    let left = (right - 2) & 7;
+    if water_ahead(left) {
+        return left;
+    }
+    (left - 1) & 7
+}
+
+/// Standing in water (depth `k` above 2) on ground that is dry (`j` 0), or wading with a depth over
+/// the limit of the terrain (3: 5, 4: 10): the actor climbs out one step a frame.
+fn climbs_out_of_water(k: i8, j: i16) -> bool {
+    k > 2 && (j == 0 || (j == 3 && k > 5) || (j == 4 && k > 10))
+}
+
+/// The hero's frame once the way has been blocked for a while: oscillating, then a frustrated one.
+fn frustrated_frame(frustration: i8, cycle: i16) -> Option<i16> {
+    if frustration > 40 {
+        Some(FRAME_FRUSTRATED)
+    } else if frustration > 20 {
+        Some(FRAME_OSCIL + ((cycle >> 1) & 1))
+    } else {
+        None
+    }
+}
+
+/// What wading does to an actor this frame.
+#[derive(Debug, PartialEq, Eq)]
+enum Wading {
+    Nothing,
+    /// Fully under: the actor stops moving (or falls through the pit).
+    Drowned,
+    /// Deep enough to show the sinking frame.
+    Sinking,
+}
+
+/// The depth after one frame in water of terrain type `j` (shallow 4 or deep 5), and what that does.
+/// The depth moves one step towards its limit; the dead are not affected.
+fn wade_step(depth: i8, j: i16, dead_or_dying: bool) -> (i8, Wading) {
+    let limit: i8 = if j == TERRAIN_SLOW_SINK { 10 } else { ENVIRON_DROWNED };
+    if depth > limit {
+        (depth - 1, Wading::Nothing)
+    } else if depth < limit {
+        let depth = depth + 1;
+        let outcome = if dead_or_dying {
+            Wading::Nothing
+        } else if depth == ENVIRON_DROWNED {
+            Wading::Drowned
+        } else if depth > ENVIRON_SINKING {
+            Wading::Sinking
+        } else {
+            Wading::Nothing
+        };
+        (depth, outcome)
+    } else {
+        (depth, Wading::Nothing)
+    }
+}
+
 /// Where the next stretch of code continues; one value per `goto` label of the C.
 #[derive(Clone, Copy)]
 enum Pc {
@@ -296,10 +374,11 @@ impl Ctx {
             self.j = 0;
             let hero = &raw const the_actors.list[0];
             if the_actors.loaded_actor_file == SWAN_FILE {
-                if the_actors.raft_nearness != 0
-                    && the_actors.carrier_slot == CARRIER_SLOT as i16
-                    && *the_hero.stuff.add(STUFF_SWAN_ITEM) != 0
-                {
+                if swan_carries(
+                    the_actors.raft_nearness,
+                    the_actors.carrier_slot,
+                    *the_hero.stuff.add(STUFF_SWAN_ITEM) != 0,
+                ) {
                     self.d = (*hero).facing as i16;
                     (*an).abs_x = (*hero).abs_x;
                     XTEST = (*hero).abs_x;
@@ -313,7 +392,7 @@ impl Ctx {
                 self.dex = self.d;
                 self.e = 0;
             } else {
-                if the_actors.raft_nearness != 0 && the_actors.carrier_slot == CARRIER_SLOT as i16 {
+                if turtle_carries(the_actors.raft_nearness, the_actors.carrier_slot) {
                     self.d = (*hero).facing as i16;
                     XTEST = (*hero).abs_x;
                     YTEST = (*hero).abs_y;
@@ -343,23 +422,11 @@ impl Ctx {
         unsafe {
             let an = self.an;
             let (ax, ay) = ((*an).abs_x as i32, (*an).abs_y as i32);
+            self.d = turtle_heading(self.d, |dir| {
+                terrain(pos_x(ax, dir, 3), pos_y(ay, dir, 3)) == TURTLE_WATER
+            });
             XTEST = pos_x(ax, self.d, 3);
             YTEST = pos_y(ay, self.d, 3);
-            if terrain(XTEST, YTEST) != TURTLE_WATER {
-                self.d = (self.d + 1) & 7;
-                XTEST = pos_x(ax, self.d, 3);
-                YTEST = pos_y(ay, self.d, 3);
-                if terrain(XTEST, YTEST) != TURTLE_WATER {
-                    self.d = (self.d - 2) & 7;
-                    XTEST = pos_x(ax, self.d, 3);
-                    YTEST = pos_y(ay, self.d, 3);
-                    if terrain(XTEST, YTEST) != TURTLE_WATER {
-                        self.d = (self.d - 1) & 7;
-                        XTEST = pos_x(ax, self.d, 3);
-                        YTEST = pos_y(ay, self.d, 3);
-                    }
-                }
-            }
             the_hero.riding = 0;
             self.dex = self.d + self.d + (self.cycle & 1);
         }
@@ -558,8 +625,7 @@ impl Ctx {
             if (*an).race == RACE_SNAKE {
                 self.dex = (self.cycle & 2) + ((self.d & 0xfe) << 2) + 0x24;
             }
-            let (k, j) = (self.k, self.j);
-            if k > 2 && (j == 0 || (j == 3 && k > 5) || (j == 4 && k > 10)) {
+            if climbs_out_of_water(self.k, self.j) {
                 if the_hero.sector != PIT_SECTOR {
                     self.k -= 1;
                 }
@@ -580,10 +646,8 @@ impl Ctx {
         unsafe {
             if self.i == 0 {
                 the_actors.frustration = the_actors.frustration.wrapping_add(1);
-                if the_actors.frustration > 40 {
-                    self.dex = FRAME_FRUSTRATED;
-                } else if the_actors.frustration > 20 {
-                    self.dex = FRAME_OSCIL + ((self.cycle >> 1) & 1);
+                if let Some(frame) = frustrated_frame(the_actors.frustration, self.cycle) {
+                    self.dex = frame;
                 }
                 return Pc::Cpx;
             }
@@ -802,18 +866,11 @@ impl Ctx {
     unsafe fn wade(&mut self, j: i16) {
         unsafe {
             let an = self.an;
-            let limit: i8 = if j == TERRAIN_SLOW_SINK {
-                10
-            } else {
-                ENVIRON_DROWNED
-            };
-            if self.k > limit {
-                self.k -= 1;
-            } else if self.k < limit {
-                self.k += 1;
-                if self.s == DYING || self.s == DEAD {
-                    // no change to the state of the dead
-                } else if self.k == ENVIRON_DROWNED {
+            let (depth, outcome) = wade_step(self.k, j, self.s == DYING || self.s == DEAD);
+            self.k = depth;
+            match outcome {
+                Wading::Nothing => {}
+                Wading::Drowned => {
                     if the_hero.sector == PIT_SECTOR {
                         if self.i == 0 {
                             self.k = 0;
@@ -825,9 +882,8 @@ impl Ctx {
                         }
                     }
                     (*an).state = STILL;
-                } else if self.k > ENVIRON_SINKING {
-                    (*an).state = SINK as i8;
                 }
+                Wading::Sinking => (*an).state = SINK as i8,
             }
         }
     }
@@ -949,5 +1005,67 @@ impl Ctx {
             (*an).rel_x = wrap_coordinate((*an).abs_x as i32 - the_world.map_x as i32 - ox) as u16;
             (*an).rel_y = wrap_coordinate((*an).abs_y as i32 - the_world.map_y as i32 - oy) as u16;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_swan_needs_the_lasso_and_the_turtle_does_not() {
+        assert!(swan_carries(1, CARRIER_SLOT as i16, true));
+        assert!(!swan_carries(1, CARRIER_SLOT as i16, false));
+        assert!(!swan_carries(0, CARRIER_SLOT as i16, true));
+        assert!(!swan_carries(1, CARRIER_SLOT as i16 + 1, true));
+        assert!(turtle_carries(1, CARRIER_SLOT as i16));
+        assert!(!turtle_carries(0, CARRIER_SLOT as i16));
+        assert!(!turtle_carries(1, 0));
+    }
+
+    #[test]
+    fn the_turtle_keeps_to_the_water() {
+        // straight on, then right, then two left of that, then one more left
+        assert_eq!(turtle_heading(2, |_| true), 2);
+        assert_eq!(turtle_heading(2, |d| d == 3), 3);
+        assert_eq!(turtle_heading(2, |d| d == 1), 1);
+        assert_eq!(turtle_heading(2, |_| false), 0);
+        // the compass wraps
+        assert_eq!(turtle_heading(7, |d| d == 0), 0);
+        assert_eq!(turtle_heading(0, |d| d == 7), 7);
+    }
+
+    #[test]
+    fn actors_climb_out_of_shallow_water() {
+        assert!(climbs_out_of_water(3, 0));
+        assert!(!climbs_out_of_water(2, 0));
+        assert!(climbs_out_of_water(6, 3));
+        assert!(!climbs_out_of_water(5, 3));
+        assert!(climbs_out_of_water(11, 4));
+        assert!(!climbs_out_of_water(10, 4));
+        assert!(!climbs_out_of_water(20, 5));
+    }
+
+    #[test]
+    fn being_stuck_shows_impatience() {
+        assert_eq!(frustrated_frame(20, 0), None);
+        assert_eq!(frustrated_frame(21, 0), Some(FRAME_OSCIL));
+        assert_eq!(frustrated_frame(21, 2), Some(FRAME_OSCIL + 1));
+        assert_eq!(frustrated_frame(41, 0), Some(FRAME_FRUSTRATED));
+    }
+
+    #[test]
+    fn wading_deeper_sinks_then_drowns() {
+        // deep water (5): wade towards ENVIRON_DROWNED
+        assert_eq!(wade_step(0, 5, false), (1, Wading::Nothing));
+        assert_eq!(wade_step(ENVIRON_SINKING, 5, false), (ENVIRON_SINKING + 1, Wading::Sinking));
+        assert_eq!(wade_step(ENVIRON_DROWNED - 1, 5, false), (ENVIRON_DROWNED, Wading::Drowned));
+        assert_eq!(wade_step(ENVIRON_DROWNED, 5, false), (ENVIRON_DROWNED, Wading::Nothing));
+        // shallow water (4) stops at 10 and comes back up from deeper
+        assert_eq!(wade_step(9, 4, false), (10, Wading::Nothing));
+        assert_eq!(wade_step(10, 4, false), (10, Wading::Nothing));
+        assert_eq!(wade_step(12, 4, false), (11, Wading::Nothing));
+        // the dead are not affected
+        assert_eq!(wade_step(ENVIRON_SINKING, 5, true), (ENVIRON_SINKING + 1, Wading::Nothing));
     }
 }

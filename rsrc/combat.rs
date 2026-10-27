@@ -116,18 +116,69 @@ unsafe fn swing(i: usize) {
             let xd = ((*target).abs_x as i32 - xs as i32) as i16;
             let yd = ((*target).abs_y as i32 - ys as i32) as i16;
             let dist = chebyshev(xd, yd);
-            if (i == 0 || rand256() > the_hero.brave as i32)
-                && dist < bv
-                && the_world.freeze_timer == 0
-            {
-                hit_actor(i as i32, j as i32, fc, wt);
-                break;
-            } else if dist < bv + WHOOSH_MARGIN && wt != TOUCH_WEAPON {
-                play_effect(SWING_SOUND, SWING_SOUND_PITCH + rand256());
+            match swing_result(
+                i == 0,
+                dist,
+                bv,
+                the_world.freeze_timer != 0,
+                wt,
+                the_hero.brave,
+                rand256,
+            ) {
+                SwingResult::Hit => {
+                    hit_actor(i as i32, j as i32, fc, wt);
+                    break;
+                }
+                SwingResult::Whoosh => play_effect(SWING_SOUND, SWING_SOUND_PITCH + rand256()),
+                SwingResult::Miss => {}
             }
             j += 1;
         }
     }
+}
+
+/// How a swing at one target turned out.
+#[derive(Debug, PartialEq, Eq)]
+enum SwingResult {
+    Hit,
+    /// Near enough to make the whoosh sound, but no hit.
+    Whoosh,
+    Miss,
+}
+
+/// The tip of the weapon is `dist` from the target and the reach is `reach`. The hero always hits
+/// within reach; an enemy also has to get past the hero's bravery (`dodge_roll` is a 0-255 draw,
+/// taken before anything else is checked, only for enemies). Nothing hits while time is frozen,
+/// and touch attacks make no sound.
+fn swing_result(
+    by_hero: bool,
+    dist: i16,
+    reach: i16,
+    frozen: bool,
+    strength: i16,
+    hero_bravery: i16,
+    dodge_roll: impl FnOnce() -> i32,
+) -> SwingResult {
+    if (by_hero || dodge_roll() > hero_bravery as i32) && dist < reach && !frozen {
+        SwingResult::Hit
+    } else if dist < reach + WHOOSH_MARGIN && strength != TOUCH_WEAPON {
+        SwingResult::Whoosh
+    } else {
+        SwingResult::Miss
+    }
+}
+
+/// Whether a missile at `dist` from a target hits it: within `range`, and for the hero (only for the
+/// first missile slot, as in the original) a roll above the hero's bravery is needed. The roll is
+/// only drawn when it is needed.
+fn missile_connects(
+    slot: usize,
+    dist: i16,
+    range: i16,
+    dodge: i16,
+    roll: impl FnOnce() -> i32,
+) -> bool {
+    (slot != 0 || roll() > dodge as i32) && dist < range
 }
 
 // ---- move_missiles ----
@@ -225,7 +276,7 @@ unsafe fn hit_first_actor_in_path(i: usize, ms: *mut Missile, xs: i16, ys: i16) 
             let xd = ((*target).abs_x as i32 - xs as i32) as i16;
             let yd = ((*target).abs_y as i32 - ys as i32) as i16;
             // the original tests the missile's own index here, not the target's
-            if (i != 0 || bitrand(DODGE_RANGE) > dodge as i32) && chebyshev(xd, yd) < range {
+            if missile_connects(i, chebyshev(xd, yd), range, dodge, || bitrand(DODGE_RANGE)) {
                 let by = if is_rock { BY_FIREBALL } else { BY_ARROW };
                 hit_actor(
                     by,
@@ -361,5 +412,46 @@ mod tests {
             let mut old = missile(MISSILE_ROCK, 5, MAX_FLIGHT + 1);
             assert!(missile_expired(&mut old, 10));
         }
+    }
+
+    #[test]
+    fn the_hero_always_hits_within_reach() {
+        let never = || -> i32 { unreachable!("the hero does not roll") };
+        assert_eq!(swing_result(true, 4, 5, false, 3, 100, never), SwingResult::Hit);
+        assert_eq!(swing_result(true, 5, 5, false, 3, 100, never), SwingResult::Whoosh);
+        assert_eq!(swing_result(true, 7, 5, false, 3, 100, never), SwingResult::Miss);
+    }
+
+    #[test]
+    fn an_enemy_must_beat_the_heros_bravery() {
+        assert_eq!(swing_result(false, 1, 5, false, 3, 100, || 101), SwingResult::Hit);
+        assert_eq!(swing_result(false, 1, 5, false, 3, 100, || 100), SwingResult::Whoosh);
+        assert_eq!(swing_result(false, 1, 5, false, 3, 100, || 0), SwingResult::Whoosh);
+    }
+
+    #[test]
+    fn the_enemy_rolls_even_when_out_of_reach() {
+        let mut drawn = 0;
+        swing_result(false, 50, 5, false, 3, 100, || {
+            drawn += 1;
+            0
+        });
+        assert_eq!(drawn, 1);
+    }
+
+    #[test]
+    fn nothing_hits_while_time_is_frozen_and_touches_are_silent() {
+        assert_eq!(swing_result(true, 1, 5, true, 3, 0, || 0), SwingResult::Whoosh);
+        assert_eq!(swing_result(true, 1, 5, true, TOUCH_WEAPON, 0, || 0), SwingResult::Miss);
+        assert_eq!(swing_result(true, 5, 5, false, TOUCH_WEAPON, 0, || 0), SwingResult::Miss);
+    }
+
+    #[test]
+    fn missiles_roll_only_for_the_first_slot() {
+        let never = || -> i32 { unreachable!("only slot 0 rolls") };
+        assert!(missile_connects(3, 5, 6, 100, never));
+        assert!(!missile_connects(3, 6, 6, 100, never));
+        assert!(missile_connects(0, 5, 6, 100, || 101));
+        assert!(!missile_connects(0, 5, 6, 100, || 100));
     }
 }

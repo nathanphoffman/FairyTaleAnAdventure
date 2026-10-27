@@ -378,119 +378,169 @@ unsafe fn take_plain_item(id: u32) -> bool {
     }
 }
 
-/// What was inside a container: nothing, an item, two things or three of something.
-/// Returns true (the container is always used up).
+/// What was inside a container. Returns true (the container is always used up).
 unsafe fn container_contents() -> bool {
     unsafe {
-        match rand4() {
-            0 => print(c"nothing.".as_ptr()),
-            1 => {
-                let i = container_item(rand8());
+        match roll_contents(rand4, rand8) {
+            Contents::Nothing => print(c"nothing.".as_ptr()),
+            Contents::One(i) => {
                 print(c"a ".as_ptr());
                 print_cont(item_name(i));
                 print_cont(c".".as_ptr());
                 add_stuff(i, 1);
             }
-            2 => two_things(),
-            _ => three_things(),
+            Contents::Two { first, second } => {
+                if first == HUNDRED_GOLD as usize {
+                    the_hero.wealth += CONTAINER_GOLD;
+                } else {
+                    print_cont(c" a".as_ptr());
+                }
+                print(item_name(first));
+                print_cont(c" and a ".as_ptr());
+                print_cont(item_name(second));
+                if first < GOLDBASE {
+                    add_stuff(first, 1);
+                }
+                add_stuff(second, 1);
+            }
+            Contents::ThreeKeys(keys) => {
+                print(c"3 keys.".as_ptr());
+                for key in keys {
+                    add_stuff(key as usize, 1);
+                }
+            }
+            Contents::ThreeOf(i) => {
+                print(c"3 ".as_ptr());
+                print_cont(item_name(i));
+                print_cont(c"s.".as_ptr());
+                add_stuff(i, 3);
+            }
         }
         true
     }
 }
 
-/// "an X and a Y" (the first may be 100 gold pieces instead).
-unsafe fn two_things() {
-    unsafe {
-        let mut i = rand8() + 8;
-        if i == 8 {
-            i = HUNDRED_GOLD;
-            the_hero.wealth += CONTAINER_GOLD;
-        } else {
-            print_cont(c" a".as_ptr());
-        }
-        print(item_name(i as usize));
-        print_cont(c" and a ".as_ptr());
-        let mut k;
-        loop {
-            k = rand8() + 8;
-            if k != i {
-                break;
-            }
-        }
-        if k == 8 {
-            k = ARROWBASE as i32;
-        }
-        print_cont(item_name(k as usize));
-        if i < GOLDBASE as i32 {
-            add_stuff(i as usize, 1);
-        }
-        add_stuff(k as usize, 1);
-    }
+/// What a container holds: nothing, an item, two things (the first may be 100 gold pieces), three
+/// keys, or three of one item.
+#[derive(Debug, PartialEq, Eq)]
+enum Contents {
+    Nothing,
+    One(usize),
+    Two { first: usize, second: usize },
+    ThreeKeys([i32; 3]),
+    ThreeOf(usize),
 }
 
-/// "3 keys" or three of one item.
-unsafe fn three_things() {
-    unsafe {
-        let i = rand8() + 8;
-        if i == 8 {
-            print(c"3 keys.".as_ptr());
-            for _ in 0..3 {
-                let key = container_key(rand8());
-                add_stuff(key as usize, 1);
+/// Rolls the contents with the game's random draws (`pick4` 0-3, `pick8` 0-7), in the same order
+/// as the original: the kind first, then the item rolls.
+fn roll_contents(mut pick4: impl FnMut() -> i32, mut pick8: impl FnMut() -> i32) -> Contents {
+    match pick4() {
+        0 => Contents::Nothing,
+        1 => Contents::One(container_item(pick8())),
+        2 => {
+            let mut first = pick8() + 8;
+            if first == 8 {
+                first = HUNDRED_GOLD;
             }
-            return;
+            let mut second;
+            loop {
+                second = pick8() + 8;
+                if second != first {
+                    break;
+                }
+            }
+            if second == 8 {
+                second = ARROWBASE as i32;
+            }
+            Contents::Two { first: first as usize, second: second as usize }
         }
-        print(c"3 ".as_ptr());
-        print_cont(item_name(i as usize));
-        print_cont(c"s.".as_ptr());
-        add_stuff(i as usize, 3);
+        _ => {
+            let i = pick8() + 8;
+            if i == 8 {
+                Contents::ThreeKeys([0; 3].map(|_| container_key(pick8())))
+            } else {
+                Contents::ThreeOf(i as usize)
+            }
+        }
     }
 }
 
 /// Searches the dead body `nearest_object`: takes its weapon and any treasure.
 unsafe fn search_body() {
     unsafe {
-        const ARCHER_WEAPON: u32 = 4;
-        const EXTRA_ARROWS_MIN: i32 = 2;
         let an = &raw mut the_actors.list[the_actors.nearest_object as usize];
         print_wrapped(c"% searched the body and found".as_ptr());
         print(c"".as_ptr());
-        let weapon = body_weapon((*an).weapon);
-        if weapon != 0 {
-            print_cont(c"a ".as_ptr());
-            print_cont(item_name(weapon as usize - 1));
-            add_stuff(weapon as usize - 1, 1);
-            the_actors.list[0].weapon = better_weapon(the_actors.list[0].weapon, weapon);
-            if weapon == ARCHER_WEAPON {
-                print_cont(c" and ".as_ptr());
-                let arrows = rand8() + EXTRA_ARROWS_MIN;
-                print_number(arrows, 1);
-                print_cont(c" Arrows.".as_ptr());
-                add_stuff(ARROWS, arrows as u8);
-                (*an).weapon = -1;
-                return;
-            }
-        }
+        let loot = body_loot(
+            (*an).weapon,
+            the_actors.list[0].weapon,
+            || rand8() + EXTRA_ARROWS_MIN,
+            || roll_body_treasure(an),
+        );
         (*an).weapon = -1;
-        let found = roll_body_treasure(an);
-        if found != 0 {
-            if weapon != 0 {
+        if loot.weapon != 0 {
+            print_cont(c"a ".as_ptr());
+            print_cont(item_name(loot.weapon as usize - 1));
+            add_stuff(loot.weapon as usize - 1, 1);
+            the_actors.list[0].weapon = loot.hero_weapon;
+        }
+        if let Some(arrows) = loot.arrows {
+            print_cont(c" and ".as_ptr());
+            print_number(arrows, 1);
+            print_cont(c" Arrows.".as_ptr());
+            add_stuff(ARROWS, arrows as u8);
+            return;
+        }
+        if loot.treasure != 0 {
+            if loot.weapon != 0 {
                 print_cont(c" and ".as_ptr());
             }
-            if found < GOLDBASE as u32 {
+            if loot.treasure < GOLDBASE as u32 {
                 print_cont(c"a ".as_ptr());
             }
-            print_cont(item_name(found as usize));
-            if found >= GOLDBASE as u32 {
-                the_hero.wealth += item(found as usize).maxshown as i16;
+            print_cont(item_name(loot.treasure as usize));
+            if loot.treasure >= GOLDBASE as u32 {
+                the_hero.wealth += item(loot.treasure as usize).maxshown as i16;
             } else {
-                add_stuff(found as usize, 1);
+                add_stuff(loot.treasure as usize, 1);
             }
-        } else if weapon == 0 {
+        } else if loot.weapon == 0 {
             print_cont(c"nothing".as_ptr());
         }
         print_cont(c".".as_ptr());
     }
+}
+
+const ARCHER_WEAPON: u32 = 4;
+const EXTRA_ARROWS_MIN: i32 = 2;
+
+/// What searching a body turns up.
+#[derive(Debug, PartialEq, Eq)]
+struct BodyLoot {
+    /// The weapon found (0 for none).
+    weapon: u32,
+    /// The weapon the hero holds afterwards (a better one replaces his).
+    hero_weapon: i8,
+    /// An archer's arrows (the count), instead of any other treasure.
+    arrows: Option<i32>,
+    /// The item number of other treasure (0 for none).
+    treasure: u32,
+}
+
+/// `arrow_roll` and `treasure_roll` are the random draws: the arrows only for an archer, the
+/// treasure only when there are no arrows.
+fn body_loot(
+    body_weapon_raw: i8,
+    hero_weapon: i8,
+    arrow_roll: impl FnOnce() -> i32,
+    treasure_roll: impl FnOnce() -> u32,
+) -> BodyLoot {
+    let weapon = body_weapon(body_weapon_raw);
+    let hero_weapon = if weapon != 0 { better_weapon(hero_weapon, weapon) } else { hero_weapon };
+    if weapon == ARCHER_WEAPON {
+        return BodyLoot { weapon, hero_weapon, arrows: Some(arrow_roll()), treasure: 0 };
+    }
+    BodyLoot { weapon, hero_weapon, arrows: None, treasure: treasure_roll() }
 }
 
 /// The heaviest weapon an enemy can carry and be searched for.
@@ -545,6 +595,43 @@ unsafe fn look_around() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn container_contents_follow_the_rolls() {
+        let rolls = |kind: i32, items: &[i32]| {
+            let mut next = items.iter().copied();
+            roll_contents(|| kind, || next.next().unwrap())
+        };
+        assert_eq!(rolls(0, &[]), Contents::Nothing);
+        assert_eq!(rolls(1, &[0]), Contents::One(ARROWBASE));
+        assert_eq!(rolls(1, &[3]), Contents::One(11));
+        // two things: a first item and a different second one
+        assert_eq!(rolls(2, &[2, 5]), Contents::Two { first: 10, second: 13 });
+        // 100 gold first can never match the second roll, so the arrows are accepted
+        assert_eq!(rolls(2, &[0, 0]), Contents::Two { first: HUNDRED_GOLD as usize, second: ARROWBASE });
+        assert_eq!(rolls(2, &[0, 4]), Contents::Two { first: HUNDRED_GOLD as usize, second: 12 });
+        assert_eq!(rolls(2, &[3, 3, 0]), Contents::Two { first: 11, second: ARROWBASE });
+        // three of one thing, or three keys
+        assert_eq!(rolls(3, &[4]), Contents::ThreeOf(12));
+        assert_eq!(rolls(3, &[0, 0, 5, 6]), Contents::ThreeKeys([16, 21, 16]));
+    }
+
+    #[test]
+    fn body_loot_rules() {
+        let none = || -> u32 { 0 };
+        let l = body_loot(2, 1, || unreachable!(), || 7);
+        assert_eq!((l.weapon, l.hero_weapon, l.arrows, l.treasure), (2, 2, None, 7));
+        // a weaker weapon does not replace the one in hand
+        assert_eq!(body_loot(2, 3, || unreachable!(), none).hero_weapon, 3);
+        // an archer gives arrows and nothing else
+        let l = body_loot(4, 1, || 5, || unreachable!());
+        assert_eq!((l.weapon, l.arrows, l.treasure, l.hero_weapon), (4, Some(5), 0, 4));
+        // no weapon at all
+        let l = body_loot(0, 2, || unreachable!(), none);
+        assert_eq!((l.weapon, l.hero_weapon, l.treasure), (0, 2, 0));
+        // an already searched body (-1) has no weapon
+        assert_eq!(body_loot(-1, 2, || unreachable!(), none).weapon, 0);
+    }
 
     #[test]
     fn bodies_yield_only_real_weapons() {

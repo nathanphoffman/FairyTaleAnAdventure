@@ -48,6 +48,17 @@ const CARRIER_SLOT: i16 = 3;
 /// The hero's centre is a little off the carrier's.
 const CARRIER_OFFSET: i32 = 4;
 
+/// 0 when the hero is not near, 1 when near and 2 when very near the carrier (offsets in pixels).
+fn nearness(dx: i16, dy: i16) -> i16 {
+    if dx < VERY_NEAR && dx > -VERY_NEAR && dy < VERY_NEAR && dy > -VERY_NEAR {
+        2
+    } else if dx < NEAR && dx > -NEAR && dy < NEAR && dy > -NEAR {
+        1
+    } else {
+        0
+    }
+}
+
 /// How close the hero is to the raft or turtle (`raft_nearness` 1 = near, 2 = very near). Riding the
 /// bird sets the hero's environ.
 pub fn raft_proximity() {
@@ -63,12 +74,7 @@ pub fn raft_proximity() {
         let hero = &raw mut the_actors.list[0];
         let dx = ((*hero).abs_x as i32 - (*carrier).abs_x as i32 - CARRIER_OFFSET) as i16;
         let dy = ((*hero).abs_y as i32 - (*carrier).abs_y as i32 - CARRIER_OFFSET) as i16;
-        if dx < NEAR && dx > -NEAR && dy < NEAR && dy > -NEAR {
-            the_actors.raft_nearness = 1;
-        }
-        if dx < VERY_NEAR && dx > -VERY_NEAR && dy < VERY_NEAR && dy > -VERY_NEAR {
-            the_actors.raft_nearness = 2;
-        }
+        the_actors.raft_nearness = nearness(dx, dy);
         if the_hero.riding == BIRD {
             (*hero).environ = TURTLE_ENVIRON;
         }
@@ -98,23 +104,45 @@ pub fn check_bed() {
 
         if the_world.region == INSIDE_REGION {
             let tile = *tile_address((the_hero.x >> 4) as i32, (the_hero.y >> 5) as i32);
-            if BED_TILES.contains(&tile) {
-                sleepwait += 1;
-                if sleepwait == BED_WAIT {
-                    if the_hero.fatigue < TOO_RESTED {
-                        show_event(EVENT_NOT_TIRED);
-                    } else {
-                        show_event(EVENT_SLEEPING);
-                        (*hero).abs_y |= BED_Y_MASK;
-                        the_hero.y = (*hero).abs_y;
-                        (*hero).state = SLEEP;
-                    }
+            let (wait, action) = bed_step(sleepwait, BED_TILES.contains(&tile), the_hero.fatigue);
+            sleepwait = wait;
+            match action {
+                BedAction::Nothing => {}
+                BedAction::NotTired => show_event(EVENT_NOT_TIRED),
+                BedAction::FallAsleep => {
+                    show_event(EVENT_SLEEPING);
+                    (*hero).abs_y |= BED_Y_MASK;
+                    the_hero.y = (*hero).abs_y;
+                    (*hero).state = SLEEP;
                 }
-            } else {
-                sleepwait = 0;
             }
         }
     }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum BedAction {
+    Nothing,
+    /// Stood on the bed long enough, but is too rested to sleep.
+    NotTired,
+    FallAsleep,
+}
+
+/// One frame indoors: `wait` counts how long the hero has stood on a bed; after `BED_WAIT` frames
+/// he sleeps if tired enough. Stepping off the bed starts the count again.
+fn bed_step(wait: i16, on_bed: bool, fatigue: i16) -> (i16, BedAction) {
+    if !on_bed {
+        return (0, BedAction::Nothing);
+    }
+    let wait = wait + 1;
+    let action = if wait != BED_WAIT {
+        BedAction::Nothing
+    } else if fatigue < TOO_RESTED {
+        BedAction::NotTired
+    } else {
+        BedAction::FallAsleep
+    };
+    (wait, action)
 }
 
 // ---- check_door ----
@@ -988,6 +1016,37 @@ mod tests {
         assert!(day_step(1023, false, 0, 10, 0, STILL).heal);
         assert!(!day_step(1023, false, 0, 10, 0, DEAD).heal);
         assert!(!day_step(1024, false, 0, 10, 0, STILL).heal);
+    }
+
+    #[test]
+    fn nearness_of_the_carrier() {
+        assert_eq!(nearness(0, 0), 2);
+        assert_eq!(nearness(VERY_NEAR - 1, 0), 2);
+        assert_eq!(nearness(VERY_NEAR, 0), 1);
+        assert_eq!(nearness(-(NEAR - 1), NEAR - 1), 1);
+        assert_eq!(nearness(NEAR, 0), 0);
+        assert_eq!(nearness(0, -NEAR), 0);
+    }
+
+    #[test]
+    fn a_tired_hero_falls_asleep_after_thirty_frames_on_a_bed() {
+        let (mut wait, mut last) = (0, BedAction::Nothing);
+        for frame in 1..=BED_WAIT {
+            (wait, last) = bed_step(wait, true, TOO_RESTED);
+            assert_eq!(last == BedAction::FallAsleep, frame == BED_WAIT);
+        }
+        assert_eq!(wait, BED_WAIT);
+        assert_eq!(last, BedAction::FallAsleep);
+    }
+
+    #[test]
+    fn a_rested_hero_is_told_he_is_not_tired() {
+        assert_eq!(bed_step(BED_WAIT - 1, true, TOO_RESTED - 1).1, BedAction::NotTired);
+    }
+
+    #[test]
+    fn leaving_the_bed_resets_the_count() {
+        assert_eq!(bed_step(20, false, 100), (0, BedAction::Nothing));
     }
 
     #[test]

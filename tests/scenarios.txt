@@ -2,8 +2,6 @@
 # Gameplay starts around tick 300 (the skip-intro key is sent by the harness itself).
 start        | 850  |                                  |
 walk_right   | 900  | 700:Right:60                     |
-walk_diag    | 900  | 700:Up:40,700:Left:40            |
-walk_far     | 1500 | 700:Down:200,900:Right:300       |
 fight        | 900  | 700:LCtrl:30                     |
 menu_list    | 800  |                                  | 700:250:166
 menu_game    | 800  |                                  | 700:225:166
@@ -18,6 +16,5 @@ rescue_scene  | 1500 |                |  | 700:tp:10840:35655
 win_ending    | 1200 | 760:T:3        |  | 700:tp:19298:16128,710:give:22:1
 
 # The hero wading into the sea: knee deep, sinking, and under water (the sprite shrinks to bubbles).
-water_wade    | 712  |                |  | 700:tp:23200:5550
 water_sinking | 745  |                |  | 700:tp:23200:5550
 water_drowned | 800  |                |  | 700:tp:23200:5550

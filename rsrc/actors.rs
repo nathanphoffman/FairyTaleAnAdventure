@@ -123,21 +123,65 @@ pub fn hit_actor(i: i32, j: i32, fc: i32, wt: i16) {
             return;
         }
         (*target).vitality = vitality_after_hit((*target).vitality, wt);
-        match (i, j) {
-            (-1, _) => play_effect(EFFECT_ARROW_HIT, 500 + rand64()),
-            (-2, _) => play_effect(EFFECT_ROCK_HIT, 3200 + bitrand(511)),
-            (_, 0) => play_effect(EFFECT_HERO_HURT, 800 + bitrand(511)),
-            _ => play_effect(EFFECT_FOE_HURT, 400 + rand256()),
+        match hit_sound(i, j) {
+            HitSound::Arrow => play_effect(EFFECT_ARROW_HIT, 500 + rand64()),
+            HitSound::Rock => play_effect(EFFECT_ROCK_HIT, 3200 + bitrand(511)),
+            HitSound::HeroHurt => play_effect(EFFECT_HERO_HURT, 800 + bitrand(511)),
+            HitSound::FoeHurt => play_effect(EFFECT_FOE_HURT, 400 + rand256()),
         }
         // push back the foe
-        if (*target).kind != DRAGON
-            && (*target).kind != SETFIG
+        if can_be_pushed((*target).kind)
             && step_figure(j as i16, fc as i16, KNOCKBACK) != 0
             && i >= 0
         {
             step_figure(i as i16, fc as i16, KNOCKBACK);
         }
         check_death(j, WORLD_DEAD_CHECK);
+    }
+}
+
+/// Which sound a hit makes: `i` is the attacker (-1 an arrow, -2 a fireball), `j` the target.
+#[derive(Debug, PartialEq, Eq)]
+enum HitSound {
+    Arrow,
+    Rock,
+    HeroHurt,
+    FoeHurt,
+}
+
+fn hit_sound(attacker: i32, target: i32) -> HitSound {
+    match (attacker, target) {
+        (-1, _) => HitSound::Arrow,
+        (-2, _) => HitSound::Rock,
+        (_, 0) => HitSound::HeroHurt,
+        _ => HitSound::FoeHurt,
+    }
+}
+
+/// Dragons and people are not pushed back by a hit.
+fn can_be_pushed(kind: i8) -> bool {
+    kind != DRAGON && kind != SETFIG
+}
+
+/// What to say after a fight.
+#[derive(Debug, PartialEq, Eq)]
+enum BattleReport {
+    /// The hero is dead, or nothing worth saying.
+    Silent,
+    Bravely,
+    Foes { dead: i32, fled: i32 },
+}
+
+/// `dead` and `fled` count the enemies that fell and that ran away.
+fn battle_report(hero_vitality: i16, dead: i32, fled: i32, extent_type: u16) -> BattleReport {
+    if hero_vitality < 1 {
+        BattleReport::Silent
+    } else if hero_vitality < BRAVE_LOW_VITALITY && dead != 0 {
+        BattleReport::Bravely
+    } else if extent_type < PEACEFUL_EXTENT {
+        BattleReport::Foes { dead, fled }
+    } else {
+        BattleReport::Silent
     }
 }
 
@@ -170,20 +214,20 @@ pub fn report_battle_result() {
             }
         }
         let vitality = (*actor(HERO as i32)).vitality;
-        if vitality < 1 {
-            // dead, so no message
-        } else if vitality < BRAVE_LOW_VITALITY && dead != 0 {
-            print(c"Bravely done!".as_ptr());
-        } else if the_world.extent_type < PEACEFUL_EXTENT {
-            if dead != 0 {
-                print(c"".as_ptr());
-                print_number(dead, 1);
-                print_cont(c"foes were defeated in battle.".as_ptr());
-            }
-            if fled != 0 {
-                print(c"".as_ptr());
-                print_number(fled, 1);
-                print_cont(c"foes fled in retreat.".as_ptr());
+        match battle_report(vitality, dead, fled, the_world.extent_type) {
+            BattleReport::Silent => {}
+            BattleReport::Bravely => print(c"Bravely done!".as_ptr()),
+            BattleReport::Foes { dead, fled } => {
+                if dead != 0 {
+                    print(c"".as_ptr());
+                    print_number(dead, 1);
+                    print_cont(c"foes were defeated in battle.".as_ptr());
+                }
+                if fled != 0 {
+                    print(c"".as_ptr());
+                    print_number(fled, 1);
+                    print_cont(c"foes fled in retreat.".as_ptr());
+                }
             }
         }
         // check for presence of turtle eggs
@@ -576,5 +620,35 @@ mod tests {
     #[test]
     fn struct_sizes() {
         assert_eq!(size_of::<Extent>(), 12);
+    }
+
+    #[test]
+    fn hit_sounds_by_who_hit_whom() {
+        assert_eq!(hit_sound(-1, 0), HitSound::Arrow);
+        assert_eq!(hit_sound(-2, 5), HitSound::Rock);
+        assert_eq!(hit_sound(3, 0), HitSound::HeroHurt);
+        assert_eq!(hit_sound(0, 3), HitSound::FoeHurt);
+    }
+
+    #[test]
+    fn dragons_and_people_are_not_pushed_back() {
+        assert!(!can_be_pushed(DRAGON));
+        assert!(!can_be_pushed(SETFIG));
+        assert!(can_be_pushed(2));
+    }
+
+    #[test]
+    fn what_is_said_after_a_fight() {
+        let calm = PEACEFUL_EXTENT - 1;
+        assert_eq!(battle_report(0, 3, 0, calm), BattleReport::Silent);
+        assert_eq!(battle_report(BRAVE_LOW_VITALITY - 1, 1, 0, calm), BattleReport::Bravely);
+        // nearly dead but nobody died: the normal report
+        assert_eq!(
+            battle_report(BRAVE_LOW_VITALITY - 1, 0, 2, calm),
+            BattleReport::Foes { dead: 0, fled: 2 }
+        );
+        assert_eq!(battle_report(50, 2, 1, calm), BattleReport::Foes { dead: 2, fled: 1 });
+        // peaceful places say nothing
+        assert_eq!(battle_report(50, 2, 1, PEACEFUL_EXTENT), BattleReport::Silent);
     }
 }
