@@ -45,40 +45,58 @@ const SUNSTONE: i32 = 7;
 const WRIT: i32 = 28;
 const BONE: i32 = 29;
 
+// The first entries that depend on items, in each menu (the earlier ones are fixed commands), and
+// how many items each menu has.
+const ITEM_ENTRIES_START: usize = 5;
+const MAGIC_ITEMS: usize = 7;
+const KEY_ITEMS: usize = 6;
+
+// Entries of the use and give menus.
+const USE_KEY_ENTRY: usize = 7;
+const USE_SUNSTONE_ENTRY: usize = 8;
+const GIVE_GOLD_ENTRY: usize = 5;
+const GIVE_BOOK_ENTRY: usize = 6;
+const GIVE_WRIT_ENTRY: usize = 7;
+const GIVE_BONE_ENTRY: usize = 8;
+
+/// The width of a menu entry in characters (blanks over an unused slot).
+const ENTRY_WIDTH: i32 = 6;
+
 /// The hero must have more than this much gold to be able to give some away.
 const GIVE_GOLD_MIN: i16 = 2;
 
 /// Switches the use, magic, keys and give entries on or off to match what the hero is carrying.
 pub fn update_menu_availability() {
     unsafe {
-        for i in 0..7 {
-            menus[MAGIC].enabled[i + 5] = item_menu_state(i as i32 + MAGIC_ITEM_BASE) as i8;
+        for i in 0..MAGIC_ITEMS {
+            menus[MAGIC].enabled[i + ITEM_ENTRIES_START] =
+                item_menu_state(i as i32 + MAGIC_ITEM_BASE) as i8;
             menus[USE].enabled[i] = item_menu_state(i as i32) as i8;
         }
 
         // "use a key" is available if any key slot reports available
         let mut keys = GREYED;
 
-        for i in 0..6 {
+        for i in 0..KEY_ITEMS {
             let flag = item_menu_state(i as i32 + KEY_ITEM_BASE) as i8;
-            menus[KEYS].enabled[i + 5] = flag;
+            menus[KEYS].enabled[i + ITEM_ENTRIES_START] = flag;
 
             if flag == AVAILABLE {
                 keys = AVAILABLE;
             }
         }
 
-        menus[USE].enabled[7] = keys;
-        menus[USE].enabled[8] = item_menu_state(SUNSTONE) as i8;
-        menus[GIVE].enabled[5] = if the_hero.wealth > GIVE_GOLD_MIN {
+        menus[USE].enabled[USE_KEY_ENTRY] = keys;
+        menus[USE].enabled[USE_SUNSTONE_ENTRY] = item_menu_state(SUNSTONE) as i8;
+        menus[GIVE].enabled[GIVE_GOLD_ENTRY] = if the_hero.wealth > GIVE_GOLD_MIN {
             AVAILABLE
         } else {
             GREYED
         }; // gold
 
-        menus[GIVE].enabled[6] = GREYED; // book
-        menus[GIVE].enabled[7] = item_menu_state(WRIT) as i8;
-        menus[GIVE].enabled[8] = item_menu_state(BONE) as i8;
+        menus[GIVE].enabled[GIVE_BOOK_ENTRY] = GREYED;
+        menus[GIVE].enabled[GIVE_WRIT_ENTRY] = item_menu_state(WRIT) as i8;
+        menus[GIVE].enabled[GIVE_BONE_ENTRY] = item_menu_state(BONE) as i8;
     }
 }
 
@@ -122,7 +140,11 @@ pub fn print_options() {
 
             let y = (slot / 2) as i32 * ROW_HEIGHT + FIRST_ROW_Y;
             Move(&raw mut the_screen.rp_text2, x, y);
-            Text(&raw mut the_screen.rp_text2, c"      ".as_ptr(), 6);
+            Text(
+                &raw mut the_screen.rp_text2,
+                c"      ".as_ptr(),
+                ENTRY_WIDTH,
+            );
             the_ui.slot_entries[slot] = -1;
             slot += 1;
         }

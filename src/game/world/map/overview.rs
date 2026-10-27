@@ -21,21 +21,38 @@ pub(super) const OVERVIEW_LINE_BYTES: usize = 80;
 /// Bytes to skip at the end of each overview row of sectors.
 pub(super) const OVERVIEW_ROW_SKIP: usize = 40 * 15 + 4;
 
+/// A sector is 256 pixels (a shift of 8). The overview starts 9 sectors to the left and 4 above the
+/// hero (half its size), and its start wraps around the 128 sector map when below 32 or above 96.
+const SECTOR_SHIFT: u32 = 8;
+const HALF_OVERVIEW_WIDTH: i32 = 9;
+const HALF_OVERVIEW_HEIGHT: i32 = 4;
+const WRAP_LOW: i16 = 32;
+const WRAP_HIGH: i16 = 96;
+
+/// The region map has 128 sectors in each row (a shift of 7).
+const MAP_ROW_SHIFT: u32 = 7;
+
+/// Each sector shows 16 x 8 pixels: a pixel row is 16 pixels, a line is two bytes, high byte first.
+const BYTE_SHIFT: u32 = 8;
+const TERRAIN_ENTRY_BYTES: usize = 4;
+const TERRAIN_COLOR_BYTE: usize = 3;
+const TILE_ROW_PIXELS: usize = 16;
+
 /// The overview's top left sector for a map position, clamped to the map.
 pub(super) fn overview_origin(mx: i32, my: i32, region_x: u16, region_y: u16) -> (i16, i16) {
     let mut x = (
         // Camera pixels to sectors (256 to a sector), then back 9 sectors to the left edge of the overview.
-        ((mx as u16 >> 8) as i32 - 9 - region_x as i32) as i16,
+        ((mx as u16 >> SECTOR_SHIFT) as i32 - HALF_OVERVIEW_WIDTH - region_x as i32) as i16,
         // Camera pixels to sectors (256 to a sector), then back 4 sectors to the top edge of the overview.
-        ((my as u16 >> 8) as i32 - 4 - region_y as i32) as i16,
+        ((my as u16 >> SECTOR_SHIFT) as i32 - HALF_OVERVIEW_HEIGHT - region_y as i32) as i16,
     );
 
     for v in [&mut x.0, &mut x.1] {
-        if *v < 32 {
+        if *v < WRAP_LOW {
             *v += MAP_WRAP;
         }
 
-        if *v > 96 {
+        if *v > WRAP_HIGH {
             *v -= MAP_WRAP;
         }
     }
@@ -60,7 +77,7 @@ pub fn draw_overview_map(mx: i32, my: i32) {
             for i in 0..OVERVIEW_COLUMNS {
                 let index =
                     // Index into the region map: the sector row times 128 plus the column.
-                    the_world.origin_x as i32 + x as i32 + i as i32 + (((y + j) as i32) << 7);
+                    the_world.origin_x as i32 + x as i32 + i as i32 + (((y + j) as i32) << MAP_ROW_SHIFT);
                 let sec = *the_memory.map_mem.add(index as u16 as usize) as usize;
                 let tiles = the_memory.sector_mem.add(sec * SECTOR_BYTES);
 
@@ -68,8 +85,10 @@ pub fn draw_overview_map(mx: i32, my: i32) {
                     let mut words = [0u32; PLANE_COUNT];
 
                     for px in 0..SECTOR_PIXELS {
-                        let tile = *tiles.add(line * 16 + px) as usize;
-                        let color = *the_memory.terrain_mem.add(tile * 4 + 3);
+                        let tile = *tiles.add(line * TILE_ROW_PIXELS + px) as usize;
+                        let color = *the_memory
+                            .terrain_mem
+                            .add(tile * TERRAIN_ENTRY_BYTES + TERRAIN_COLOR_BYTE);
 
                         for (p, word) in words.iter_mut().enumerate() {
                             // Builds one bit per pixel for bitplane `p`: shift the row left and add the plane's bit of this colour.
@@ -81,9 +100,9 @@ pub fn draw_overview_map(mx: i32, my: i32) {
                         let d =
                             (*the_screen.planes.add(p)).add(offset + line * OVERVIEW_LINE_BYTES);
                         // A 16 pixel row is two bytes, high byte first.
-                        *d = (word >> 8) as u8;
+                        *d = (word >> BYTE_SHIFT) as u8;
                         // The second copy is for the other page.
-                        *d.add(OVERVIEW_LINE_COPY) = (word >> 8) as u8;
+                        *d.add(OVERVIEW_LINE_COPY) = (word >> BYTE_SHIFT) as u8;
                         *d.add(1) = *word as u8;
                         *d.add(OVERVIEW_LINE_COPY + 1) = *word as u8;
                     }

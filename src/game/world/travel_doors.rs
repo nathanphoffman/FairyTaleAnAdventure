@@ -20,25 +20,61 @@ const REGION_INSIDE_OTHER: u16 = 9;
 const FIRST_INSIDE_REGION: u16 = 8;
 const FADE_WHITE: i16 = 100;
 
+// Arrival offsets from a door's corner (pixels): in through a cave door, a horizontal door and a
+// vertical door, then out through each.
+const CAVE_IN: (u16, u16) = (24, 16);
+const HORIZONTAL_IN: (u16, u16) = (16, 0);
+const VERTICAL_IN: (u16, u16) = (1, 16);
+const CAVE_OUT: (u16, u16) = (4, 16);
+const HORIZONTAL_OUT: (u16, u16) = (16, 34);
+const VERTICAL_OUT: (u16, u16) = (20, 16);
+
+/// The hero is lined up with a door when these bits of the position are in range: a tile is 16
+/// pixels wide and 32 high, so bit 4 of y says which half of the tile row.
+const LOWER_HALF_BIT: u16 = 0x10;
+const TILE_COLUMN_MASK: u16 = 15;
+const IN_COLUMN_LIMIT: u16 = 6;
+const OUT_COLUMN_LIMIT: u16 = 2;
+
+/// Snaps the hero's position to a tile (16 wide, 32 high).
+const TILE_X_MASK: u16 = 0xfff0;
+const TILE_Y_MASK: u16 = 0xffe0;
+const TILE_WIDTH: i32 = 16;
+
 /// Where to arrive on the other side of a door going in.
 fn inside_spot(d: &Door) -> (u16, u16) {
     if d.kind == CAVE {
-        (d.xc2.wrapping_add(24), d.yc2.wrapping_add(16))
+        (d.xc2.wrapping_add(CAVE_IN.0), d.yc2.wrapping_add(CAVE_IN.1))
     } else if d.kind & 1 != 0 {
-        (d.xc2.wrapping_add(16), d.yc2)
+        (
+            d.xc2.wrapping_add(HORIZONTAL_IN.0),
+            d.yc2.wrapping_add(HORIZONTAL_IN.1),
+        )
     } else {
-        (d.xc2.wrapping_sub(1), d.yc2.wrapping_add(16))
+        (
+            d.xc2.wrapping_sub(VERTICAL_IN.0),
+            d.yc2.wrapping_add(VERTICAL_IN.1),
+        )
     }
 }
 
 /// Where to arrive going out.
 fn outside_spot(d: &Door) -> (u16, u16) {
     if d.kind == CAVE {
-        (d.xc1.wrapping_sub(4), d.yc1.wrapping_add(16))
+        (
+            d.xc1.wrapping_sub(CAVE_OUT.0),
+            d.yc1.wrapping_add(CAVE_OUT.1),
+        )
     } else if d.kind & 1 != 0 {
-        (d.xc1.wrapping_add(16), d.yc1.wrapping_add(34))
+        (
+            d.xc1.wrapping_add(HORIZONTAL_OUT.0),
+            d.yc1.wrapping_add(HORIZONTAL_OUT.1),
+        )
     } else {
-        (d.xc1.wrapping_add(20), d.yc1.wrapping_add(16))
+        (
+            d.xc1.wrapping_add(VERTICAL_OUT.0),
+            d.yc1.wrapping_add(VERTICAL_OUT.1),
+        )
     }
 }
 
@@ -46,9 +82,9 @@ fn outside_spot(d: &Door) -> (u16, u16) {
 /// the desert door needs the gold statues.
 fn may_enter(d: &Door, hero_x: u16, hero_y: u16, statues: u8) -> bool {
     let lined_up = if d.kind & 1 != 0 {
-        hero_y & 0x10 == 0
+        hero_y & LOWER_HALF_BIT == 0
     } else {
-        hero_x & 15 <= 6
+        hero_x & TILE_COLUMN_MASK <= IN_COLUMN_LIMIT
     };
 
     lined_up && (d.kind != DESERT || statues >= STATUES_NEEDED)
@@ -68,15 +104,15 @@ fn region_inside(d: &Door) -> u16 {
 fn is_exit_here(d: &Door, xtest: u16, ytest: u16) -> bool {
     let horizontal = d.kind & 1 != 0;
 
-    d.yc2 == ytest && (d.xc2 == xtest || (d.xc2 as i32 == xtest as i32 - 16 && horizontal))
+    d.yc2 == ytest && (d.xc2 == xtest || (d.xc2 as i32 == xtest as i32 - TILE_WIDTH && horizontal))
 }
 
 /// The hero can go out when lined up with the door the other way round to `may_enter`.
 fn may_leave(d: &Door, hero_x: u16, hero_y: u16) -> bool {
     if d.kind & 1 != 0 {
-        hero_y & 0x10 != 0
+        hero_y & LOWER_HALF_BIT != 0
     } else {
-        hero_x & 15 >= 2
+        hero_x & TILE_COLUMN_MASK >= OUT_COLUMN_LIMIT
     }
 }
 
@@ -93,8 +129,8 @@ pub fn check_door() {
             return;
         }
 
-        let xtest = the_hero.x & 0xfff0;
-        let ytest = the_hero.y & 0xffe0;
+        let xtest = the_hero.x & TILE_X_MASK;
+        let ytest = the_hero.y & TILE_Y_MASK;
 
         if the_world.region < FIRST_INSIDE_REGION {
             enter_door(xtest, ytest);
@@ -142,7 +178,7 @@ unsafe fn find_outdoor_door(xtest: u16, ytest: u16) -> Option<i32> {
 
             if d.xc1 > xtest {
                 high = j - 1;
-            } else if d.xc1 as i32 + 16 < xtest as i32 {
+            } else if d.xc1 as i32 + TILE_WIDTH < xtest as i32 {
                 low = j + 1;
             } else if d.xc1 < xtest && d.kind & 1 == 0 {
                 low = j + 1; // vertical door: its x must match exactly

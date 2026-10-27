@@ -5,24 +5,40 @@ use crate::game::data::random::{rand4, rand8};
 use crate::game::data::state::the_hero;
 use crate::game::ui::messages::{print, print_cont};
 
+/// The container items start at this entry of `item_list`; a roll of 0 there means arrows (or 100
+/// gold when it is the first of two things).
+const FIRST_CONTAINER_ITEM: i32 = 8;
+const ROLL_ARROWS_OR_GOLD: i32 = FIRST_CONTAINER_ITEM;
+
+/// The two key types that fold onto an earlier one, and what they fold onto.
+const ODD_KEYS: [(i32, i32); 2] = [(22, 16), (23, 20)];
+
+/// How many of one item, or keys, a container with several holds.
+const MANY: usize = 3;
+
 /// The 100 gold pieces entry of `item_list`.
 const HUNDRED_GOLD: i32 = GOLDBASE as i32 + 3;
 const CONTAINER_GOLD: i16 = 100;
 
 /// The item a container holds when it rolls `roll` (0-7) for one item: slot 8 means arrows.
 fn container_item(roll: i32) -> usize {
-    let i = roll as usize + 8;
+    let i = roll + FIRST_CONTAINER_ITEM;
 
-    if i == 8 { ARROWBASE } else { i }
+    if i == ROLL_ARROWS_OR_GOLD {
+        ARROWBASE
+    } else {
+        i as usize
+    }
 }
 
 /// A key found in a container: the two odd key types fold onto the first of their kind.
 fn container_key(roll: i32) -> i32 {
-    match roll + KEYBASE {
-        22 => 16,
-        23 => 20,
-        key => key,
-    }
+    let key = roll + KEYBASE;
+
+    ODD_KEYS
+        .iter()
+        .find(|(odd, _)| *odd == key)
+        .map_or(key, |(_, folded)| *folded)
 }
 
 /// What was inside a container. Returns true (the container is always used up).
@@ -67,7 +83,7 @@ pub(super) unsafe fn container_contents() -> bool {
                 print(c"3 ".as_ptr());
                 print_cont(item_name(i));
                 print_cont(c"s.".as_ptr());
-                add_stuff(i, 3);
+                add_stuff(i, MANY as u8);
             }
         }
 
@@ -93,23 +109,23 @@ fn roll_contents(mut pick4: impl FnMut() -> i32, mut pick8: impl FnMut() -> i32)
         0 => Contents::Nothing,
         1 => Contents::One(container_item(pick8())),
         2 => {
-            let mut first = pick8() + 8;
+            let mut first = pick8() + FIRST_CONTAINER_ITEM;
 
-            if first == 8 {
+            if first == ROLL_ARROWS_OR_GOLD {
                 first = HUNDRED_GOLD;
             }
 
             let mut second;
 
             loop {
-                second = pick8() + 8;
+                second = pick8() + FIRST_CONTAINER_ITEM;
 
                 if second != first {
                     break;
                 }
             }
 
-            if second == 8 {
+            if second == ROLL_ARROWS_OR_GOLD {
                 second = ARROWBASE as i32;
             }
 
@@ -120,10 +136,10 @@ fn roll_contents(mut pick4: impl FnMut() -> i32, mut pick8: impl FnMut() -> i32)
         }
 
         _ => {
-            let i = pick8() + 8;
+            let i = pick8() + FIRST_CONTAINER_ITEM;
 
-            if i == 8 {
-                Contents::ThreeKeys([0; 3].map(|_| container_key(pick8())))
+            if i == ROLL_ARROWS_OR_GOLD {
+                Contents::ThreeKeys([0; MANY].map(|_| container_key(pick8())))
             } else {
                 Contents::ThreeOf(i as usize)
             }

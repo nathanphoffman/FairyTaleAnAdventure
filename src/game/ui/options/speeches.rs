@@ -24,6 +24,28 @@ const GHOST: u8 = 11;
 const RANGER: u8 = 12;
 const BEGGAR: u8 = 13;
 
+// Speech numbers (the lines in the narration table).
+const SPEECH_WIZARD_UNKIND: i32 = 35;
+const SPEECH_WIZARD_BASE: i32 = 27;
+const SPEECH_GUARD: i32 = 15;
+const SPEECH_PRINCESS: i32 = 16;
+const SPEECH_KING: i32 = 17;
+const SPEECH_NOBLE: i32 = 20;
+const SPEECH_BARTENDER_RESTED: i32 = 13;
+const SPEECH_BARTENDER_NIGHT: i32 = 12;
+const SPEECH_BARTENDER_EVENING: i32 = 14;
+const SPEECH_WITCH: i32 = 46;
+const SPEECH_SPECTRE: i32 = 47;
+const SPEECH_GHOST: i32 = 49;
+const SPEECH_RANGER_SWAMP: i32 = 22;
+const SPEECH_RANGER_BASE: i32 = 53;
+const SPEECH_BEGGAR: i32 = 23;
+const SPEECH_SORCERESS_HELP: i32 = 45;
+const SPEECH_PRIEST_WRIT_REWARD: i32 = 39;
+const SPEECH_PRIEST_WRIT_AGAIN: i32 = 19;
+const SPEECH_PRIEST_SCOLD: i32 = 40;
+const SPEECH_PRIEST_BLESSING_BASE: i32 = 36;
+
 /// Kindness the hero needs for the wizard and priest to be friendly.
 const KIND_ENOUGH: i16 = 10;
 
@@ -38,6 +60,7 @@ const SORCERESS_LUCK: i16 = 5;
 /// Hero vitality when healed by the priest is `15 + brave / 4`.
 const FULL_VITALITY_BASE: i16 = 15;
 const PRIEST_BLESSINGS: u16 = 3;
+const BRAVERY_DIVISOR: i16 = 4;
 const NIGHT_PERIOD: i16 = 7;
 const TIRED: i16 = 5;
 const RANGER_SWAMP_REGION: u16 = 2;
@@ -83,30 +106,30 @@ struct Talker {
 fn plain_speech(person: u8, t: &Talker) -> Option<i32> {
     match person {
         WIZARD => Some(if t.kindness < KIND_ENOUGH {
-            35
+            SPEECH_WIZARD_UNKIND
         } else {
-            27 + t.goal
+            SPEECH_WIZARD_BASE + t.goal
         }),
-        GUARD_FRONT | GUARD_BACK => Some(15),
-        PRINCESS if t.princess_freed => Some(16),
-        KING if t.princess_freed => Some(17),
-        NOBLE => Some(20),
+        GUARD_FRONT | GUARD_BACK => Some(SPEECH_GUARD),
+        PRINCESS if t.princess_freed => Some(SPEECH_PRINCESS),
+        KING if t.princess_freed => Some(SPEECH_KING),
+        NOBLE => Some(SPEECH_NOBLE),
         BARTENDER => Some(if t.fatigue < TIRED {
-            13
+            SPEECH_BARTENDER_RESTED
         } else if t.day_period > NIGHT_PERIOD {
-            12
+            SPEECH_BARTENDER_NIGHT
         } else {
-            14
+            SPEECH_BARTENDER_EVENING
         }),
-        WITCH => Some(46),
-        SPECTRE => Some(47),
-        GHOST => Some(49),
+        WITCH => Some(SPEECH_WITCH),
+        SPECTRE => Some(SPEECH_SPECTRE),
+        GHOST => Some(SPEECH_GHOST),
         RANGER => Some(if t.region == RANGER_SWAMP_REGION {
-            22
+            SPEECH_RANGER_SWAMP
         } else {
-            53 + t.goal
+            SPEECH_RANGER_BASE + t.goal
         }),
-        BEGGAR => Some(23),
+        BEGGAR => Some(SPEECH_BEGGAR),
         _ => None,
     }
 }
@@ -120,7 +143,7 @@ unsafe fn sorceress_speaks() {
             SorceressAction::GiveLuck => the_hero.luck += SORCERESS_LUCK,
             SorceressAction::Nothing => {}
             SorceressAction::AskForHelp => {
-                speak(45);
+                speak(SPEECH_SORCERESS_HELP);
                 ob_listg[SORCERESS_SLOT].ob_stat = 1;
             }
         }
@@ -162,15 +185,15 @@ unsafe fn priest_speaks() {
             the_world.day_clock,
         ) {
             PriestAction::WritReward => {
-                speak(39);
+                speak(SPEECH_PRIEST_WRIT_REWARD);
                 ob_listg[PRIEST_WRIT_SLOT].ob_stat = 1;
             }
 
-            PriestAction::WritAgain => speak(19),
-            PriestAction::Scold => speak(40),
+            PriestAction::WritAgain => speak(SPEECH_PRIEST_WRIT_AGAIN),
+            PriestAction::Scold => speak(SPEECH_PRIEST_SCOLD),
             PriestAction::Bless { speech } => {
                 speak(speech);
-                the_actors.list[0].vitality = FULL_VITALITY_BASE + the_hero.brave / 4;
+                the_actors.list[0].vitality = FULL_VITALITY_BASE + the_hero.brave / BRAVERY_DIVISOR;
                 queue_print(PRQ_STATS);
             }
         }
@@ -203,7 +226,7 @@ fn priest_action(has_writ: bool, reward_stat: i8, kindness: i16, clock: u16) -> 
         PriestAction::Scold
     } else {
         PriestAction::Bless {
-            speech: 36 + (clock % PRIEST_BLESSINGS) as i32,
+            speech: SPEECH_PRIEST_BLESSING_BASE + (clock % PRIEST_BLESSINGS) as i32,
         }
     }
 }

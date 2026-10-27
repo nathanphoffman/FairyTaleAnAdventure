@@ -6,6 +6,24 @@ use crate::amiga::{BitMap, RasInfo, RastPort, View, ViewPort};
 use crate::game::data::types::{Extent, FPage, Missile, SeqInfo, Shape};
 use crate::game::input::handler::InWork;
 
+/// How many items a brother can carry (the size of the `stuff` list).
+pub const STUFF_SLOTS: usize = 35;
+
+/// The actors on the map (the hero, the raft, the first person, the carrier, then monsters), and
+/// the missiles in flight.
+pub const ACTOR_SLOTS: usize = 20;
+pub const MISSILE_SLOTS: usize = 6;
+
+/// Sound effects loaded from disk, and score tracks (4 voices each).
+pub const SAMPLE_SLOTS: usize = 6;
+pub const TRACK_SLOTS: usize = 32;
+
+/// Sprite sheets loaded at once (hero, objects, ... see `seq_list`).
+pub const SPRITE_SHEETS: usize = 7;
+
+/// Entries of the menu slot list.
+pub const MENU_SLOTS: usize = 12;
+
 /// The hero: where they are, their stats, and what they carry or ride.
 pub struct Hero {
     pub x: u16,
@@ -22,9 +40,9 @@ pub struct Hero {
     pub flying: i16,
     pub brother: i16,
     pub stuff: *mut u8,
-    pub julstuff: [u8; 35],
-    pub kevstuff: [u8; 35],
-    pub philstuff: [u8; 35],
+    pub julstuff: [u8; STUFF_SLOTS],
+    pub kevstuff: [u8; STUFF_SLOTS],
+    pub philstuff: [u8; STUFF_SLOTS],
     pub safe_flag: i8,
     pub safe_r: u16,
     pub safe_x: u16,
@@ -81,16 +99,16 @@ pub static mut the_encounter: Encounters = unsafe { std::mem::zeroed() };
 
 /// The actors on the map, the missiles in flight, and who is near the hero.
 pub struct Actors {
-    pub list: [Shape; 20],
+    pub list: [Shape; ACTOR_SLOTS],
     pub active: i16,
     pub drawn: i16,
-    pub missiles: [Missile; 6],
+    pub missiles: [Missile; MISSILE_SLOTS],
     pub next_missile: i16,
     pub nearest_object: i16,
     pub nearest_person: i16,
     pub last_person: i16,
     pub leader: i16,
-    pub draw_order: [u8; 20],
+    pub draw_order: [u8; ACTOR_SLOTS],
     pub loading: i8,
     pub on_screen: i8,
     pub active_carrier: i16,
@@ -160,13 +178,13 @@ pub struct Memory {
     pub sample_mem: *mut u8,
     pub wavmem: *mut u8,
     pub volmem: *mut u8,
-    pub sample: [*mut u8; 6],
-    pub sample_size: [u32; 6],
-    pub track: [*mut u8; 32],
+    pub sample: [*mut u8; SAMPLE_SLOTS],
+    pub sample_size: [u32; SAMPLE_SLOTS],
+    pub track: [*mut u8; TRACK_SLOTS],
     pub nextshape: *mut u8,
     pub nhinor: *mut u8,
     pub nhivar: *mut u8,
-    pub seq_list: [SeqInfo; 7],
+    pub seq_list: [SeqInfo; SPRITE_SHEETS],
 }
 
 pub static mut the_memory: Memory = unsafe { std::mem::zeroed() };
@@ -181,7 +199,7 @@ pub struct Ui {
     pub cheat_enabled: i16,
     pub quit_requested: i8,
     pub handler_data: InWork,
-    pub slot_entries: [i8; 12],
+    pub slot_entries: [i8; MENU_SLOTS],
 }
 
 pub static mut the_ui: Ui = unsafe { std::mem::zeroed() };

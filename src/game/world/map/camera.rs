@@ -63,12 +63,17 @@ pub fn move_camera_to(x: i32, y: i32) {
 /// Small lookup used by the page-turn animation: how far in from the top and bottom a strip of
 /// the curling page starts, given its distance from the fold.
 pub fn page_turn_inset(x: i32) -> i32 {
-    const SMALL: [i32; 11] = [9, 9, 8, 7, 6, 5, 5, 5, 4, 4, 4];
+    const NEAR_FOLD: [i32; 11] = [9, 9, 8, 7, 6, 5, 5, 5, 4, 4, 4];
+
+    // Distances from the fold where the inset changes, and the inset from there on.
+    const FAR_EDGE: i32 = 137;
+    const FAR_INSET: i32 = 10;
+    const LAST_STEP: i32 = 136;
 
     match x {
-        ..=10 => SMALL[x as usize],
-        137.. => 10,
-        136 => 7,
+        ..=10 => NEAR_FOLD[x as usize],
+        FAR_EDGE.. => FAR_INSET,
+        LAST_STEP => 7,
         124..=135 => 6,
         99..=123 => 5,
         72..=98 => 4,

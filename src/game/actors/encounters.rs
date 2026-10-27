@@ -42,6 +42,27 @@ const BOW_BIT: i8 = 4;
 /// Tries this many random spots before giving up.
 const MAX_TRY: i32 = 15;
 
+/// The encounter's `mix_flag` bits: 2 picks one of a pair of races, 4 picks the weapon at random.
+const MIX_RANDOM_WEAPON: i16 = 4;
+const MIX_RACE_PAIR: i16 = 2;
+
+/// The enemy kind that never mixes races, and the mask that rounds a race down to the first of its
+/// pair.
+const KIND_NO_MIX: u16 = 4;
+const PAIR_MASK: u16 = 0xfffe;
+
+/// Each chart row has four weapon choices.
+const WEAPON_CHOICES: i32 = 4;
+
+/// An enemy starts this far off from the screen's corner (its sprite's anchor, in pixels).
+const ENEMY_ANCHOR: (u16, u16) = (8, 26);
+
+/// A carrier appears this far from its extent's corner.
+const CARRIER_OFFSET: (u16, u16) = (250, 200);
+
+/// Actors active once a carrier is out: the hero, the raft, the first person, and the carrier.
+const ACTORS_WITH_CARRIER: i16 = 4;
+
 /// The extent value (`v3`) of the special encounter that always appears at a fixed place.
 const FIXED_PLACE_ENCOUNTER: u8 = 7;
 const FIXED_PLACE: (u16, u16) = (21635, 25762);
@@ -88,12 +109,12 @@ pub fn place_encounter(i: u16, spread: u16) -> i32 {
         let race = encounter_race();
         (*actor).race = race as u8;
 
-        if the_encounter.mix_flag & 4 != 0 {
+        if the_encounter.mix_flag & MIX_RANDOM_WEAPON != 0 {
             the_encounter.weapon_type = rand4() as i16;
         }
 
         let chart = &encounter_chart[race as usize];
-        let w = (chart.arms as i32 * 4) + the_encounter.weapon_type as i32;
+        let w = (chart.arms as i32 * WEAPON_CHOICES) + the_encounter.weapon_type as i32;
         (*actor).weapon = weapon_probs[w as usize];
         (*actor).state = STILL;
         (*actor).environ = 0;
@@ -106,11 +127,14 @@ pub fn place_encounter(i: u16, spread: u16) -> i32 {
         }
 
         (*actor).vitality = chart.hitpoints as i16;
-        (*actor).rel_x = (*actor).abs_x.wrapping_sub(the_world.map_x).wrapping_sub(8);
+        (*actor).rel_x = (*actor)
+            .abs_x
+            .wrapping_sub(the_world.map_x)
+            .wrapping_sub(ENEMY_ANCHOR.0);
         (*actor).rel_y = (*actor)
             .abs_y
             .wrapping_sub(the_world.map_y)
-            .wrapping_sub(26);
+            .wrapping_sub(ENEMY_ANCHOR.1);
 
         1
     }
@@ -150,8 +174,8 @@ unsafe fn find_open_spot(i: u16, spread: u16) -> Option<(u16, u16)> {
 /// (except encounter type 4).
 unsafe fn encounter_race() -> i32 {
     unsafe {
-        if (the_encounter.mix_flag & 2) != 0 && the_encounter.kind != 4 {
-            (the_encounter.kind & 0xfffe) as i32 + rand2()
+        if (the_encounter.mix_flag & MIX_RACE_PAIR) != 0 && the_encounter.kind != KIND_NO_MIX {
+            (the_encounter.kind & PAIR_MASK) as i32 + rand2()
         } else {
             the_encounter.kind as i32
         }
@@ -251,14 +275,14 @@ pub fn load_carrier(n: i16) {
         }
 
         let e = &*(&raw mut extent_list).cast::<Extent>().add(extent);
-        (*actor).abs_x = e.x1.wrapping_add(250);
-        (*actor).abs_y = e.y1.wrapping_add(200);
+        (*actor).abs_x = e.x1.wrapping_add(CARRIER_OFFSET.0);
+        (*actor).abs_y = e.y1.wrapping_add(CARRIER_OFFSET.1);
         (*actor).index = 0;
         (*actor).weapon = 0;
         (*actor).environ = 0;
         (*actor).state = STILL;
         (*actor).vitality = VITALITY_CARRIER;
-        the_actors.active = 4;
+        the_actors.active = ACTORS_WITH_CARRIER;
         the_actors.active_carrier = n;
         the_actors.loaded_actor_file = n;
         (*actor).race = n as u8;

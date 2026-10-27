@@ -259,7 +259,7 @@ pub fn read_score() {
 
         for _ in 0..TRACK_COUNT {
             let mut length = 0i32;
-            Read(file as BPTR, (&raw mut length).cast(), 4);
+            Read(file as BPTR, (&raw mut length).cast(), LENGTH_BYTES);
             length = length.swap_bytes(); // the length is stored big-endian
 
             if length * 2 + loaded > SCORE_MEMORY {
@@ -359,6 +359,19 @@ const FIRST_HALF: usize = 11;
 const PAGE_HALF_WIDTH: i32 = 135;
 const PAGE_STRIP_END: i16 = 136;
 
+/// The page turn is drawn around the book's spine at x = 160 (the right page starts one pixel
+/// later); the left page starts at x = 24 and the outer edge of the right page is at x = 296. The
+/// last strip is a pixel wide, 7 lines in from the top and bottom, which leaves 186 lines.
+const SPINE: i32 = 160;
+const SPINE_RIGHT: i32 = SPINE + 1;
+const PAGE_LEFT_EDGE: i32 = 24;
+const PAGE_RIGHT_EDGE: i32 = 296;
+const EDGE_INSET: i32 = 7;
+const PAGE_EDGE_HEIGHT: i32 = 186;
+
+/// A length in the score and sample files is a 4 byte big-endian number.
+const LENGTH_BYTES: i32 = 4;
+
 /// Copies a rectangle between bitmaps (all five planes, plain copy).
 #[allow(clippy::too_many_arguments)] // source and destination bitmap with their rectangle
 unsafe fn copy_rect(
@@ -428,9 +441,9 @@ unsafe fn turn_right_page_frame(
     wide: i32,
 ) {
     unsafe {
-        let bcol = 161 - wide;
+        let bcol = SPINE_RIGHT - wide;
         let mut dcol: i32 = 0;
-        copy_rect(b, 160, 0, temp, 160, 0, PAGE_HALF_WIDTH, SCREEN_HEIGHT);
+        copy_rect(b, SPINE, 0, temp, SPINE, 0, PAGE_HALF_WIDTH, SCREEN_HEIGHT);
 
         if rate == 0 {
             return;
@@ -446,7 +459,7 @@ unsafe fn turn_right_page_frame(
                 bcol + scol as i32,
                 h,
                 temp,
-                161 + dcol,
+                SPINE_RIGHT + dcol,
                 h,
                 wide,
                 SCREEN_HEIGHT - h - h,
@@ -456,7 +469,16 @@ unsafe fn turn_right_page_frame(
             scol += rate;
         }
 
-        copy_rect(a, 296, 7, temp, 161 + dcol, h, 1, 186);
+        copy_rect(
+            a,
+            PAGE_RIGHT_EDGE,
+            EDGE_INSET,
+            temp,
+            SPINE_RIGHT + dcol,
+            h,
+            1,
+            PAGE_EDGE_HEIGHT,
+        );
     }
 }
 
@@ -469,15 +491,33 @@ unsafe fn turn_left_page_frame(
     wide: i32,
 ) {
     unsafe {
-        let bcol = 160;
+        let bcol = SPINE;
 
         if rate == 0 {
-            copy_rect(b, 24, 0, temp, 24, 0, PAGE_HALF_WIDTH, SCREEN_HEIGHT);
+            copy_rect(
+                b,
+                PAGE_LEFT_EDGE,
+                0,
+                temp,
+                PAGE_LEFT_EDGE,
+                0,
+                PAGE_HALF_WIDTH,
+                SCREEN_HEIGHT,
+            );
 
             return;
         }
 
-        copy_rect(a, 24, 0, temp, 24, 0, PAGE_HALF_WIDTH, SCREEN_HEIGHT);
+        copy_rect(
+            a,
+            PAGE_LEFT_EDGE,
+            0,
+            temp,
+            PAGE_LEFT_EDGE,
+            0,
+            PAGE_HALF_WIDTH,
+            SCREEN_HEIGHT,
+        );
         let mut dcol: i32 = 0;
         let mut scol = wide as i16;
 
@@ -498,8 +538,17 @@ unsafe fn turn_left_page_frame(
             scol += rate;
         }
 
-        let h = 7;
-        copy_rect(b, 24, h, temp, 159 - dcol, h, 1, SCREEN_HEIGHT - h - h);
+        let h = EDGE_INSET;
+        copy_rect(
+            b,
+            PAGE_LEFT_EDGE,
+            h,
+            temp,
+            SPINE - 1 - dcol,
+            h,
+            1,
+            SCREEN_HEIGHT - h - h,
+        );
     }
 }
 
@@ -554,7 +603,7 @@ pub fn read_sample() {
 
         for i in 0..SAMPLE_COUNT {
             let length = u32::from_be_bytes([*at, *at.add(1), *at.add(2), *at.add(3)]);
-            at = at.add(4);
+            at = at.add(LENGTH_BYTES as usize);
             the_memory.sample[i] = at;
             the_memory.sample_size[i] = length;
             at = at.add(length as usize);

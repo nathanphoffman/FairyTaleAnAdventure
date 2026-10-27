@@ -38,6 +38,22 @@ pub(super) struct Clip {
     pub(super) yoff: i8,
 }
 
+/// Bit 7 of an object's image number means it is drawn from the middle of its picture (8 lines in).
+const FROM_MIDDLE_BIT: i16 = 128;
+const MIDDLE_START: i8 = 8;
+const IMAGE_NUMBER_MASK: i16 = 0x7f;
+
+/// The blitter's size word has the height in the bits above the 6 bit width.
+const BLIT_HEIGHT_SHIFT: u32 = 6;
+
+/// A sprite is 16 pixels to a word (2 bytes); the shadow mask repeats every 32 lines; the page is
+/// 40 bytes wide.
+const WORD_PIXELS_MASK: i16 = 15;
+const WORD_PIXELS_SHIFT: u32 = 4;
+const WORD_BYTES: i32 = 2;
+const SHADOW_LINES_MASK: i16 = 31;
+const PAGE_ROW_BYTES: i32 = 40;
+
 /// Cuts the sprite to the screen. Also notes in the image number whether the sprite is drawn from
 /// the middle of its picture (bit 7).
 pub(super) fn clip_to_screen(sprite: &mut Sprite) -> Clip {
@@ -52,9 +68,9 @@ pub(super) fn clip_to_screen(sprite: &mut Sprite) -> Clip {
         yoff: (ystart - sprite.ystart) as i8,
     };
 
-    if sprite.atype == OBJECTS && (sprite.inum & 128) != 0 {
-        sprite.inum &= 0x7f;
-        clip.yoff = clip.yoff.wrapping_add(8);
+    if sprite.atype == OBJECTS && (sprite.inum & FROM_MIDDLE_BIT) != 0 {
+        sprite.inum &= IMAGE_NUMBER_MASK;
+        clip.yoff = clip.yoff.wrapping_add(MIDDLE_START);
     }
 
     clip
@@ -105,9 +121,10 @@ pub(super) unsafe fn set_up_blit(
             .cast::<SShape>()
             .offset((*the_screen.drawing_page).obcount as isize);
         the_screen.planesize = seq.bytes;
-        (*current_sshape).savesize = (blitwide as i32 * blithigh as i32 * 2) as i16;
+        (*current_sshape).savesize = (blitwide as i32 * blithigh as i32 * WORD_BYTES) as i16;
         // Blitter size word: height in the high bits, width in words in the low 6 bits.
-        (*current_sshape).blitsize = (((blithigh as i32) << 6) + blitwide as i32) as i16;
+        (*current_sshape).blitsize =
+            (((blithigh as i32) << BLIT_HEIGHT_SHIFT) + blitwide as i32) as i16;
 
         the_memory.shapedata = seq
             .location
@@ -130,21 +147,24 @@ pub(super) unsafe fn set_up_blit(
 /// it goes.
 unsafe fn set_blitter_registers(sprite: &Sprite, clip: &Clip, cwide: i8, xbw: i8, blitwide: i8) {
     unsafe {
-        shadow_mask_offset = ((clip.ystart & 31) as i32 * blitwide as i32 * 2) as i16;
+        shadow_mask_offset =
+            ((clip.ystart & SHADOW_LINES_MASK) as i32 * blitwide as i32 * WORD_BYTES) as i16;
         // Where the visible part starts in the mask: whole words (2 bytes per 16 pixels) in, and whole rows down.
-        sprite_mask_offset = ((clip.xoff >> 4) as i32 * 2 + cwide as i32 * clip.yoff as i32) as i16;
-        (*current_sshape).coff = (xbw as i32 * 2 + clip.ystart as i32 * 40) as i16;
-        sprite_x_shift = sprite.xstart & 15;
+        sprite_mask_offset = ((clip.xoff >> WORD_PIXELS_SHIFT) as i32 * WORD_BYTES
+            + cwide as i32 * clip.yoff as i32) as i16;
+        (*current_sshape).coff =
+            (xbw as i32 * WORD_BYTES + clip.ystart as i32 * PAGE_ROW_BYTES) as i16;
+        sprite_x_shift = sprite.xstart & WORD_PIXELS_MASK;
 
-        if clip.xoff & 15 != 0 {
-            (*current_sshape).coff -= 2;
+        if clip.xoff & WORD_PIXELS_MASK as i8 != 0 {
+            (*current_sshape).coff -= WORD_BYTES as i16;
             last_word_mask = 0;
         } else {
             last_word_mask = -1;
         }
 
-        sprite_mask_modulo = (cwide as i32 - blitwide as i32 * 2) as i16;
-        (*current_sshape).cmod = (40 - blitwide as i32 * 2) as i16;
+        sprite_mask_modulo = (cwide as i32 - blitwide as i32 * WORD_BYTES) as i16;
+        (*current_sshape).cmod = (PAGE_ROW_BYTES - blitwide as i32 * WORD_BYTES) as i16;
     }
 }
 

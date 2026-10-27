@@ -19,7 +19,9 @@ use crate::game::files::disk::motor_off;
 use crate::game::files::loading::finish_sprite_load;
 use crate::game::ui::music::set_mood;
 use crate::game::ui::text::show_message;
-use crate::game::world::regions::{load_region_now, refresh_minimap};
+use crate::game::world::regions::{
+    REGION_HEIGHT_SHIFT, REGION_WIDTH_SHIFT, center_sector, load_region_now, refresh_minimap,
+};
 use std::ffi::c_char;
 
 unsafe extern "C" {
@@ -32,6 +34,29 @@ unsafe extern "C" {
 /// The first region number that is indoors.
 const FIRST_INDOOR_REGION: u16 = 8;
 const NO_REGION: u16 = 10;
+
+/// Moving the hero picks the region from the centre sector: the row there is 3 bits (8 rows).
+const TRANSFER_ROW_MASK: u32 = 7;
+
+/// `view_status` that makes the whole screen be rebuilt.
+const VIEW_REBUILD_ALL: i8 = 99;
+
+/// The place tables have a row of three bytes (first sector, last sector, message) per entry.
+const PLACE_TABLE_ROWS: usize = 256;
+const PLACE_ROW_BYTES: usize = 3;
+const SECTOR_BYTE_MASK: i16 = 255;
+
+/// Regions up to this number are in the north half of the map.
+const LAST_NORTHERN_REGION: u16 = 3;
+
+/// A sector is 256 pixels (a shift of 8); a sector column with bit 6 set, or a row with bit 5 set,
+/// is outside the loaded region.
+const SECTOR_SHIFT: u32 = 8;
+const OUTSIDE_COLUMN_BIT: u16 = 64;
+const OUTSIDE_ROW_BIT: u16 = 32;
+
+/// The necromancer and the turtle eggs appear again when fewer than this many actors are active.
+const MIN_BOSS_ACTORS: i16 = 4;
 
 /// The place message that stands for "the mountains", which depends on the region.
 const MOUNTAINS_MESSAGE: u8 = 4;
@@ -83,19 +108,16 @@ pub extern "C" fn transfer_hero(xtest: u16, ytest: u16, flag: u16) -> i32 {
         the_encounter.number = 0;
 
         if flag != 0 {
-            // The sector at the middle of the screen (offset 151 and 64 pixels from the corner), 256 pixels to a sector.
-            let sector_x = (the_world.map_x as u32 + 151) >> 8;
-            // The sector at the middle of the screen, 256 pixels to a sector.
-            let sector_y = (the_world.map_y as u32 + 64) >> 8;
-            let column = (sector_x >> 6) & 1; // 64 sectors across
-            let row = (sector_y >> 5) & 7; // 32 sectors down
+            let (sector_x, sector_y) = center_sector();
+            let column = (sector_x >> REGION_WIDTH_SHIFT) & 1;
+            let row = (sector_y >> REGION_HEIGHT_SHIFT) & TRANSFER_ROW_MASK;
             the_world.new_region = (column + row + row) as u16;
         }
 
         the_ui.held_direction = 0;
         load_region_now();
         refresh_minimap(); // to set region_origin_x and region_origin_y
-        the_screen.view_status = 99;
+        the_screen.view_status = VIEW_REBUILD_ALL;
         set_mood(1);
 
         while blocked_at(the_hero.x as i16, the_hero.y as i16, 0) != 0 {
@@ -161,7 +183,7 @@ pub fn find_place(flag: i16) -> i32 {
 /// when the hero is on the edge of the loaded one.
 unsafe fn place_message_number() -> u8 {
     unsafe {
-        the_hero.sector &= 255;
+        the_hero.sector &= SECTOR_BYTE_MASK;
         let sector = the_hero.sector as u8;
         let table = if the_world.region >= FIRST_INDOOR_REGION {
             the_hero.sector += INSIDE_SECTOR_OFFSET;
@@ -174,12 +196,12 @@ unsafe fn place_message_number() -> u8 {
         // find the table row (three bytes: first sector, last sector, message) that holds this sector
         let mut row = table;
 
-        for _ in 0..256 {
+        for _ in 0..PLACE_TABLE_ROWS {
             if sector >= *row && sector <= *row.add(1) {
                 break;
             }
 
-            row = row.add(3);
+            row = row.add(PLACE_ROW_BYTES);
         }
 
         let mut message = *row.add(2);
@@ -188,17 +210,20 @@ unsafe fn place_message_number() -> u8 {
             if the_world.region >= FIRST_INDOOR_REGION {
             } else if the_world.region & 1 != 0 {
                 message = NORTHERN_MOUNTAINS_MESSAGE;
-            } else if the_world.region > 3 {
+            } else if the_world.region > LAST_NORTHERN_REGION {
                 message = SOUTHERN_MOUNTAINS_MESSAGE;
             }
         }
 
         // The hero's sector column: 256 pixels to a sector.
-        let hero_column = (the_hero.x >> 8).wrapping_sub(the_world.origin_x);
+        let hero_column = (the_hero.x >> SECTOR_SHIFT).wrapping_sub(the_world.origin_x);
         // The hero's sector row: 256 pixels to a sector.
-        let hero_row = (the_hero.y >> 8).wrapping_sub(the_world.origin_y);
+        let hero_row = (the_hero.y >> SECTOR_SHIFT).wrapping_sub(the_world.origin_y);
 
-        if the_world.new_region < NO_REGION || hero_column & 64 != 0 || hero_row & 32 != 0 {
+        if the_world.new_region < NO_REGION
+            || hero_column & OUTSIDE_COLUMN_BIT != 0
+            || hero_row & OUTSIDE_ROW_BIT != 0
+        {
             message = 0;
         }
 
@@ -264,7 +289,7 @@ unsafe fn enter_extent(flag: i16) -> bool {
             // birds, turtles, special
             if (the_world.extent_type == XT_NECROMANCER || the_world.extent_type == XT_TURTLE_EGGS)
                 && (the_actors.list[FIRST_MONSTER as usize].race != (*the_world.extent).v3
-                    || the_actors.active < 4)
+                    || the_actors.active < MIN_BOSS_ACTORS)
             {
                 the_encounter.x =
                     (((*the_world.extent).x1 as u32 + (*the_world.extent).x2 as u32) / 2) as u16;

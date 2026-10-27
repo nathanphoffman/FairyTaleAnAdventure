@@ -46,9 +46,31 @@ const TERRA_TABLE_SIZE: usize = 512;
 /// The desert region and the inventory slot of the golden statue count. Until the hero has five
 /// statues, the door into the desert fort is blocked by four map tiles (254) at this spot.
 const DESERT_REGION: u16 = 4;
+
+/// The region map has 128 sector bytes to a row.
+const MAP_ROW_BYTES: usize = 128;
+
+/// The screen's middle is this far from its top left corner, in pixels, and a sector is 256
+/// pixels (a shift of 8).
+const CENTER_OFFSET_X: u32 = 151;
+const CENTER_OFFSET_Y: u32 = 64;
+const SECTOR_PIXELS_SHIFT: u32 = 8;
+
+/// A region is 64 sectors wide and 32 high; there are 4 rows of them.
+pub const REGION_WIDTH_SHIFT: u32 = 6;
+pub const REGION_HEIGHT_SHIFT: u32 = 5;
+const REGION_ROW_MASK: u32 = 3;
+
+/// The map position wraps at these sizes; new regions are only loaded between these rows, and not
+/// in the strip of x positions that straddles the join.
+const MAP_X_WRAP: u32 = 0x3fff;
+const MAP_Y_WRAP: u32 = 0x1fff;
+const MAP_Y_MIN_FOR_LOAD: u32 = 109;
+const MAP_Y_MAX_FOR_LOAD: u32 = 7936;
+const DEAD_STRIP_X: std::ops::RangeInclusive<u32> = 16128..=16156;
 const STATUE_SLOT: usize = 25;
 const STATUES_NEEDED: u8 = 5;
-const DESERT_DOOR_TILE: usize = (11 * 128) + 26;
+const DESERT_DOOR_TILE: usize = (11 * MAP_ROW_BYTES) + 26;
 const BLOCKED_TILE: u8 = 254;
 
 /// Works out which region the camera is in and starts loading it if it changed; sets `region_origin_x` and
@@ -60,22 +82,21 @@ pub fn refresh_minimap() {
     unsafe {
         if the_world.region < FIRST_INDOOR_REGION {
             if the_world.new_region < NO_REGION {
-                let xs = the_world.map_x as u32 & 0x3fff;
-                let ys = the_world.map_y as u32 & 0x1fff;
+                let xs = the_world.map_x as u32 & MAP_X_WRAP;
+                let ys = the_world.map_y as u32 & MAP_Y_WRAP;
 
-                if (ys > 109 && ys < 7936) && !(16128..=16156).contains(&xs) {
+                if (ys > MAP_Y_MIN_FOR_LOAD && ys < MAP_Y_MAX_FOR_LOAD)
+                    && !DEAD_STRIP_X.contains(&xs)
+                {
                     load_region_now();
                 }
             }
 
-            // The sector at the middle of the screen, 256 pixels to a sector.
-            let xs = (the_world.map_x as u32 + 151) >> 8;
-            // The sector at the middle of the screen, 256 pixels to a sector.
-            let ys = (the_world.map_y as u32 + 64) >> 8;
+            let (xs, ys) = center_sector();
             // The map is two regions wide (64 sectors each).
-            let xr = (xs >> 6) & 1;
+            let xr = (xs >> REGION_WIDTH_SHIFT) & 1;
             // The map is four regions high (32 sectors each).
-            let yr = (ys >> 5) & 3;
+            let yr = (ys >> REGION_HEIGHT_SHIFT) & REGION_ROW_MASK;
             the_world.target_region = (xr + yr + yr) as u16;
 
             if the_world.target_region != the_world.region {
@@ -89,19 +110,30 @@ pub fn refresh_minimap() {
         if (read_finished(2) != 0 && read_finished(0) != 0) || the_world.new_region >= NO_REGION {
             // Regions are numbered along the row: two to a row, so the row is the number halved.
             let yr = the_world.target_region >> 1;
-            let xr = if the_world.target_region > 7 {
+            let xr = if the_world.target_region >= FIRST_INDOOR_REGION {
                 0
             } else {
                 the_world.target_region & 1
             };
 
             // Where the region starts in sectors: 64 across, 32 down.
-            the_world.origin_x = xr << 6;
+            the_world.origin_x = xr << REGION_WIDTH_SHIFT;
             // Where the region starts in sectors: 64 across, 32 down.
-            the_world.origin_y = yr << 5;
+            the_world.origin_y = yr << REGION_HEIGHT_SHIFT;
         }
 
         fill_minimap(the_world.tile_x as i32, the_world.tile_y as i32);
+    }
+}
+
+/// The sector (column, row) at the middle of the screen: the map position is the screen's top
+/// left corner, so the middle is 151 pixels across and 64 down from it, and a sector is 256 pixels.
+pub fn center_sector() -> (u32, u32) {
+    unsafe {
+        (
+            (the_world.map_x as u32 + CENTER_OFFSET_X) >> SECTOR_PIXELS_SHIFT,
+            (the_world.map_y as u32 + CENTER_OFFSET_Y) >> SECTOR_PIXELS_SHIFT,
+        )
     }
 }
 
@@ -226,7 +258,7 @@ unsafe fn block_desert_door_without_statues() {
         if the_world.new_region == DESERT_REGION
             && *the_hero.stuff.add(STATUE_SLOT) < STATUES_NEEDED
         {
-            for offset in [0, 1, 128, 129] {
+            for offset in [0, 1, MAP_ROW_BYTES, MAP_ROW_BYTES + 1] {
                 *the_memory.map_mem.add(DESERT_DOOR_TILE + offset) = BLOCKED_TILE;
             }
         }

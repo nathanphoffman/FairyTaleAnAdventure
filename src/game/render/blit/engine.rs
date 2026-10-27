@@ -26,16 +26,33 @@ pub(super) struct Blit {
     pub(super) height: i32,
 }
 
+/// BLTSIZE: the width in words is the low 6 bits, the height the 10 bits above them.
+const WIDTH_BITS: u32 = 6;
+const WIDTH_MASK: i32 = 0x3f;
+const HEIGHT_MASK: i32 = 0x3ff;
+
+/// A width of 0 in the size word means 64 words.
+const MAX_WIDTH: i32 = 64;
+
+/// A word is 16 bits: two words are joined to shift across them. The minterm has 8 result bits,
+/// picked by the A, B and C bits (4, 2, 1).
+const WORD_BITS: u32 = 16;
+const BYTE_BITS: u32 = 8;
+const MINTERM_BITS: u32 = 8;
+const MINTERM_A: u32 = 4;
+const MINTERM_B: u32 = 2;
+const MINTERM_C: u32 = 1;
+
 /// BLTSIZE: height in the top 10 bits ...
 pub(super) fn blit_height(size: i16) -> i32 {
     // The size word is height * 64 + width in words, so the height is everything above the low 6 bits.
-    (size as i32 >> 6) & 0x3ff
+    (size as i32 >> WIDTH_BITS) & HEIGHT_MASK
 }
 
 /// ... and the width in words in the low 6 bits (0 means 64).
 pub(super) fn blit_width(size: i16) -> i32 {
-    match size as i32 & 0x3f {
-        0 => 64,
+    match size as i32 & WIDTH_MASK {
+        0 => MAX_WIDTH,
         width => width,
     }
 }
@@ -43,14 +60,14 @@ pub(super) fn blit_width(size: i16) -> i32 {
 /// Reads a big-endian 16-bit word.
 pub(super) unsafe fn read_word(p: *const u8) -> u32 {
     // Words are big-endian in memory: the first byte is the high half.
-    unsafe { ((*p as u32) << 8) | *p.add(1) as u32 }
+    unsafe { ((*p as u32) << BYTE_BITS) | *p.add(1) as u32 }
 }
 
 /// Writes a big-endian 16-bit word.
 pub(super) unsafe fn write_word(p: *mut u8, v: u32) {
     unsafe {
         // Big-endian: the high byte is stored first.
-        *p = (v >> 8) as u8;
+        *p = (v >> BYTE_BITS) as u8;
         *p.add(1) = v as u8;
     }
 }
@@ -64,10 +81,12 @@ pub(super) fn minterm_word(minterm: u32, a: u32, b: u32, c: u32) -> u32 {
     let pick = |word: u32, set: bool| if set { word } else { !word };
     let mut result = 0;
 
-    for index in 0..8 {
+    for index in 0..MINTERM_BITS {
         // Bit `index` of the minterm is the result for that combination of the A, B and C bits.
         if minterm >> index & 1 != 0 {
-            result |= pick(a, index & 4 != 0) & pick(b, index & 2 != 0) & pick(c, index & 1 != 0);
+            result |= pick(a, index & MINTERM_A != 0)
+                & pick(b, index & MINTERM_B != 0)
+                & pick(c, index & MINTERM_C != 0);
         }
     }
 
@@ -120,9 +139,9 @@ pub(super) unsafe fn blit_row(t: &mut Blit) {
             }
 
             // Shifting right across two words: the bits that fell off the previous word enter from the left.
-            let shifted_a = ((a_prev << 16 | aw) >> t.ashift) & ALL_BITS;
+            let shifted_a = ((a_prev << WORD_BITS | aw) >> t.ashift) & ALL_BITS;
             // Shifting right across two words: the bits that fell off the previous word enter from the left.
-            let shifted_b = ((b_prev << 16 | bw) >> t.bshift) & ALL_BITS;
+            let shifted_b = ((b_prev << WORD_BITS | bw) >> t.bshift) & ALL_BITS;
             a_prev = aw;
             b_prev = bw;
 

@@ -3,12 +3,13 @@
 use super::water::climbs_out_of_water;
 use super::{
     BLOCK_DOOR, BLOCK_PASSABLE_WITH_KEY, Ctx, ENVIRON_BACKWARDS, ENVIRON_ICE, ENVIRON_SHALLOW,
-    ENVIRON_SLOW, FRAME_FRUSTRATED, FRAME_OSCIL, FRUST, PIT_SECTOR, Pc, RACE_SNAKE, RACE_WRAITH,
-    RIDING_SWAN, RIDING_TURTLE, STUFF_GOLD_KEY_SLOT, XTEST, YTEST, diroff, pos_x, pos_y, terrain,
+    ENVIRON_SLOW, FACING_MASK, FRAME_FRUSTRATED, FRAME_OSCIL, FRUST, PIT_SECTOR, Pc, RACE_SNAKE,
+    RACE_WRAITH, RIDING_SWAN, RIDING_TURTLE, STUFF_GOLD_KEY_SLOT, XTEST, YTEST, diroff, pos_x,
+    pos_y, terrain,
 };
 
 use crate::game::actors::interaction::blocked_at;
-use crate::game::actors::steering::steer_actor;
+use crate::game::actors::steering::{STEER_OFFSET, steer_actor};
 use crate::game::data::random::rand4;
 use crate::game::data::state::{the_actors, the_hero};
 use crate::game::data::tables::swing_transitions;
@@ -36,7 +37,6 @@ const ICE_TOP_SPEED: i16 = 42;
 const ICE_STEP_ORIGIN: i32 = 20;
 const ICE_STEP_SPEED: i32 = 2;
 const ICE_X_MARGIN: i16 = 8;
-const SWAN_STEER_SPEED: i32 = 6;
 
 /// A walking frame cycles through 8 (flipping the low 3 bits plays them backwards).
 const WALK_FRAMES_MASK: i32 = 7;
@@ -46,9 +46,6 @@ const SNAKE_FIRST_FRAME: i16 = 0x24;
 
 /// Velocity is kept as four times the movement of the last step.
 const VELOCITY_SCALE: i32 = 4;
-
-/// Facings are 0-7.
-const FACING_MASK: i16 = 7;
 
 /// The fighting states 6 and 7 are shown as state 8 (the follow-through).
 const SWING_STATE_FOLLOW_THROUGH: i16 = 8;
@@ -164,7 +161,7 @@ impl Ctx {
             YTEST = ((*actor).abs_y as i32 + (*actor).vel_y as i32 / VELOCITY_SCALE) as u16;
 
             if the_hero.riding == RIDING_SWAN {
-                steer_actor(0, -(nvx as i32), -(nvy as i32), SWAN_STEER_SPEED);
+                steer_actor(0, -(nvx as i32), -(nvy as i32), STEER_OFFSET);
                 self.facing = (*actor).facing as i16;
 
                 return Some(Pc::NewLoc);

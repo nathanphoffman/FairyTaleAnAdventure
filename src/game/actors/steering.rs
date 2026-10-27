@@ -8,6 +8,29 @@ use crate::game::data::state::the_actors;
 const WALKING: i8 = 12;
 const STILL: i8 = 13;
 
+// Steering modes (see `steer`).
+pub const STEER_STRAIGHT: i32 = 4;
+pub const STEER_TURN_ONLY: i32 = 5;
+pub const STEER_OFFSET: i32 = 6;
+const STEER_WOBBLE_FAR: i32 = 1;
+const STEER_WOBBLE_NEAR: i32 = 2;
+const STEER_AWAY: i32 = 3;
+
+/// The wobble starts when the target is closer than this (in mode 1 and in mode 2).
+const WOBBLE_DISTANCE_FAR: i16 = 40;
+const WOBBLE_DISTANCE_NEAR: i16 = 30;
+
+/// The steering mode is the low byte of the argument; directions are 0-7.
+const MODE_MASK: i32 = 0xff;
+const FACING_MASK: i32 = 7;
+
+/// The table is indexed by 4 - 3 * (vertical sign) - (horizontal sign).
+const TABLE_CENTER: i32 = 4;
+const TABLE_ROW_WIDTH: i32 = 3;
+
+/// An axis is ignored when it is less than half the other (a shift of one).
+const IGNORE_SHIFT: u32 = 1;
+
 /// Direction number for each of the 9 combinations of horizontal and vertical steering.
 const DIRECTION_TABLE: [u8; 9] = [0, 1, 2, 7, 9, 3, 6, 5, 4];
 const NO_DIRECTION: i32 = 9;
@@ -37,14 +60,14 @@ fn steer(xdif: i16, ydif: i16, mode: i32, random_bit: impl FnOnce() -> bool) -> 
     let yabs = (ydif as i32).unsigned_abs() as u16;
     let (mut xdir, mut ydir) = (sign(xdif), sign(ydif));
 
-    if mode != 4 {
+    if mode != STEER_STRAIGHT {
         // An axis less than half as far as the other is ignored, so the actor goes straight along the long one.
-        if (yabs as i16) < (xabs >> 1) as i16 {
+        if (yabs as i16) < (xabs >> IGNORE_SHIFT) as i16 {
             ydir = 0;
         }
 
         // An axis less than half as far as the other is ignored, so the actor goes straight along the long one.
-        if (xabs as i16) < (yabs >> 1) as i16 {
+        if (xabs as i16) < (yabs >> IGNORE_SHIFT) as i16 {
             xdir = 0;
         }
     }
@@ -52,20 +75,21 @@ fn steer(xdif: i16, ydif: i16, mode: i32, random_bit: impl FnOnce() -> bool) -> 
     let close = (xabs as i32 + yabs as i32) as i16;
     let mut deviation = 0;
 
-    if mode == 1 && close < 40 {
+    if mode == STEER_WOBBLE_FAR && close < WOBBLE_DISTANCE_FAR {
         deviation = 1;
     }
 
-    if mode == 2 && close < 30 {
+    if mode == STEER_WOBBLE_NEAR && close < WOBBLE_DISTANCE_NEAR {
         deviation = 1;
     }
 
-    if mode == 3 {
+    if mode == STEER_AWAY {
         xdir = -xdir;
         ydir = -ydir;
     }
 
-    let mut facing = DIRECTION_TABLE[(4 - ydir * 3 - xdir) as usize] as i32;
+    let mut facing =
+        DIRECTION_TABLE[(TABLE_CENTER - ydir * TABLE_ROW_WIDTH - xdir) as usize] as i32;
 
     if facing == NO_DIRECTION {
         return Course::Stop;
@@ -73,17 +97,19 @@ fn steer(xdif: i16, ydif: i16, mode: i32, random_bit: impl FnOnce() -> bool) -> 
 
     facing += if random_bit() { deviation } else { -deviation };
 
-    Course::Face { facing: facing & 7 }
+    Course::Face {
+        facing: facing & FACING_MASK,
+    }
 }
 
 /// Points an actor toward (or away from) a target and sets it walking (see `steer` for modes).
 /// The random number is only drawn when the actor moves, as in the original, so recorded games
 /// stay in step.
 pub fn steer_actor(object: i32, target_x: i32, target_y: i32, mode: i32) {
-    let mode = mode & 0xff;
+    let mode = mode & MODE_MASK;
     unsafe {
         let actor = &mut (*(&raw mut the_actors.list))[object as usize];
-        let (xdif, ydif) = if mode == 6 {
+        let (xdif, ydif) = if mode == STEER_OFFSET {
             (target_x as i16, target_y as i16)
         } else {
             (
@@ -97,7 +123,7 @@ pub fn steer_actor(object: i32, target_x: i32, target_y: i32, mode: i32) {
             Course::Face { facing } => {
                 actor.facing = facing as i8;
 
-                if mode != 5 {
+                if mode != STEER_TURN_ONLY {
                     actor.state = WALKING;
                 }
             }

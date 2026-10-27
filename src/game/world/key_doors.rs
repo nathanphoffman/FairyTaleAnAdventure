@@ -33,6 +33,21 @@ const SIDE: u8 = 2;
 const BACK: u8 = 3;
 const CABINET_LAYOUT: u8 = 4;
 
+/// A door is looked for this far (pixels) to the right and left, and a tile is 16 pixels wide and
+/// 32 high (shifts 4 and 5). Each map set covers 64 sector numbers (a shift of 6).
+const DOOR_SEARCH_SIDE: u16 = 4;
+const TILE_WIDTH: u16 = 16;
+const TILE_HEIGHT: u16 = 32;
+const TILE_WIDTH_SHIFT: u32 = 4;
+const TILE_HEIGHT_SHIFT: u32 = 5;
+const MAP_SET_SHIFT: u32 = 6;
+
+/// A door can be up to three tiles wide, so at most two steps to its left edge.
+const DOOR_MAX_LEFT_STEPS: usize = 2;
+
+/// The tiles of an opened cabinet: the open door's top, and the three around it.
+const CABINET_TILES: [u8; 3] = [87, 86, 88];
+
 /// One kind of door: `door_id` is the tile it starts as, in the map set `map_id`; it turns into
 /// `new1` (and `new2` next to it, placed by `above`); `keytype` is the key that opens it.
 struct DoorOpen {
@@ -92,8 +107,7 @@ pub fn open_door_near(x: u16, y: u16, keytype: u32) -> i32 {
 
         // we know where the door starts; now which type is it?
         let sector_id = *tile(x, y);
-        // Each map set covers 64 sector numbers.
-        let map_id = loaded_blocks.image[(sector_id >> 6) as usize];
+        let map_id = loaded_blocks.image[(sector_id >> MAP_SET_SHIFT) as usize];
 
         if let Some(open) = find_open(sector_id, map_id, keytype) {
             swap_in_open_door_tiles(open, x, y);
@@ -122,12 +136,12 @@ fn find_door_corner(x: u16, y: u16) -> Option<(i32, i32)> {
     let mut found = terrain_at(x as i32, y as i32) == DOOR_TERRAIN;
 
     if !found {
-        x = x.wrapping_add(4);
+        x = x.wrapping_add(DOOR_SEARCH_SIDE);
         found = terrain_at(x as i32, y as i32) == DOOR_TERRAIN;
     }
 
     if !found {
-        x = x.wrapping_sub(8);
+        x = x.wrapping_sub(2 * DOOR_SEARCH_SIDE);
         found = terrain_at(x as i32, y as i32) == DOOR_TERRAIN;
     }
 
@@ -136,18 +150,20 @@ fn find_door_corner(x: u16, y: u16) -> Option<(i32, i32)> {
     }
 
     // A door can be up to three tiles wide; step to its left edge.
-    for _ in 0..2 {
-        if terrain_at(x as i32 - 16, y as i32) == DOOR_TERRAIN {
-            x = x.wrapping_sub(16);
+    for _ in 0..DOOR_MAX_LEFT_STEPS {
+        if terrain_at(x as i32 - TILE_WIDTH as i32, y as i32) == DOOR_TERRAIN {
+            x = x.wrapping_sub(TILE_WIDTH);
         }
     }
 
-    if terrain_at(x as i32, y as i32 + 32) == DOOR_TERRAIN {
-        y = y.wrapping_add(32);
+    if terrain_at(x as i32, y as i32 + TILE_HEIGHT as i32) == DOOR_TERRAIN {
+        y = y.wrapping_add(TILE_HEIGHT);
     }
 
-    // The door's top left tile: 16 pixels wide, 32 high.
-    Some(((x >> 4) as i32, (y >> 5) as i32))
+    Some((
+        (x >> TILE_WIDTH_SHIFT) as i32,
+        (y >> TILE_HEIGHT_SHIFT) as i32,
+    ))
 }
 
 /// Replaces the closed door tile at (`x`, `y`) with its open version, and the neighbouring tiles
@@ -192,9 +208,9 @@ fn open_changes(open: &DoorOpen, x: i32, y: i32) -> ([(i32, i32, u8); 4], usize)
             }
 
             CABINET_LAYOUT => {
-                changes[1] = (x, y - 1, 87);
-                changes[2] = (x + 1, y, 86);
-                changes[3] = (x + 1, y - 1, 88);
+                changes[1] = (x, y - 1, CABINET_TILES[0]);
+                changes[2] = (x + 1, y, CABINET_TILES[1]);
+                changes[3] = (x + 1, y - 1, CABINET_TILES[2]);
                 count = 4;
             }
 

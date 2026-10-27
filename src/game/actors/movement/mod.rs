@@ -135,6 +135,12 @@ const DRAGON_BREATH_FACING: i8 = 5;
 /// Hitting the pit: the luck it costs.
 const PIT_LUCK_COST: i16 = 2;
 
+/// Facings are 0-7 (clockwise from north-west).
+const FACING_MASK: i16 = 7;
+
+/// How far the turtle swims in a frame.
+const TURTLE_STEP: i16 = 3;
+
 // More terrain types and the `environ` they give.
 const TERRAIN_SHALLOW: i16 = 2;
 const TERRAIN_WADE: i16 = 3;

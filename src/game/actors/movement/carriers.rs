@@ -1,8 +1,9 @@
 //! The raft, the swan and the turtle: when they carry the hero, and where the turtle swims on its own.
 
 use super::{
-    CARRIER_SLOT, Ctx, Pc, RIDING_RAFT, RIDING_SWAN, RIDING_TURTLE, STUFF_SWAN_ITEM, SWAN_FILE,
-    TURTLE_WATER, WALKING, XTEST, YTEST, pos_x, pos_y, terrain,
+    CARRIER_SLOT, Ctx, FACING_MASK, Pc, RIDING_RAFT, RIDING_SWAN, RIDING_TURTLE, STUFF_SWAN_ITEM,
+    SWAN_FILE, TERRAIN_DEEP_WATER, TERRAIN_WADE, TURTLE_STEP, TURTLE_WATER, WALKING, XTEST, YTEST,
+    pos_x, pos_y, terrain,
 };
 
 use crate::game::actors::interaction::center_extent_on;
@@ -26,19 +27,19 @@ fn turtle_heading(dir: i16, water_ahead: impl Fn(i16) -> bool) -> i16 {
         return dir;
     }
 
-    let right = (dir + 1) & 7;
+    let right = (dir + 1) & FACING_MASK;
 
     if water_ahead(right) {
         return right;
     }
 
-    let left = (right - 2) & 7;
+    let left = (right - 2) & FACING_MASK;
 
     if water_ahead(left) {
         return left;
     }
 
-    (left - 1) & 7
+    (left - 1) & FACING_MASK
 }
 
 impl Ctx {
@@ -125,11 +126,11 @@ impl Ctx {
             let actor = self.actor;
             let (ax, ay) = ((*actor).abs_x as i32, (*actor).abs_y as i32);
             self.facing = turtle_heading(self.facing, |dir| {
-                terrain(pos_x(ax, dir, 3), pos_y(ay, dir, 3)) == TURTLE_WATER
+                terrain(pos_x(ax, dir, TURTLE_STEP), pos_y(ay, dir, TURTLE_STEP)) == TURTLE_WATER
             });
 
-            XTEST = pos_x(ax, self.facing, 3);
-            YTEST = pos_y(ay, self.facing, 3);
+            XTEST = pos_x(ax, self.facing, TURTLE_STEP);
+            YTEST = pos_y(ay, self.facing, TURTLE_STEP);
             the_hero.riding = 0;
             self.image = self.facing + self.facing + (self.cycle & 1);
         }
@@ -149,7 +150,7 @@ impl Ctx {
             YTEST = the_actors.list[0].abs_y;
             self.terrain = terrain(XTEST, YTEST);
 
-            if self.terrain < 3 || self.terrain > 5 {
+            if !(TERRAIN_WADE..=TERRAIN_DEEP_WATER).contains(&self.terrain) {
                 return Pc::Statc;
             }
 

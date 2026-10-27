@@ -33,6 +33,12 @@ unsafe extern "C" {
 /// In a string: followed by x/2 and y, moves the text position.
 const XY: u8 = 128;
 
+/// A positioning code in a string is three bytes long: the marker, then x / 2 and y.
+const XY_BYTES: usize = 3;
+const XY_X_SCALE: i32 = 2;
+
+const DECIMAL_BASE: u32 = 10;
+
 /// Digits in the number buffer; one trailing space follows them.
 const NUMBER_DIGITS: usize = 10;
 
@@ -48,8 +54,8 @@ pub fn format_number(mut value: u32) -> i32 {
 
         loop {
             i -= 1;
-            digits[i] = b'0' as c_char + (value % 10) as c_char;
-            value /= 10;
+            digits[i] = b'0' as c_char + (value % DECIMAL_BASE) as c_char;
+            value /= DECIMAL_BASE;
 
             if value == 0 || i == 0 {
                 break;
@@ -97,11 +103,11 @@ pub fn print_positioned(mut s: *const u8) {
             if *s == XY {
                 Move(
                     the_screen.current_rastport,
-                    *s.add(1) as i32 * 2,
+                    *s.add(1) as i32 * XY_X_SCALE,
                     *s.add(2) as i32,
                 );
 
-                s = s.add(3);
+                s = s.add(XY_BYTES);
             } else {
                 let mut n = 0;
 
@@ -184,6 +190,13 @@ const BORDER_X_STEPS: [i32; 16] = [-4, -4, -4, 0, 0, 0, 4, 4, 0, -4, 0, 4, 4, 0,
 const BORDER_Y_STEPS: [i32; 16] = [0, 0, 0, 4, 4, 4, 0, 0, -4, 0, -4, 0, 0, 4, 4, 4];
 const BORDER_START_X: i32 = 12;
 const BORDER_PASSES: i32 = 17;
+const BORDER_STEPS: usize = 16;
+
+/// The page the border goes around is 284 x 124 (the long edges) and 268 x 112 (the short ones,
+/// drawn turned a quarter), with the short edges offset by 16 and 12.
+const LONG_EDGE_FAR: (i32, i32) = (284, 124);
+const SHORT_EDGE_NEAR: (i32, i32) = (16, 12);
+const SHORT_EDGE_FAR: (i32, i32) = (268, 112);
 
 /// Passes numbered above this also draw the long (top and bottom) edges.
 const LONG_EDGE_ABOVE_PASS: i32 = 9;
@@ -209,7 +222,7 @@ pub fn draw_placard_border() {
         let (mut xorg, mut yorg) = (BORDER_START_X, 0);
 
         for pass in (0..BORDER_PASSES).rev() {
-            for step in 0..16 {
+            for step in 0..BORDER_STEPS {
                 let dx = xorg + BORDER_X_STEPS[step];
                 let dy = yorg + BORDER_Y_STEPS[step];
 
@@ -225,11 +238,29 @@ pub fn draw_placard_border() {
 
                     if pass > LONG_EDGE_ABOVE_PASS {
                         line(r, xorg, yorg, dx, dy);
-                        line(r, 284 - xorg, 124 - yorg, 284 - dx, 124 - dy);
+                        line(
+                            r,
+                            LONG_EDGE_FAR.0 - xorg,
+                            LONG_EDGE_FAR.1 - yorg,
+                            LONG_EDGE_FAR.0 - dx,
+                            LONG_EDGE_FAR.1 - dy,
+                        );
                     }
 
-                    line(r, 16 + yorg, 12 - xorg, 16 + dy, 12 - dx);
-                    line(r, 268 - yorg, 112 + xorg, 268 - dy, 112 + dx);
+                    line(
+                        r,
+                        SHORT_EDGE_NEAR.0 + yorg,
+                        SHORT_EDGE_NEAR.1 - xorg,
+                        SHORT_EDGE_NEAR.0 + dy,
+                        SHORT_EDGE_NEAR.1 - dx,
+                    );
+                    line(
+                        r,
+                        SHORT_EDGE_FAR.0 - yorg,
+                        SHORT_EDGE_FAR.1 + xorg,
+                        SHORT_EDGE_FAR.0 - dy,
+                        SHORT_EDGE_FAR.1 + dx,
+                    );
                 }
 
                 xorg = dx;
@@ -239,12 +270,16 @@ pub fn draw_placard_border() {
     }
 }
 
+/// Menu states: an item the player has, and one they lack.
+const MENU_STATE_HAVE: i32 = 10;
+const MENU_STATE_LACKING: i32 = 8;
+
 /// Menu state for an item: 10 if the player has item `n`, otherwise 8 (a menu item state).
 pub fn item_menu_state(n: i32) -> i32 {
     if unsafe { *the_hero.stuff.offset(n as isize) } != 0 {
-        10
+        MENU_STATE_HAVE
     } else {
-        8
+        MENU_STATE_LACKING
     }
 }
 
@@ -253,6 +288,7 @@ const ERROR_SCREEN_Y: i32 = 90;
 
 /// Error number meaning graphics are not open, so nothing can be printed.
 const ERROR_NO_GRAPHICS: i32 = 2;
+const ERROR_LABEL_LEN: i32 = 6;
 
 /// Shows "ERROR n" on the text panel (startup failures). Error 2 (no graphics) cannot be shown.
 pub fn show_error(n: i32) {
@@ -261,6 +297,6 @@ pub fn show_error(n: i32) {
     }
 
     move_to(ERROR_SCREEN_X, ERROR_SCREEN_Y);
-    draw_text(c"ERROR ".as_ptr(), 6);
+    draw_text(c"ERROR ".as_ptr(), ERROR_LABEL_LEN);
     print_number(n, 2);
 }

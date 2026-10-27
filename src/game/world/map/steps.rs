@@ -8,13 +8,21 @@ pub(super) const COORD_SIGN: i32 = 0x8000;
 pub(super) const X_STEPS: [i16; 10] = [-2, 0, 2, 3, 2, 0, -2, -3, 0, 0];
 pub(super) const Y_STEPS: [i16; 10] = [-2, -3, -2, 0, 2, 3, 2, 0, 0, 0];
 
+/// Directions are the low byte of the value; a step is half the table value times the speed.
+const DIRECTION_MASK: i32 = 0xff;
+const WORD_MASK: u32 = 0xffff;
+const HIGH_WORD_MASK: u32 = 0xffff_0000;
+const SIGN_BIT_14: u32 = 0x4000;
+const SIGN_BIT_15: u32 = 0x8000;
+const LOW_15_BITS: u32 = 0x7fff;
+
 /// Directions above this mean "no move".
 pub(super) const MAX_DIRECTION: i32 = 7;
 
 /// Moves `v` one step in direction `dir` at `speed`; the result stays within 15 bits.
 /// The step is table value * speed / 2, so speed 2 moves the table's amount in pixels.
 pub(super) fn step(v: i32, dir: i32, speed: i32, table: &[i16; 10]) -> i32 {
-    let product = table[(dir & 0xff) as usize] as i32 * speed as i16 as i32;
+    let product = table[(dir & DIRECTION_MASK) as usize] as i32 * speed as i16 as i32;
     // Half the table step times the speed: speed 2 moves the table's amount.
     let half = (product as u16 >> 1) as i32;
 
@@ -24,7 +32,7 @@ pub(super) fn step(v: i32, dir: i32, speed: i32, table: &[i16; 10]) -> i32 {
 /// The x position after one step in direction `dir` (0-7) at `speed`. Directions above 7 mean
 /// "no move". Directions go clockwise from north-west.
 pub fn step_x(x: i32, dir: i32, speed: i32) -> i32 {
-    if dir & 0xff > MAX_DIRECTION {
+    if dir & DIRECTION_MASK > MAX_DIRECTION {
         return x;
     }
 
@@ -33,7 +41,7 @@ pub fn step_x(x: i32, dir: i32, speed: i32) -> i32 {
 
 /// Like `step_x`, but for y; it keeps bit 15 of y (a flag the game stores there).
 pub fn step_y(y: i32, dir: i32, speed: i32) -> i32 {
-    if dir & 0xff > MAX_DIRECTION {
+    if dir & DIRECTION_MASK > MAX_DIRECTION {
         return y;
     }
 
@@ -42,15 +50,15 @@ pub fn step_y(y: i32, dir: i32, speed: i32) -> i32 {
 
 /// Copies bit 14 into bit 15, giving a signed 15 bit value (the world wraps around at the edges).
 pub fn wrap_coordinate(x: i32) -> i32 {
-    let mut low = x as u32 & 0xffff;
+    let mut low = x as u32 & WORD_MASK;
 
-    if low & 0x4000 != 0 {
-        low |= 0x8000;
+    if low & SIGN_BIT_14 != 0 {
+        low |= SIGN_BIT_15;
     } else {
-        low &= 0x7fff;
+        low &= LOW_15_BITS;
     }
 
-    ((x as u32 & 0xffff_0000) | low) as i32
+    ((x as u32 & HIGH_WORD_MASK) | low) as i32
 }
 
 #[cfg(test)]

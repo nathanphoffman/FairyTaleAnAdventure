@@ -58,6 +58,35 @@ const CAMERA_OFFSET: (u16, u16) = (144, 90);
 /// The last brother is number 3; one past that is the end of the game.
 const LAST_BROTHER: i16 = 3;
 
+/// The brothers in order; their numbers go up with each fallen one.
+const JULIAN: i16 = 1;
+const PHILLIP: i16 = 2;
+const KEVIN: i16 = 3;
+
+/// Placard text numbers: the first brother's, the second's, ... the game-over one, then the
+/// follow-up placards that tell why the next brother sets out.
+const PLACARD_JULIAN: i32 = 0;
+const PLACARD_PHILLIP: i32 = 1;
+const PLACARD_PHILLIP_FOLLOW_UP: i32 = 2;
+const PLACARD_KEVIN: i32 = 3;
+const PLACARD_KEVIN_FOLLOW_UP: i32 = 4;
+const PLACARD_GAME_OVER: i32 = 5;
+
+/// Event messages for setting out: always the first, then one for the second and third brother.
+const EVENT_SETTING_OUT: i32 = 9;
+const EVENT_PHILLIP_SETS_OUT: i32 = 10;
+const EVENT_KEVIN_SETS_OUT: i32 = 11;
+
+/// Vitality of a brother who sets out: 15 plus a quarter of the bravery.
+const BASE_VITALITY: i16 = 15;
+const BRAVERY_DIVISOR: i16 = 4;
+
+/// The hero's body is marked with this race.
+const HERO_RACE: u8 = 255;
+
+/// Actors active when a brother starts: the hero, the raft and the first person.
+const START_ACTORS: i16 = 3;
+
 /// Time of day when a brother starts or revives, and the light then.
 const START_DAYNIGHT: u16 = 8000;
 const START_LIGHT: u16 = 300;
@@ -129,7 +158,7 @@ pub fn revive(new: i16) {
         put_hero_at_safe_spot(hero);
         restore_hero(hero);
 
-        if the_hero.brother > 3 {
+        if the_hero.brother > LAST_BROTHER {
             the_screen.view_status = VIEW_GAME_OVER;
         } else {
             the_screen.view_status = VIEW_FADE_IN;
@@ -164,7 +193,7 @@ unsafe fn place_raft_and_setfig(list: *mut Shape) {
 /// The fallen brother's body is left where he died, and his ghost appears.
 unsafe fn leave_fallen_brother() {
     unsafe {
-        if the_hero.brother > 0 && the_hero.brother < 3 {
+        if the_hero.brother > 0 && the_hero.brother < KEVIN {
             ob_listg[the_hero.brother as usize].xc = the_hero.x;
             ob_listg[the_hero.brother as usize].yc = the_hero.y;
             ob_listg[the_hero.brother as usize].ob_stat = ON_GROUND;
@@ -230,17 +259,17 @@ unsafe fn show_brother_placards() {
         map_message();
         SetFont(the_screen.current_rastport, story_font);
 
-        if the_hero.brother == 1 {
-            placard_text(0);
+        if the_hero.brother == JULIAN {
+            placard_text(PLACARD_JULIAN);
             the_screen.rp_map.BitMap = (*(*the_screen.drawing_page).ri_page).BitMap;
             SetRast(&raw mut the_screen.rp_map, PEN_BLACK);
             the_screen.rp_map.BitMap = (*(*the_screen.viewing_page).ri_page).BitMap;
-        } else if the_hero.brother == 2 {
-            placard_text(1);
-        } else if the_hero.brother == 3 {
-            placard_text(3);
+        } else if the_hero.brother == PHILLIP {
+            placard_text(PLACARD_PHILLIP);
+        } else if the_hero.brother == KEVIN {
+            placard_text(PLACARD_KEVIN);
         } else {
-            placard_text(5);
+            placard_text(PLACARD_GAME_OVER);
         }
 
         draw_placard_border();
@@ -249,7 +278,7 @@ unsafe fn show_brother_placards() {
         if the_hero.brother > LAST_BROTHER {
             the_ui.quit_requested = 1;
             Delay(GAME_OVER_PAUSE);
-        } else if the_hero.brother > 1 {
+        } else if the_hero.brother > JULIAN {
             Delay(SHORT_PAUSE);
             SetAPen(the_screen.current_rastport, PEN_BLACK);
             RectFill(
@@ -263,7 +292,11 @@ unsafe fn show_brother_placards() {
             Delay(TINY_PAUSE);
             SetAPen(the_screen.current_rastport, PEN_TEXT);
 
-            placard_text(if the_hero.brother == 2 { 2 } else { 4 });
+            placard_text(if the_hero.brother == PHILLIP {
+                PLACARD_PHILLIP_FOLLOW_UP
+            } else {
+                PLACARD_KEVIN_FOLLOW_UP
+            });
             Delay(SHOW_PLACARD);
         }
     }
@@ -279,17 +312,17 @@ unsafe fn announce_brother() {
         the_actors.loaded_setfig_file = HERO_SET_FILE;
         load_start_sprites();
 
-        if the_hero.brother < 4 {
+        if the_hero.brother <= LAST_BROTHER {
             message_off();
             the_hero.place = START_PLACE;
-            show_event(9);
+            show_event(EVENT_SETTING_OUT);
 
-            if the_hero.brother == 1 {
+            if the_hero.brother == JULIAN {
                 print_cont(c".".as_ptr());
-            } else if the_hero.brother == 2 {
-                show_event(10);
-            } else if the_hero.brother == 3 {
-                show_event(11);
+            } else if the_hero.brother == PHILLIP {
+                show_event(EVENT_PHILLIP_SETS_OUT);
+            } else if the_hero.brother == KEVIN {
+                show_event(EVENT_KEVIN_SETS_OUT);
             }
         }
     }
@@ -329,7 +362,7 @@ unsafe fn restore_hero(hero: *mut Shape) {
             &mut *(&raw mut the_world),
         );
 
-        the_actors.active = 3;
+        the_actors.active = START_ACTORS;
         update_menu_availability();
         queue_print(PRQ_VITALITY);
         queue_print(PRQ_STATS);
@@ -339,10 +372,10 @@ unsafe fn restore_hero(hero: *mut Shape) {
 /// Full health for the bravery, standing still on dry land, the morning clock, and no hunger or
 /// fatigue.
 fn restore_stats(hero: &mut Hero, body: &mut Shape, world: &mut World) {
-    body.vitality = 15 + hero.brave / 4;
+    body.vitality = BASE_VITALITY + hero.brave / BRAVERY_DIVISOR;
     body.environ = 0;
     body.state = STILL;
-    body.race = 255; // -1
+    body.race = HERO_RACE;
     world.day_clock = START_DAYNIGHT;
     world.light_level = START_LIGHT;
     hero.hunger = 0;

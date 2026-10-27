@@ -26,6 +26,14 @@ unsafe extern "C" {
 }
 
 // The menu entries: the spells are entries 5-11 and use the item slots 9-15 (`4 + entry`).
+/// A sector is 256 pixels wide and high, and a tile 16 (shifts of 8 and 4).
+const SECTOR_SHIFT: u32 = 8;
+const SECTOR_MASK: u16 = 255;
+const TILE_SHIFT: u32 = 4;
+
+/// The heal cap grows by a quarter of the bravery.
+const BRAVERY_DIVISOR: i16 = 4;
+
 const SPELL_STONE: i16 = 5;
 const SPELL_LIGHT: i16 = 6;
 const SPELL_HEAL: i16 = 7;
@@ -212,13 +220,13 @@ unsafe fn show_map() {
         the_screen.planes = (*the_screen.bm_draw).Planes.as_mut_ptr();
         draw_overview_map(the_world.map_x as i32, the_world.map_y as i32);
 
-        // The hero on the overview map: his tile column minus the left edge of the shown sectors (16 tiles to a sector).
-        let x = ((the_hero.x >> 4) as i64
-            - ((the_world.sector_x as i64 + the_world.origin_x as i64) << 4)
+        // The hero on the overview map: his tile column minus the left edge of the shown sectors.
+        let x = ((the_hero.x >> TILE_SHIFT) as i64
+            - ((the_world.sector_x as i64 + the_world.origin_x as i64) << TILE_SHIFT)
             - MARK_X_OFFSET) as u32;
         // The hero on the overview map: his position in 16 pixel steps minus the top edge of the shown sectors.
-        let y = ((the_hero.y >> 4) as i64
-            - ((the_world.sector_y as i64 + the_world.origin_y as i64) << 4)
+        let y = ((the_hero.y >> TILE_SHIFT) as i64
+            - ((the_world.sector_y as i64 + the_world.origin_y as i64) << TILE_SHIFT)
             + MARK_Y_OFFSET) as u32;
         the_screen.rp_map.BitMap = the_screen.bm_draw;
         SetDrMd(&raw mut the_screen.rp_map, JAM1);
@@ -285,12 +293,11 @@ fn stone_target(sector: i16, px: u16, py: u16, facing: i8, list: &[u8]) -> Stone
         return StoneJump::Refused;
     }
 
-    if (px & 255) / STONE_COLUMN_WIDTH != 1 || (py & 255) / STONE_ROW_HEIGHT != 1 {
+    if (px & SECTOR_MASK) / STONE_COLUMN_WIDTH != 1 || (py & SECTOR_MASK) / STONE_ROW_HEIGHT != 1 {
         return StoneJump::Refused;
     }
 
-    // Sectors are 256 pixels wide and high.
-    let (sector_x, sector_y) = (px >> 8, py >> 8);
+    let (sector_x, sector_y) = (px >> SECTOR_SHIFT, py >> SECTOR_SHIFT);
 
     for ring in 0..STONE_CIRCLES {
         if list[ring * 2] as u16 == sector_x && list[ring * 2 + 1] as u16 == sector_y {
@@ -301,8 +308,8 @@ fn stone_target(sector: i16, px: u16, py: u16, facing: i8, list: &[u8]) -> Stone
             }
 
             // Back to pixels: the target sector, then the same spot inside it.
-            let x = ((list[target * 2] as u16) << 8) + (px & 255);
-            let y = ((list[target * 2 + 1] as u16) << 8) + (py & 255);
+            let x = ((list[target * 2] as u16) << SECTOR_SHIFT) + (px & SECTOR_MASK);
+            let y = ((list[target * 2 + 1] as u16) << SECTOR_SHIFT) + (py & SECTOR_MASK);
 
             return StoneJump::To(x, y);
         }
@@ -329,7 +336,7 @@ unsafe fn heal() {
 /// Vitality after the heal spell: it adds 4 plus a roll (`roll`, 0-7), up to a limit that grows with
 /// bravery. Also says whether the limit was hit (then the hero was already nearly full).
 fn healed_vitality(vitality: i16, brave: i16, roll: i32) -> (i16, bool) {
-    let cap = HEAL_CAP_BASE + brave / 4;
+    let cap = HEAL_CAP_BASE + brave / BRAVERY_DIVISOR;
     let healed = vitality.wrapping_add((roll + HEAL_MIN) as i16);
 
     if healed > cap {

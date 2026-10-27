@@ -4,6 +4,7 @@
 use crate::amiga::{BitMap, RastPort, TextFont, View, ViewPort};
 use crate::game::files::loading::intro_skip_requested;
 use crate::game::ui::menus::print_options;
+use std::ffi::CStr;
 
 use crate::game::actors::revive::revive;
 use crate::game::data::globals::{main_view, story_font};
@@ -85,6 +86,31 @@ const TEXT_COLORS: i32 = 20;
 /// Pens: the title text, and the colour of the flashing pointer.
 const TITLE_PEN: u32 = 1;
 
+// The title screen's palette: a blue page background and white text; the play screen's background
+// is darker while the panel loads.
+const BACKGROUND_COLOR: i32 = 0;
+const TEXT_COLOR: i32 = 1;
+const TITLE_BLUE: (u32, u32, u32) = (0, 0, 6);
+const WHITE_RGB: (u32, u32, u32) = (15, 15, 15);
+const LOADING_BLUE: (u32, u32, u32) = (0, 0, 3);
+
+/// Pens of the story text.
+const STORY_PEN: u32 = 10;
+const STORY_BACKGROUND_PEN: u32 = 11;
+
+/// The tracks of the intro tune.
+const INTRO_TRACKS: [usize; 4] = [12, 13, 14, 15];
+
+/// The story pages: file names and the delays in ticks before and after each is shown.
+const STORY_PAGES: [(&CStr, &CStr, i16, i16); 3] = [
+    (c"p1a", c"p1b", 21, 29),
+    (c"p2a", c"p2b", 20, 29),
+    (c"p3a", c"p3b", 20, 33),
+];
+
+/// The screen has five bit planes.
+const PLANES: usize = 5;
+
 /// Waits, in fiftieths of a second.
 const TITLE_WAIT: i32 = 50;
 const INTRO_PAGES_WAIT: i32 = 190;
@@ -141,6 +167,11 @@ unsafe fn clear_both_pages() {
     }
 }
 
+/// Sets a colour of the page palette from 4-bit red, green and blue.
+unsafe fn set_page_color(color: i32, (r, g, b): (u32, u32, u32)) {
+    unsafe { SetRGB4(&raw mut the_screen.vp_page, color, r, g, b) };
+}
+
 /// The legal title text on a blue page, then the music and the sound effects are read in.
 unsafe fn show_title_screen() {
     unsafe {
@@ -149,8 +180,8 @@ unsafe fn show_title_screen() {
         clear_both_pages();
         the_screen.current_rastport = &raw mut the_screen.rp_map;
         set_intro_zoom(ZOOM_NORMAL);
-        SetRGB4(&raw mut the_screen.vp_page, 0, 0, 0, 6);
-        SetRGB4(&raw mut the_screen.vp_page, 1, 15, 15, 15);
+        set_page_color(BACKGROUND_COLOR, TITLE_BLUE);
+        set_page_color(TEXT_COLOR, WHITE_RGB);
 
         let pen = (*the_screen.current_rastport).FgPen as u32;
         SetAPen(the_screen.current_rastport, TITLE_PEN);
@@ -162,8 +193,8 @@ unsafe fn show_title_screen() {
         the_screen.current_rastport = &raw mut the_screen.rp_text;
         the_screen.rp_text.BitMap = &raw mut the_screen.bm_scroll;
         SetFont(the_screen.current_rastport, story_font);
-        SetAPen(the_screen.current_rastport, 10);
-        SetBPen(the_screen.current_rastport, 11);
+        SetAPen(the_screen.current_rastport, STORY_PEN);
+        SetBPen(the_screen.current_rastport, STORY_BACKGROUND_PEN);
 
         read_score();
         read_sample();
@@ -179,7 +210,7 @@ unsafe fn prepare_intro_pages_and_music() {
         the_screen.current_viewport = &raw mut the_screen.vp_page; // so that the IFF routines can communicate
         the_screen.vp_page.RasInfo = &raw mut the_screen.ri_page1;
 
-        for i in 0..5 {
+        for i in 0..PLANES {
             the_screen.pageb.Planes[i] = the_memory.image_mem.add(i * IMAGE_PLANE_BYTES);
             the_screen.pagea.Planes[i] = the_screen.pageb.Planes[i].add(PAGE_HALF_BYTES);
         }
@@ -187,10 +218,10 @@ unsafe fn prepare_intro_pages_and_music() {
         (*the_screen.bm_lim).Planes[0] = the_memory.sector_mem;
 
         playscore(
-            the_memory.track[12],
-            the_memory.track[13],
-            the_memory.track[14],
-            the_memory.track[15],
+            the_memory.track[INTRO_TRACKS[0]],
+            the_memory.track[INTRO_TRACKS[1]],
+            the_memory.track[INTRO_TRACKS[2]],
+            the_memory.track[INTRO_TRACKS[3]],
         );
 
         LoadRGB4(
@@ -221,7 +252,7 @@ unsafe fn show_play_screen_background() {
         );
 
         set_intro_zoom(ZOOM_NORMAL);
-        SetRGB4(&raw mut the_screen.vp_page, 0, 0, 0, 3);
+        set_page_color(BACKGROUND_COLOR, LOADING_BLUE);
         load_track_range(
             SHADOW_BLOCK.0,
             SHADOW_BLOCK.1,
@@ -232,10 +263,10 @@ unsafe fn show_play_screen_background() {
         wait_for_last_read();
         mark_last_read_unused();
 
-        SetRGB4(&raw mut the_screen.vp_page, 0, 0, 0, 6);
+        set_page_color(BACKGROUND_COLOR, TITLE_BLUE);
         load_picture(c"hiscreen".as_ptr(), the_screen.bm_text, 0, 0);
 
-        SetRGB4(&raw mut the_screen.vp_page, 1, 15, 15, 15);
+        set_page_color(TEXT_COLOR, WHITE_RGB);
 
         the_screen.current_rastport = &raw mut the_screen.rp_map;
         the_screen.rp_map.BitMap = (*(*the_screen.drawing_page).ri_page).BitMap;
@@ -302,9 +333,9 @@ unsafe fn play_intro() {
         the_screen.fp_page2.ri_page = &raw mut the_screen.ri_page2;
 
         if intro_skipped() == 0 {
-            show_story_page(c"p1a".as_ptr(), c"p1b".as_ptr(), 21, 29);
-            show_story_page(c"p2a".as_ptr(), c"p2b".as_ptr(), 20, 29);
-            show_story_page(c"p3a".as_ptr(), c"p3b".as_ptr(), 20, 33);
+            for (first, second, first_wait, second_wait) in STORY_PAGES {
+                show_story_page(first.as_ptr(), second.as_ptr(), first_wait, second_wait);
+            }
 
             if intro_skip_requested == 0 {
                 Delay(INTRO_PAGES_WAIT);
