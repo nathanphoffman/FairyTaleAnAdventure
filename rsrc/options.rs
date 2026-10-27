@@ -242,17 +242,7 @@ unsafe fn person_speaks(person: u8, an: *mut Shape) {
                 }
             }
             NOBLE => speak(20),
-            SORCERESS => {
-                if ob_listg[SORCERESS_SLOT].ob_stat != 0 {
-                    if luck < rand64() as i16 {
-                        luck += SORCERESS_LUCK;
-                    }
-                } else {
-                    speak(45);
-                    ob_listg[SORCERESS_SLOT].ob_stat = 1;
-                }
-                queue_print(PRQ_VITALITY);
-            }
+            SORCERESS => sorceress_speaks(),
             BARTENDER => {
                 if fatigue < TIRED {
                     speak(13);
@@ -273,6 +263,21 @@ unsafe fn person_speaks(person: u8, an: *mut Shape) {
             BEGGAR => speak(23),
             _ => {}
         }
+    }
+}
+
+/// The sorceress gives luck once she has been freed; before that she asks for help.
+unsafe fn sorceress_speaks() {
+    unsafe {
+        if ob_listg[SORCERESS_SLOT].ob_stat != 0 {
+            if luck < rand64() as i16 {
+                luck += SORCERESS_LUCK;
+            }
+        } else {
+            speak(45);
+            ob_listg[SORCERESS_SLOT].ob_stat = 1;
+        }
+        queue_print(PRQ_VITALITY);
     }
 }
 

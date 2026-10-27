@@ -140,27 +140,14 @@ pub fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: *const u16) {
             g2 = 0;
         }
         for i in 0..COLOR_COUNT {
-            let color = *colors.add(i) as i32;
-            let mut r1 = (color & 0x0f00) >> 4;
-            let mut g1 = color & 0x00f0;
-            let mut b1 = color & 0x000f;
-            if light_timer != 0 && r1 < g1 {
-                r1 = g1;
-            }
-            r1 = (r * r1) / 1600;
-            g1 = (g * g1) / 1600;
-            b1 = (b * b1 + g2 * g1) / 100;
-            if limit != 0 {
-                if (16..=24).contains(&i) && g > 20 {
-                    if g < 50 {
-                        b1 += 2;
-                    } else if g < 75 {
-                        b1 += 1;
-                    }
-                }
-                b1 = b1.min(MAX_COMPONENT);
-            }
-            fader[i] = ((r1 << 8) + (g1 << 4) + b1) as u16;
+            fader[i] = faded_color(
+                i,
+                *colors.add(i),
+                (r, g, b),
+                g2,
+                limit != 0,
+                light_timer != 0,
+            );
         }
         LoadRGB4(
             &raw mut vp_page,
@@ -168,6 +155,40 @@ pub fn fade_page(r: i16, g: i16, b: i16, limit: i16, colors: *const u16) {
             COLOR_COUNT as i32,
         );
     }
+}
+
+/// Colour `i` of the palette (`color`, 4 bits per channel) scaled to the light levels `r`, `g`, `b`
+/// (percent). At night (`night`) blue is lifted by `g2` times green, the lake colours (16-24) get a
+/// moonlight tint, and blue is capped. With a magic light (`lit`) red is brought up to the green.
+fn faded_color(
+    i: usize,
+    color: u16,
+    (r, g, b): (i32, i32, i32),
+    g2: i32,
+    night: bool,
+    lit: bool,
+) -> u16 {
+    let color = color as i32;
+    let mut r1 = (color & 0x0f00) >> 4;
+    let mut g1 = color & 0x00f0;
+    let mut b1 = color & 0x000f;
+    if lit && r1 < g1 {
+        r1 = g1;
+    }
+    r1 = (r * r1) / 1600;
+    g1 = (g * g1) / 1600;
+    b1 = (b * b1 + g2 * g1) / 100;
+    if night {
+        if (16..=24).contains(&i) && g > 20 {
+            if g < 50 {
+                b1 += 2;
+            } else if g < 75 {
+                b1 += 1;
+            }
+        }
+        b1 = b1.min(MAX_COMPONENT);
+    }
+    ((r1 << 8) + (g1 << 4) + b1) as u16
 }
 
 /// The teleport effect: random colours flicker for a moment (32 flashes).
@@ -234,23 +255,28 @@ pub fn handle_print_request() {
             REQUEST_OPTIONS => {
                 print_options();
             }
-            REQUEST_STATS => {
-                if luck < 0 {
-                    luck = 0;
-                }
-                for (x, label, len, value) in [
-                    (14, c"Brv:", 4, brave),
-                    (90, c"Lck:", 4, luck),
-                    (168, c"Knd:", 4, hero_kind),
-                    (321, c"Wlth:", 5, wealth),
-                ] {
-                    move_to(x, STATS_Y);
-                    draw_text(label.as_ptr(), len);
-                    print_number(value as i32, 3);
-                }
-            }
+            REQUEST_STATS => draw_stats(),
             REQUEST_TAKE_WHAT => print(c"Take What?".as_ptr()),
             _ => {}
+        }
+    }
+}
+
+/// Draws the hero's four stats (bravery, luck, kindness, wealth) along the stats line.
+unsafe fn draw_stats() {
+    unsafe {
+        if luck < 0 {
+            luck = 0;
+        }
+        for (x, label, len, value) in [
+            (14, c"Brv:", 4, brave),
+            (90, c"Lck:", 4, luck),
+            (168, c"Knd:", 4, hero_kind),
+            (321, c"Wlth:", 5, wealth),
+        ] {
+            move_to(x, STATS_Y);
+            draw_text(label.as_ptr(), len);
+            print_number(value as i32, 3);
         }
     }
 }
@@ -466,6 +492,35 @@ mod tests {
         assert_eq!(down.first(), Some(&100));
         assert_eq!(down.last(), Some(&0));
         assert_eq!(down.len(), 21);
+    }
+
+    #[test]
+    fn full_light_leaves_colours_alone() {
+        assert_eq!(
+            faded_color(0, 0x0a5c, (100, 100, 100), 0, false, false),
+            0x0a5c
+        );
+    }
+
+    #[test]
+    fn no_light_is_black() {
+        assert_eq!(faded_color(0, 0x0fff, (0, 0, 0), 0, false, false), 0);
+    }
+
+    #[test]
+    fn magic_light_raises_red_to_green() {
+        assert_eq!(
+            faded_color(0, 0x00f0, (100, 100, 100), 0, false, true),
+            0x0ff0
+        );
+    }
+
+    #[test]
+    fn night_tints_the_lake_colours_but_caps_blue() {
+        let lake = faded_color(20, 0x0000, (100, 40, 100), 0, true, false);
+        assert_eq!(lake & 0xf, 2);
+        let capped = faded_color(0, 0x000f, (100, 100, 100), 100, true, false);
+        assert_eq!(capped & 0xf, MAX_COMPONENT as u16);
     }
 
     #[test]

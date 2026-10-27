@@ -16,7 +16,7 @@ use super::objects::change_object;
 use super::random::{rand4, rand8};
 use super::screen_fx::{map_message, show_still_screen, win_colors};
 use super::tables::{itrans, ob_listg, page_colors, treasure_probs};
-use super::types::{InvItem, SeqInfo};
+use super::types::{InvItem, SeqInfo, Shape};
 use crate::amiga::{BitMap, RastPort, TextFont, ViewPort};
 use std::ffi::c_char;
 
@@ -161,6 +161,24 @@ unsafe fn show_item_list() {
             pagea.Planes[plane] = data.add(plane * ITEM_IMAGE_BYTES);
         }
 
+        draw_item_icons(bm);
+
+        SetRGB4(&raw mut vp_page, BACKGROUND_PEN as i32, 0, 0, 0);
+        show_still_screen();
+        LoadRGB4(
+            &raw mut vp_page,
+            (&raw const page_colors).cast(),
+            COLOURS_SHOWN,
+        );
+        view_status = VIEW_ITEMS;
+        queue_print(PRQ_LIST);
+    }
+}
+
+/// Draws one small picture for each item the hero holds (up to the most the screen shows),
+/// stacked down the item's column. The pictures are read from `pagea`.
+unsafe fn draw_item_icons(bm: *mut BitMap) {
+    unsafe {
         for slot in 0..GOLDBASE {
             let it = item(slot);
             let shown = (*stuff.add(slot)).min(it.maxshown);
@@ -184,16 +202,6 @@ unsafe fn show_item_list() {
                 y = y.wrapping_add(it.ydelta as u16);
             }
         }
-
-        SetRGB4(&raw mut vp_page, BACKGROUND_PEN as i32, 0, 0, 0);
-        show_still_screen();
-        LoadRGB4(
-            &raw mut vp_page,
-            (&raw const page_colors).cast(),
-            COLOURS_SHOWN,
-        );
-        view_status = VIEW_ITEMS;
-        queue_print(PRQ_LIST);
     }
 }
 
@@ -405,8 +413,6 @@ unsafe fn search_body() {
         const ARCHER_WEAPON: u32 = 4;
         const MAX_WEAPON: u32 = 5;
         const EXTRA_ARROWS_MIN: i32 = 2;
-        const SETFIG_RACE_BIT: u8 = 0x80;
-        const TREASURE_CLASS_SIZE: i32 = 8;
         let an = &raw mut actor_list[nearest_object as usize];
         print_wrapped(c"% searched the body and found".as_ptr());
         print(c"".as_ptr());
@@ -432,15 +438,7 @@ unsafe fn search_body() {
             }
         }
         (*an).weapon = -1;
-        let mut found = 0;
-        if (*an).race & SETFIG_RACE_BIT == 0 {
-            let class = (*(&raw const encounter_chart)
-                .cast::<Encounter>()
-                .add((*an).race as usize))
-            .treasure;
-            found = treasure_probs[(class as i32 * TREASURE_CLASS_SIZE + rand8()) as usize] as i32
-                as u32;
-        }
+        let found = roll_body_treasure(an);
         if found != 0 {
             if weapon != 0 {
                 print_cont(c" and ".as_ptr());
@@ -458,6 +456,23 @@ unsafe fn search_body() {
             print_cont(c"nothing".as_ptr());
         }
         print_cont(c".".as_ptr());
+    }
+}
+
+/// Picks what a dead enemy carries besides its weapon, from the treasure table for its race.
+/// Returns an item number (0 for nothing); characters like shopkeepers (a set figure) carry none.
+unsafe fn roll_body_treasure(an: *mut Shape) -> u32 {
+    const SETFIG_RACE_BIT: u8 = 0x80;
+    const TREASURE_CLASS_SIZE: i32 = 8;
+    unsafe {
+        if (*an).race & SETFIG_RACE_BIT != 0 {
+            return 0;
+        }
+        let class = (*(&raw const encounter_chart)
+            .cast::<Encounter>()
+            .add((*an).race as usize))
+        .treasure;
+        treasure_probs[(class as i32 * TREASURE_CLASS_SIZE + rand8()) as usize] as i32 as u32
     }
 }
 

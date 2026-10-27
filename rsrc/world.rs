@@ -181,6 +181,41 @@ pub fn check_door() {
 
 unsafe fn enter_door(xtest: u16, ytest: u16) {
     unsafe {
+        let Some(index) = find_outdoor_door(xtest, ytest) else {
+            return;
+        };
+        let d = door_at(index);
+        let horizontal = d.kind & 1 != 0;
+        let lined_up = if horizontal {
+            hero_y & 0x10 == 0
+        } else {
+            hero_x & 15 <= 6
+        };
+        let allowed = d.kind != DESERT || *stuff.add(STATBASE) >= STATUES_NEEDED;
+        if lined_up && allowed {
+            let (x, y) = inside_spot(d);
+            new_region = if d.secs == 1 {
+                REGION_INSIDE
+            } else {
+                REGION_INSIDE_OTHER
+            };
+            transfer_hero(x, y, 0);
+            find_place(2);
+            fade_page(
+                FADE_WHITE,
+                FADE_WHITE,
+                FADE_WHITE,
+                1,
+                (&raw const page_colors).cast(),
+            );
+        }
+    }
+}
+
+/// Binary search of the (sorted) outdoor doors for the one whose entrance covers the point.
+/// A door matches within 16 pixels to the right of its x; vertical doors need the exact x.
+unsafe fn find_outdoor_door(xtest: u16, ytest: u16) -> Option<i32> {
+    unsafe {
         let mut low = 0;
         let mut high = DOORCOUNT - 1;
         while high >= low {
@@ -197,36 +232,13 @@ unsafe fn enter_door(xtest: u16, ytest: u16) {
             } else if d.yc1 < ytest {
                 low = j + 1;
             } else {
-                let horizontal = d.kind & 1 != 0;
-                let lined_up = if horizontal {
-                    hero_y & 0x10 == 0
-                } else {
-                    hero_x & 15 <= 6
-                };
-                let allowed = d.kind != DESERT || *stuff.add(STATBASE) >= STATUES_NEEDED;
-                if lined_up && allowed {
-                    let (x, y) = inside_spot(d);
-                    new_region = if d.secs == 1 {
-                        REGION_INSIDE
-                    } else {
-                        REGION_INSIDE_OTHER
-                    };
-                    transfer_hero(x, y, 0);
-                    find_place(2);
-                    fade_page(
-                        FADE_WHITE,
-                        FADE_WHITE,
-                        FADE_WHITE,
-                        1,
-                        (&raw const page_colors).cast(),
-                    );
-                }
-                break;
+                return Some(j);
             }
             if low >= DOORCOUNT || high < 0 {
                 break;
             }
         }
+        None
     }
 }
 
@@ -625,6 +637,40 @@ unsafe fn bubble_step(j: usize) {
         if y2 < y1 {
             draw_order[j - 1] = k2;
             draw_order[j] = k1;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Doors whose entrance the binary search cannot reach, because a neighbouring door's x range
+    /// (16 pixels) overlaps theirs. This is how the original data behaves; they are listed so a
+    /// change to the search is noticed.
+    const UNREACHABLE: &[i32] = &[38, 67];
+
+    #[test]
+    fn every_other_door_is_found_at_its_own_entrance() {
+        unsafe {
+            for j in (0..DOORCOUNT).filter(|j| !UNREACHABLE.contains(j)) {
+                let d = door_at(j);
+                let found = find_outdoor_door(d.xc1, d.yc1)
+                    .unwrap_or_else(|| panic!("door {j} at {},{} not found", d.xc1, d.yc1));
+                let f = door_at(found);
+                assert_eq!((f.xc1, f.yc1), (d.xc1, d.yc1));
+            }
+            for j in UNREACHABLE {
+                let d = door_at(*j);
+                assert_eq!(find_outdoor_door(d.xc1, d.yc1), None);
+            }
+        }
+    }
+
+    #[test]
+    fn empty_ground_has_no_door() {
+        unsafe {
+            assert_eq!(find_outdoor_door(1, 1), None);
         }
     }
 }

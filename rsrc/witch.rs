@@ -143,17 +143,24 @@ pub fn witch_fx(fp: *mut FPage) {
                 AREA_MAX_VECTORS,
             );
             (*r).AreaInfo = &raw mut MY_AREA_INFO;
-            AreaMove(r, p1.0 as i32, p1.1 as i32);
-            AreaDraw(r, p2.0 as i32, p2.1 as i32);
-            AreaDraw(r, p4.0 as i32, p4.1 as i32);
-            AreaDraw(r, p3.0 as i32, p3.1 as i32);
-            AreaEnd(r);
+            fill_beam(r, [p1, p2, p4, p3]);
             FreeRaster(MY_RAS, RASTER_SIZE, RASTER_SIZE);
             (*r).TmpRas = old_tmp;
             (*r).AreaInfo = old_area;
         }
         (*r).Layer = OLD_LAYER;
         DeleteLayer(std::ptr::null_mut(), LAYER);
+    }
+}
+
+/// Fills the quadrilateral with corners `p` (in drawing order) on the map rastport `r`.
+unsafe fn fill_beam(r: *mut RastPort, p: [(i16, i16); 4]) {
+    unsafe {
+        AreaMove(r, p[0].0 as i32, p[0].1 as i32);
+        for corner in &p[1..] {
+            AreaDraw(r, corner.0 as i32, corner.1 as i32);
+        }
+        AreaEnd(r);
     }
 }
 

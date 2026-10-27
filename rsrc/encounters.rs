@@ -75,37 +75,13 @@ const FIRST_CARRIER_SLOT: usize = 3;
 pub fn place_encounter(i: u16, spread: u16) -> i32 {
     unsafe {
         let an = (&raw mut actor_list).cast::<Shape>().add(i as usize);
-        let mut xtest: u16 = 0;
-        let mut ytest: u16 = 0;
-        let mut tries = 0;
-        if (*current_extent).v3 == FIXED_PLACE_ENCOUNTER {
-            (xtest, ytest) = FIXED_PLACE;
-        } else {
-            while tries < MAX_TRY {
-                xtest = (encounter_x as i32 + bitrand(spread as i32) - (spread as i32 / 2)) as u16;
-                ytest = (encounter_y as i32 + bitrand(spread as i32) - (spread as i32 / 2)) as u16;
-                if blocked_at(xtest as i16, ytest as i16, i as i16) == 0 {
-                    break;
-                }
-                if extent_type == SPIDER_PIT
-                    && terrain_at(xtest as i32, ytest as i32) == TERRAIN_SWAMP
-                {
-                    break;
-                }
-                tries += 1;
-            }
-        }
-        if tries == MAX_TRY {
+        let Some((xtest, ytest)) = find_open_spot(i, spread) else {
             return 0;
-        }
+        };
         (*an).abs_x = xtest;
         (*an).abs_y = ytest;
         (*an).kind = ENEMY;
-        let race = if (mixflag & 2) != 0 && encounter_type != 4 {
-            (encounter_type & 0xfffe) as i32 + rand2()
-        } else {
-            encounter_type as i32
-        };
+        let race = encounter_race();
         (*an).race = race as u8;
         if mixflag & 4 != 0 {
             wt = rand4() as i16;
@@ -125,6 +101,41 @@ pub fn place_encounter(i: u16, spread: u16) -> i32 {
         (*an).rel_x = (*an).abs_x.wrapping_sub(map_x).wrapping_sub(8);
         (*an).rel_y = (*an).abs_y.wrapping_sub(map_y).wrapping_sub(26);
         1
+    }
+}
+
+/// Finds a place near the encounter point for actor `i`, trying up to `MAX_TRY` random spots
+/// within `spread` pixels. Some encounters always use one fixed place. Returns `None` if every
+/// spot was blocked.
+unsafe fn find_open_spot(i: u16, spread: u16) -> Option<(u16, u16)> {
+    unsafe {
+        if (*current_extent).v3 == FIXED_PLACE_ENCOUNTER {
+            return Some(FIXED_PLACE);
+        }
+        for _ in 0..MAX_TRY {
+            let xtest = (encounter_x as i32 + bitrand(spread as i32) - (spread as i32 / 2)) as u16;
+            let ytest = (encounter_y as i32 + bitrand(spread as i32) - (spread as i32 / 2)) as u16;
+            if blocked_at(xtest as i16, ytest as i16, i as i16) == 0 {
+                return Some((xtest, ytest));
+            }
+            if extent_type == SPIDER_PIT && terrain_at(xtest as i32, ytest as i32) == TERRAIN_SWAMP
+            {
+                return Some((xtest, ytest));
+            }
+        }
+        None
+    }
+}
+
+/// The race of the next enemy: for mixed groups the two races of the pair are picked at random
+/// (except encounter type 4).
+unsafe fn encounter_race() -> i32 {
+    unsafe {
+        if (mixflag & 2) != 0 && encounter_type != 4 {
+            (encounter_type & 0xfffe) as i32 + rand2()
+        } else {
+            encounter_type as i32
+        }
     }
 }
 

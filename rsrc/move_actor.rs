@@ -433,26 +433,8 @@ impl Ctx {
         unsafe {
             let an = self.an;
             if self.k == ENVIRON_ICE {
-                self.e = if riding == RIDING_SWAN { 40 } else { 42 };
-                let nvx = ((*an).vel_x as i32 + step_x(20, self.d as i32, 2) - 20) as i16;
-                let nvy = ((*an).vel_y as i32 + step_y(20, self.d as i32, 2) - 20) as i16;
-                let nvx1 = if nvx < 0 { -nvx } else { nvx };
-                let nvy1 = if nvy < 0 { -nvy } else { nvy };
-                if nvx1 < self.e - 8 {
-                    (*an).vel_x = nvx as i8;
-                }
-                if nvy1 < self.e {
-                    (*an).vel_y = nvy as i8;
-                }
-                XTEST = ((*an).abs_x as i32 + (*an).vel_x as i32 / 4) as u16;
-                YTEST = ((*an).abs_y as i32 + (*an).vel_y as i32 / 4) as u16;
-                if riding == RIDING_SWAN {
-                    steer_actor(0, -(nvx as i32), -(nvy as i32), 6);
-                    self.d = (*an).facing as i16;
-                    return Pc::NewLoc;
-                }
-                if blocked_at(XTEST as i16, YTEST as i16, self.i as i16) == 0 {
-                    return Pc::NewLoc;
+                if let Some(next) = self.slide_on_ice() {
+                    return next;
                 }
                 self.k = 0;
             }
@@ -486,6 +468,35 @@ impl Ctx {
             } else {
                 Pc::NewLoc
             }
+        }
+    }
+
+    /// On ice the actor keeps its momentum: pushes the velocity toward the wanted direction up to a
+    /// limit and moves by it. Returns where to go next, or `None` when it hit something and should
+    /// walk normally this tick.
+    unsafe fn slide_on_ice(&mut self) -> Option<Pc> {
+        unsafe {
+            let an = self.an;
+            self.e = if riding == RIDING_SWAN { 40 } else { 42 };
+            let nvx = ((*an).vel_x as i32 + step_x(20, self.d as i32, 2) - 20) as i16;
+            let nvy = ((*an).vel_y as i32 + step_y(20, self.d as i32, 2) - 20) as i16;
+            if nvx.abs() < self.e - 8 {
+                (*an).vel_x = nvx as i8;
+            }
+            if nvy.abs() < self.e {
+                (*an).vel_y = nvy as i8;
+            }
+            XTEST = ((*an).abs_x as i32 + (*an).vel_x as i32 / 4) as u16;
+            YTEST = ((*an).abs_y as i32 + (*an).vel_y as i32 / 4) as u16;
+            if riding == RIDING_SWAN {
+                steer_actor(0, -(nvx as i32), -(nvy as i32), 6);
+                self.d = (*an).facing as i16;
+                return Some(Pc::NewLoc);
+            }
+            if blocked_at(XTEST as i16, YTEST as i16, self.i as i16) == 0 {
+                return Some(Pc::NewLoc);
+            }
+            None
         }
     }
 
