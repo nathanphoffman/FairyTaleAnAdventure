@@ -1,6 +1,6 @@
 //! Swinging weapons and biting: who is hit, how far the weapon reaches and the whoosh of a near miss.
 
-use super::{CARRIER, DEAD, RAFT, WALKING, chebyshev};
+use super::{CARRIER, DEAD, RAFT, WALKING, distance_to_point};
 use crate::game::actors::interaction::hit_actor;
 use crate::game::data::random::{bitrand, rand4, rand8, rand256};
 use crate::game::data::state::{the_actors, the_hero, the_world};
@@ -138,12 +138,9 @@ unsafe fn swing_at(swing: &Swing, j: usize) -> bool {
             return false;
         }
 
-        let xd = ((*target).abs_x as i32 - swing.tip.0 as i32) as i16;
-        let yd = ((*target).abs_y as i32 - swing.tip.1 as i32) as i16;
-
         match swing_result(
             swing.attacker == 0,
-            chebyshev(xd, yd),
+            distance_to_point(target, swing.tip.0, swing.tip.1),
             swing.reach,
             the_world.freeze_timer != 0,
             swing.strength,

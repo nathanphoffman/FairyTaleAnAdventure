@@ -11,6 +11,8 @@ pub use self::melee::resolve_melee;
 pub use self::missile_sprites::queue_missile_sprites;
 pub use self::missiles::advance_missiles;
 
+use crate::game::data::types::Shape;
+
 // Actor kinds and states (csrc/ftale.h).
 const OBJECTS: i8 = 1;
 const CARRIER: i8 = 5;
@@ -25,6 +27,17 @@ const MISSILES: usize = 6;
 /// Distance between two points as the larger of the x and y differences.
 fn chebyshev(dx: i16, dy: i16) -> i16 {
     dx.wrapping_abs().max(dy.wrapping_abs())
+}
+
+/// How far actor `target` is from the point (`x`, `y`), by `chebyshev` (the differences wrap in 16
+/// bits, as in the original).
+unsafe fn distance_to_point(target: *const Shape, x: i16, y: i16) -> i16 {
+    unsafe {
+        let xd = ((*target).abs_x as i32 - x as i32) as i16;
+        let yd = ((*target).abs_y as i32 - y as i32) as i16;
+
+        chebyshev(xd, yd)
+    }
 }
 
 #[cfg(test)]

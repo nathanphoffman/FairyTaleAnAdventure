@@ -97,6 +97,15 @@ const VIAL_SLOT: usize = 22;
 
 /// Handles one key code. `notpause` is true unless the game is paused.
 ///
+/// A key pressed in the key menu: 1 to 6 choose that key, anything else goes back to the items.
+fn press_in_key_menu(key: i8) {
+    if (b'1' as i8..=b'6' as i8).contains(&key) {
+        choose_menu_entry((key - b'1' as i8 + KEY_ENTRY_BASE) as i16);
+    } else {
+        go_to_menu(ITEMS);
+    }
+}
+
 /// Codes with bit 7 set are releases. Keys that do nothing in the current state fall through
 /// to the menu shortcut letters at the end.
 pub fn handle_key(key: i32, notpause: i32) {
@@ -130,11 +139,7 @@ pub fn handle_key(key: i32, notpause: i32) {
         } else if cheat_move(key) {
             // handled
         } else if the_ui.current_menu == KEYS && key & RELEASED == 0 {
-            if (b'1' as i8..=b'6' as i8).contains(&key) {
-                choose_menu_entry((key - b'1' as i8 + KEY_ENTRY_BASE) as i16);
-            } else {
-                go_to_menu(ITEMS);
-            }
+            press_in_key_menu(key);
         } else if key == b' ' as i8 || notpause {
             menu_letter(key);
         }

@@ -37,29 +37,35 @@ pub fn blocked_at(x: i16, y: i16, i: i16) -> i32 {
             }
         }
 
-        for j in 0..the_actors.active as i32 {
-            let other = actor_at(j);
-
-            // dead actors and rafts can be walked over
-            if i as i32 != j
-                && j != RAFT_SLOT as i32
-                && (*other).kind != RAFT_TYPE
-                && (*other).state != DEAD
-            {
-                let dx = x as i32 - (*other).abs_x as i32;
-                let dy = y as i32 - (*other).abs_y as i32;
-
-                if dx < BLOCK_HALF_WIDTH
-                    && dx > -BLOCK_HALF_WIDTH
-                    && dy < BLOCK_HALF_HEIGHT
-                    && dy > -BLOCK_HALF_HEIGHT
-                {
-                    return BLOCKED_BY_ACTOR;
-                }
-            }
+        if (0..the_actors.active as i32).any(|j| blocked_by_actor(x, y, i, j)) {
+            return BLOCKED_BY_ACTOR;
         }
 
         0
+    }
+}
+
+/// Whether actor `j` stands in the way of actor `i` at (`x`, `y`). Dead actors and rafts can be
+/// walked over.
+unsafe fn blocked_by_actor(x: i16, y: i16, i: i16, j: i32) -> bool {
+    unsafe {
+        let other = actor_at(j);
+
+        if i as i32 == j
+            || j == RAFT_SLOT as i32
+            || (*other).kind == RAFT_TYPE
+            || (*other).state == DEAD
+        {
+            return false;
+        }
+
+        let dx = x as i32 - (*other).abs_x as i32;
+        let dy = y as i32 - (*other).abs_y as i32;
+
+        dx < BLOCK_HALF_WIDTH
+            && dx > -BLOCK_HALF_WIDTH
+            && dy < BLOCK_HALF_HEIGHT
+            && dy > -BLOCK_HALF_HEIGHT
     }
 }
 

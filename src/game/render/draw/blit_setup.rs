@@ -7,6 +7,7 @@ use crate::game::data::globals::current_sshape;
 use crate::game::data::globals::{
     last_word_mask, shadow_mask_offset, sprite_mask_modulo, sprite_mask_offset, sprite_x_shift,
 };
+use crate::game::data::types::SeqInfo;
 
 use crate::game::data::state::{the_memory, the_screen};
 use crate::game::render::blit::SShape;
@@ -130,12 +131,7 @@ pub(super) unsafe fn set_up_blit(
             // Shifts by BLIT_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
             (((blithigh as i32) << BLIT_HEIGHT_SHIFT) + blitwide as i32) as i16;
 
-        the_memory.shapedata = seq
-            .location
-            .offset(the_screen.planesize as isize * PLANES as isize * sprite.inum as isize);
-        the_memory.mask_buffer = seq
-            .maskloc
-            .offset(the_screen.planesize as isize * sprite.inum as isize);
+        locate_sprite_data(seq, sprite.inum);
 
         if !assign_background_save(frame) {
             return false;
@@ -144,6 +140,18 @@ pub(super) unsafe fn set_up_blit(
         set_blitter_registers(sprite, clip, cwide, xbw, blitwide);
 
         true
+    }
+}
+
+/// Points the blitter at the picture and the mask of image `inum` in its sprite sheet.
+unsafe fn locate_sprite_data(seq: &SeqInfo, inum: i16) {
+    unsafe {
+        the_memory.shapedata = seq
+            .location
+            .offset(the_screen.planesize as isize * PLANES as isize * inum as isize);
+        the_memory.mask_buffer = seq
+            .maskloc
+            .offset(the_screen.planesize as isize * inum as isize);
     }
 }
 

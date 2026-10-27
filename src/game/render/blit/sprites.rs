@@ -94,29 +94,37 @@ pub fn draw_shape() {
         }
 
         for p in (0..PLANE_COUNT).rev() {
-            let mut t = Blit::new(
-                USE_A | USE_B | USE_C | USE_D,
-                D_EQUALS_A_THEN_B_ELSE_C,
-                (*current_sshape).blitsize,
-            );
-
-            t.bshift = bit_shift;
-            t.afwm = first & last_word_mask as u16 as u32;
-            t.alwm = last;
-            t.a = the_memory
-                .bmask_mem
-                .add(MASK_START)
-                .offset(shadow_mask_offset as isize);
-            t.b = the_memory
-                .shapedata
-                .offset(sprite_mask_offset as isize + the_screen.planesize as isize * p as isize);
-            t.bmod = sprite_mask_modulo as i32;
-            t.c = plane_at_sprite(p);
-            t.d = t.c;
-            t.cmod = (*current_sshape).cmod as i32;
-            t.dmod = t.cmod;
-            blit(&mut t);
+            draw_shape_plane(p, bit_shift, (first, last));
         }
+    }
+}
+
+/// Draws one bit plane of the sprite: the mask picks, bit by bit, the sprite's pixel or the screen's.
+/// `(first, last)` are the masks for the first and last word of each row.
+unsafe fn draw_shape_plane(p: i32, bit_shift: u32, (first, last): (u32, u32)) {
+    unsafe {
+        let mut t = Blit::new(
+            USE_A | USE_B | USE_C | USE_D,
+            D_EQUALS_A_THEN_B_ELSE_C,
+            (*current_sshape).blitsize,
+        );
+
+        t.bshift = bit_shift;
+        t.afwm = first & last_word_mask as u16 as u32;
+        t.alwm = last;
+        t.a = the_memory
+            .bmask_mem
+            .add(MASK_START)
+            .offset(shadow_mask_offset as isize);
+        t.b = the_memory
+            .shapedata
+            .offset(sprite_mask_offset as isize + the_screen.planesize as isize * p as isize);
+        t.bmod = sprite_mask_modulo as i32;
+        t.c = plane_at_sprite(p);
+        t.d = t.c;
+        t.cmod = (*current_sshape).cmod as i32;
+        t.dmod = t.cmod;
+        blit(&mut t);
     }
 }
 

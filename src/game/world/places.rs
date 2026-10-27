@@ -312,18 +312,11 @@ unsafe fn enter_extent(flag: i16) -> bool {
         } else if the_world.extent_type >= XT_SPECIAL_MIN {
             // birds, turtles, special
             if boss_is_missing() {
-                the_encounter.x =
-                    (((*the_world.extent).x1 as u32 + (*the_world.extent).x2 as u32) / 2) as u16;
-                the_encounter.y =
-                    (((*the_world.extent).y1 as u32 + (*the_world.extent).y2 as u32) / 2) as u16;
+                aim_encounter_at_extent_middle();
                 force = true;
             }
         } else if the_world.extent_type == XT_SPIDER_PIT {
-            the_encounter.kind = SPIDER_ENCOUNTER;
-            load_enemy_sprites();
-            finish_sprite_load(ENEMY_SLOT);
-            motor_off();
-            the_actors.loading = 0;
+            load_spiders();
         } else if the_world.extent_type >= XT_MONSTER_ZONE_MIN && flag == 1 {
             the_encounter.x = the_hero.x;
             the_encounter.y = the_hero.y;
@@ -335,6 +328,27 @@ unsafe fn enter_extent(flag: i16) -> bool {
         }
 
         true
+    }
+}
+
+/// The forced encounter appears in the middle of the extent.
+unsafe fn aim_encounter_at_extent_middle() {
+    unsafe {
+        the_encounter.x =
+            (((*the_world.extent).x1 as u32 + (*the_world.extent).x2 as u32) / 2) as u16;
+        the_encounter.y =
+            (((*the_world.extent).y1 as u32 + (*the_world.extent).y2 as u32) / 2) as u16;
+    }
+}
+
+/// The spider pit loads its spiders at once (no waiting for the disk).
+unsafe fn load_spiders() {
+    unsafe {
+        the_encounter.kind = SPIDER_ENCOUNTER;
+        load_enemy_sprites();
+        finish_sprite_load(ENEMY_SLOT);
+        motor_off();
+        the_actors.loading = 0;
     }
 }
 

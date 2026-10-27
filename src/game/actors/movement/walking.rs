@@ -81,6 +81,18 @@ fn step_length(hero_on_turtle: bool, environ: i8) -> i16 {
     }
 }
 
+/// The velocity after one more push toward the facing: the wanted step's size added to the
+/// current velocity.
+fn ice_velocity_toward(facing: i16, vel_x: i8, vel_y: i8) -> (i16, i16) {
+    let push_x = step_x(ICE_STEP_ORIGIN, facing as i32, ICE_STEP_SPEED) - ICE_STEP_ORIGIN;
+    let push_y = step_y(ICE_STEP_ORIGIN, facing as i32, ICE_STEP_SPEED) - ICE_STEP_ORIGIN;
+
+    (
+        (vel_x as i32 + push_x) as i16,
+        (vel_y as i32 + push_y) as i16,
+    )
+}
+
 impl Ctx {
     /// Walking: sliding on ice, picking a step, and trying to go around what is in the way.
     pub(super) unsafe fn walking(&mut self) -> Pc {
@@ -142,12 +154,7 @@ impl Ctx {
                 ICE_TOP_SPEED
             };
 
-            let nvx = ((*actor).vel_x as i32
-                + step_x(ICE_STEP_ORIGIN, self.facing as i32, ICE_STEP_SPEED)
-                - ICE_STEP_ORIGIN) as i16;
-            let nvy = ((*actor).vel_y as i32
-                + step_y(ICE_STEP_ORIGIN, self.facing as i32, ICE_STEP_SPEED)
-                - ICE_STEP_ORIGIN) as i16;
+            let (nvx, nvy) = ice_velocity_toward(self.facing, (*actor).vel_x, (*actor).vel_y);
 
             if nvx.abs() < self.step - ICE_X_MARGIN {
                 (*actor).vel_x = nvx as i8;

@@ -1,6 +1,6 @@
 //! Arrows and fireballs in flight: moving, hitting actors and stopping at walls.
 
-use super::{CARRIER, DEAD, MISSILES, RAFT, chebyshev};
+use super::{CARRIER, DEAD, MISSILES, RAFT, distance_to_point};
 use crate::game::actors::interaction::hit_actor;
 use crate::game::data::random::{bitrand, rand8};
 use crate::game::data::state::{the_actors, the_hero, the_world};
@@ -124,11 +124,10 @@ pub(super) unsafe fn hit_first_actor_in_path(i: usize, ms: *mut Missile, xs: i16
                 continue;
             }
 
-            let xd = ((the_actors.list[target].abs_x as i32) - xs as i32) as i16;
-            let yd = ((the_actors.list[target].abs_y as i32) - ys as i32) as i16;
+            let dist = distance_to_point(&raw const the_actors.list[target], xs, ys);
 
             // the original tests the missile's own index here, not the target's
-            if missile_connects(i, chebyshev(xd, yd), range, dodge, || bitrand(DODGE_RANGE)) {
+            if missile_connects(i, dist, range, dodge, || bitrand(DODGE_RANGE)) {
                 let by = if is_rock { BY_FIREBALL } else { BY_ARROW };
                 hit_actor(
                     by,
