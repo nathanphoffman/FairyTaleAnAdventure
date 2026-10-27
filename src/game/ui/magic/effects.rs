@@ -1,64 +1,25 @@
-//! The Magic menu actions (from `choose_menu_entry` in csrc/fmain.c): casting the spells the hero has
-//! stones, vials and so on for. Each use takes one from the stack.
+//! What the spells do once cast: the map, the stone jump, healing and scaring enemies.
 
-use crate::amiga::RastPort;
+use super::{Move, SetAPen, SetDrMd, Text};
 use crate::game::actors::encounters::check_death;
 use crate::game::data::random::rand8;
-use crate::game::data::state::{the_actors, the_hero, the_screen, the_ui, the_world};
+use crate::game::data::state::{the_actors, the_hero, the_screen, the_world};
 use crate::game::data::tables::stone_ring_sectors;
 use crate::game::data::types::Shape;
 use crate::game::render::screen_fx::{flicker_colors, show_still_screen};
-use crate::game::ui::menus::update_menu_availability;
 use crate::game::ui::messages::print;
-use crate::game::ui::text::{queue_print, show_event, speak};
+use crate::game::ui::text::{queue_print, show_event};
 use crate::game::world::map::draw_overview_map;
 use crate::game::world::places::transfer_hero;
-use std::ffi::c_char;
-
-unsafe extern "C" {
-    fn SetDrMd(current_rastport: *mut RastPort, mode: u32);
-
-    fn SetAPen(current_rastport: *mut RastPort, pen: u32);
-
-    fn Move(current_rastport: *mut RastPort, x: i32, y: i32);
-
-    fn Text(current_rastport: *mut RastPort, s: *const c_char, len: i32) -> i32;
-}
 
 // The menu entries: the spells are entries 5-11 and use the item slots 9-15 (`4 + entry`).
 /// A sector is 256 pixels wide and high, and a tile 16 (shifts of 8 and 4).
 const SECTOR_SHIFT: u32 = 8;
 const SECTOR_MASK: u16 = 255;
 const TILE_SHIFT: u32 = 4;
-
 /// The heal cap grows by a quarter of the bravery.
 const BRAVERY_DIVISOR: i16 = 4;
-
-const SPELL_STONE: i16 = 5;
-const SPELL_LIGHT: i16 = 6;
-const SPELL_HEAL: i16 = 7;
-const SPELL_SECRET: i16 = 8;
-const SPELL_MAP: i16 = 9;
-const SPELL_FREEZE: i16 = 10;
-const SPELL_FEAR: i16 = 11;
-const FIRST_SPELL: i16 = 5;
-const SPELL_SLOT_BASE: usize = 4;
-
-const LIGHT_TIME: i16 = 760;
-const SECRET_TIME: i16 = 360;
-const FREEZE_TIME: i16 = 100;
-
-/// Where the spells cannot be used: the extent type with this `v3` (a quiet place).
-const NO_MAGIC_ZONE: u8 = 9;
-const NO_MAGIC_SPEECH: i32 = 59;
-const NO_SPELL_EVENT: i32 = 21;
 const BATTLE_EVENT: i32 = 34;
-
-/// Regions above this are indoors (no overview map there).
-const LAST_OUTDOOR_REGION: u16 = 7;
-
-/// Riding something bigger than the raft stops the freeze spell.
-const RIDING_BIG: i16 = 1;
 
 // The stone circle: sector, and where in the sector the hero must stand.
 const STONE_SECTOR: i16 = 144;
@@ -73,148 +34,17 @@ const MARK_X_OFFSET: i64 = 4;
 const MARK_Y_OFFSET: i64 = 3;
 const MARK_MAX: (u32, u32) = (320, 143);
 const VIEW_MAP: i8 = 1;
-
 const PRQ_STATS: i32 = 4;
 const PRQ_MAP: i32 = 5;
-
 /// Healing is capped at this plus a quarter of bravery.
 const HEAL_CAP_BASE: i16 = 15;
 const HEAL_MIN: i32 = 4;
-
 /// The fear spell only hits enemies of races below this.
 const FEAR_RACE_LIMIT: u8 = 7;
 const ENEMY: i8 = 2;
 
-/// Handles an entry of the Magic menu. Returns false if `update_menu_availability` should not follow
-/// (the spell did not work, so the stone is not used up).
-pub unsafe fn magic_option(chosen_entry: i16) -> bool {
-    unsafe {
-        if let Some(result) = refuse_spell(chosen_entry) {
-            return result;
-        }
-
-        if !cast_spell(chosen_entry) {
-            return false;
-        }
-
-        use_up_one(chosen_entry);
-
-        true
-    }
-}
-
-/// Checks that the spell can be cast here and now. Gives `Some(result)` for `magic_option` to
-/// return when it cannot, and `None` when the spell goes ahead.
-unsafe fn refuse_spell(chosen_entry: i16) -> Option<bool> {
-    unsafe {
-        let count = if chosen_entry < FIRST_SPELL {
-            0
-        } else {
-            *the_hero.stuff.add(SPELL_SLOT_BASE + chosen_entry as usize)
-        };
-
-        let gate = spell_gate(
-            chosen_entry,
-            count,
-            (*the_world.extent).v3,
-            the_hero.riding,
-            the_ui.cheat_enabled,
-            the_world.region,
-        );
-
-        match gate {
-            SpellGate::NoSpell => {
-                show_event(NO_SPELL_EVENT);
-
-                Some(true)
-            }
-
-            SpellGate::QuietZone => {
-                speak(NO_MAGIC_SPEECH);
-
-                Some(true)
-            }
-
-            SpellGate::Refused => Some(false),
-            SpellGate::Proceed => None,
-        }
-    }
-}
-
-/// Casts the spell. Returns false if it did not work (the stone ring only works in a circle).
-unsafe fn cast_spell(chosen_entry: i16) -> bool {
-    unsafe {
-        match chosen_entry {
-            SPELL_LIGHT => the_world.light_timer += LIGHT_TIME,
-            SPELL_SECRET => the_world.secret_timer += SECRET_TIME,
-            SPELL_FREEZE => the_world.freeze_timer += FREEZE_TIME,
-            SPELL_MAP => show_map(),
-            SPELL_STONE => {
-                if !stone_jump() {
-                    return false;
-                }
-
-                heal();
-            }
-
-            SPELL_HEAL => heal(),
-            SPELL_FEAR => scare_enemies(),
-            _ => {}
-        }
-
-        true
-    }
-}
-
-/// Takes one of the spell's stones from the stack, and updates the menu when the last is gone.
-unsafe fn use_up_one(chosen_entry: i16) {
-    unsafe {
-        let slot = SPELL_SLOT_BASE + chosen_entry as usize;
-
-        *the_hero.stuff.add(slot) = (*the_hero.stuff.add(slot)).wrapping_sub(1);
-
-        if *the_hero.stuff.add(slot) == 0 {
-            update_menu_availability();
-        }
-    }
-}
-
-/// What stands between the hero and a spell.
-#[derive(Debug, PartialEq, Eq)]
-enum SpellGate {
-    /// No such spell, or none of it left: the "no spell" event.
-    NoSpell,
-    /// In a quiet place: the hero says it does not work here.
-    QuietZone,
-    /// The spell cannot be cast now (freeze while riding, map indoors); nothing is used up.
-    Refused,
-    Proceed,
-}
-
-/// The checks before a spell is cast: `count` is how many of the spell's item the hero has and
-/// `zone` the `v3` of the current extent.
-fn spell_gate(entry: i16, count: u8, zone: u8, riding: i16, cheat: i16, region: u16) -> SpellGate {
-    if entry < FIRST_SPELL || count == 0 {
-        return SpellGate::NoSpell;
-    }
-
-    if zone == NO_MAGIC_ZONE {
-        return SpellGate::QuietZone;
-    }
-
-    if entry == SPELL_FREEZE && riding > RIDING_BIG {
-        return SpellGate::Refused;
-    }
-
-    if entry == SPELL_MAP && cheat == 0 && region > LAST_OUTDOOR_REGION {
-        return SpellGate::Refused;
-    }
-
-    SpellGate::Proceed
-}
-
 /// Draws the overview map with a "+" where the hero is, and shows it.
-unsafe fn show_map() {
+pub(super) unsafe fn show_map() {
     unsafe {
         the_screen.bm_draw = (*(*the_screen.drawing_page).ri_page).BitMap;
         the_screen.planes = (*the_screen.bm_draw).Planes.as_mut_ptr();
@@ -245,7 +75,7 @@ unsafe fn show_map() {
 
 /// The stone ring spell: only works standing in the middle of a stone circle. Takes the hero to
 /// the next circle in the direction faced. Returns false if the spell did not work.
-unsafe fn stone_jump() -> bool {
+pub(super) unsafe fn stone_jump() -> bool {
     unsafe {
         let ring_list = stone_ring_sectors;
 
@@ -319,7 +149,7 @@ fn stone_target(sector: i16, px: u16, py: u16, facing: i8, list: &[u8]) -> Stone
 }
 
 /// Heals the hero a little, up to a limit set by bravery.
-unsafe fn heal() {
+pub(super) unsafe fn heal() {
     unsafe {
         let hero = &raw mut the_actors.list[0];
         let (vitality, capped) = healed_vitality((*hero).vitality, the_hero.brave, rand8());
@@ -352,7 +182,7 @@ fn is_scared_by_fear_spell(actor: &Shape) -> bool {
 }
 
 /// Kills every weak enemy on the screen (and costs a little bravery for each).
-unsafe fn scare_enemies() {
+pub(super) unsafe fn scare_enemies() {
     unsafe {
         let mut i = 1;
 
@@ -381,23 +211,7 @@ mod tests {
     const LIST: [u8; 22] = [
         54, 43, 71, 77, 78, 102, 66, 121, 12, 85, 79, 40, 107, 38, 73, 21, 12, 26, 26, 53, 84, 60,
     ];
-
-    #[test]
-    fn spell_gate_checks_in_order() {
-        assert_eq!(spell_gate(4, 1, 0, 0, 0, 0), SpellGate::NoSpell);
-        assert_eq!(spell_gate(SPELL_LIGHT, 0, 0, 0, 0, 0), SpellGate::NoSpell);
-        assert_eq!(
-            spell_gate(SPELL_LIGHT, 1, NO_MAGIC_ZONE, 0, 0, 0),
-            SpellGate::QuietZone
-        );
-
-        assert_eq!(spell_gate(SPELL_FREEZE, 1, 0, 2, 0, 0), SpellGate::Refused);
-        assert_eq!(spell_gate(SPELL_FREEZE, 1, 0, 1, 0, 0), SpellGate::Proceed);
-        assert_eq!(spell_gate(SPELL_LIGHT, 1, 0, 5, 0, 9), SpellGate::Proceed);
-        assert_eq!(spell_gate(SPELL_MAP, 1, 0, 0, 0, 8), SpellGate::Refused);
-        assert_eq!(spell_gate(SPELL_MAP, 1, 0, 0, 1, 8), SpellGate::Proceed);
-        assert_eq!(spell_gate(SPELL_MAP, 1, 0, 0, 0, 7), SpellGate::Proceed);
-    }
+    use crate::game::data::types::Shape;
 
     #[test]
     fn stone_jump_rules() {
