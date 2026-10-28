@@ -308,4 +308,15 @@ pub struct Witch {
     pub angle: u8,
 }
 
-pub static mut the_witch: Witch = unsafe { std::mem::zeroed() };
+/// Everything that changes while the game runs, in one value that is passed down from `run_game`.
+/// The pieces move in from the `static mut` variables one at a time; what is still a static is
+/// listed in modern_engine_plan.md.
+pub struct Game {
+    pub witch: Witch,
+}
+
+impl Game {
+    pub fn new() -> Game {
+        Game { witch: Witch { direction: 0, on_screen: 0, angle: 0 } }
+    }
+}

@@ -20,6 +20,7 @@ mod walking;
 
 mod water;
 
+use crate::game::data::state::Game;
 use crate::game::data::state::{ActorRef, MissileRef};
 use crate::game::data::state::{the_actors, the_world};
 use crate::game::data::tables::facing_frame_offsets;
@@ -278,13 +279,13 @@ fn terrain(x: u16, y: u16) -> i16 {
 /// Moves and animates actor `i`; `cycle` is the frame counter. `*jp` is the main loop's `j`, which
 /// carries the last terrain value from one actor to the next (a dead actor reads it without setting
 /// it), so it is passed in and written back.
-pub fn move_actor(i: i32, cycle: i16, jp: &mut i16) {
+pub fn move_actor(game: &mut Game, i: i32, cycle: i16, jp: &mut i16) {
     unsafe {
         let (mut c, mut pc) = Ctx::start(i, cycle, *jp);
 
         loop {
             pc = match pc {
-                Pc::Dispatch => c.dispatch(),
+                Pc::Dispatch => c.dispatch(game),
                 Pc::CheckDev1 => c.check_dev1(),
                 Pc::CheckDev2 => c.check_dev2(),
                 Pc::NewLoc => c.new_loc(),
@@ -342,7 +343,7 @@ impl Ctx {
 
 impl Ctx {
     /// Picks the code for this kind of actor and state (the `if` chain at the top of the C).
-    unsafe fn dispatch(&mut self) -> Pc {
+    unsafe fn dispatch(&mut self, game: &mut Game) -> Pc {
         unsafe {
             let actor = self.actor;
             let kind = actor.kind;
@@ -356,7 +357,7 @@ impl Ctx {
             } else if kind == CARRIER {
                 self.carrier()
             } else if kind == SETFIG {
-                self.setfig()
+                self.setfig(game)
             } else if kind == RAFT {
                 self.raft()
             } else if self.state == SINK {

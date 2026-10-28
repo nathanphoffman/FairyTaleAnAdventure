@@ -1,6 +1,7 @@
 //! The main loop (from csrc/fmain.c): one pass per frame, reading input, moving the actors, updating
 //! the world and drawing.
 
+use crate::game::data::state::Game;
 use crate::game::render::draw::{draw_sprites, repair_edges};
 
 use crate::game::actors::ai::update_enemy_goals;
@@ -115,7 +116,7 @@ struct FrameState {
 }
 
 /// The main loop: one pass per frame until the player quits.
-pub(super) unsafe fn main_loop() {
+pub(super) unsafe fn main_loop(game: &mut Game) {
     unsafe {
         let mut state = FrameState {
             cycle: 0,
@@ -126,19 +127,19 @@ pub(super) unsafe fn main_loop() {
         the_ui.quit_requested = 0;
 
         while the_ui.quit_requested == 0 {
-            run_frame(&mut state);
+            run_frame(game, &mut state);
         }
     }
 }
 
 /// One frame: input, moving everything, updating the map and the world, then drawing.
-unsafe fn run_frame(state: &mut FrameState) {
+unsafe fn run_frame(game: &mut Game, state: &mut FrameState) {
     unsafe {
         state.cycle = state.cycle.wrapping_add(1);
         the_screen.flasher = the_screen.flasher.wrapping_add(1);
         crate::game::statedump::run_pending_command(); // test commands, does nothing normally
 
-        read_keyboard();
+        read_keyboard(game);
 
         if handle_view_status() {
             return;
@@ -154,7 +155,7 @@ unsafe fn run_frame(state: &mut FrameState) {
         }
 
         update_hero(state.cycle);
-        move_everything(state);
+        move_everything(game, state);
         check_bed();
         check_door();
 
@@ -165,15 +166,15 @@ unsafe fn run_frame(state: &mut FrameState) {
         let (scroll_x, scroll_y, world_update) = update_map_view();
 
         if world_update {
-            run_world_update();
+            run_world_update(game);
         }
 
-        draw_frame(state, scroll_x, scroll_y);
+        draw_frame(game, state, scroll_x, scroll_y);
     }
 }
 
 /// Reads one key and handles it.
-unsafe fn read_keyboard() {
+unsafe fn read_keyboard(game: &mut Game) {
     unsafe {
         let key = next_key() as i8;
 
@@ -181,7 +182,7 @@ unsafe fn read_keyboard() {
         let notpause = menus[GAME_MENU].enabled[PAUSE_ENTRY] & 1 == 0;
 
         if key != 0 {
-            handle_key(key as i32, notpause as i32);
+            handle_key(game, key as i32, notpause as i32);
         }
     }
 }
@@ -216,13 +217,13 @@ unsafe fn handle_view_status() -> bool {
 
 /// Moves the hero, the raft and every monster and person (the actor count is read each time round,
 /// as in the original).
-unsafe fn move_everything(state: &mut FrameState) {
+unsafe fn move_everything(game: &mut Game, state: &mut FrameState) {
     unsafe {
         raft_proximity();
         let mut i = 0;
 
         while i < the_actors.active as i32 {
-            move_actor(i, state.cycle, &mut state.last_terrain);
+            move_actor(game, i, state.cycle, &mut state.last_terrain);
             i += 1;
         }
     }
@@ -310,7 +311,7 @@ unsafe fn update_map_view() -> (i16, i16, bool) {
 
 /// The once-per-frame world update: the clock, then (unless time is frozen) new monsters, talking,
 /// what the monsters want to do, and hunger.
-unsafe fn run_world_update() {
+unsafe fn run_world_update(game: &mut Game) {
     unsafe {
         day_night_tick();
 
@@ -318,13 +319,13 @@ unsafe fn run_world_update() {
             spawn_encounters();
             speak_nearby();
             update_enemy_goals();
-            survival_tick();
+            survival_tick(game);
         }
     }
 }
 
 /// Fights, missiles and drawing, then shows the page that was just drawn.
-unsafe fn draw_frame(state: &mut FrameState, scroll_x: i16, scroll_y: i16) {
+unsafe fn draw_frame(game: &mut Game, state: &mut FrameState, scroll_x: i16, scroll_y: i16) {
     unsafe {
         let page = screen().drawing_page_mut();
         page.isv_x = the_world.tile_x as i32;
@@ -336,14 +337,14 @@ unsafe fn draw_frame(state: &mut FrameState, scroll_x: i16, scroll_y: i16) {
         advance_missiles();
 
         the_actors.drawn = the_actors.active;
-        spawn_object_actors();
+        spawn_object_actors(game);
 
         // the flying missiles, then sort the actors by position
         queue_missile_sprites();
         sort_actors();
 
         // now that the scroll blit is done, finish repairing the map
-        repair_edges(scroll_x, scroll_y);
+        repair_edges(game, scroll_x, scroll_y);
 
         draw_sprites(state.cycle);
 

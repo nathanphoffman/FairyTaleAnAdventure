@@ -1,9 +1,10 @@
 //! Finishing the scrolled map edge each frame, and the witch's beam and her damage.
 
+use crate::game::data::state::Game;
 use crate::game::actors::interaction::{actor_distance, hit_actor};
 use crate::game::data::random::{rand2, rand4};
 use crate::game::data::state::ActorRef;
-use crate::game::data::state::{the_witch, the_world};
+use crate::game::data::state::{the_world};
 use crate::game::render::screen::screen;
 use crate::game::render::witch::{SIDE_1 as s1, SIDE_2 as s2, witch_fx};
 use crate::game::world::map::{draw_map_column, draw_map_row};
@@ -28,7 +29,7 @@ const WITCH_SLOT: usize = 2;
 
 /// Finishes the scrolled map edge (`dif_x`, `dif_y` = scroll step) and runs the witch's beam and her
 /// damage.
-pub fn repair_edges(dif_x: i16, dif_y: i16) {
+pub fn repair_edges(game: &mut Game, dif_x: i16, dif_y: i16) {
     unsafe {
         if dif_x == 1 {
             draw_map_column(STRIP_RIGHT);
@@ -52,14 +53,14 @@ pub fn repair_edges(dif_x: i16, dif_y: i16) {
             - (the_world.map_y & TILE_Y_MASK) as i32) as i16;
 
         if rand4() == 0 {
-            the_witch.direction = if s1 > 0 { 1 } else { -1 };
+            game.witch.direction = if s1 > 0 { 1 } else { -1 };
         }
 
-        the_witch.angle = the_witch.angle.wrapping_add(the_witch.direction as u8);
-        page.witchdir = the_witch.angle as i16;
-        page.wflag = the_witch.on_screen as i16;
+        game.witch.angle = game.witch.angle.wrapping_add(game.witch.direction as u8);
+        page.witchdir = game.witch.angle as i16;
+        page.wflag = game.witch.on_screen as i16;
 
-        if the_witch.on_screen != 0 {
+        if game.witch.on_screen != 0 {
             witch_fx(screen().drawing);
 
             if s1 > 0 && s2 < 0 && actor_distance(WITCH_SLOT as i32, 0) < WITCH_REACH {

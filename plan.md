@@ -1,5 +1,9 @@
 # Porting Plan
 
+> History of the port. The game is now fully Rust and no C is built; for the current status and
+> the plan going forward see `modern_engine_plan.md` ("Where we are"). Unchecked boxes below that
+> mention the C build or Amiga stubs are obsolete.
+
 Goal: run The Faery Tale Adventure natively on Linux using Rust, with the original C logic reused
 at first and ported to Rust gradually. Original source (reference) is in `faery-tale-amiga/`.
 
@@ -149,7 +153,7 @@ and each file is ported into `src/game/`. Move modules one at a time, with the g
 - [x] `asm_port.c`, `input.c`, `iffsubs.c`, `hdrive.c`
 - [x] `asm_blit.c`, `asm_text.c`, `asm_map.c`, `asm_stubs.c`
 - [x] `fmain2.c` (functions and data tables)
-- [ ] `fmain.c` (about 60% done; the remaining groups A-F are in `modern_engine_plan.md`, section 4a)
+- [x] `fmain.c` (done; see `modern_engine_plan.md`, "Where we are")
 
 ### Phase 8 - Polish
 - [x] Window scaling and fullscreen, correct aspect ratio. (F11, resizable; gamepad added too)

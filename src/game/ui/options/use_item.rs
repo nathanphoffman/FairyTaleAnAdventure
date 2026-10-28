@@ -1,10 +1,11 @@
 //! The Use menu: picking a weapon, the key menu, the turtle shell and the sunstone, and using a key.
 
+use crate::game::data::state::Game;
 use super::shop::FIRST_MENU_ENTRY;
 use super::{ITEMS, KEYBASE, KEYS};
 use crate::game::actors::interaction::summon_turtle;
 use crate::game::data::state::player;
-use crate::game::data::state::{the_actors, the_hero, the_ui, the_witch};
+use crate::game::data::state::{the_actors, the_hero, the_ui};
 use crate::game::ui::items_menu::item_name;
 use crate::game::ui::menus::go_to_menu;
 use crate::game::ui::messages::{print, print_cont, print_wrapped};
@@ -36,7 +37,7 @@ unsafe fn in_no_turtle_area() -> bool {
 }
 
 /// Picks a weapon, the key menu, the turtle shell, or the sunstone.
-pub(super) unsafe fn use_option(chosen_entry: i16) -> bool {
+pub(super) unsafe fn use_option(game: &mut Game, chosen_entry: i16) -> bool {
     unsafe {
         if chosen_entry == KEY_ENTRY {
             if the_ui.menu_hit_enabled != 0 {
@@ -64,7 +65,7 @@ pub(super) unsafe fn use_option(chosen_entry: i16) -> bool {
             summon_turtle();
         }
 
-        if chosen_entry == SUNSTONE_ENTRY && the_witch.on_screen != 0 {
+        if chosen_entry == SUNSTONE_ENTRY && game.witch.on_screen != 0 {
             speak(SUNSTONE_SPEECH);
         }
 

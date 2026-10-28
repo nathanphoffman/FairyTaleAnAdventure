@@ -1,7 +1,6 @@
 # The Faery Tale Adventure - Linux Port
 
-A native Linux port of *The Faery Tale Adventure* (MicroIllusions, 1987, Amiga), written in Rust
-with the original game logic kept in C at first and moved to Rust over time.
+A native Linux port of *The Faery Tale Adventure* (MicroIllusions, 1987, Amiga), written in Rust.
 
 The original Amiga source by Talin is at https://github.com/viridia/faery-tale-amiga. Clone it
 into `faery-tale-amiga/` in this directory to use as a reference. It is git-ignored and is not part
@@ -13,34 +12,42 @@ git clone https://github.com/viridia/faery-tale-amiga
 
 ## Status
 
-Phases 0-3 done: the original C game runs inside a Rust program on SDL2. The intro, menus and text panel work, with keyboard and mouse. The map is not drawn yet (Phase 4), so it is not playable. See [plan.md](plan.md).
+The game is fully ported to Rust and playable: intro, map, fighting, shops, doors, magic, music,
+save and load. No C is compiled any more; `csrc/` is the original C kept as a reference. The code has
+been cleaned up (short functions, named constants, unit tests) and the Amiga structs and raw pointers
+are gone. What is left is the shared game state (`static mut`), then the optional "modern engine"
+steps. The detailed status and plan are in [modern_engine_plan.md](modern_engine_plan.md)
+(start at "Where we are"); the history of the port is in [plan.md](plan.md).
 
 ## Approach
 
-- Rust provides the new platform layer: SDL2 window, graphics, input, audio, timing, file loading.
-- The original C game logic is compiled into the Rust build (via the `cc` crate) and calls the
-  platform layer through `extern "C"` functions.
-- The 68000 assembly is rewritten by hand.
-- Game modules are ported from C to Rust one at a time, with the game runnable after each step.
+- `src/game/` is the game, a clean Rust version of the C with the same behaviour (bugs included).
+- `src/gfx/` is safe drawing code: owned bitmaps, pens, fonts, and a scene that becomes one frame.
+- `src/platform/` is SDL2: window, audio, input, file paths.
+- `csrc/` (original C) is not built and not edited. It is the reference for what the game should do.
 
 ## Layout
 
 | Path | Purpose |
 |------|---------|
 | `faery-tale-amiga/` | Original source, reference only (git-ignored) |
-| `plan.md` | Porting plan and progress |
-| `src/` | Rust code (to be created) |
-| `csrc/` | Original C game code with minimal changes, plus Amiga stand-in headers and stubs |
-| `tools/` | Helper scripts (`genprotos.sh` regenerates `csrc/protos.h`) |
+| `src/game/` | The game: `actors`, `world`, `ui`, `input`, `render`, `files`, `data`, `startup` |
+| `src/gfx/` | Safe bitmap, font and scene drawing |
+| `src/platform/` | SDL2 layer: `display`, `audio`, `input`, `paths` |
+| `csrc/` | Original C, reference only |
+| `docs/` | Notes on the data formats, Amiga calls and assembly routines |
+| `tests/` | Headless regression scripts and their golden hashes |
+| `tools/` | Helper scripts (`narr2rs.py` regenerates the story text, `package.sh`) |
+| `plan.md`, `modern_engine_plan.md` | History and plan |
 
 ## Building
 
-Needs Rust (stable), a C compiler (gcc) and SDL2 (`libsdl2-dev`).
+Needs Rust (stable) and SDL2 (`libsdl2-dev`). No C compiler is needed.
 
 ```
-cd csrc && make                             # builds ../build/fta_c (C part only, stubbed)
 cargo run                                   # runs the game, skipping the intro (Esc quits)
 cargo run -- --intro                        # plays the story-book intro first
+cargo test                                  # unit tests
 cargo run --bin dump_image -- faery-tale-amiga/game/image   # map of the floppy image
 ```
 
@@ -61,7 +68,9 @@ cargo run --bin dump_image -- faery-tale-amiga/game/image   # map of the floppy 
 
 All headless (no window opens, no sound):
 - `tests/regress.sh` replays scripted sessions (walking, fighting, menus, save/load) and compares screen hashes with `tests/golden.txt`. `--update` accepts new output.
-- `tests/soak.sh [runs] [ticks]` feeds random keys and clicks to an AddressSanitizer build.
+- `tests/state_regress.sh` replays scenarios and compares a dump of the game state with `tests/state_golden.txt`.
+- `tests/soak.sh [runs] [ticks]` feeds random keys and clicks to an AddressSanitizer build (written when
+  C was part of the build; not re-checked since).
 
 Set `SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy` to run the game itself headless, `FTA_FAST=1` to skip the 50 Hz pacing.
 

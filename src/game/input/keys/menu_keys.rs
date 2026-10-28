@@ -1,5 +1,6 @@
 //! Keys and clicks on the menu entries: choosing an entry with the mouse or with its letter.
 
+use crate::game::data::state::Game;
 use super::{
     CODE_MASK, DISPLAYED, FIRST_ACTION_MENU, FIRST_MENU_CLICK, LETTER_COUNT, PRQ_OPTIONS, RELEASED,
     SAVEX, SELECTED, TYPE_IMMEDIATE, TYPE_MASK, TYPE_RADIO, TYPE_TOGGLE,
@@ -15,7 +16,7 @@ use crate::game::ui::text::queue_print;
 
 /// A click on a menu slot (the mouse sends 'a' + slot for the button going down, and the same
 /// with bit 7 set for it coming up).
-pub(super) unsafe fn menu_click(key: i8, notpause: bool) {
+pub(super) unsafe fn menu_click(game: &mut Game, key: i8, notpause: bool) {
     unsafe {
         // Masks with CODE_MASK, keeping only the bits that matter here.
         let slot = ((key & CODE_MASK) - FIRST_MENU_CLICK) as i16;
@@ -40,6 +41,7 @@ pub(super) unsafe fn menu_click(key: i8, notpause: bool) {
         }
 
         press_entry(
+            game,
             slot,
             chosen_entry,
             menu_entry(menu, chosen_entry as usize),
@@ -50,7 +52,7 @@ pub(super) unsafe fn menu_click(key: i8, notpause: bool) {
 
 /// Presses a valid menu entry according to its type: toggles, immediate actions and radio buttons
 /// work even when paused; the rest (menu names) only when not.
-unsafe fn press_entry(slot: i16, chosen_entry: i16, entry: &mut i8, notpause: bool) {
+unsafe fn press_entry(game: &mut Game, slot: i16, chosen_entry: i16, entry: &mut i8, notpause: bool) {
     unsafe {
         // Masks with TYPE_MASK, keeping only the bits that matter here.
         let kind = *entry as i32 & TYPE_MASK;
@@ -64,14 +66,14 @@ unsafe fn press_entry(slot: i16, chosen_entry: i16, entry: &mut i8, notpause: bo
             *entry ^= SELECTED;
             // Masks with SELECTED, keeping only the bits that matter here.
             print_menu_entry(slot, (*entry & SELECTED) as i16);
-            choose_menu_entry(chosen_entry);
+            choose_menu_entry(game, chosen_entry);
         } else if kind == TYPE_IMMEDIATE {
             print_menu_entry(slot, 1);
-            choose_menu_entry(chosen_entry);
+            choose_menu_entry(game, chosen_entry);
         } else if kind == TYPE_RADIO {
             *entry |= SELECTED;
             print_menu_entry(slot, 1);
-            choose_menu_entry(chosen_entry);
+            choose_menu_entry(game, chosen_entry);
         } else if !notpause {
             // paused: only the menu types above work
         } else if kind == 0 && chosen_entry < FIRST_ACTION_MENU {
@@ -85,7 +87,7 @@ unsafe fn press_entry(slot: i16, chosen_entry: i16, entry: &mut i8, notpause: bo
 }
 
 /// A keyboard shortcut for a menu entry. Letters only work for the Save/Exit menu while it is open.
-pub(super) unsafe fn menu_letter(key: i8) {
+pub(super) unsafe fn menu_letter(game: &mut Game, key: i8) {
     unsafe {
         for i in 0..LETTER_COUNT {
             let shortcut = &*(&raw const menu_shortcuts).cast::<Letter>().add(i);
@@ -112,7 +114,7 @@ pub(super) unsafe fn menu_letter(key: i8) {
                 *entry ^= SELECTED;
             }
 
-            choose_menu_entry(the_ui.chosen_entry as i16);
+            choose_menu_entry(game, the_ui.chosen_entry as i16);
             print_options();
 
             break;

@@ -12,6 +12,7 @@ mod menu_keys;
 
 pub use self::hero_state::update_hero;
 
+use crate::game::data::state::Game;
 use self::cheats::{cheat_items, cheat_move};
 use self::menu_keys::{menu_click, menu_letter};
 
@@ -97,9 +98,9 @@ const VIAL_SLOT: usize = 22;
 /// Handles one key code. `notpause` is true unless the game is paused.
 ///
 /// A key pressed in the key menu: 1 to 6 choose that key, anything else goes back to the items.
-fn press_in_key_menu(key: i8) {
+fn press_in_key_menu(game: &mut Game, key: i8) {
     if (b'1' as i8..=b'6' as i8).contains(&key) {
-        choose_menu_entry((key - b'1' as i8 + KEY_ENTRY_BASE) as i16);
+        choose_menu_entry(game, (key - b'1' as i8 + KEY_ENTRY_BASE) as i16);
     } else {
         go_to_menu(ITEMS);
     }
@@ -107,7 +108,7 @@ fn press_in_key_menu(key: i8) {
 
 /// Codes with bit 7 set are releases. Keys that do nothing in the current state fall through
 /// to the menu shortcut letters at the end.
-pub fn handle_key(key: i32, notpause: i32) {
+pub fn handle_key(game: &mut Game, key: i32, notpause: i32) {
     unsafe {
         let key = key as i8;
         let notpause = notpause as i16 != 0;
@@ -134,13 +135,13 @@ pub fn handle_key(key: i32, notpause: i32) {
         } else if cheat_items(key) {
             // handled
         } else if key & CODE_MASK >= FIRST_MENU_CLICK {
-            menu_click(key, notpause);
+            menu_click(game, key, notpause);
         } else if cheat_move(key) {
             // handled
         } else if the_ui.current_menu == KEYS && key & RELEASED == 0 {
-            press_in_key_menu(key);
+            press_in_key_menu(game, key);
         } else if key == b' ' as i8 || notpause {
-            menu_letter(key);
+            menu_letter(game, key);
         }
     }
 }

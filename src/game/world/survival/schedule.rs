@@ -1,9 +1,10 @@
 //! The survival tick: noting the safe spot, picking the music and applying hunger once a frame.
 
+use crate::game::data::state::Game;
 use super::hunger::{eats_fruit, hunger_due, hunger_effects};
 use super::{MOOD_PERIOD_MASK, STARVING_AT, safe_check_due};
 use crate::game::data::state::ActorRef;
-use crate::game::data::state::{Hero, the_actors, the_hero, the_witch, the_world};
+use crate::game::data::state::{Hero, the_actors, the_hero, the_world};
 use crate::game::data::types::Shape;
 use crate::game::ui::music::set_mood;
 use crate::game::ui::text::{queue_print, show_event};
@@ -26,14 +27,14 @@ fn mood_due(clock: u16, battle: bool) -> bool {
 }
 
 /// Notes a safe spot, picks the music, and makes the hero hungrier and more tired.
-pub fn survival_tick() {
+pub fn survival_tick(game: &mut Game) {
     unsafe {
         let facts = SurvivalFacts {
             clock: the_world.day_clock,
             region: the_world.region,
             actors_on_screen: the_actors.on_screen != 0,
             actors_loading: the_actors.loading != 0,
-            witch_on_screen: the_witch.on_screen != 0,
+            witch_on_screen: game.witch.on_screen != 0,
             battle: the_actors.battle_flag != 0,
         };
 

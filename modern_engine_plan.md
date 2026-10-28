@@ -15,6 +15,47 @@ changed in the C code since then with `git diff original-baseline -- csrc/`.
 Core idea: split the game into **rules** (what happens) and **presentation** (drawing and input).
 Both engines share the rules. They differ only in how they draw and read input.
 
+## Where we are
+
+**Done (all verified: 224 unit tests, the state and pixel playtests (21 and 13 scenarios ok), save/load round trip).**
+1. Safety net, `main()` cut into functions, game state gathered into structs (steps 1-3 below).
+2. The whole game ported from C to Rust in `src/game/` (step 4a). `fmain.c` and the rest of `csrc/`
+   are no longer compiled.
+3. Cleanup: magic numbers named, big files split, long functions split, comments, unit tests instead
+   of most playtests. Last codequality score 93.6 / 100 (A).
+4. No C in the build (story text is generated Rust data); platform calls are plain Rust.
+5. Amiga structs gone: safe `gfx` module, a `Screen` that owns bitmaps and ports, owned audio data,
+   save file written field by field, input handler is a normal Rust type.
+6. Memory model: owned buffers for map, sectors, terrain, tile images, shadow masks and sprite
+   sheets; the sprite blitter works on places in those buffers instead of raw pointers.
+7. Text is `&str`; actors and missiles are `ActorRef` / `MissileRef`; item counts, extents and object
+   lists are plain data. No `*mut` / `*const` left in the game code (details in "Owned memory instead
+   of Amiga structs and raw pointers" at the end).
+
+**Not done.**
+- The shared game state is still `static mut` structs (`the_hero`, `the_world`, `the_actors`,
+  `the_ui`, `the_memory`, `the_screen`, ...), reached from everywhere. That is the remaining source of
+  the roughly 500 `unsafe` mentions. The accessors `screen()`, `memory()`, `player()`,
+  `current_extent()` and the `ActorRef` handles are stop-gaps: they hide the `unsafe` but a function
+  can still hold two `&mut` to the same thing. They are safe in practice because the game is single
+  threaded and no caller keeps one across a call that re-fetches it.
+- Steps 5 to 7 below (classic/modern engines, remastered, reimagined) have not been started.
+
+**Plan for what comes next, in order.**
+1. *One `Game` value.* Move the statics into a `Game { hero, world, actors, ui, memory, screen, ... }`
+   and pass `&mut Game` (or the parts a function needs) down from `run_game`. Do it one subsystem at a
+   time, smallest first (`Witch`, `Ui`, `Encounters`), so the game runs after every step. At the end
+   there is no `static mut` and `unsafe` is only left in `platform/`. Accept pure functions first:
+   the rules that already take values (hunger, tactics, hits) need no change.
+2. *Separate rules from drawing* (the "core idea" above): `Game` without SDL or bitmaps, a renderer
+   that reads it. This is what steps 5 and 6 need.
+3. Step 5 (classic engine, improved options), step 6 (modern renderer: RGBA tiles, zoom, bigger view),
+   step 7 (data files for items, enemies, spells and text).
+
+Each step keeps the rule: tests pass before each commit, behaviour is unchanged unless the step says
+so. Checks: `cargo build`, `cargo test`, `tests/regress.sh`, `tests/state_regress.sh` (every scenario
+must say `ok`).
+
 ## Layout (target)
 
 ```
@@ -96,7 +137,7 @@ Give C a small API: `tick(input)` and `get_state()`.
 Small leaves first: RNG, collision, text, save/load. Then AI, combat, inventory, shops. The old
 `main()` loop goes last. Compare against the C using the state tests.
 
-### 4a. `src/game/`: clean Rust copy of `csrc/` (decided, in progress)
+### 4a. `src/game/`: clean Rust copy of `csrc/` (done; the notes below are the history, and they mention the C build, `build.rs` and `RSRC_*` guards that no longer exist)
 Decision: `csrc/` is the reference and is not edited, except `#ifndef RSRC_*` guards (preprocessor
 only) and the step-2 `main()` cuts. Each C file is ported 1:1 into `src/game/` (same behaviour, same
 function names, bugs included), written to the cleanup rules (short functions, named constants,

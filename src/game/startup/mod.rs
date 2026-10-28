@@ -8,6 +8,7 @@ pub mod intro;
 
 pub mod open_close;
 
+use crate::game::data::state::Game;
 use game_loop::main_loop;
 use intro::start_up;
 use open_close::{close_all, open_all};
@@ -19,6 +20,7 @@ use crate::platform::audio::stopscore;
 
 /// The game: the original `main`. Called once from `src/main.rs`.
 pub fn run_game() {
+    let mut game = Game::new();
     unsafe {
         the_world.light_timer = 0;
         let err = open_all();
@@ -31,7 +33,7 @@ pub fn run_game() {
         }
 
         if start_up() {
-            main_loop();
+            main_loop(&mut game);
             stopscore();
         }
 

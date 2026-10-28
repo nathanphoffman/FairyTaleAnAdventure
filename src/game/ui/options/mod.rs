@@ -14,6 +14,7 @@ mod talk;
 
 mod use_item;
 
+use crate::game::data::state::Game;
 use self::game_menu::{file_option, game_option, save_exit_option};
 use self::give::give_option;
 use self::shop::buy_option;
@@ -47,7 +48,7 @@ const PRQ_STATS: i32 = 4;
 const PRQ_VITALITY: i32 = 7;
 
 /// Does what menu entry `chosen_entry` of the current menu `current_menu` says.
-pub fn choose_menu_entry(chosen_entry: i16) {
+pub fn choose_menu_entry(game: &mut Game, chosen_entry: i16) {
     unsafe {
         let refresh = match the_ui.current_menu as i32 {
             ITEMS => {
@@ -60,7 +61,7 @@ pub fn choose_menu_entry(chosen_entry: i16) {
             TALK => talk_option(chosen_entry),
             BUY => buy_option(chosen_entry),
             GAME => game_option(chosen_entry),
-            USE => use_option(chosen_entry),
+            USE => use_option(game, chosen_entry),
             SAVEX => save_exit_option(chosen_entry),
             FILE => file_option(chosen_entry),
             KEYS => keys_option(chosen_entry),
