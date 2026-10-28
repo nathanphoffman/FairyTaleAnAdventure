@@ -5,7 +5,7 @@ use crate::game::data::object_tables::weapon_probs;
 use crate::game::data::random::{bitrand, rand2, rand4, rnd};
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::{Hero, current_extent, the_actors, the_hero, the_world};
+use crate::game::data::state::{Hero, current_extent, the_actors, the_world};
 use crate::game::data::tables::{encounter_chart, extent_list};
 use crate::game::data::types::{Extent, Shape};
 use crate::game::files::disk::motor_off;
@@ -199,25 +199,23 @@ fn encounter_race(game: &mut Game) -> i32 {
 /// 3 kindness. If it is the hero, `dtype` is the death message, luck drops by 5 and the music
 /// changes. The hero's stats are always refreshed on screen.
 pub fn check_death(game: &mut Game, i: i32, dtype: i32) {
-    unsafe {
-        let mut actor = ActorRef::new(i as usize);
+    let mut actor = ActorRef::new(i as usize);
 
-        if let Some(death) = start_dying(i, &mut actor, &mut *(&raw mut the_hero)) {
-            if death.dark_knight {
-                speak(game, SPEAK_DARK_KNIGHT_DIES);
-            }
-
-            if i == 0 {
-                show_event(game, dtype);
-                set_mood(1);
-            }
-
-            queue_print(PRQ_VITALITY);
+    if let Some(death) = start_dying(i, &mut actor, &mut game.hero) {
+        if death.dark_knight {
+            speak(game, SPEAK_DARK_KNIGHT_DIES);
         }
 
         if i == 0 {
-            queue_print(PRQ_STATS);
+            show_event(game, dtype);
+            set_mood(game, 1);
         }
+
+        queue_print(PRQ_VITALITY);
+    }
+
+    if i == 0 {
+        queue_print(PRQ_STATS);
     }
 }
 

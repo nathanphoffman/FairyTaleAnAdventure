@@ -2,7 +2,7 @@
 
 use crate::game::data::object_tables::{pplay, prec, print_que};
 use crate::game::data::state::Game;
-use crate::game::data::state::{the_actors, the_hero, the_world};
+use crate::game::data::state::{the_actors, the_world};
 use crate::game::render::display::delay;
 use crate::game::ui::menus::print_options;
 use crate::game::ui::messages::print;
@@ -62,24 +62,22 @@ pub fn handle_print_request(game: &mut Game) {
 }
 
 /// Debug information: the hero's map position and the memory left.
-unsafe fn show_debug_coords(game: &mut Game) {
-    unsafe {
-        print(game, "Coords = ");
-        print_number(game, the_hero.x as i32, COORD_DIGITS);
-        print_number(game, the_hero.y as i32, COORD_DIGITS);
-        print(game, "Memory Available: ");
-        print_number(game, FAKE_FREE_BYTES, COORD_DIGITS);
-    }
+fn show_debug_coords(game: &mut Game) {
+    print(game, "Coords = ");
+    print_number(game, game.hero.x as i32, COORD_DIGITS);
+    print_number(game, game.hero.y as i32, COORD_DIGITS);
+    print(game, "Memory Available: ");
+    print_number(game, FAKE_FREE_BYTES, COORD_DIGITS);
 }
 
 /// Debug information: the hero's sector and the type of the extent the hero is in.
 unsafe fn show_debug_sector(game: &mut Game) {
     unsafe {
         print(game, "You are at: ");
-        print_number(game, the_hero.x as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
-        print_number(game, the_hero.y as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
+        print_number(game, game.hero.x as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
+        print_number(game, game.hero.y as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
         print(game, "H/Sector = ");
-        print_number(game, the_hero.sector as i32, SECTOR_DIGITS);
+        print_number(game, game.hero.sector as i32, SECTOR_DIGITS);
         draw_text(game, b" Extent = ");
         print_number(game, the_world.extent_type as i32, EXTENT_DIGITS);
     }
@@ -95,21 +93,19 @@ unsafe fn draw_vitality(game: &mut Game) {
 }
 
 /// Draws the hero's four stats (bravery, luck, kindness, wealth) along the stats line.
-unsafe fn draw_stats(game: &mut Game) {
-    unsafe {
-        if the_hero.luck < 0 {
-            the_hero.luck = 0;
-        }
+fn draw_stats(game: &mut Game) {
+    if game.hero.luck < 0 {
+        game.hero.luck = 0;
+    }
 
-        for (x, label, value) in [
-            (BRAVERY_X, b"Brv:".as_slice(), the_hero.brave),
-            (LUCK_X, b"Lck:", the_hero.luck),
-            (KINDNESS_X, b"Knd:", the_hero.kindness),
-            (WEALTH_X, b"Wlth:", the_hero.wealth),
-        ] {
-            move_to(game, x, STATS_Y);
-            draw_text(game, label);
-            print_number(game, value as i32, STAT_DIGITS);
-        }
+    for (x, label, value) in [
+        (BRAVERY_X, b"Brv:".as_slice(), game.hero.brave),
+        (LUCK_X, b"Lck:", game.hero.luck),
+        (KINDNESS_X, b"Knd:", game.hero.kindness),
+        (WEALTH_X, b"Wlth:", game.hero.wealth),
+    ] {
+        move_to(game, x, STATS_Y);
+        draw_text(game, label);
+        print_number(game, value as i32, STAT_DIGITS);
     }
 }

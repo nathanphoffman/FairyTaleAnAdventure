@@ -8,7 +8,7 @@ use crate::game::data::random::{bitrand, rand2, rand4};
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
 use crate::game::data::state::current_extent;
-use crate::game::data::state::{the_actors, the_hero, the_world};
+use crate::game::data::state::{the_actors, the_world};
 use crate::game::ui::music::set_mood;
 use crate::game::ui::text::queue_print;
 
@@ -66,16 +66,16 @@ pub fn update_enemy_goals(game: &mut Game) {
         let mut i = FIRST_AI_ACTOR;
 
         while i < the_actors.active as usize {
-            if the_hero.good_fairy_timer != 0 && the_hero.good_fairy_timer < FAIRY_ARRIVES {
+            if game.hero.good_fairy_timer != 0 && game.hero.good_fairy_timer < FAIRY_ARRIVES {
                 break;
             }
 
-            think(i, battle2);
+            think(game, i, battle2);
             i += 1;
         }
 
         if battle2 == 0 && the_actors.battle_flag != 0 {
-            set_mood(1);
+            set_mood(game, 1);
         }
 
         if the_actors.battle_flag == 0 && battle2 != 0 {
@@ -88,19 +88,19 @@ pub fn update_enemy_goals(game: &mut Game) {
 
 /// One actor's decision. Returns early (skipping the goal update) for carriers, people and
 /// anyone out of hit points who is on screen.
-unsafe fn think(i: usize, battle2: i8) {
+unsafe fn think(game: &mut Game, i: usize, battle2: i8) {
     unsafe {
         let mut actor = ActorRef::new(i);
 
         if actor.kind == CARRIER {
-            aim_carrier(i);
+            aim_carrier(game, i);
 
             return;
         } else if actor.kind == SETFIG {
             return;
         }
 
-        let (xd, yd) = distance_from_hero(actor);
+        let (xd, yd) = distance_from_hero(game, actor);
 
         if !notice_actor(actor, xd, yd, battle2) {
             return;
@@ -109,7 +109,7 @@ unsafe fn think(i: usize, battle2: i8) {
         let tactic = actor.tactic as i16;
         let new_tactic_roll = bitrand(NEW_TACTIC_ODDS - 1) == 0;
         let mode = adjust_mode_for_situation(actor, actor.goal as i16);
-        let mode = act_on_goal(i, actor, mode, tactic, (xd, yd), new_tactic_roll);
+        let mode = act_on_goal(game, i, actor, mode, tactic, (xd, yd), new_tactic_roll);
 
         actor.goal = mode as i8;
 
@@ -120,14 +120,14 @@ unsafe fn think(i: usize, battle2: i8) {
 }
 
 /// A carrier (raft, turtle, swan) keeps steering toward the hero every few frames.
-unsafe fn aim_carrier(i: usize) {
+unsafe fn aim_carrier(game: &mut Game, i: usize) {
     unsafe {
         // Masks with CARRIER_AIM_MASK, keeping only the bits that matter here.
         if the_world.day_clock & CARRIER_AIM_MASK == 0 {
             steer_actor(
                 i as i32,
-                the_hero.x as i32,
-                the_hero.y as i32,
+                game.hero.x as i32,
+                game.hero.y as i32,
                 CARRIER_AIM_MODE,
             );
         }
@@ -135,13 +135,11 @@ unsafe fn aim_carrier(i: usize) {
 }
 
 /// How far the actor is from the hero along each axis, never negative.
-unsafe fn distance_from_hero(actor: ActorRef) -> (i16, i16) {
-    unsafe {
-        let xd = (actor.abs_x as i32 - the_hero.x as i32) as i16;
-        let yd = (actor.abs_y as i32 - the_hero.y as i32) as i16;
+fn distance_from_hero(game: &mut Game, actor: ActorRef) -> (i16, i16) {
+    let xd = (actor.abs_x as i32 - game.hero.x as i32) as i16;
+    let yd = (actor.abs_y as i32 - game.hero.y as i32) as i16;
 
-        (xd.wrapping_abs(), yd.wrapping_abs())
-    }
+    (xd.wrapping_abs(), yd.wrapping_abs())
 }
 
 /// Notes that an actor is on screen, and that a battle is on if it is awake and in view. Returns
@@ -165,19 +163,21 @@ unsafe fn notice_actor(actor: ActorRef, xd: i16, yd: i16, battle2: i8) -> bool {
 }
 
 /// A stuck actor picks a new tactic: archers one of the ranged ones, the others a melee one.
-fn try_something_else(i: usize, actor: ActorRef) {
+fn try_something_else(game: &mut Game, i: usize, actor: ActorRef) {
     // Masks with BOW_BIT, keeping only the bits that matter here.
     if actor.weapon & BOW_BIT != 0 {
-        run_tactic(i as i32, rand4() + ARCHER_FRUSTRATION_TACTIC);
+        run_tactic(game, i as i32, rand4() + ARCHER_FRUSTRATION_TACTIC);
     } else {
-        run_tactic(i as i32, rand2() + MELEE_FRUSTRATION_TACTIC);
+        run_tactic(game, i as i32, rand2() + MELEE_FRUSTRATION_TACTIC);
     }
 }
 
 /// Carries out the actor's goal for this frame: a stuck actor tries something else, a hostile one
 /// picks a tactic now and then and acts on it, the others flee, follow, stand or wait. Returns the
 /// goal for next frame, which a hostile actor may change.
+#[allow(clippy::too_many_arguments)] // the whole situation of one actor, plus the game state
 unsafe fn act_on_goal(
+    game: &mut Game,
     i: usize,
     mut actor: ActorRef,
     mut mode: i16,
@@ -187,7 +187,7 @@ unsafe fn act_on_goal(
 ) -> i16 {
     unsafe {
         if tactic == FRUST || tactic == SHOOTFRUST {
-            try_something_else(i, actor);
+            try_something_else(game, i, actor);
         } else if actor.state == SHOOT1 {
             actor.state = SHOOT3;
         } else if mode <= ARCHER2 {
@@ -200,13 +200,13 @@ unsafe fn act_on_goal(
                 (mode, tactic) = choose_tactic(actor, mode, xd, yd);
             }
 
-            hostile_action(i, actor, mode, tactic, xd, yd);
+            hostile_action(game, i, actor, mode, tactic, xd, yd);
         } else if mode == FLEE {
-            run_tactic(i as i32, BACKUP);
+            run_tactic(game, i as i32, BACKUP);
         } else if mode == FOLLOWER {
-            run_tactic(i as i32, FOLLOW);
+            run_tactic(game, i as i32, FOLLOW);
         } else if mode == STAND {
-            steer_actor(i as i32, the_hero.x as i32, the_hero.y as i32, 0);
+            steer_actor(i as i32, game.hero.x as i32, game.hero.y as i32, 0);
             actor.state = STILL;
         } else if mode == WAIT {
             actor.state = STILL;

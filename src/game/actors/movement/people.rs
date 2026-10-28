@@ -8,7 +8,6 @@ use crate::game::data::state::Game;
 
 use crate::game::actors::steering::steer_actor;
 use crate::game::data::random::rand2;
-use crate::game::data::state::the_hero;
 use crate::game::data::tables::setfig_table;
 use crate::game::world::objects::SetFigEntry;
 
@@ -36,7 +35,7 @@ impl Ctx {
             } else if self.state == DEAD {
                 self.image += PERSON_DEAD_OFFSET + witch_extra(witch);
             } else if witch {
-                steer_actor(self.slot, the_hero.x as i32, the_hero.y as i32, 0);
+                steer_actor(self.slot, game.hero.x as i32, game.hero.y as i32, 0);
                 self.image = (actor.facing / 2) as i16;
                 game.witch.on_screen = 1;
             } else if self.state == TALKING {

@@ -3,7 +3,7 @@
 
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::{the_hero, the_world};
+use crate::game::data::state::the_world;
 use crate::game::ui::text::show_event;
 use crate::game::world::map::tile_index;
 
@@ -35,22 +35,22 @@ pub fn check_bed(game: &mut Game) {
             the_world.bed_wait = 0;
         }
 
-        the_hero.x = hero.abs_x;
-        the_hero.y = hero.abs_y;
+        game.hero.x = hero.abs_x;
+        game.hero.y = hero.abs_y;
 
         if the_world.region == INSIDE_REGION {
             let tile = game.memory.sector_byte(tile_index(
                 game,
                 // Shifts by TILE_WIDTH_SHIFT, converting between pixels, tiles, sectors or bytes.
-                (the_hero.x >> TILE_WIDTH_SHIFT) as i32,
+                (game.hero.x >> TILE_WIDTH_SHIFT) as i32,
                 // Shifts by TILE_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
-                (the_hero.y >> TILE_HEIGHT_SHIFT) as i32,
+                (game.hero.y >> TILE_HEIGHT_SHIFT) as i32,
             ));
 
             let (wait, action) = bed_step(
                 the_world.bed_wait,
                 BED_TILES.contains(&tile),
-                the_hero.fatigue,
+                game.hero.fatigue,
             );
 
             the_world.bed_wait = wait;
@@ -61,7 +61,7 @@ pub fn check_bed(game: &mut Game) {
                 BedAction::FallAsleep => {
                     show_event(game, EVENT_SLEEPING);
                     hero.abs_y |= BED_Y_MASK;
-                    the_hero.y = hero.abs_y;
+                    game.hero.y = hero.abs_y;
                     hero.state = SLEEP;
                 }
             }

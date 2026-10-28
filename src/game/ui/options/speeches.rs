@@ -6,8 +6,7 @@ use crate::game::data::object_tables::{ob_list8, ob_listg};
 use crate::game::data::random::rand64;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::player;
-use crate::game::data::state::{the_actors, the_hero, the_world};
+use crate::game::data::state::{the_actors, the_world};
 use crate::game::ui::text::{queue_print, speak};
 
 const WRIT: usize = 28;
@@ -76,8 +75,8 @@ pub(super) unsafe fn person_speaks(game: &mut Game, person: u8, actor: ActorRef)
             SORCERESS => sorceress_speaks(game),
             _ => {
                 let facts = Talker {
-                    kindness: the_hero.kindness,
-                    fatigue: the_hero.fatigue,
+                    kindness: game.hero.kindness,
+                    fatigue: game.hero.fatigue,
                     day_period: the_world.day_period,
                     region: the_world.region,
                     goal: actor.goal as i32,
@@ -141,8 +140,8 @@ unsafe fn sorceress_speaks(game: &mut Game) {
     unsafe {
         let freed = ob_listg[SORCERESS_SLOT].ob_stat != 0;
 
-        match sorceress_action(freed, the_hero.luck, || rand64() as i16) {
-            SorceressAction::GiveLuck => the_hero.luck += SORCERESS_LUCK,
+        match sorceress_action(freed, game.hero.luck, || rand64() as i16) {
+            SorceressAction::GiveLuck => game.hero.luck += SORCERESS_LUCK,
             SorceressAction::Nothing => {}
             SorceressAction::AskForHelp => {
                 speak(game, SPEECH_SORCERESS_HELP);
@@ -178,12 +177,12 @@ fn sorceress_action(freed: bool, luck: i16, roll: impl FnOnce() -> i16) -> Sorce
 /// The priest gives the writ's reward, scolds the unkind, or heals.
 unsafe fn priest_speaks(game: &mut Game) {
     unsafe {
-        let has_writ = player().stuff()[WRIT] != 0;
+        let has_writ = game.hero.stuff()[WRIT] != 0;
 
         match priest_action(
             has_writ,
             ob_listg[PRIEST_WRIT_SLOT].ob_stat,
-            the_hero.kindness,
+            game.hero.kindness,
             the_world.day_clock,
         ) {
             PriestAction::WritReward => {
@@ -195,7 +194,8 @@ unsafe fn priest_speaks(game: &mut Game) {
             PriestAction::Scold => speak(game, SPEECH_PRIEST_SCOLD),
             PriestAction::Bless { speech } => {
                 speak(game, speech);
-                the_actors.list[0].vitality = FULL_VITALITY_BASE + the_hero.brave / BRAVERY_DIVISOR;
+                the_actors.list[0].vitality =
+                    FULL_VITALITY_BASE + game.hero.brave / BRAVERY_DIVISOR;
                 queue_print(PRQ_STATS);
             }
         }

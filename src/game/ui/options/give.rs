@@ -4,8 +4,7 @@ use super::{BONE, ITEMS, PRQ_STATS, PRQ_VITALITY};
 use crate::game::data::random::rand64;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::player;
-use crate::game::data::state::{the_actors, the_hero};
+use crate::game::data::state::the_actors;
 use crate::game::ui::menus::go_to_menu;
 use crate::game::ui::text::{queue_print, speak};
 use crate::game::world::objects::leave_item;
@@ -32,11 +31,11 @@ pub(super) unsafe fn give_option(game: &mut Game, chosen_entry: i16) -> bool {
         let person = ActorRef::new(the_actors.nearest_person as usize);
         let race = person.race;
 
-        if chosen_entry == GIVE_GOLD && the_hero.wealth > GOLD_GIVEN {
-            the_hero.wealth -= GOLD_GIVEN;
+        if chosen_entry == GIVE_GOLD && game.hero.wealth > GOLD_GIVEN {
+            game.hero.wealth -= GOLD_GIVEN;
 
-            if rand64() > the_hero.kindness as i32 {
-                the_hero.kindness += 1;
+            if rand64() > game.hero.kindness as i32 {
+                game.hero.kindness += 1;
             }
 
             queue_print(PRQ_STATS);
@@ -47,12 +46,12 @@ pub(super) unsafe fn give_option(game: &mut Game, chosen_entry: i16) -> bool {
             } else {
                 speak(game, BEGGAR_THANKS);
             }
-        } else if chosen_entry == GIVE_BONE && player().stuff()[BONE] != 0 {
+        } else if chosen_entry == GIVE_BONE && game.hero.stuff()[BONE] != 0 {
             if race != SPECTRE_RACE {
                 speak(game, SPECTRE_NOT_HERE);
             } else {
                 speak(game, SPECTRE_THANKS);
-                player().stuff_mut()[BONE] = 0;
+                game.hero.stuff_mut()[BONE] = 0;
                 leave_item(the_actors.nearest_person, SPECTRE_BONE_DROP);
             }
         }

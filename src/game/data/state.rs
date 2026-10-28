@@ -51,8 +51,6 @@ pub struct Hero {
     pub good_fairy_timer: u8,
 }
 
-pub static mut the_hero: Hero = unsafe { std::mem::zeroed() };
-
 impl Hero {
     /// The item counts of the brother who is playing (brothers are numbered from 1).
     pub fn stuff(&self) -> &[u8; STUFF_SLOTS] {
@@ -70,12 +68,6 @@ impl Hero {
             _ => &mut self.julstuff,
         }
     }
-}
-
-/// The hero, which the whole game shares (single threaded; no caller holds on to it across a call
-/// that uses it again).
-pub fn player() -> &'static mut Hero {
-    unsafe { &mut *(&raw mut the_hero) }
 }
 
 /// The world around the hero: the map position, region, clock, light and magic timers.
@@ -303,6 +295,7 @@ pub struct Game {
     pub encounter: Encounters,
     pub memory: Memory,
     pub screen: Screen,
+    pub hero: Hero,
 }
 
 impl Game {
@@ -316,6 +309,7 @@ impl Game {
             ui: unsafe { std::mem::zeroed() },
             encounter: unsafe { std::mem::zeroed() },
             screen: Screen::new(),
+            hero: unsafe { std::mem::zeroed() },
             memory: Memory::new(),
         }
     }

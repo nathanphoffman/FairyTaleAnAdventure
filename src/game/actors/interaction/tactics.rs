@@ -6,10 +6,11 @@ use super::{
     WALKING,
 };
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Game;
 
 use crate::game::actors::steering::steer_actor;
 use crate::game::data::random::fta_rand;
-use crate::game::data::state::{the_actors, the_hero};
+use crate::game::data::state::the_actors;
 
 // How an enemy shooting at the hero lines up.
 const SHOOT_CLOSE: i16 = 8;
@@ -42,7 +43,7 @@ const EGG_Y: i32 = 5667;
 ///   diagonal) and aim, else approach.  - RANDOM: wander.  - BUMBLE_SEEK: head toward the hero
 ///   without smart steering.  - BACKUP: head away from the hero.  - FOLLOW: stay near the leader.
 /// - EVADE: keep away from another enemy.  - EGG_SEEK: go to the turtle eggs.
-pub fn run_tactic(i: i32, tactic: i32) {
+pub fn run_tactic(game: &mut Game, i: i32, tactic: i32) {
     unsafe {
         let mut acts_now = fta_rand() & ACTS_ONE_IN_8 == 0;
         let mut actor = actor_at(i);
@@ -52,7 +53,7 @@ pub fn run_tactic(i: i32, tactic: i32) {
             acts_now = fta_rand() & ACTS_ONE_IN_4 == 0;
         }
 
-        let (hx, hy) = (the_hero.x as i32, the_hero.y as i32);
+        let (hx, hy) = (game.hero.x as i32, game.hero.y as i32);
 
         match tactic {
             PURSUE => steer_if(acts_now, i, hx, hy, COURSE_TOWARD),

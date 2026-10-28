@@ -3,7 +3,7 @@
 use crate::game::data::object_tables::{ob_list8, ob_listg};
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::{Hero, World, the_actors, the_hero, the_world};
+use crate::game::data::state::{Hero, World, the_actors, the_world};
 use crate::game::data::tables::brother_stats;
 use crate::game::data::types::{Bro, Shape};
 use crate::game::files::loading::load_start_sprites;
@@ -94,13 +94,13 @@ pub(super) fn reset_raft_setfig() {
 }
 
 /// The fallen brother's body is left where he died, and his ghost appears.
-pub(super) unsafe fn leave_fallen_brother() {
+pub(super) unsafe fn leave_fallen_brother(game: &mut Game) {
     unsafe {
-        if the_hero.brother > 0 && the_hero.brother < KEVIN {
-            ob_listg[the_hero.brother as usize].xc = the_hero.x;
-            ob_listg[the_hero.brother as usize].yc = the_hero.y;
-            ob_listg[the_hero.brother as usize].ob_stat = ON_GROUND;
-            ob_listg[the_hero.brother as usize + DEAD_BROTHER_PERSON].ob_stat = PERSON;
+        if game.hero.brother > 0 && game.hero.brother < KEVIN {
+            ob_listg[game.hero.brother as usize].xc = game.hero.x;
+            ob_listg[game.hero.brother as usize].yc = game.hero.y;
+            ob_listg[game.hero.brother as usize].ob_stat = ON_GROUND;
+            ob_listg[game.hero.brother as usize + DEAD_BROTHER_PERSON].ob_stat = PERSON;
         }
 
         ob_list8[SPECTRE_SLOT].ob_stat = PERSON;
@@ -111,14 +111,11 @@ pub(super) unsafe fn leave_fallen_brother() {
 /// safe spot.
 pub(super) unsafe fn take_over_next_brother(game: &mut Game, mut hero: ActorRef) {
     unsafe {
-        start_next_brother(
-            &mut *(&raw mut the_hero),
-            &mut hero,
-            &brother_stats[the_hero.brother as usize],
-        );
+        let stats = &brother_stats[game.hero.brother as usize];
+        start_next_brother(&mut game.hero, &mut hero, stats);
 
-        reset_for_next_brother(&mut *(&raw mut the_hero), &mut *(&raw mut the_world));
-        move_camera_to(the_hero.safe_x as i32, the_hero.safe_y as i32);
+        reset_for_next_brother(&mut game.hero, &mut *(&raw mut the_world));
+        move_camera_to(game.hero.safe_x as i32, game.hero.safe_y as i32);
         game.screen.view_status = VIEW_REDRAW;
         the_actors.on_screen = 1;
         the_actors.loading = 0;
@@ -154,60 +151,56 @@ pub(super) fn start_next_brother(hero: &mut Hero, body: &mut Shape, next: &Bro) 
 }
 
 /// The story pages between brothers (and the game over page after the last).
-pub(super) unsafe fn show_brother_placards(game: &mut Game) {
-    unsafe {
-        map_message(game);
-        let current = game.screen.current_port;
-        game.screen.set_font_kind(current, FontKind::Story);
+pub(super) fn show_brother_placards(game: &mut Game) {
+    map_message(game);
+    let current = game.screen.current_port;
+    game.screen.set_font_kind(current, FontKind::Story);
 
-        if the_hero.brother == JULIAN {
-            placard_text(game, PLACARD_JULIAN);
-            game.screen.port_mut(PortId::Map).target = Some(game.screen.drawing_bitmap_id());
-            game.screen.clear(PortId::Map, PEN_BLACK);
-            game.screen.port_mut(PortId::Map).target = Some(game.screen.viewing_bitmap_id());
-        } else if the_hero.brother == PHILLIP {
-            placard_text(game, PLACARD_PHILLIP);
-        } else if the_hero.brother == KEVIN {
-            placard_text(game, PLACARD_KEVIN);
-        } else {
-            placard_text(game, PLACARD_GAME_OVER);
-        }
+    if game.hero.brother == JULIAN {
+        placard_text(game, PLACARD_JULIAN);
+        game.screen.port_mut(PortId::Map).target = Some(game.screen.drawing_bitmap_id());
+        game.screen.clear(PortId::Map, PEN_BLACK);
+        game.screen.port_mut(PortId::Map).target = Some(game.screen.viewing_bitmap_id());
+    } else if game.hero.brother == PHILLIP {
+        placard_text(game, PLACARD_PHILLIP);
+    } else if game.hero.brother == KEVIN {
+        placard_text(game, PLACARD_KEVIN);
+    } else {
+        placard_text(game, PLACARD_GAME_OVER);
+    }
 
-        draw_placard_border(game);
-        delay(game, SHOW_PLACARD);
+    draw_placard_border(game);
+    delay(game, SHOW_PLACARD);
 
-        if the_hero.brother > LAST_BROTHER {
-            game.ui.quit_requested = 1;
-            delay(game, GAME_OVER_PAUSE);
-        } else if the_hero.brother > JULIAN {
-            show_follow_up_placard(game);
-        }
+    if game.hero.brother > LAST_BROTHER {
+        game.ui.quit_requested = 1;
+        delay(game, GAME_OVER_PAUSE);
+    } else if game.hero.brother > JULIAN {
+        show_follow_up_placard(game);
     }
 }
 
 /// After the first story page the panel is cleared and the follow-up page for this brother is shown.
-unsafe fn show_follow_up_placard(game: &mut Game) {
-    unsafe {
-        delay(game, SHORT_PAUSE);
-        let current = game.screen.current_port;
-        game.screen.set_a_pen(current, PEN_BLACK);
-        game.screen
-            .rect_fill(current, (PANEL.0, PANEL.1), (PANEL.2, PANEL.3));
+fn show_follow_up_placard(game: &mut Game) {
+    delay(game, SHORT_PAUSE);
+    let current = game.screen.current_port;
+    game.screen.set_a_pen(current, PEN_BLACK);
+    game.screen
+        .rect_fill(current, (PANEL.0, PANEL.1), (PANEL.2, PANEL.3));
 
-        delay(game, TINY_PAUSE);
-        game.screen.set_a_pen(current, PEN_TEXT);
+    delay(game, TINY_PAUSE);
+    game.screen.set_a_pen(current, PEN_TEXT);
 
-        placard_text(
-            game,
-            if the_hero.brother == PHILLIP {
-                PLACARD_PHILLIP_FOLLOW_UP
-            } else {
-                PLACARD_KEVIN_FOLLOW_UP
-            },
-        );
+    placard_text(
+        game,
+        if game.hero.brother == PHILLIP {
+            PLACARD_PHILLIP_FOLLOW_UP
+        } else {
+            PLACARD_KEVIN_FOLLOW_UP
+        },
+    );
 
-        delay(game, SHOW_PLACARD);
-    }
+    delay(game, SHOW_PLACARD);
 }
 
 /// Loads the brother's sprites and tells where the story starts.
@@ -221,16 +214,16 @@ pub(super) unsafe fn announce_brother(game: &mut Game) {
         the_actors.loaded_setfig_file = HERO_SET_FILE;
         load_start_sprites(game);
 
-        if the_hero.brother <= LAST_BROTHER {
+        if game.hero.brother <= LAST_BROTHER {
             message_off(game);
-            the_hero.place = START_PLACE;
+            game.hero.place = START_PLACE;
             show_event(game, EVENT_SETTING_OUT);
 
-            if the_hero.brother == JULIAN {
+            if game.hero.brother == JULIAN {
                 print_cont(game, ".");
-            } else if the_hero.brother == PHILLIP {
+            } else if game.hero.brother == PHILLIP {
                 show_event(game, EVENT_PHILLIP_SETS_OUT);
-            } else if the_hero.brother == KEVIN {
+            } else if game.hero.brother == KEVIN {
                 show_event(game, EVENT_KEVIN_SETS_OUT);
             }
         }

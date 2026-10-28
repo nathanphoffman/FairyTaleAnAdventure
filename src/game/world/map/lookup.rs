@@ -4,7 +4,7 @@
 use super::drawing::{SCREEN_COLUMNS, SCREEN_ROWS};
 use crate::game::data::object_tables::minimap;
 use crate::game::data::state::Game;
-use crate::game::data::state::{the_hero, the_world};
+use crate::game::data::state::the_world;
 
 /// Sectors are 16 x 8 tiles of 128 bytes; the region map has 128 sector bytes per row.
 pub(super) const SECTOR_BYTES: usize = 128;
@@ -209,7 +209,7 @@ pub fn fill_minimap(game: &mut Game, tile_x: i32, tile_y: i32) {
             x += 1;
         }
 
-        the_hero.sector = hero_sector(game);
+        game.hero.sector = hero_sector(game);
     }
 }
 
@@ -242,12 +242,12 @@ fn tile_number(game: &Game, x: u16, y: u16) -> u8 {
 unsafe fn hero_sector(game: &mut Game) -> i16 {
     unsafe {
         // the assembly read the high byte of hero_x and hero_y (68000 is big-endian)
-        let hx = (the_hero.x >> SECTOR_POSITION_SHIFT) as i32;
+        let hx = (game.hero.x >> SECTOR_POSITION_SHIFT) as i32;
 
         // The hero's sector row: 256 pixels to a sector.
         let hy =
             // Shifts by SECTOR_POSITION_SHIFT, converting between pixels, tiles, sectors or bytes.
-            ((the_hero.y >> SECTOR_POSITION_SHIFT).wrapping_sub(the_world.origin_y)) as i16 as i32;
+            ((game.hero.y >> SECTOR_POSITION_SHIFT).wrapping_sub(the_world.origin_y)) as i16 as i32;
         // The region map has 128 sectors in each row.
         let mut sec = game
             .memory

@@ -6,7 +6,6 @@ use super::{DEAD, DRAGON, ENEMY, FLEE, HERO, SETFIG, turtle_eggs};
 use crate::game::actors::encounters::check_death;
 use crate::game::data::random::{bitrand, rand64, rand256};
 use crate::game::data::state::Game;
-use crate::game::data::state::player;
 use crate::game::data::state::{ActorRef, the_actors, the_world};
 use crate::game::files::loading::play_effect;
 use crate::game::ui::messages::{print, print_cont};
@@ -62,7 +61,7 @@ pub(super) fn actor_at(i: i32) -> ActorRef {
 pub fn hit_actor(game: &mut Game, i: i32, j: i32, fc: i32, wt: i16) {
     let mut target = actor_at(j);
     let hero_weapon = actor_at(HERO as i32).weapon;
-    let has_spirit_item = player().stuff()[SPIRIT_HURT_ITEM] != 0;
+    let has_spirit_item = game.hero.stuff()[SPIRIT_HURT_ITEM] != 0;
 
     if too_weak_to_hurt(target.race, hero_weapon, has_spirit_item) {
         speak(game, MESSAGE_NEEDS_WEAPON);

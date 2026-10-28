@@ -11,7 +11,7 @@ use crate::game::actors::interaction::{blocked_at, rescue_princess};
 use crate::game::data::object_tables::ob_list8;
 use crate::game::data::state::Game;
 use crate::game::data::state::current_extent;
-use crate::game::data::state::{the_actors, the_hero, the_world};
+use crate::game::data::state::{the_actors, the_world};
 
 use crate::game::data::story_text::{INSIDE_MSG, INSIDE_TBL, PLACE_MSG, PLACE_TBL};
 use crate::game::files::disk::motor_off;
@@ -89,11 +89,15 @@ const SPIDER_ENCOUNTER: u16 = 8;
 /// `new_region` must already be set. If the spot is blocked the hero is moved down until it is free.
 pub fn transfer_hero(game: &mut Game, xtest: u16, ytest: u16, flag: u16) -> i32 {
     unsafe {
-        the_world.map_x = the_world.map_x.wrapping_add(xtest.wrapping_sub(the_hero.x));
-        the_world.map_y = the_world.map_y.wrapping_add(ytest.wrapping_sub(the_hero.y));
-        the_hero.x = xtest;
+        the_world.map_x = the_world
+            .map_x
+            .wrapping_add(xtest.wrapping_sub(game.hero.x));
+        the_world.map_y = the_world
+            .map_y
+            .wrapping_add(ytest.wrapping_sub(game.hero.y));
+        game.hero.x = xtest;
         the_actors.list[0].abs_x = xtest;
-        the_hero.y = ytest;
+        game.hero.y = ytest;
         the_actors.list[0].abs_y = ytest;
 
         game.encounter.number = 0;
@@ -113,10 +117,10 @@ pub fn transfer_hero(game: &mut Game, xtest: u16, ytest: u16, flag: u16) -> i32 
         load_region_now(game);
         refresh_minimap(game); // to set region_origin_x and region_origin_y
         game.screen.view_status = VIEW_REBUILD_ALL;
-        set_mood(1);
+        set_mood(game, 1);
 
-        while blocked_at(game, the_hero.x as i16, the_hero.y as i16, 0) != 0 {
-            the_hero.y = the_hero.y.wrapping_add(1);
+        while blocked_at(game, game.hero.x as i16, game.hero.y as i16, 0) != 0 {
+            game.hero.y = game.hero.y.wrapping_add(1);
         }
 
         0
@@ -157,7 +161,7 @@ pub fn find_place(game: &mut Game, flag: i16) -> i32 {
 
         loop {
             announce_place(game, flag);
-            locate_extent();
+            locate_extent(game);
 
             if !enter_extent(game, flag) {
                 // the princess was rescued: look again from the top, without the messages
@@ -176,12 +180,12 @@ pub fn find_place(game: &mut Game, flag: i16) -> i32 {
 /// The place-name message number for the hero's sector, or 0 for none. Mountains get the name of
 /// the part of the map they are in, and nothing is said while the next region is still loading or
 /// when the hero is on the edge of the loaded one.
-unsafe fn place_message_number() -> u8 {
+unsafe fn place_message_number(game: &mut Game) -> u8 {
     unsafe {
-        the_hero.sector &= SECTOR_BYTE_MASK;
-        let sector = the_hero.sector as u8;
+        game.hero.sector &= SECTOR_BYTE_MASK;
+        let sector = game.hero.sector as u8;
         let table = if the_world.region >= FIRST_INDOOR_REGION {
-            the_hero.sector += INSIDE_SECTOR_OFFSET;
+            game.hero.sector += INSIDE_SECTOR_OFFSET;
 
             &INSIDE_TBL[..]
         } else {
@@ -190,7 +194,11 @@ unsafe fn place_message_number() -> u8 {
 
         let message = mountain_name(find_table_message(table, sector));
 
-        if hero_on_loaded_edge() { 0 } else { message }
+        if hero_on_loaded_edge(game) {
+            0
+        } else {
+            message
+        }
     }
 }
 
@@ -221,13 +229,13 @@ unsafe fn mountain_name(message: u8) -> u8 {
 }
 
 /// True while the next region is still loading, or when the hero is outside the loaded one.
-unsafe fn hero_on_loaded_edge() -> bool {
+unsafe fn hero_on_loaded_edge(game: &mut Game) -> bool {
     unsafe {
         // The hero's sector column and row: 256 pixels to a sector.
-        let hero_column = (the_hero.x >> SECTOR_SHIFT).wrapping_sub(the_world.origin_x);
+        let hero_column = (game.hero.x >> SECTOR_SHIFT).wrapping_sub(the_world.origin_x);
 
         // Shifts by SECTOR_SHIFT, converting between pixels, tiles, sectors or bytes.
-        let hero_row = (the_hero.y >> SECTOR_SHIFT).wrapping_sub(the_world.origin_y);
+        let hero_row = (game.hero.y >> SECTOR_SHIFT).wrapping_sub(the_world.origin_y);
 
         the_world.new_region < NO_REGION
             // Masks with OUTSIDE_COLUMN_BIT, keeping only the bits that matter here.
@@ -240,10 +248,10 @@ unsafe fn hero_on_loaded_edge() -> bool {
 /// Remembers the place the hero is in, and says its name when it changes (if `flag` is set).
 unsafe fn announce_place(game: &mut Game, flag: i16) {
     unsafe {
-        let message = place_message_number();
+        let message = place_message_number(game);
 
-        if message != 0 && message as u16 != the_hero.place {
-            the_hero.place = message as u16;
+        if message != 0 && message as u16 != game.hero.place {
+            game.hero.place = message as u16;
 
             if flag != 0 {
                 let messages = if the_world.region >= FIRST_INDOOR_REGION {
@@ -259,14 +267,15 @@ unsafe fn announce_place(game: &mut Game, flag: i16) {
 }
 
 /// Finds the first extent (special rectangle of the world) the hero is in.
-unsafe fn locate_extent() {
+unsafe fn locate_extent(game: &mut Game) {
     unsafe {
         the_world.extent = 0;
 
         for _ in 0..EXTENT_COUNT {
             let e = current_extent();
 
-            if the_hero.x > e.x1 && the_hero.x < e.x2 && the_hero.y > e.y1 && the_hero.y < e.y2 {
+            if game.hero.x > e.x1 && game.hero.x < e.x2 && game.hero.y > e.y1 && game.hero.y < e.y2
+            {
                 break;
             }
 
@@ -300,8 +309,8 @@ unsafe fn enter_extent(game: &mut Game, flag: i16) -> bool {
         } else if the_world.extent_type == XT_SPIDER_PIT {
             load_spiders(game);
         } else if the_world.extent_type >= XT_MONSTER_ZONE_MIN && flag == 1 {
-            game.encounter.x = the_hero.x;
-            game.encounter.y = the_hero.y;
+            game.encounter.x = game.hero.x;
+            game.encounter.y = game.hero.y;
             force = true;
         }
 
@@ -348,7 +357,7 @@ unsafe fn update_carrier(game: &mut Game) {
             the_actors.active_carrier = 0;
         } else if the_world.extent_type == XT_CARRIER
             && (the_actors.active_carrier == 0
-                || (the_hero.riding == 0
+                || (game.hero.riding == 0
                     && the_actors.loaded_actor_file != current_extent().v3 as i16))
         {
             load_carrier(game, current_extent().v3 as i16);

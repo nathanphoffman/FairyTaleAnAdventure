@@ -7,8 +7,7 @@
 use crate::game::actors::encounters::check_death;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::player;
-use crate::game::data::state::{the_actors, the_hero, the_world};
+use crate::game::data::state::{the_actors, the_world};
 use crate::game::data::tables::{seed1, seed2};
 use crate::game::data::types::Shape;
 use crate::game::world::places::transfer_hero;
@@ -70,13 +69,13 @@ pub fn run_pending_command(game: &mut Game) {
                 transfer_hero(game, x as u16, y as u16, 1);
             }
 
-            Command::Give { slot, count } => player().stuff_mut()[slot as usize] = count as u8,
-            Command::SetStat { stat: 0, value } => the_hero.hunger = value as i16,
-            Command::SetStat { stat: 1, value } => the_hero.fatigue = value as i16,
-            Command::SetStat { value, .. } => the_hero.wealth = value as i16,
+            Command::Give { slot, count } => game.hero.stuff_mut()[slot as usize] = count as u8,
+            Command::SetStat { stat: 0, value } => game.hero.hunger = value as i16,
+            Command::SetStat { stat: 1, value } => game.hero.fatigue = value as i16,
+            Command::SetStat { value, .. } => game.hero.wealth = value as i16,
             Command::SlayEnemies => slay_enemies(game),
             Command::KillHero { luck: remaining } => {
-                the_hero.luck = remaining as i16;
+                game.hero.luck = remaining as i16;
                 the_actors.list[0].vitality = 0;
                 check_death(game, 0, DEATH_BY_TEST);
             }
@@ -98,9 +97,9 @@ unsafe fn slay_enemies(game: &mut Game) {
 
 /// The state as text: the brother, place, stats, clock, random seeds, every actor, and the
 /// inventory.
-pub fn state_text() -> String {
+pub fn state_text(game: &mut Game) -> String {
     unsafe {
-        let mut out = hero_world_lines();
+        let mut out = hero_world_lines(game);
         out.push_str(&format!("seed {} {}\n", { seed1 }, { seed2 }));
 
         for i in 0..20 {
@@ -110,7 +109,7 @@ pub fn state_text() -> String {
         out.push_str("stuff");
 
         for slot in 0..DUMPED_STUFF_SLOTS {
-            out.push_str(&format!(" {}", player().stuff()[slot]));
+            out.push_str(&format!(" {}", game.hero.stuff()[slot]));
         }
 
         out.push('\n');
@@ -120,35 +119,35 @@ pub fn state_text() -> String {
 }
 
 /// The first lines of the dump: where the hero is, his stats, and the clock and light.
-unsafe fn hero_world_lines() -> String {
+unsafe fn hero_world_lines(game: &mut Game) -> String {
     unsafe {
         let mut out = String::new();
         out.push_str(&format!(
             "brother {} region {} hero {},{} map {},{}\n",
-            { the_hero.brother },
+            { game.hero.brother },
             { the_world.region },
-            { the_hero.x },
-            { the_hero.y },
+            { game.hero.x },
+            { game.hero.y },
             { the_world.map_x },
             { the_world.map_y }
         ));
 
         out.push_str(&format!(
             "brave {} luck {} kind {} wealth {} hunger {} fatigue {}\n",
-            { the_hero.brave },
-            { the_hero.luck },
-            { the_hero.kindness },
-            { the_hero.wealth },
-            { the_hero.hunger },
-            { the_hero.fatigue }
+            { game.hero.brave },
+            { game.hero.luck },
+            { game.hero.kindness },
+            { game.hero.wealth },
+            { game.hero.hunger },
+            { game.hero.fatigue }
         ));
 
         out.push_str(&format!(
             "daynight {} light {} riding {} flying {} anix {},{}\n",
             { the_world.day_clock },
             { the_world.light_level },
-            { the_hero.riding },
-            { the_hero.flying },
+            { game.hero.riding },
+            { game.hero.flying },
             { the_actors.active },
             { the_actors.drawn }
         ));
@@ -180,8 +179,8 @@ fn actor_line(i: usize, a: &Shape) -> String {
 }
 
 /// Writes `state_text` to the file at `path`.
-pub fn dump_state(path: &Path) {
-    if let Err(error) = std::fs::write(path, state_text()) {
+pub fn dump_state(game: &mut Game, path: &Path) {
+    if let Err(error) = std::fs::write(path, state_text(game)) {
         eprintln!("Could not write the state dump {}: {error}", path.display());
     }
 }

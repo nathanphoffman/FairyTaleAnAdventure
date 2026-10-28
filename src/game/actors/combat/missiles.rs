@@ -5,7 +5,7 @@ use crate::game::actors::interaction::hit_actor;
 use crate::game::data::random::{bitrand, rand8};
 use crate::game::data::state::Game;
 use crate::game::data::state::{ActorRef, MissileRef};
-use crate::game::data::state::{the_actors, the_hero, the_world};
+use crate::game::data::state::{the_actors, the_world};
 use crate::game::data::types::Missile;
 use crate::game::world::map::{step_x, step_y, terrain_at};
 
@@ -61,29 +61,27 @@ pub fn advance_missiles(game: &mut Game) {
 }
 
 /// One missile's flight for this frame.
-pub(super) unsafe fn fly(game: &mut Game, i: usize, mut ms: MissileRef) {
-    unsafe {
-        let mut s = ms.speed as i16 * 2;
+pub(super) fn fly(game: &mut Game, i: usize, mut ms: MissileRef) {
+    let mut s = ms.speed as i16 * 2;
 
-        if missile_expired(&mut ms, s) {
-            ms.missile_type = MISSILE_NONE;
+    if missile_expired(&mut ms, s) {
+        ms.missile_type = MISSILE_NONE;
 
-            return;
-        }
-
-        let xs = ms.abs_x as i16;
-        let ys = ms.abs_y as i16;
-
-        if WALL_TERRAIN.contains(&terrain_at(game, xs as i32, ys as i32)) {
-            ms.missile_type = MISSILE_NONE;
-            s = 0;
-        }
-
-        let fc = ms.direction as i32;
-        hit_first_actor_in_path(game, i, ms, xs, ys);
-        ms.abs_x = step_x(ms.abs_x as i32, fc, s as i32) as u16;
-        ms.abs_y = step_y(ms.abs_y as i32, fc, s as i32) as u16;
+        return;
     }
+
+    let xs = ms.abs_x as i16;
+    let ys = ms.abs_y as i16;
+
+    if WALL_TERRAIN.contains(&terrain_at(game, xs as i32, ys as i32)) {
+        ms.missile_type = MISSILE_NONE;
+        s = 0;
+    }
+
+    let fc = ms.direction as i32;
+    hit_first_actor_in_path(game, i, ms, xs, ys);
+    ms.abs_x = step_x(ms.abs_x as i32, fc, s as i32) as u16;
+    ms.abs_y = step_y(ms.abs_y as i32, fc, s as i32) as u16;
 }
 
 /// Whether the missile is unused, spent, standing still (`s` is its doubled speed) or has been in
@@ -103,54 +101,52 @@ pub(super) fn missile_expired(ms: &mut Missile, s: i16) -> bool {
 /// Hits the first actor close enough to the missile at (`xs`, `ys`) and stops the missile.
 /// `i` is the missile's own index; the hero (actor 0) gets a dodge chance from `brave`, others a
 /// fixed one.
-pub(super) unsafe fn hit_first_actor_in_path(
+pub(super) fn hit_first_actor_in_path(
     game: &mut Game,
     i: usize,
     mut ms: MissileRef,
     xs: i16,
     ys: i16,
 ) {
-    unsafe {
-        let fc = ms.direction as i32;
-        let is_rock = ms.missile_type == MISSILE_ROCK;
-        let range = if is_rock {
-            FIREBALL_HIT_RANGE
-        } else {
-            ARROW_HIT_RANGE
-        };
+    let fc = ms.direction as i32;
+    let is_rock = ms.missile_type == MISSILE_ROCK;
+    let range = if is_rock {
+        FIREBALL_HIT_RANGE
+    } else {
+        ARROW_HIT_RANGE
+    };
 
-        let mut j = 0;
+    let mut j = 0;
 
-        while j < actor_count() {
-            let dodge = if j == 0 { the_hero.brave } else { OTHER_DODGE };
-            let target = j;
-            j += 1;
+    while j < actor_count() {
+        let dodge = if j == 0 { game.hero.brave } else { OTHER_DODGE };
+        let target = j;
+        j += 1;
 
-            if !missile_can_hit(ms, target) {
-                continue;
+        if !missile_can_hit(ms, target) {
+            continue;
+        }
+
+        let dist = distance_to_point(ActorRef::new(target), xs, ys);
+
+        // the original tests the missile's own index here, not the target's
+        if missile_connects(i, dist, range, dodge, || bitrand(DODGE_RANGE)) {
+            let by = if is_rock { BY_FIREBALL } else { BY_ARROW };
+            hit_actor(
+                game,
+                by,
+                target as i32,
+                fc,
+                (rand8() + MISSILE_DAMAGE_BASE) as i16,
+            );
+
+            ms.speed = 0;
+
+            if is_rock {
+                ms.missile_type = MISSILE_SPENT;
             }
 
-            let dist = distance_to_point(ActorRef::new(target), xs, ys);
-
-            // the original tests the missile's own index here, not the target's
-            if missile_connects(i, dist, range, dodge, || bitrand(DODGE_RANGE)) {
-                let by = if is_rock { BY_FIREBALL } else { BY_ARROW };
-                hit_actor(
-                    game,
-                    by,
-                    target as i32,
-                    fc,
-                    (rand8() + MISSILE_DAMAGE_BASE) as i16,
-                );
-
-                ms.speed = 0;
-
-                if is_rock {
-                    ms.missile_type = MISSILE_SPENT;
-                }
-
-                return;
-            }
+            return;
         }
     }
 }

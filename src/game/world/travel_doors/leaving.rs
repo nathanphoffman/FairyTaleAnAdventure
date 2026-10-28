@@ -3,7 +3,6 @@
 use super::entering::door_at;
 use super::{CAVE, DOORCOUNT, LOWER_HALF_BIT, TILE_COLUMN_MASK, TILE_WIDTH};
 use crate::game::data::state::Game;
-use crate::game::data::state::the_hero;
 use crate::game::data::types::Door;
 use crate::game::world::places::{find_place, transfer_hero};
 
@@ -63,7 +62,7 @@ pub(super) unsafe fn leave_door(game: &mut Game, xtest: u16, ytest: u16) {
             let d = door_at(j);
 
             if is_exit_here(d, xtest, ytest) {
-                if may_leave(d, the_hero.x, the_hero.y) {
+                if may_leave(d, game.hero.x, game.hero.y) {
                     let (x, y) = outside_spot(d);
                     transfer_hero(game, x, y, 1);
                     find_place(game, 0);

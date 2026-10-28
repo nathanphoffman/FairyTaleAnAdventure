@@ -4,7 +4,7 @@ use super::{ARROWS, PRQ_VITALITY};
 use crate::game::actors::interaction::eat_food;
 use crate::game::data::object_tables::jtrans;
 use crate::game::data::state::Game;
-use crate::game::data::state::{the_actors, the_hero};
+use crate::game::data::state::the_actors;
 use crate::game::ui::items_menu::{add_stuff, item_name};
 use crate::game::ui::messages::{print, print_cont, print_wrapped};
 use crate::game::ui::text::{queue_print, show_event};
@@ -103,10 +103,10 @@ pub(super) unsafe fn buy_option(game: &mut Game, chosen_entry: i16) -> bool {
             BuyGate::Offer { item, price } => (item, price),
         };
 
-        match purchase(the_hero.wealth, price, item) {
+        match purchase(game.hero.wealth, price, item) {
             Purchase::TooPoor => print(game, "Not enough money!"),
             Purchase::Bought { wealth_left, what } => {
-                the_hero.wealth = wealth_left;
+                game.hero.wealth = wealth_left;
                 queue_print(PRQ_VITALITY);
                 receive_purchase(game, item, what);
             }
@@ -126,12 +126,12 @@ fn receive_purchase(game: &mut Game, item: usize, what: Bought) {
         }
 
         Bought::Arrows => {
-            add_stuff(item, ARROWS_BOUGHT);
+            add_stuff(game, item, ARROWS_BOUGHT);
             show_event(game, BOUGHT_ARROWS_EVENT);
         }
 
         Bought::Item => {
-            add_stuff(item, 1);
+            add_stuff(game, item, 1);
             print_wrapped(game, "% bought a ");
             print_cont(game, item_name(item));
             print_cont(game, ".");

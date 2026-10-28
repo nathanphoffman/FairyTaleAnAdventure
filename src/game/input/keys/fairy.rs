@@ -8,19 +8,19 @@ use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
 
 use crate::game::actors::revive::revive;
-use crate::game::data::state::{the_actors, the_hero};
+use crate::game::data::state::the_actors;
 
 /// The hero is dead or falling: the fairy flies in, then the hero revives (or, with no luck left,
 /// the next brother takes over). Returns the hero's new state.
 pub(super) unsafe fn fairy_revival(game: &mut Game, state: i8, cycle: i16) -> i8 {
     unsafe {
         let (timer, action) = fairy_step(
-            the_hero.good_fairy_timer,
-            the_hero.luck,
+            game.hero.good_fairy_timer,
+            game.hero.luck,
             the_actors.list[0].state == FALL,
         );
 
-        the_hero.good_fairy_timer = timer;
+        game.hero.good_fairy_timer = timer;
 
         match action {
             FairyAction::Revive => {
@@ -36,7 +36,7 @@ pub(super) unsafe fn fairy_revival(game: &mut Game, state: i8, cycle: i16) -> i8
             }
 
             FairyAction::Wait => {}
-            FairyAction::FlyIn => place_fairy(cycle),
+            FairyAction::FlyIn => place_fairy(game, cycle),
         }
 
         state
@@ -44,15 +44,16 @@ pub(super) unsafe fn fairy_revival(game: &mut Game, state: i8, cycle: i16) -> i8
 }
 
 /// Puts the fairy near the hero, closer each frame, and clears the other actors away.
-unsafe fn place_fairy(cycle: i16) {
+unsafe fn place_fairy(game: &mut Game, cycle: i16) {
     unsafe {
         let mut fairy = ActorRef::new(FAIRY_SLOT);
         the_actors.active = NO_ACTORS_LOADED;
-        fairy.abs_x = the_hero
+        fairy.abs_x = game
+            .hero
             .x
-            .wrapping_add(the_hero.good_fairy_timer as u16 * FAIRY_SPEED)
+            .wrapping_add(game.hero.good_fairy_timer as u16 * FAIRY_SPEED)
             .wrapping_sub(FAIRY_X_OFFSET);
-        fairy.abs_y = the_hero.y;
+        fairy.abs_y = game.hero.y;
         fairy.kind = OBJECTS;
 
         // Masks with FAIRY_IMAGE, keeping only the bits that matter here.

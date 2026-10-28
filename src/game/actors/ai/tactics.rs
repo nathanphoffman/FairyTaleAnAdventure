@@ -5,7 +5,7 @@ use crate::game::actors::interaction::{run_tactic, turtle_eggs};
 use crate::game::actors::steering::steer_actor;
 use crate::game::data::random::rand2;
 use crate::game::data::state::ActorRef;
-use crate::game::data::state::the_hero;
+use crate::game::data::state::Game;
 
 const FIGHTING: i8 = 0;
 const WALKING: i8 = 12;
@@ -89,7 +89,9 @@ fn pick_tactic(
 }
 
 /// A hostile enemy strikes if close enough, otherwise acts on its tactic.
-pub(super) unsafe fn hostile_action(
+#[allow(clippy::too_many_arguments)] // the whole situation of one actor, plus the game state
+pub(super) fn hostile_action(
+    game: &mut Game,
     i: usize,
     mut actor: ActorRef,
     mode: i16,
@@ -97,23 +99,21 @@ pub(super) unsafe fn hostile_action(
     xd: i16,
     yd: i16,
 ) {
-    unsafe {
-        match hostile_choice(actor.race, actor.weapon, actor.vitality, mode, xd, yd) {
-            Hostile::Strike => {
-                steer_actor(i as i32, the_hero.x as i32, the_hero.y as i32, 0);
+    match hostile_choice(actor.race, actor.weapon, actor.vitality, mode, xd, yd) {
+        Hostile::Strike => {
+            steer_actor(i as i32, game.hero.x as i32, game.hero.y as i32, 0);
 
-                if actor.state >= WALKING {
-                    actor.state = FIGHTING;
-                }
+            if actor.state >= WALKING {
+                actor.state = FIGHTING;
             }
-
-            Hostile::KnightGuard => {
-                actor.state = STILL;
-                actor.facing = DKNIGHT_FACING;
-            }
-
-            Hostile::Tactic => run_tactic(i as i32, tactic as i32),
         }
+
+        Hostile::KnightGuard => {
+            actor.state = STILL;
+            actor.facing = DKNIGHT_FACING;
+        }
+
+        Hostile::Tactic => run_tactic(game, i as i32, tactic as i32),
     }
 }
 

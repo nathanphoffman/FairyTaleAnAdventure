@@ -3,7 +3,6 @@
 use super::{ARROWBASE, GOLDBASE, KEYBASE, add_stuff, item_name};
 use crate::game::data::random::{rand4, rand8};
 use crate::game::data::state::Game;
-use crate::game::data::state::the_hero;
 use crate::game::ui::messages::{print, print_cont};
 
 /// The container items start at this entry of `item_list`; a roll of 0 there means arrows (or 100
@@ -43,57 +42,53 @@ fn container_key(roll: i32) -> i32 {
 }
 
 /// What was inside a container. Returns true (the container is always used up).
-pub(super) unsafe fn container_contents(game: &mut Game) -> bool {
-    unsafe {
-        match roll_contents(rand4, rand8) {
-            Contents::Nothing => print(game, "nothing."),
-            Contents::One(i) => {
-                print(game, "a ");
-                print_cont(game, item_name(i));
-                print_cont(game, ".");
-                add_stuff(i, 1);
-            }
+pub(super) fn container_contents(game: &mut Game) -> bool {
+    match roll_contents(rand4, rand8) {
+        Contents::Nothing => print(game, "nothing."),
+        Contents::One(i) => {
+            print(game, "a ");
+            print_cont(game, item_name(i));
+            print_cont(game, ".");
+            add_stuff(game, i, 1);
+        }
 
-            Contents::Two { first, second } => take_two_things(game, first, second),
-            Contents::ThreeKeys(keys) => {
-                print(game, "3 keys.");
+        Contents::Two { first, second } => take_two_things(game, first, second),
+        Contents::ThreeKeys(keys) => {
+            print(game, "3 keys.");
 
-                for key in keys {
-                    add_stuff(key as usize, 1);
-                }
-            }
-
-            Contents::ThreeOf(i) => {
-                print(game, "3 ");
-                print_cont(game, item_name(i));
-                print_cont(game, "s.");
-                add_stuff(i, MANY as u8);
+            for key in keys {
+                add_stuff(game, key as usize, 1);
             }
         }
 
-        true
+        Contents::ThreeOf(i) => {
+            print(game, "3 ");
+            print_cont(game, item_name(i));
+            print_cont(game, "s.");
+            add_stuff(game, i, MANY as u8);
+        }
     }
+
+    true
 }
 
 /// Tells what two things were found and adds them (the first may be 100 gold pieces).
-unsafe fn take_two_things(game: &mut Game, first: usize, second: usize) {
-    unsafe {
-        if first == HUNDRED_GOLD as usize {
-            the_hero.wealth += CONTAINER_GOLD;
-        } else {
-            print_cont(game, " a");
-        }
-
-        print(game, item_name(first));
-        print_cont(game, " and a ");
-        print_cont(game, item_name(second));
-
-        if first < GOLDBASE {
-            add_stuff(first, 1);
-        }
-
-        add_stuff(second, 1);
+fn take_two_things(game: &mut Game, first: usize, second: usize) {
+    if first == HUNDRED_GOLD as usize {
+        game.hero.wealth += CONTAINER_GOLD;
+    } else {
+        print_cont(game, " a");
     }
+
+    print(game, item_name(first));
+    print_cont(game, " and a ");
+    print_cont(game, item_name(second));
+
+    if first < GOLDBASE {
+        add_stuff(game, first, 1);
+    }
+
+    add_stuff(game, second, 1);
 }
 
 /// What a container holds: nothing, an item, two things (the first may be 100 gold pieces), three

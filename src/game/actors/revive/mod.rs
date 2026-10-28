@@ -16,7 +16,7 @@ use crate::game::data::state::Game;
 
 use self::safe_spot::{put_hero_at_safe_spot, restore_hero};
 
-use crate::game::data::state::{ActorRef, the_actors, the_hero, the_world};
+use crate::game::data::state::{ActorRef, the_actors, the_world};
 use crate::game::render::display::reset_input;
 use crate::game::render::screen_fx::fade_down;
 use crate::game::ui::music::set_mood;
@@ -48,12 +48,12 @@ pub fn revive(game: &mut Game, new: i16) {
 
         reset_input();
         the_actors.battle_flag = 0;
-        the_hero.good_fairy_timer = 0;
+        game.hero.good_fairy_timer = 0;
         the_actors.next_missile = 0;
 
         if new != 0 {
             stopscore();
-            leave_fallen_brother();
+            leave_fallen_brother(game);
             take_over_next_brother(game, hero);
             show_brother_placards(game);
             announce_brother(game);
@@ -62,13 +62,13 @@ pub fn revive(game: &mut Game, new: i16) {
         }
 
         put_hero_at_safe_spot(game, hero);
-        restore_hero(hero);
+        restore_hero(game, hero);
 
-        if the_hero.brother > LAST_BROTHER {
+        if game.hero.brother > LAST_BROTHER {
             game.screen.view_status = VIEW_GAME_OVER;
         } else {
             game.screen.view_status = VIEW_FADE_IN;
-            set_mood(1);
+            set_mood(game, 1);
         }
 
         the_world.extent_type = 0;

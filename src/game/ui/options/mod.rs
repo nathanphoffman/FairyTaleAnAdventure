@@ -69,7 +69,7 @@ pub fn choose_menu_entry(game: &mut Game, chosen_entry: i16) {
         };
 
         if refresh {
-            update_menu_availability();
+            update_menu_availability(game);
         }
     }
 }

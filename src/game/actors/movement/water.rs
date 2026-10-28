@@ -6,7 +6,7 @@ use super::{
 };
 use crate::game::data::state::Game;
 
-use crate::game::data::state::{the_hero, the_world};
+use crate::game::data::state::the_world;
 use crate::game::world::places::{find_place, transfer_hero};
 
 /// Depth of water that starts to matter, and how deep each wadeable terrain may be before the
@@ -80,7 +80,7 @@ impl Ctx {
             match outcome {
                 Wading::Nothing => {}
                 Wading::Drowned => {
-                    if the_hero.sector == PIT_SECTOR {
+                    if game.hero.sector == PIT_SECTOR {
                         if self.slot == 0 {
                             self.environ = 0;
                             the_world.new_region = DUNGEON_REGION;

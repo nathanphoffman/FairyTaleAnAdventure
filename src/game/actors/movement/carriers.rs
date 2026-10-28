@@ -7,10 +7,9 @@ use super::{
 };
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::player;
 
 use crate::game::actors::interaction::center_extent_on;
-use crate::game::data::state::{the_actors, the_hero};
+use crate::game::data::state::the_actors;
 
 /// The swan carries the hero once he is near, with the swan on its slot and the lasso in the pack.
 fn swan_carries(nearness: i16, carrier_slot: i16, has_lasso: bool) -> bool {
@@ -56,7 +55,7 @@ impl Ctx {
             self.terrain = 0;
 
             if the_actors.loaded_actor_file == SWAN_FILE {
-                self.swan_moves();
+                self.swan_moves(game);
             } else {
                 self.turtle_moves(game);
             }
@@ -68,7 +67,7 @@ impl Ctx {
     }
 
     /// The swan goes where the hero goes if he is near and has the lasso, otherwise it stays.
-    unsafe fn swan_moves(&mut self) {
+    unsafe fn swan_moves(&mut self, game: &mut Game) {
         unsafe {
             let mut actor = self.actor;
             let hero = ActorRef::new(0);
@@ -76,14 +75,14 @@ impl Ctx {
             if swan_carries(
                 the_actors.raft_nearness,
                 the_actors.carrier_slot,
-                player().stuff()[STUFF_SWAN_ITEM] != 0,
+                game.hero.stuff()[STUFF_SWAN_ITEM] != 0,
             ) {
                 self.facing = hero.facing as i16;
                 actor.abs_x = hero.abs_x;
                 XTEST = hero.abs_x;
                 actor.abs_y = hero.abs_y;
                 YTEST = hero.abs_y;
-                the_hero.riding = RIDING_SWAN;
+                game.hero.riding = RIDING_SWAN;
             } else {
                 XTEST = actor.abs_x;
                 YTEST = actor.abs_y;
@@ -104,7 +103,7 @@ impl Ctx {
                 self.facing = hero.facing as i16;
                 XTEST = hero.abs_x;
                 YTEST = hero.abs_y;
-                the_hero.riding = RIDING_TURTLE;
+                game.hero.riding = RIDING_TURTLE;
                 self.image = self.facing + self.facing;
 
                 if hero.state as i16 == WALKING {
@@ -142,7 +141,7 @@ impl Ctx {
 
             XTEST = pos_x(ax, self.facing, TURTLE_STEP);
             YTEST = pos_y(ay, self.facing, TURTLE_STEP);
-            the_hero.riding = 0;
+            game.hero.riding = 0;
 
             // Masks off the low bits (a cheap remainder or a flag test).
             self.image = self.facing + self.facing + (self.cycle & 1);
@@ -153,7 +152,7 @@ impl Ctx {
     pub(super) unsafe fn raft(&mut self, game: &mut Game) -> Pc {
         unsafe {
             let mut actor = self.actor;
-            the_hero.riding = 0;
+            game.hero.riding = 0;
 
             if the_actors.carrier_slot != RIDING_RAFT || the_actors.raft_nearness != 2 {
                 return Pc::Statc;
@@ -169,7 +168,7 @@ impl Ctx {
 
             actor.abs_x = XTEST;
             actor.abs_y = YTEST;
-            the_hero.riding = RIDING_RAFT;
+            game.hero.riding = RIDING_RAFT;
 
             Pc::Statc
         }

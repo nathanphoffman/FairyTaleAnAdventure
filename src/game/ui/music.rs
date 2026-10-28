@@ -3,7 +3,8 @@
 //! The music depends on what the hero is doing: dying, in the astral plane, fighting, indoors,
 //! or just walking by day or night. `track` holds the four voices of each tune in order.
 
-use crate::game::data::state::{the_actors, the_hero, the_world};
+use crate::game::data::state::Game;
+use crate::game::data::state::{the_actors, the_world};
 use crate::game::data::tables::menus;
 use crate::game::files::loading::tune_tracks;
 use crate::platform::audio::{Track, playscore, set_instrument, setscore, stopscore};
@@ -61,8 +62,8 @@ pub fn export_tunes(dir: &std::path::Path) {
 
 /// Picks the tune for the situation and plays it right away if `now` is set, otherwise changes
 /// to it at the end of the current one. If music is switched off, stops the music.
-pub fn set_mood(now: i8) {
-    let tune = pick_tune();
+pub fn set_mood(game: &mut Game, now: i8) {
+    let tune = pick_tune(game);
 
     // Masks with GAME_MENU, keeping only the bits that matter here.
     if unsafe { menus[GAME_MENU].enabled[MUSIC_ENTRY] } & 1 != 0 {
@@ -78,14 +79,14 @@ pub fn set_mood(now: i8) {
 
 /// The tune for what the hero is doing: dying, in the astral plane, fighting, indoors (which also
 /// picks the instrument for houses or caves), or walking by day or by night.
-fn pick_tune() -> usize {
+fn pick_tune(game: &mut Game) -> usize {
     unsafe {
         if the_actors.list[0].vitality == 0 {
             TUNE_DEATH
-        } else if the_hero.x > ASTRAL_X.0
-            && the_hero.x < ASTRAL_X.1
-            && the_hero.y > ASTRAL_Y.0
-            && the_hero.y < ASTRAL_Y.1
+        } else if game.hero.x > ASTRAL_X.0
+            && game.hero.x < ASTRAL_X.1
+            && game.hero.y > ASTRAL_Y.0
+            && game.hero.y < ASTRAL_Y.1
         {
             TUNE_ASTRAL
         } else if the_actors.battle_flag != 0 {

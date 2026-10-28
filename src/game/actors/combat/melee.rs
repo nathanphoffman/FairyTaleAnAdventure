@@ -5,7 +5,7 @@ use crate::game::actors::interaction::hit_actor;
 use crate::game::data::random::{bitrand, rand4, rand8, rand256};
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::{the_actors, the_hero, the_world};
+use crate::game::data::state::{the_actors, the_world};
 use crate::game::files::loading::play_effect;
 use crate::game::world::map::{step_x, step_y};
 
@@ -110,7 +110,7 @@ pub(super) unsafe fn swing(game: &mut Game, i: usize) {
             strength,
             tip: weapon_tip(attacker, facing, strength),
             reach: if i == 0 {
-                hero_reach(the_hero.brave)
+                hero_reach(game.hero.brave)
             } else {
                 enemy_reach(rand4() as i16)
             },
@@ -141,7 +141,7 @@ unsafe fn swing_at(game: &mut Game, swing: &Swing, j: usize) -> bool {
             swing.reach,
             the_world.freeze_timer != 0,
             swing.strength,
-            the_hero.brave,
+            game.hero.brave,
             rand256,
         ) {
             SwingResult::Hit => {

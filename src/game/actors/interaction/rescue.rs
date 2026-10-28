@@ -2,13 +2,11 @@
 
 use super::extents::center_extent_on;
 use crate::game::data::state::Game;
-use crate::game::data::state::player;
 use crate::game::render::display::delay;
 use crate::game::render::screen::FontKind;
 
 use crate::game::data::globals::princesses_rescued;
 use crate::game::data::object_tables::region_objects;
-use crate::game::data::state::the_hero;
 use crate::game::render::screen_fx::{map_message, message_off};
 use crate::game::ui::messages::name;
 use crate::game::ui::text::{draw_placard_border, placard_text, speak};
@@ -76,13 +74,13 @@ pub fn rescue_princess(game: &mut Game) {
         center_extent_on(0, PRINCESS_EXTENT.0, PRINCESS_EXTENT.1);
         let objects = region_objects(INSIDE_OBJECTS);
         objects[PRINCESS_OBJECT].ob_id = PRINCESS_OBJECT_ID;
-        player().stuff_mut()[PRINCESS_STUFF] = 1;
+        game.hero.stuff_mut()[PRINCESS_STUFF] = 1;
         speak(game, REWARD_MESSAGE);
-        the_hero.wealth = the_hero.wealth.wrapping_add(REWARD_GOLD);
+        game.hero.wealth = game.hero.wealth.wrapping_add(REWARD_GOLD);
         objects[CAPTIVE_OBJECT].ob_stat = 0;
 
         for item in KEY_ITEMS {
-            player().stuff_mut()[item] = (player().stuff()[item]).wrapping_add(KEYS_REWARD);
+            game.hero.stuff_mut()[item] = (game.hero.stuff()[item]).wrapping_add(KEYS_REWARD);
         }
     }
 }

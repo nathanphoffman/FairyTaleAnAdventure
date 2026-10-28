@@ -9,7 +9,7 @@ use crate::game::data::globals::{
 };
 use crate::game::data::object_tables::{dstobs, glbobs, mapobs, ob_listg, region_objects};
 use crate::game::data::state::Game;
-use crate::game::data::state::{SAVED_STUFF_SLOTS, player, the_actors, the_hero, the_world};
+use crate::game::data::state::{SAVED_STUFF_SLOTS, the_actors, the_world};
 use crate::game::data::tables::extent_list;
 use crate::game::data::types::{Extent, Missile, Shape, WorldObject};
 
@@ -134,29 +134,29 @@ fn transfer_variables(game: &mut Game, t: &mut Transfer) {
     unsafe {
         t.u16(&mut *(&raw mut the_world.map_x));
         t.u16(&mut *(&raw mut the_world.map_y));
-        t.u16(&mut *(&raw mut the_hero.x));
-        t.u16(&mut *(&raw mut the_hero.y));
-        t.u16(&mut *(&raw mut the_hero.safe_x));
-        t.u16(&mut *(&raw mut the_hero.safe_y));
-        t.u16(&mut *(&raw mut the_hero.safe_r));
+        t.u16(&mut *(&raw mut game.hero.x));
+        t.u16(&mut *(&raw mut game.hero.y));
+        t.u16(&mut *(&raw mut game.hero.safe_x));
+        t.u16(&mut *(&raw mut game.hero.safe_y));
+        t.u16(&mut *(&raw mut game.hero.safe_r));
         t.u16(&mut *(&raw mut the_world.tile_x));
         t.u16(&mut *(&raw mut the_world.tile_y));
         t.u16(&mut *(&raw mut game.ui.cheat_enabled));
-        t.u16(&mut *(&raw mut the_hero.riding));
-        t.u16(&mut *(&raw mut the_hero.flying));
+        t.u16(&mut *(&raw mut game.hero.riding));
+        t.u16(&mut *(&raw mut game.hero.flying));
         t.u16(&mut *(&raw mut the_actors.carrier_slot));
         t.u16(&mut *(&raw mut the_actors.turtle_nearness));
         t.u16(&mut *(&raw mut the_actors.raft_nearness));
-        t.u16(&mut *(&raw mut the_hero.brave));
-        t.u16(&mut *(&raw mut the_hero.luck));
-        t.u16(&mut *(&raw mut the_hero.kindness));
-        t.u16(&mut *(&raw mut the_hero.wealth));
-        t.u16(&mut *(&raw mut the_hero.hunger));
-        t.u16(&mut *(&raw mut the_hero.fatigue));
-        t.u16(&mut *(&raw mut the_hero.brother));
+        t.u16(&mut *(&raw mut game.hero.brave));
+        t.u16(&mut *(&raw mut game.hero.luck));
+        t.u16(&mut *(&raw mut game.hero.kindness));
+        t.u16(&mut *(&raw mut game.hero.wealth));
+        t.u16(&mut *(&raw mut game.hero.hunger));
+        t.u16(&mut *(&raw mut game.hero.fatigue));
+        t.u16(&mut *(&raw mut game.hero.brother));
         t.u16(&mut *(&raw mut princesses_rescued));
-        t.u16(&mut *(&raw mut the_hero.sector));
-        t.u16(&mut *(&raw mut the_hero.place));
+        t.u16(&mut *(&raw mut game.hero.sector));
+        t.u16(&mut *(&raw mut game.hero.place));
         t.u16(&mut *(&raw mut the_world.day_clock));
         t.u16(&mut *(&raw mut the_world.light_level));
         t.u16(&mut *(&raw mut the_actors.loaded_actor_file));
@@ -229,11 +229,11 @@ fn transfer_missile(t: &mut Transfer, m: &mut Missile) {
 
 /// Saves or loads the three brothers' item lists and the missiles (the count `next_missile` is saved
 /// elsewhere).
-fn transfer_party(t: &mut Transfer) {
+fn transfer_party(game: &mut Game, t: &mut Transfer) {
     unsafe {
-        t.bytes(&mut player().julstuff[..SAVED_STUFF_SLOTS]);
-        t.bytes(&mut player().philstuff[..SAVED_STUFF_SLOTS]);
-        t.bytes(&mut player().kevstuff[..SAVED_STUFF_SLOTS]);
+        t.bytes(&mut game.hero.julstuff[..SAVED_STUFF_SLOTS]);
+        t.bytes(&mut game.hero.philstuff[..SAVED_STUFF_SLOTS]);
+        t.bytes(&mut game.hero.kevstuff[..SAVED_STUFF_SLOTS]);
 
         for missile in (*(&raw mut the_actors.missiles)).iter_mut() {
             transfer_missile(t, missile);
@@ -256,7 +256,7 @@ pub fn transfer_all(game: &mut Game, t: &mut Transfer) {
             transfer_actor(t, &mut *(&raw mut the_actors.list[i]));
         }
 
-        transfer_party(t);
+        transfer_party(game, t);
 
         for extent in (*(&raw mut extent_list)).iter_mut().take(SAVED_EXTENTS) {
             transfer_extent(t, extent);

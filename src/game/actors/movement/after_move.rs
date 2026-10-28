@@ -15,18 +15,17 @@ use super::{
     VELOCITY_QUARTER, WALKING, WITCH_BODY_VITALITY, WORLD_MAX, WORLD_MIN, diroff, terrain,
 };
 use crate::game::data::state::Game;
-use crate::game::data::state::player;
 
 use crate::game::actors::encounters::check_death;
 use crate::game::data::object_tables::fallstates;
-use crate::game::data::state::{the_actors, the_hero, the_world};
+use crate::game::data::state::{the_actors, the_world};
 use crate::game::ui::music::set_mood;
 use crate::game::world::map::{move_camera_to, wrap_coordinate};
 use crate::game::world::objects::leave_item;
 
 impl Ctx {
     /// The remaining states: dying, dead, frozen, oscillating, asleep and falling.
-    pub(super) unsafe fn other_states(&mut self) -> Pc {
+    pub(super) unsafe fn other_states(&mut self, game: &mut Game) -> Pc {
         unsafe {
             let actor = self.actor;
             let s = self.state;
@@ -43,7 +42,7 @@ impl Ctx {
             } else if s == SLEEP {
                 self.image = FRAME_SLEEP;
             } else if s == FALL && actor.tactic < FALL_STEPS {
-                self.falling_frame();
+                self.falling_frame(game);
             }
 
             Pc::Cpx
@@ -80,16 +79,13 @@ impl Ctx {
     }
 
     /// One step of the fall into the pit: the next falling frame, and the slide slows down.
-    unsafe fn falling_frame(&mut self) {
-        unsafe {
-            let mut actor = self.actor;
-            self.terrain =
-                actor.tactic as i16 / FALL_STEPS_PER_FRAME + the_hero.brother * FALL_FRAMES;
-            self.image = fallstates.get(self.terrain as usize).copied().unwrap_or(0) as i16;
-            actor.tactic += 1;
-            actor.vel_x = (actor.vel_x as i32 * FALL_DRAG.0 / FALL_DRAG.1) as i8;
-            actor.vel_y = (actor.vel_y as i32 * FALL_DRAG.0 / FALL_DRAG.1) as i8;
-        }
+    fn falling_frame(&mut self, game: &mut Game) {
+        let mut actor = self.actor;
+        self.terrain = actor.tactic as i16 / FALL_STEPS_PER_FRAME + game.hero.brother * FALL_FRAMES;
+        self.image = fallstates.get(self.terrain as usize).copied().unwrap_or(0) as i16;
+        actor.tactic += 1;
+        actor.vel_x = (actor.vel_x as i32 * FALL_DRAG.0 / FALL_DRAG.1) as i8;
+        actor.vel_y = (actor.vel_y as i32 * FALL_DRAG.0 / FALL_DRAG.1) as i8;
     }
 
     /// Works out the terrain under the actor, and carries on sliding if it is on ice.
@@ -168,11 +164,11 @@ impl Ctx {
                 self.environ = ENVIRON_BACKWARDS;
             } else if j == TERRAIN_PIT && i == 0 && the_world.extent_type == PIT_XTYPE {
                 if actor.state as i16 != FALL {
-                    self.image = fallstates[(the_hero.brother * FALL_FRAMES) as usize] as i16;
+                    self.image = fallstates[(game.hero.brother * FALL_FRAMES) as usize] as i16;
                     actor.state = FALL as i8;
                     actor.tactic = 0;
-                    the_hero.luck = the_hero.luck.wrapping_sub(PIT_LUCK_COST);
-                    set_mood(1);
+                    game.hero.luck = game.hero.luck.wrapping_sub(PIT_LUCK_COST);
+                    set_mood(game, 1);
                 }
 
                 self.environ = ENVIRON_ICE;
@@ -206,11 +202,11 @@ impl Ctx {
             actor.index = self.image as i8;
 
             if i == 0 {
-                self.hero_wrap();
-                the_hero.x = actor.abs_x;
-                the_hero.y = actor.abs_y;
-                move_camera_to(the_hero.x as i32, the_hero.y as i32);
-                the_hero.safe_flag = self.terrain as i8;
+                self.hero_wrap(game);
+                game.hero.x = actor.abs_x;
+                game.hero.y = actor.abs_y;
+                move_camera_to(game.hero.x as i32, game.hero.y as i32);
+                game.hero.safe_flag = self.terrain as i8;
             }
 
             if actor.vitality == 0 {
@@ -232,7 +228,7 @@ impl Ctx {
             let i = self.slot;
 
             if the_actors.fiery_death != 0 {
-                if i == 0 && player().stuff()[STUFF_FIREPROOF] != 0 {
+                if i == 0 && game.hero.stuff()[STUFF_FIREPROOF] != 0 {
                     actor.environ = 0;
                 } else if actor.environ > ENVIRON_SINKING {
                     actor.vitality = 0;
@@ -303,7 +299,7 @@ impl Ctx {
 
     /// The hero leaving the edge of the world comes back on the other side (outdoor regions only);
     /// whatever the hero rides is moved along.
-    unsafe fn hero_wrap(&mut self) {
+    unsafe fn hero_wrap(&mut self, game: &mut Game) {
         unsafe {
             let mut actor = self.actor;
 
@@ -323,7 +319,7 @@ impl Ctx {
                 return;
             }
 
-            if the_hero.riding > 1 {
+            if game.hero.riding > 1 {
                 the_actors.list[CARRIER_SLOT].abs_x = actor.abs_x;
                 the_actors.list[CARRIER_SLOT].abs_y = actor.abs_y;
             }
@@ -331,10 +327,10 @@ impl Ctx {
     }
 
     /// Where the actor is on screen: relative to the map, with the sprite's anchor offset.
-    pub(super) unsafe fn statc(&mut self) {
+    pub(super) unsafe fn statc(&mut self, game: &mut Game) {
         unsafe {
             let mut actor = self.actor;
-            let (ox, oy) = if actor.kind == CARRIER && the_hero.riding == RIDING_SWAN {
+            let (ox, oy) = if actor.kind == CARRIER && game.hero.riding == RIDING_SWAN {
                 ANCHOR_SWAN
             } else if actor.kind == RAFT || actor.kind == CARRIER || actor.kind == DRAGON {
                 ANCHOR_LARGE

@@ -8,12 +8,11 @@ use super::{
     pos_y, terrain,
 };
 use crate::game::data::state::Game;
-use crate::game::data::state::player;
 
 use crate::game::actors::interaction::blocked_at;
 use crate::game::actors::steering::{STEER_OFFSET, steer_actor};
 use crate::game::data::random::rand4;
-use crate::game::data::state::{the_actors, the_hero};
+use crate::game::data::state::the_actors;
 use crate::game::data::tables::swing_transitions;
 use crate::game::world::key_doors::{bumped_locked_door, open_door_near};
 use crate::game::world::map::{step_x, step_y};
@@ -110,7 +109,7 @@ impl Ctx {
             }
 
             self.step = step_length(
-                self.slot == 0 && the_hero.riding == RIDING_TURTLE,
+                self.slot == 0 && game.hero.riding == RIDING_TURTLE,
                 self.environ,
             );
 
@@ -140,7 +139,7 @@ impl Ctx {
                 bumped_locked_door = 0;
             }
 
-            player().stuff()[STUFF_GOLD_KEY_SLOT] != 0 && self.terrain == BLOCK_PASSABLE_WITH_KEY
+            game.hero.stuff()[STUFF_GOLD_KEY_SLOT] != 0 && self.terrain == BLOCK_PASSABLE_WITH_KEY
         }
     }
 
@@ -150,7 +149,7 @@ impl Ctx {
     unsafe fn slide_on_ice(&mut self, game: &mut Game) -> Option<Pc> {
         unsafe {
             let mut actor = self.actor;
-            self.step = if the_hero.riding == RIDING_SWAN {
+            self.step = if game.hero.riding == RIDING_SWAN {
                 ICE_TOP_SPEED_SWAN
             } else {
                 ICE_TOP_SPEED
@@ -169,7 +168,7 @@ impl Ctx {
             XTEST = (actor.abs_x as i32 + actor.vel_x as i32 / VELOCITY_SCALE) as u16;
             YTEST = (actor.abs_y as i32 + actor.vel_y as i32 / VELOCITY_SCALE) as u16;
 
-            if the_hero.riding == RIDING_SWAN {
+            if game.hero.riding == RIDING_SWAN {
                 steer_actor(0, -(nvx as i32), -(nvy as i32), STEER_OFFSET);
                 self.facing = actor.facing as i16;
 
@@ -224,7 +223,7 @@ impl Ctx {
     /// slows the actor to a halt).
     pub(super) unsafe fn new_loc(&mut self, game: &mut Game) -> Pc {
         unsafe {
-            self.pick_walking_frame();
+            self.pick_walking_frame(game);
 
             if self.environ == ENVIRON_ICE {
                 return Pc::Cpx;
@@ -238,7 +237,7 @@ impl Ctx {
             self.look_at_new_terrain(game);
 
             if climbs_out_of_water(self.environ, self.terrain) {
-                if the_hero.sector != PIT_SECTOR {
+                if game.hero.sector != PIT_SECTOR {
                     self.environ -= 1;
                 }
 
@@ -253,19 +252,17 @@ impl Ctx {
 
     /// Faces the actor the way it will step, and picks the walking frame for this tick (a rider and
     /// the wraiths keep their one frame).
-    unsafe fn pick_walking_frame(&mut self) {
-        unsafe {
-            let mut actor = self.actor;
-            actor.facing = self.facing as i8;
-            self.frame_base = diroff(self.facing);
-            self.image = self.frame_base;
+    fn pick_walking_frame(&mut self, game: &mut Game) {
+        let mut actor = self.actor;
+        actor.facing = self.facing as i8;
+        self.frame_base = diroff(self.facing);
+        self.image = self.frame_base;
 
-            if !(the_hero.riding != 0 && self.slot == 0) && actor.race != RACE_WRAITH {
-                self.image = (self.image as i32
-                    // Masks with WALK_FRAMES_MASK, keeping only the bits that matter here.
-                    + ((self.cycle as i32 + self.slot) & WALK_FRAMES_MASK))
-                    as i16;
-            }
+        if !(game.hero.riding != 0 && self.slot == 0) && actor.race != RACE_WRAITH {
+            self.image = (self.image as i32
+                // Masks with WALK_FRAMES_MASK, keeping only the bits that matter here.
+                + ((self.cycle as i32 + self.slot) & WALK_FRAMES_MASK))
+                as i16;
         }
     }
 

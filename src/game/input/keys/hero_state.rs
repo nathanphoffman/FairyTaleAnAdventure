@@ -11,7 +11,7 @@ use crate::game::data::state::Game;
 
 use crate::game::actors::interaction::blocked_at;
 use crate::game::data::random::{fta_rand, rand4};
-use crate::game::data::state::{ActorRef, the_actors, the_hero, the_world};
+use crate::game::data::state::{ActorRef, the_actors, the_world};
 use crate::game::data::tables::compass_lit_direction;
 use crate::game::input::handler::{joystick_fire, mouse_buttons};
 use crate::game::ui::text::show_event;
@@ -66,7 +66,7 @@ pub(super) unsafe fn fighting_state(game: &mut Game, state: i8) -> i8 {
             return enter_shooting_zone(game, state);
         }
 
-        if the_hero.riding == BIRD {
+        if game.hero.riding == BIRD {
             try_to_dismount(game, hero);
 
             return state;
@@ -122,7 +122,7 @@ fn try_to_dismount(game: &mut Game, mut hero: ActorRef) {
                     0,
                 ) == 0
             {
-                the_hero.riding = 0;
+                game.hero.riding = 0;
                 hero.abs_y = ytest;
             }
         } else {
@@ -150,7 +150,7 @@ pub(super) unsafe fn walking_state(game: &mut Game, state: i8) -> i8 {
 
         compass_lit_direction = stumble(
             compass_lit_direction,
-            the_hero.hunger,
+            game.hero.hunger,
             || rand4() == 0,
             // Masks off the low bits (a cheap remainder or a flag test).
             || fta_rand() & 1 != 0,

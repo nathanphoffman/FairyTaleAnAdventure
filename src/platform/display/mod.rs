@@ -11,6 +11,7 @@ mod hooks;
 
 mod scripting;
 
+use crate::game::data::state::Game;
 use crate::gfx::scene::{FRAME_HEIGHT, FRAME_WIDTH, Scene, compose};
 use sdl2::EventPump;
 use sdl2::pixels::PixelFormatEnum;
@@ -180,25 +181,25 @@ fn draw(d: &mut Display, scene: &Scene) {
 }
 
 /// Shows the scene on screen (the game calls this when it flips pages).
-pub fn present(scene: &Scene) {
+pub fn present(game: &mut Game) {
     BEAT.fetch_add(1, Ordering::Relaxed);
     DISPLAY.with(|d| {
         let mut d = d.borrow_mut();
 
         let Some(d) = d.as_mut() else { return };
-        draw(d, scene);
+        draw(d, &game.screen.scene());
         d.presents += 1;
         events::handle_events(d);
-        hooks::test_hooks(d);
+        hooks::test_hooks(game, d);
     });
 }
 
 /// Redraws every tick. Some screens (the item list, story pages) never flip pages, but the pointer
 /// still moves and text is still printed into the bitmaps.
-fn redraw(scene: &Scene) {
+fn redraw(game: &Game) {
     DISPLAY.with(|d| {
         if let Some(d) = d.borrow_mut().as_mut() {
-            draw(d, scene);
+            draw(d, &game.screen.scene());
         }
     });
 }
@@ -217,13 +218,13 @@ fn pace(d: &mut Display) -> Duration {
 }
 
 /// Waits for the next 50 Hz tick (the Amiga's vertical blank), keeping the window alive.
-pub fn wait_frame(scene: &Scene) {
+pub fn wait_frame(game: &mut Game) {
     BEAT.fetch_add(1, Ordering::Relaxed);
     let wait = DISPLAY.with(|d| {
         let mut d = d.borrow_mut();
         let d = d.as_mut()?;
         events::handle_events(d);
-        hooks::test_hooks(d);
+        hooks::test_hooks(game, d);
         d.ticks += 1;
         scripting::run_script(d);
 
@@ -236,13 +237,13 @@ pub fn wait_frame(scene: &Scene) {
             std::thread::sleep(w);
         }
 
-        redraw(scene);
+        redraw(game);
     }
 }
 
 /// Waits n ticks of 1/50 second, showing the scene.
-pub fn delay(scene: &Scene, ticks: i32) {
+pub fn delay(game: &mut Game, ticks: i32) {
     for _ in 0..ticks.max(1) {
-        wait_frame(scene);
+        wait_frame(game);
     }
 }

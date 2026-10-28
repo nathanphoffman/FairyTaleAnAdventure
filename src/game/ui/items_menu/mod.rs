@@ -15,7 +15,6 @@ use self::item_list::show_item_list;
 use self::look::look_around;
 use self::take::take_nearest;
 use crate::game::data::state::Game;
-use crate::game::data::state::player;
 
 use crate::game::data::tables::item_list;
 use crate::game::data::types::InvItem;
@@ -55,8 +54,8 @@ fn item(i: usize) -> &'static InvItem {
 }
 
 /// Adds `amount` to the hero's count of inventory slot `slot`.
-pub(in crate::game::ui) fn add_stuff(slot: usize, amount: u8) {
-    player().stuff_mut()[slot] = (player().stuff()[slot]).wrapping_add(amount);
+pub(in crate::game::ui) fn add_stuff(game: &mut Game, slot: usize, amount: u8) {
+    game.hero.stuff_mut()[slot] = (game.hero.stuff()[slot]).wrapping_add(amount);
 }
 
 /// Handles an entry of the Items menu.

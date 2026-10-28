@@ -4,7 +4,7 @@ use super::{CARRIER, FALL, OBJECTS, RAFT_SLOT};
 use crate::game::data::object_tables::minimap;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::{the_hero, the_world};
+use crate::game::data::state::the_world;
 use crate::game::render::blit::{add_scenery_mask, clear_memory};
 
 /// The mask buffer (the mask region) is cleared before each sprite: 96 lines of 64 words, plus 5.
@@ -62,16 +62,22 @@ pub(super) fn clear_scenery_mask(game: &mut Game) {
 
 /// True for sprites drawn in front of everything: carriers, the hero when riding the swan or in
 /// certain places, arrows and some special races.
-pub(super) unsafe fn drawn_in_front(actor: ActorRef, i: i32, atype: i16, inum: i16) -> bool {
+pub(super) unsafe fn drawn_in_front(
+    game: &mut Game,
+    actor: ActorRef,
+    i: i32,
+    atype: i16,
+    inum: i16,
+) -> bool {
     unsafe {
         if atype == CARRIER
             || (i == 0
-                && (the_hero.riding == RIDING_SWAN
+                && (game.hero.riding == RIDING_SWAN
                     || the_world.extent_type == NO_MASK_XTYPE
-                    || (the_hero.x > FRONT_AREA_X.0
-                        && the_hero.x < FRONT_AREA_X.1
-                        && the_hero.y > FRONT_AREA_Y.0
-                        && the_hero.y < FRONT_AREA_Y.1)))
+                    || (game.hero.x > FRONT_AREA_X.0
+                        && game.hero.x < FRONT_AREA_X.1
+                        && game.hero.y > FRONT_AREA_Y.0
+                        && game.hero.y < FRONT_AREA_Y.1)))
         {
             return true;
         }
@@ -188,7 +194,7 @@ impl SpriteTiles {
                 k = TYPE_BRIDGE;
             }
 
-            let on_bridge = the_hero.sector == BRIDGE_SECTOR && self.i != RAFT_SLOT;
+            let on_bridge = game.hero.sector == BRIDGE_SECTOR && self.i != RAFT_SLOT;
 
             match scenery_rule(k, xm, ym, ystop, on_bridge) {
                 SceneryRule::Skip => return None,

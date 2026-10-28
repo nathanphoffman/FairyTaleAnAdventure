@@ -3,8 +3,7 @@
 use super::{CAVE, DOORCOUNT, LOWER_HALF_BIT, TILE_COLUMN_MASK, TILE_WIDTH};
 use crate::game::data::object_tables::page_colors;
 use crate::game::data::state::Game;
-use crate::game::data::state::player;
-use crate::game::data::state::{the_hero, the_world};
+use crate::game::data::state::the_world;
 use crate::game::data::tables::door_list;
 use crate::game::data::types::Door;
 use crate::game::render::screen_fx::fade_page;
@@ -79,9 +78,9 @@ pub(super) unsafe fn enter_door(game: &mut Game, xtest: u16, ytest: u16) {
         };
 
         let d = door_at(index);
-        let statues = player().stuff()[STATBASE];
+        let statues = game.hero.stuff()[STATBASE];
 
-        if may_enter(d, the_hero.x, the_hero.y, statues) {
+        if may_enter(d, game.hero.x, game.hero.y, statues) {
             let (x, y) = inside_spot(d);
             the_world.new_region = region_inside(d);
             transfer_hero(game, x, y, 0);

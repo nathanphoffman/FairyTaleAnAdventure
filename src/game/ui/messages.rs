@@ -7,7 +7,6 @@
 //! story tables, breaks it into lines that fit the panel and prints each one.
 
 use crate::game::data::state::Game;
-use crate::game::data::state::the_hero;
 use crate::game::data::tables::brother_names;
 use crate::game::ui::text::{draw_text, move_to};
 use crate::gfx::bitmap::Rect;
@@ -39,8 +38,8 @@ const NAME_MARK: u8 = b'%';
 const LINE_BUFFER: usize = 200;
 
 /// The current brother's name.
-fn brother_name() -> &'static str {
-    brother_names[unsafe { the_hero.brother } as usize - 1]
+fn brother_name(game: &Game) -> &'static str {
+    brother_names[{ game.hero.brother } as usize - 1]
 }
 
 /// Starts a new line in the panel and prints `s` on it.
@@ -101,8 +100,8 @@ impl LineBuffer {
     }
 
     /// Adds the current brother's name. Returns its length.
-    fn put_brother_name(&mut self) -> i16 {
-        let name = brother_name();
+    fn put_brother_name(&mut self, game: &mut Game) -> i16 {
+        let name = brother_name(game);
 
         for c in name.bytes() {
             self.put(c);
@@ -130,7 +129,7 @@ pub fn print_wrapped(game: &mut Game, message: impl AsRef<[u8]>) {
     let mut i: i16 = 0;
 
     loop {
-        let line_break = copy_up_to_a_line(&mut chars, &mut buffer, &mut i);
+        let line_break = copy_up_to_a_line(game, &mut chars, &mut buffer, &mut i);
 
         if let Some(line_break) = line_break {
             // found a wrap point: end the line and print it
@@ -161,6 +160,7 @@ pub fn print_wrapped(game: &mut Game, message: impl AsRef<[u8]>) {
 /// Copies message characters into the buffer until a line is full or the text ends, counting them in
 /// `i` and returning where the last space (or the end) was, or `None` if there was none.
 fn copy_up_to_a_line(
+    game: &mut Game,
     chars: &mut impl Iterator<Item = u8>,
     buffer: &mut LineBuffer,
     i: &mut i16,
@@ -187,7 +187,7 @@ fn copy_up_to_a_line(
         }
 
         if c == NAME_MARK {
-            *i += buffer.put_brother_name();
+            *i += buffer.put_brother_name(game);
         } else {
             buffer.put(c);
         }
@@ -200,7 +200,8 @@ fn copy_up_to_a_line(
 
 /// Prints "<Brother> found <container> containing ", ready for the contents to be added.
 pub fn announce_container(game: &mut Game, s: &str) {
-    print(game, brother_name());
+    let name = brother_name(game);
+    print(game, name);
     print_cont(game, " found ");
     print_cont(game, s);
     print_cont(game, " containing ");
@@ -208,12 +209,14 @@ pub fn announce_container(game: &mut Game, s: &str) {
 
 /// Prints "<Brother> found <treasure>".
 pub fn announce_treasure(game: &mut Game, s: &str) {
-    print(game, brother_name());
+    let name = brother_name(game);
+    print(game, name);
     print_cont(game, " found ");
     print_cont(game, s);
 }
 
 /// Adds the current brother's name to the line being printed.
 pub fn name(game: &mut Game) {
-    print_cont(game, brother_name());
+    let name = brother_name(game);
+    print_cont(game, name);
 }

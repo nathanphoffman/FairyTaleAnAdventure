@@ -5,7 +5,6 @@
 //! has the matching item (`item_menu_state`).
 
 use crate::game::data::state::Game;
-use crate::game::data::state::the_hero;
 use crate::game::data::tables::{key_colors, label1, menus};
 use crate::game::input::handler::forget_last_menu;
 use crate::game::render::screen::PortId;
@@ -55,19 +54,19 @@ const ENTRY_WIDTH: i32 = 6;
 const GIVE_GOLD_MIN: i16 = 2;
 
 /// Switches the use, magic, keys and give entries on or off to match what the hero is carrying.
-pub fn update_menu_availability() {
+pub fn update_menu_availability(game: &mut Game) {
     unsafe {
         for i in 0..MAGIC_ITEMS {
             menus[MAGIC].enabled[i + ITEM_ENTRIES_START] =
-                item_menu_state(i as i32 + MAGIC_ITEM_BASE) as i8;
-            menus[USE].enabled[i] = item_menu_state(i as i32) as i8;
+                item_menu_state(game, i as i32 + MAGIC_ITEM_BASE) as i8;
+            menus[USE].enabled[i] = item_menu_state(game, i as i32) as i8;
         }
 
         // "use a key" is available if any key slot reports available
         let mut keys = GREYED;
 
         for i in 0..KEY_ITEMS {
-            let flag = item_menu_state(i as i32 + KEY_ITEM_BASE) as i8;
+            let flag = item_menu_state(game, i as i32 + KEY_ITEM_BASE) as i8;
             menus[KEYS].enabled[i + ITEM_ENTRIES_START] = flag;
 
             if flag == AVAILABLE {
@@ -76,16 +75,16 @@ pub fn update_menu_availability() {
         }
 
         menus[USE].enabled[USE_KEY_ENTRY] = keys;
-        menus[USE].enabled[USE_SUNSTONE_ENTRY] = item_menu_state(SUNSTONE) as i8;
-        menus[GIVE].enabled[GIVE_GOLD_ENTRY] = if the_hero.wealth > GIVE_GOLD_MIN {
+        menus[USE].enabled[USE_SUNSTONE_ENTRY] = item_menu_state(game, SUNSTONE) as i8;
+        menus[GIVE].enabled[GIVE_GOLD_ENTRY] = if game.hero.wealth > GIVE_GOLD_MIN {
             AVAILABLE
         } else {
             GREYED
         }; // gold
 
         menus[GIVE].enabled[GIVE_BOOK_ENTRY] = GREYED;
-        menus[GIVE].enabled[GIVE_WRIT_ENTRY] = item_menu_state(WRIT) as i8;
-        menus[GIVE].enabled[GIVE_BONE_ENTRY] = item_menu_state(BONE) as i8;
+        menus[GIVE].enabled[GIVE_WRIT_ENTRY] = item_menu_state(game, WRIT) as i8;
+        menus[GIVE].enabled[GIVE_BONE_ENTRY] = item_menu_state(game, BONE) as i8;
     }
 }
 

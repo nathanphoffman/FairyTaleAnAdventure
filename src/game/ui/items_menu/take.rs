@@ -10,12 +10,11 @@ use super::{
 };
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::player;
 use crate::game::render::screen::FontKind;
 
 use crate::game::actors::interaction::{eat_food, find_nearest_figure};
 use crate::game::data::object_tables::{itrans, ob_listg};
-use crate::game::data::state::{the_actors, the_hero, the_world};
+use crate::game::data::state::{the_actors, the_world};
 use crate::game::render::screen_fx::{map_message, win_colors};
 use crate::game::ui::messages::{announce_container, announce_treasure, print_cont};
 use crate::game::ui::text::{queue_print, show_event};
@@ -60,7 +59,7 @@ pub(super) unsafe fn take_nearest(game: &mut Game) {
         queue_print(PRQ_VITALITY);
         find_nearest_figure(0, TAKE_RANGE);
 
-        player().stuff_mut()[ARROWBASE] = 0;
+        game.hero.stuff_mut()[ARROWBASE] = 0;
         if the_actors.nearest_object == 0 {
             queue_print(PRQ_NOTHING_NEAR);
 
@@ -89,11 +88,12 @@ unsafe fn finish_pickup(game: &mut Game) {
     unsafe {
         change_object(the_actors.nearest_object as i32, 2);
         add_stuff(
+            game,
             ARROWS,
-            (player().stuff()[ARROWBASE] as u32 * ARROWS_PER_QUIVER) as u8,
+            (game.hero.stuff()[ARROWBASE] as u32 * ARROWS_PER_QUIVER) as u8,
         );
 
-        if player().stuff()[TALISMAN] != 0 {
+        if game.hero.stuff()[TALISMAN] != 0 {
             game.ui.quit_requested = 1;
             game.screen.view_status = VIEW_GAME_OVER;
             map_message(game);
@@ -113,10 +113,10 @@ unsafe fn take_object(game: &mut Game) -> bool {
         // Masks with OWNER_MASK, keeping only the bits that matter here.
         let owner = actor.vitality as u32 & OWNER_MASK;
 
-        match classify_take(id, the_hero.hunger, the_world.region) {
+        match classify_take(id, game.hero.hunger, the_world.region) {
             Take::Gold => {
                 announce_treasure(game, "50 gold pieces");
-                the_hero.wealth += GOLD_FOUND;
+                game.hero.wealth += GOLD_FOUND;
 
                 true
             }
@@ -156,7 +156,7 @@ fn read_paper(game: &mut Game, indoors: bool) -> bool {
 /// Fruit is kept in the pack when the hero is not hungry, and eaten otherwise.
 fn take_fruit(game: &mut Game, keep: bool) -> bool {
     if keep {
-        add_stuff(FRUIT_SLOT, 1);
+        add_stuff(game, FRUIT_SLOT, 1);
         show_event(game, EVENT_FRUIT_KEPT);
     } else {
         eat_food(game, FRUIT_HUNGER);
@@ -175,12 +175,12 @@ unsafe fn take_brothers_goods(game: &mut Game, owner: u32) -> bool {
 
         for slot in 0..GOLDBASE {
             let other = if owner == 1 {
-                the_hero.julstuff[slot]
+                game.hero.julstuff[slot]
             } else {
-                the_hero.philstuff[slot]
+                game.hero.philstuff[slot]
             };
 
-            add_stuff(slot, other);
+            add_stuff(game, slot, other);
         }
 
         true
@@ -250,7 +250,7 @@ fn item_slot(id: u32, table: &[u8]) -> Option<usize> {
 fn take_plain_item(game: &mut Game, id: u32) -> bool {
     match item_slot(id, &itrans) {
         Some(slot) => {
-            add_stuff(slot, 1);
+            add_stuff(game, slot, 1);
             announce_treasure(game, "a ");
             print_cont(game, item_name(slot));
             print_cont(game, ".");

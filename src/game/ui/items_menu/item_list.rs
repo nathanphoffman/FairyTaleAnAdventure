@@ -3,7 +3,6 @@
 use super::{GOLDBASE, OBJECTS, item};
 use crate::game::data::object_tables::page_colors;
 use crate::game::data::state::Game;
-use crate::game::data::state::player;
 use crate::game::render::screen::{BitmapId, PortId, ViewPortId};
 use crate::game::render::screen_fx::show_still_screen;
 use crate::game::ui::text::queue_print;
@@ -78,7 +77,7 @@ fn item_pictures(game: &Game) -> Bitmap {
 fn draw_item_icons(game: &mut Game, page: BitmapId) {
     for slot in 0..GOLDBASE {
         let it = item(slot);
-        let shown = (player().stuff()[slot]).min(it.maxshown);
+        let shown = (game.hero.stuff()[slot]).min(it.maxshown);
         let x = it.xoff as i32 + ITEM_X_MARGIN;
         let mut y = it.yoff as u16;
         let source_row = it.image_number as i32 * ITEM_ROW_HEIGHT + it.img_off as i32;

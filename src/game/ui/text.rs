@@ -11,7 +11,6 @@
 
 use crate::game::data::object_tables::{pplay, prec, print_que};
 use crate::game::data::state::Game;
-use crate::game::data::state::player;
 use crate::game::data::story_text::{EVENT_MSG, PLACARD_MSGS, SPEECHES};
 use crate::game::render::screen::PortId;
 use crate::game::ui::messages::print_wrapped;
@@ -243,8 +242,8 @@ const MENU_STATE_HAVE: i32 = 10;
 const MENU_STATE_LACKING: i32 = 8;
 
 /// Menu state for an item: 10 if the player has item `n`, otherwise 8 (a menu item state).
-pub fn item_menu_state(n: i32) -> i32 {
-    if player().stuff()[n as usize] != 0 {
+pub fn item_menu_state(game: &mut Game, n: i32) -> i32 {
+    if game.hero.stuff()[n as usize] != 0 {
         MENU_STATE_HAVE
     } else {
         MENU_STATE_LACKING

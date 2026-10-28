@@ -4,7 +4,6 @@ use super::speeches::person_speaks;
 use crate::game::actors::interaction::find_nearest_figure;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::player;
 use crate::game::data::state::the_actors;
 use crate::game::data::tables::setfig_table;
 use crate::game::ui::text::speak;
@@ -64,7 +63,7 @@ pub(super) unsafe fn talk_option(game: &mut Game, chosen_entry: i16) -> bool {
             chosen_entry == YELL,
             distance,
             the_actors.active_carrier,
-            player().stuff()[SHELL] != 0,
+            game.hero.stuff()[SHELL] != 0,
         );
 
         carry_out(game, action, actor);
@@ -111,7 +110,7 @@ unsafe fn carry_out(game: &mut Game, action: TalkAction, mut actor: ActorRef) {
 
             TalkAction::TurtleHasShell => speak(game, SPEECH_TURTLE_HAS_SHELL),
             TalkAction::TurtleGivesShell => {
-                player().stuff_mut()[SHELL] = 1;
+                game.hero.stuff_mut()[SHELL] = 1;
                 speak(game, SPEECH_TURTLE_GIVES_SHELL);
             }
 

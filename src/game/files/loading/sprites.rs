@@ -2,7 +2,7 @@
 
 use super::{CARRIER, CFileInfo, DRAGON, cfile};
 use crate::game::data::state::Game;
-use crate::game::data::state::{the_actors, the_hero, the_world};
+use crate::game::data::state::{the_actors, the_world};
 use crate::game::data::types::SeqInfo;
 use crate::game::files::disk::{
     is_last_read_pending, last_read_finished, load_track_range, mark_read_unused, motor_off,
@@ -70,7 +70,7 @@ pub fn load_start_sprites(game: &mut Game) {
         game.memory.nextshape = 0;
         load_sprite_file(game, OBJECTS_FILE);
         finish_sprite_load(game, OBJECTS as i16);
-        load_sprite_file(game, the_hero.brother as i32 - 1);
+        load_sprite_file(game, game.hero.brother as i32 - 1);
         finish_sprite_load(game, PHIL as i16);
         load_sprite_file(game, RAFT_FILE);
         finish_sprite_load(game, RAFT as i16);

@@ -120,13 +120,13 @@ unsafe fn draw_one(
     unsafe {
         clear_scenery_mask(game);
 
-        let Some(mut sprite) = choose_image(actor, i, passmode) else {
+        let Some(mut sprite) = choose_image(game, actor, i, passmode) else {
             return Drawn::Done;
         };
 
         let bytes_wide = place_on_screen(game, &mut sprite);
 
-        if !adjust_for_depth(actor, i, cycle, passmode, &mut sprite) {
+        if !adjust_for_depth(game, actor, i, cycle, passmode, &mut sprite) {
             return Drawn::Done;
         }
 
@@ -222,7 +222,7 @@ unsafe fn blit_sprite(
         }
         save_background(game, current_sshape.backsave);
 
-        if !drawn_in_front(actor, i, sprite.atype, sprite.inum) {
+        if !drawn_in_front(game, actor, i, sprite.atype, sprite.inum) {
             mask_against_scenery(
                 game,
                 actor,

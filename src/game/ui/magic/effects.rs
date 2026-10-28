@@ -4,7 +4,7 @@ use crate::game::actors::encounters::check_death;
 use crate::game::data::random::rand8;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::{the_actors, the_hero, the_world};
+use crate::game::data::state::{the_actors, the_world};
 use crate::game::data::tables::stone_ring_sectors;
 use crate::game::data::types::Shape;
 use crate::game::render::screen::PortId;
@@ -55,13 +55,13 @@ pub(super) unsafe fn show_map(game: &mut Game) {
         draw_overview_map(game, the_world.map_x as i32, the_world.map_y as i32);
 
         // The hero on the overview map: his tile column minus the left edge of the shown sectors.
-        let x = ((the_hero.x >> TILE_SHIFT) as i64
+        let x = ((game.hero.x >> TILE_SHIFT) as i64
             // Shifts by TILE_SHIFT, converting between pixels, tiles, sectors or bytes.
             - ((the_world.sector_x as i64 + the_world.origin_x as i64) << TILE_SHIFT)
             - MARK_X_OFFSET) as u32;
 
         // The hero on the overview map: his position in 16 pixel steps minus the top edge of the shown sectors.
-        let y = ((the_hero.y >> TILE_SHIFT) as i64
+        let y = ((game.hero.y >> TILE_SHIFT) as i64
             // Shifts by TILE_SHIFT, converting between pixels, tiles, sectors or bytes.
             - ((the_world.sector_y as i64 + the_world.origin_y as i64) << TILE_SHIFT)
             + MARK_Y_OFFSET) as u32;
@@ -87,9 +87,9 @@ pub(super) unsafe fn stone_jump(game: &mut Game) -> bool {
         let ring_list = stone_ring_sectors;
 
         match stone_target(
-            the_hero.sector,
-            the_hero.x,
-            the_hero.y,
+            game.hero.sector,
+            game.hero.x,
+            game.hero.y,
             the_actors.list[0].facing,
             &ring_list,
         ) {
@@ -99,7 +99,7 @@ pub(super) unsafe fn stone_jump(game: &mut Game) -> bool {
                 flicker_colors(game);
                 transfer_hero(game, x, y, 1);
 
-                if the_hero.riding != 0 {
+                if game.hero.riding != 0 {
                     the_actors.list[the_actors.carrier_slot as usize].abs_x =
                         the_actors.list[0].abs_x;
                     the_actors.list[the_actors.carrier_slot as usize].abs_y =
@@ -160,18 +160,16 @@ fn stone_target(sector: i16, px: u16, py: u16, facing: i8, list: &[u8]) -> Stone
 }
 
 /// Heals the hero a little, up to a limit set by bravery.
-pub(super) unsafe fn heal(game: &mut Game) {
-    unsafe {
-        let mut hero = ActorRef::new(0);
-        let (vitality, capped) = healed_vitality(hero.vitality, the_hero.brave, rand8());
-        hero.vitality = vitality;
+pub(super) fn heal(game: &mut Game) {
+    let mut hero = ActorRef::new(0);
+    let (vitality, capped) = healed_vitality(hero.vitality, game.hero.brave, rand8());
+    hero.vitality = vitality;
 
-        if !capped {
-            print(game, "That feels a lot better!");
-        }
-
-        queue_print(PRQ_STATS);
+    if !capped {
+        print(game, "That feels a lot better!");
     }
+
+    queue_print(PRQ_STATS);
 }
 
 /// Vitality after the heal spell: it adds 4 plus a roll (`roll`, 0-7), up to a limit that grows with
@@ -203,7 +201,7 @@ pub(super) unsafe fn scare_enemies(game: &mut Game) {
             if is_scared_by_fear_spell(&actor) {
                 actor.vitality = 0;
                 check_death(game, i as i32, 0);
-                the_hero.brave -= 1;
+                game.hero.brave -= 1;
             }
 
             i += 1;

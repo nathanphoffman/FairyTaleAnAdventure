@@ -14,7 +14,7 @@ pub fn reset_input() {
 
 /// Waits `ticks` ticks, showing the screen as it is now.
 pub fn delay(game: &mut Game, ticks: i32) {
-    display::delay(&game.screen.scene(), ticks);
+    display::delay(game, ticks);
 }
 
 /// Swaps the page being drawn with the one being shown, and shows the one just finished.
@@ -23,6 +23,6 @@ pub fn flip_pages(game: &mut Game) {
     std::mem::swap(&mut game.screen.drawing, &mut game.screen.viewing);
     game.screen.vp_page.ras = Some(game.screen.pages[finished].ras);
 
-    display::present(&game.screen.scene());
-    display::wait_frame(&game.screen.scene());
+    display::present(game);
+    display::wait_frame(game);
 }

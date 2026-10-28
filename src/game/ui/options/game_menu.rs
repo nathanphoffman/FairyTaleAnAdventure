@@ -18,7 +18,7 @@ const EXIT: i16 = 6;
 /// Music on/off, and going to the save/exit and load menus.
 pub(super) fn game_option(game: &mut Game, chosen_entry: i16) -> bool {
     if chosen_entry == MUSIC {
-        set_mood(1);
+        set_mood(game, 1);
     }
 
     if chosen_entry == QUIT {

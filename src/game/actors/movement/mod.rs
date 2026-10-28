@@ -299,7 +299,7 @@ pub fn move_actor(game: &mut Game, i: i32, cycle: i16, jp: &mut i16) {
             };
         }
 
-        c.statc();
+        c.statc(game);
         *jp = c.terrain;
     }
 }
@@ -377,7 +377,7 @@ impl Ctx {
             } else if self.state <= LAST_FIGHT_STATE {
                 self.fighting()
             } else {
-                self.other_states()
+                self.other_states(game)
             }
         }
     }

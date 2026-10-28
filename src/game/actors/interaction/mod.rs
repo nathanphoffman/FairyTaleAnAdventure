@@ -26,7 +26,6 @@ pub use self::rescue::rescue_princess;
 pub use self::tactics::run_tactic;
 
 use crate::game::data::state::Game;
-use crate::game::data::state::the_hero;
 use crate::game::ui::messages::print;
 use crate::game::ui::text::show_event;
 
@@ -67,15 +66,13 @@ pub static mut turtle_eggs: i8 = 0;
 /// (message 13); otherwise "Yum!".
 pub fn eat_food(game: &mut Game, amt: i32) {
     const HUNGER_FULL_MESSAGE: i32 = 13;
-    unsafe {
-        the_hero.hunger = (the_hero.hunger as i32 - amt) as i16;
+    game.hero.hunger = (game.hero.hunger as i32 - amt) as i16;
 
-        if the_hero.hunger < 0 {
-            the_hero.hunger = 0;
-            show_event(game, HUNGER_FULL_MESSAGE);
-        } else {
-            print(game, "Yum!");
-        }
+    if game.hero.hunger < 0 {
+        game.hero.hunger = 0;
+        show_event(game, HUNGER_FULL_MESSAGE);
+    } else {
+        print(game, "Yum!");
     }
 }
 

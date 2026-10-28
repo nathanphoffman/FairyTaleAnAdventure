@@ -4,8 +4,7 @@ use super::shop::FIRST_MENU_ENTRY;
 use super::{ITEMS, KEYBASE, KEYS};
 use crate::game::actors::interaction::summon_turtle;
 use crate::game::data::state::Game;
-use crate::game::data::state::player;
-use crate::game::data::state::{the_actors, the_hero};
+use crate::game::data::state::the_actors;
 use crate::game::ui::items_menu::item_name;
 use crate::game::ui::menus::go_to_menu;
 use crate::game::ui::messages::{print, print_cont, print_wrapped};
@@ -28,12 +27,10 @@ const DIRECTIONS: i32 = 9;
 const DOOR_REACH: i32 = 16;
 
 /// Whether the hero is in the box where the turtle cannot be called.
-unsafe fn in_no_turtle_area() -> bool {
-    unsafe {
-        let (x_low, x_high, y_low, y_high) = NO_TURTLE_AREA;
+fn in_no_turtle_area(game: &mut Game) -> bool {
+    let (x_low, x_high, y_low, y_high) = NO_TURTLE_AREA;
 
-        the_hero.x < x_high && the_hero.x > x_low && the_hero.y < y_high && the_hero.y > y_low
-    }
+    game.hero.x < x_high && game.hero.x > x_low && game.hero.y < y_high && game.hero.y > y_low
 }
 
 /// Picks a weapon, the key menu, the turtle shell, or the sunstone.
@@ -58,7 +55,7 @@ pub(super) unsafe fn use_option(game: &mut Game, chosen_entry: i16) -> bool {
         }
 
         if chosen_entry == SHELL_ENTRY && game.ui.menu_hit_enabled != 0 {
-            if in_no_turtle_area() {
+            if in_no_turtle_area(game) {
                 return true;
             }
 
@@ -81,15 +78,15 @@ pub(super) unsafe fn keys_option(game: &mut Game, chosen_entry: i16) -> bool {
         let key = (chosen_entry - FIRST_MENU_ENTRY) as usize;
         bumped_locked_door = 0;
 
-        if player().stuff()[key + KEYBASE] != 0 {
+        if game.hero.stuff()[key + KEYBASE] != 0 {
             let mut direction = 0;
 
             while direction < DIRECTIONS {
-                let x = step_x(the_hero.x as i32, direction, DOOR_REACH) as u16;
-                let y = step_y(the_hero.y as i32, direction, DOOR_REACH) as u16;
+                let x = step_x(game.hero.x as i32, direction, DOOR_REACH) as u16;
+                let y = step_y(game.hero.y as i32, direction, DOOR_REACH) as u16;
 
                 if open_door_near(game, x, y, key as u32 + 1) != 0 {
-                    player().stuff_mut()[key + KEYBASE] -= 1;
+                    game.hero.stuff_mut()[key + KEYBASE] -= 1;
                     break;
                 }
 

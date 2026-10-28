@@ -6,7 +6,6 @@ use super::{
     WEAPON_FIREBALL, diroff,
 };
 use crate::game::data::state::Game;
-use crate::game::data::state::player;
 
 use crate::game::data::random::rand256;
 use crate::game::data::state::{the_actors, the_world};
@@ -36,7 +35,7 @@ impl Ctx {
             }
 
             let early_exit = if self.state == SHOOT3 {
-                self.release_shot()
+                self.release_shot(game)
             } else if self.state == SHOOT1 {
                 self.start_shot(game)
             } else {
@@ -55,7 +54,7 @@ impl Ctx {
 
     /// The shot is let go: a fireball just stays drawn, an arrow leaves the bow (and one is used up
     /// for the hero). `Some` means nothing is fired.
-    unsafe fn release_shot(&mut self) -> Option<Pc> {
+    unsafe fn release_shot(&mut self, game: &mut Game) -> Option<Pc> {
         unsafe {
             let mut actor = self.actor;
             let d8 = self.facing + SHOOTING_FACING_OFFSET;
@@ -70,11 +69,11 @@ impl Ctx {
             actor.state = STILL;
 
             if self.slot == 0 {
-                if player().stuff()[STUFF_ARROWS] == 0 {
+                if game.hero.stuff()[STUFF_ARROWS] == 0 {
                     return Some(Pc::Cpx);
                 }
 
-                player().stuff_mut()[STUFF_ARROWS] -= 1;
+                game.hero.stuff_mut()[STUFF_ARROWS] -= 1;
             }
 
             self.missile.speed = MISSILE_SPEED_ARROW;
@@ -105,7 +104,7 @@ impl Ctx {
                 actor.state = SHOOT3 as i8;
                 self.image = diroff(d8);
                 play_effect(EFFECT_FIREBALL, EFFECT_FIREBALL_PITCH + rand256());
-            } else if self.slot == 0 && player().stuff()[STUFF_ARROWS] == 0 {
+            } else if self.slot == 0 && game.hero.stuff()[STUFF_ARROWS] == 0 {
                 print(game, "No Arrows!");
 
                 return Some(Pc::Cpx);

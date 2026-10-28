@@ -3,7 +3,6 @@
 use crate::game::actors::encounters::load_carrier;
 use crate::game::data::random::{rand8, rand64};
 use crate::game::data::state::Game;
-use crate::game::data::state::the_hero;
 use crate::game::data::tables::extent_list;
 use crate::game::data::types::Extent;
 use crate::game::world::map::{step_x, step_y, terrain_at};
@@ -60,10 +59,8 @@ const ENCOUNTER_MIN_DISTANCE: i32 = 150;
 /// Picks where a new encounter appears: a random direction and distance from the hero
 /// (150 to 213 pixels).
 pub fn pick_encounter_spot(game: &mut Game) {
-    unsafe {
-        let direction = rand8();
-        let distance = ENCOUNTER_MIN_DISTANCE + rand64();
-        game.encounter.x = step_x(the_hero.x as i32, direction, distance) as u16;
-        game.encounter.y = step_y(the_hero.y as i32, direction, distance) as u16;
-    }
+    let direction = rand8();
+    let distance = ENCOUNTER_MIN_DISTANCE + rand64();
+    game.encounter.x = step_x(game.hero.x as i32, direction, distance) as u16;
+    game.encounter.y = step_y(game.hero.y as i32, direction, distance) as u16;
 }

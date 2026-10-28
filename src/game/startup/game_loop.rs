@@ -10,7 +10,7 @@ use crate::game::actors::combat::{advance_missiles, queue_missile_sprites, resol
 use crate::game::actors::movement::move_actor;
 use crate::game::actors::nearby_speech::speak_nearby;
 use crate::game::actors::spawning::spawn_encounters;
-use crate::game::data::state::{the_actors, the_hero, the_world};
+use crate::game::data::state::{the_actors, the_world};
 use crate::game::data::tables::menus;
 use crate::game::files::loading::load_pending_region;
 use crate::game::input::handler::{next_key, read_walk_direction};
@@ -159,8 +159,8 @@ unsafe fn run_frame(game: &mut Game, state: &mut FrameState) {
         check_bed(game);
         check_door(game);
 
-        the_hero.x = the_actors.list[0].abs_x;
-        the_hero.y = the_actors.list[0].abs_y;
+        game.hero.x = the_actors.list[0].abs_x;
+        game.hero.y = the_actors.list[0].abs_y;
 
         undo_sprites(game);
         let (scroll_x, scroll_y, world_update) = update_map_view(game);
@@ -218,7 +218,7 @@ fn handle_view_status(game: &mut Game) -> bool {
 /// as in the original).
 unsafe fn move_everything(game: &mut Game, state: &mut FrameState) {
     unsafe {
-        raft_proximity();
+        raft_proximity(game);
         let mut i = 0;
 
         while i < the_actors.active as i32 {
@@ -338,7 +338,7 @@ unsafe fn draw_frame(game: &mut Game, state: &mut FrameState, scroll_x: i16, scr
 
         // the flying missiles, then sort the actors by position
         queue_missile_sprites();
-        sort_actors();
+        sort_actors(game);
 
         // now that the scroll blit is done, finish repairing the map
         repair_edges(game, scroll_x, scroll_y);

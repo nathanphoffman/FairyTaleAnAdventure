@@ -80,7 +80,7 @@ fn reset_after_load(game: &mut Game) {
         game.encounter.weapon_type = 0;
         game.encounter.number = 0;
         load_start_sprites(game);
-        update_menu_availability();
+        update_menu_availability(game);
         game.screen.view_status = VIEW_CORRUPT;
         queue_print(PRINT_VITALITY);
         queue_print(PRINT_STATS);

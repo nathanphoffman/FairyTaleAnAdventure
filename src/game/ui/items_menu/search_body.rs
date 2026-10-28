@@ -6,7 +6,7 @@ use crate::game::data::object_tables::treasure_probs;
 use crate::game::data::random::rand8;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::{the_actors, the_hero};
+use crate::game::data::state::the_actors;
 use crate::game::data::tables::encounter_chart;
 use crate::game::ui::messages::{print, print_cont, print_wrapped};
 use crate::game::ui::text::print_number;
@@ -32,7 +32,7 @@ pub(super) unsafe fn search_body(game: &mut Game) {
             print_cont(game, " and ");
             print_number(game, arrows, 1);
             print_cont(game, " Arrows.");
-            add_stuff(ARROWS, arrows as u8);
+            add_stuff(game, ARROWS, arrows as u8);
 
             return;
         }
@@ -48,7 +48,7 @@ unsafe fn take_found_weapon(game: &mut Game, loot: &BodyLoot) {
         if loot.weapon != 0 {
             print_cont(game, "a ");
             print_cont(game, item_name(loot.weapon as usize - 1));
-            add_stuff(loot.weapon as usize - 1, 1);
+            add_stuff(game, loot.weapon as usize - 1, 1);
             the_actors.list[0].weapon = loot.hero_weapon;
         }
     }
@@ -56,27 +56,25 @@ unsafe fn take_found_weapon(game: &mut Game, loot: &BodyLoot) {
 
 /// Says what other treasure was found and takes it: gold into the purse, anything else into the
 /// pack. Says "nothing" if there was neither weapon nor treasure.
-unsafe fn take_treasure(game: &mut Game, loot: &BodyLoot) {
-    unsafe {
-        if loot.treasure != 0 {
-            if loot.weapon != 0 {
-                print_cont(game, " and ");
-            }
-
-            if loot.treasure < GOLDBASE as u32 {
-                print_cont(game, "a ");
-            }
-
-            print_cont(game, item_name(loot.treasure as usize));
-
-            if loot.treasure >= GOLDBASE as u32 {
-                the_hero.wealth += item(loot.treasure as usize).maxshown as i16;
-            } else {
-                add_stuff(loot.treasure as usize, 1);
-            }
-        } else if loot.weapon == 0 {
-            print_cont(game, "nothing");
+fn take_treasure(game: &mut Game, loot: &BodyLoot) {
+    if loot.treasure != 0 {
+        if loot.weapon != 0 {
+            print_cont(game, " and ");
         }
+
+        if loot.treasure < GOLDBASE as u32 {
+            print_cont(game, "a ");
+        }
+
+        print_cont(game, item_name(loot.treasure as usize));
+
+        if loot.treasure >= GOLDBASE as u32 {
+            game.hero.wealth += item(loot.treasure as usize).maxshown as i16;
+        } else {
+            add_stuff(game, loot.treasure as usize, 1);
+        }
+    } else if loot.weapon == 0 {
+        print_cont(game, "nothing");
     }
 }
 

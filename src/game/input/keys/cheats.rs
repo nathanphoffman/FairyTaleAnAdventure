@@ -7,12 +7,11 @@ use super::{
 };
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::player;
 
 use crate::game::actors::encounters::load_carrier;
 use crate::game::actors::interaction::{center_extent_on, rescue_princess};
 use crate::game::data::random::rnd;
-use crate::game::data::state::{the_actors, the_hero, the_world};
+use crate::game::data::state::{the_actors, the_world};
 use crate::game::ui::menus::update_menu_availability;
 use crate::game::ui::text::queue_print;
 
@@ -25,13 +24,13 @@ pub(super) unsafe fn cheat_items(game: &mut Game, key: i8) -> bool {
 
         if key == CHEAT_CARRIER {
             if the_actors.active_carrier == CARRIER_BIRD {
-                player().stuff_mut()[RAFT_STONE_SLOT] = 1;
+                game.hero.stuff_mut()[RAFT_STONE_SLOT] = 1;
             }
 
             center_extent_on(
                 0,
-                (the_hero.x as i16).wrapping_add(CARRIER_OFFSET),
-                (the_hero.y as i16).wrapping_add(CARRIER_OFFSET),
+                (game.hero.x as i16).wrapping_add(CARRIER_OFFSET),
+                (game.hero.y as i16).wrapping_add(CARRIER_OFFSET),
             );
 
             load_carrier(game, CARRIER_BIRD);
@@ -39,10 +38,10 @@ pub(super) unsafe fn cheat_items(game: &mut Game, key: i8) -> bool {
             true
         } else if key == CHEAT_STUFF {
             let slot = rnd(GOLDBASE) as usize;
-            player().stuff_mut()[slot] = (player().stuff()[slot]).wrapping_add(CHEAT_STUFF_COUNT);
-            update_menu_availability();
+            game.hero.stuff_mut()[slot] = (game.hero.stuff()[slot]).wrapping_add(CHEAT_STUFF_COUNT);
+            update_menu_availability(game);
 
-            player().stuff_mut()[VIAL_SLOT] = 0;
+            game.hero.stuff_mut()[VIAL_SLOT] = 0;
             true
         } else {
             false

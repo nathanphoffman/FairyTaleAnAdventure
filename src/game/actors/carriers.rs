@@ -2,7 +2,8 @@
 //! csrc/fmain.c).
 
 use crate::game::data::state::ActorRef;
-use crate::game::data::state::{the_actors, the_hero};
+use crate::game::data::state::Game;
+use crate::game::data::state::the_actors;
 
 // Actor kinds and states (csrc/ftale.h).
 const BIRD: i16 = 11;
@@ -33,7 +34,7 @@ fn nearness(dx: i16, dy: i16) -> i16 {
 
 /// How close the hero is to the raft or turtle (`raft_nearness` 1 = near, 2 = very near). Riding the
 /// bird sets the hero's environ.
-pub fn raft_proximity() {
+pub fn raft_proximity(game: &mut Game) {
     unsafe {
         the_actors.raft_nearness = 0;
         the_actors.turtle_nearness = 0;
@@ -49,7 +50,7 @@ pub fn raft_proximity() {
         let dy = (hero.abs_y as i32 - carrier.abs_y as i32 - CARRIER_OFFSET) as i16;
         the_actors.raft_nearness = nearness(dx, dy);
 
-        if the_hero.riding == BIRD {
+        if game.hero.riding == BIRD {
             hero.environ = TURTLE_ENVIRON;
         }
     }
