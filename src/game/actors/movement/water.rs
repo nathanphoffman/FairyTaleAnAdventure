@@ -85,14 +85,14 @@ impl Ctx {
                         transfer_hero(game, DUNGEON_ARRIVAL.0, DUNGEON_ARRIVAL.1, 0);
                         find_place(game, 1);
                     } else {
-                        game.actors.list[actor.slot()].vitality = 0;
+                        game.actor_mut(actor).vitality = 0;
                     }
                 }
 
-                game.actors.list[actor.slot()].state = STILL;
+                game.actor_mut(actor).state = STILL;
             }
 
-            Wading::Sinking => game.actors.list[actor.slot()].state = SINK as i8,
+            Wading::Sinking => game.actor_mut(actor).state = SINK as i8,
         }
     }
 }

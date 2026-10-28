@@ -73,7 +73,7 @@ pub fn draw_sprites(game: &mut Game, cycle: i16) {
     for j in 0..game.actors.drawn {
         let i = game.actors.draw_order[j as usize] as i32;
         let actor = ActorRef::new(i as usize);
-        game.actors.list[actor.slot()].visible = 0;
+        game.actor_mut(actor).visible = 0;
         let mut pass: u8 = 0;
 
         loop {
@@ -228,7 +228,7 @@ fn blit_sprite(
 
     combine_masks(game);
     draw_shape(game);
-    game.actors.list[actor.slot()].visible = 1;
+    game.actor_mut(actor).visible = 1;
     queue_shape(game, game.blitter.sshape);
 
     Drawn::Done

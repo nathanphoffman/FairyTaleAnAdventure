@@ -42,7 +42,7 @@ pub fn resolve_melee(game: &mut Game) {
 
         let attacker = ActorRef::new(i);
 
-        if i != RAFT && game.actors.list[attacker.slot()].state < WALKING {
+        if i != RAFT && game.actor(attacker).state < WALKING {
             swing(game, i);
         }
 
@@ -94,12 +94,12 @@ struct Swing {
 /// One actor's swing.
 pub(super) fn swing(game: &mut Game, i: usize) {
     let attacker = ActorRef::new(i);
-    let Some(base) = melee_weapon(game.actors.list[attacker.slot()].weapon as i16) else {
+    let Some(base) = melee_weapon(game.actor(attacker).weapon as i16) else {
         return;
     };
 
     let strength = base + bitrand(&mut game.rng, 2) as i16;
-    let facing = game.actors.list[attacker.slot()].facing as i32;
+    let facing = game.actor(attacker).facing as i32;
     let swing = Swing {
         attacker: i,
         facing,
@@ -127,8 +127,8 @@ fn swing_at(game: &mut Game, swing: &Swing, j: usize) -> bool {
 
     if j == RAFT
         || j == swing.attacker
-        || game.actors.list[target.slot()].state == DEAD
-        || game.actors.list[attacker.slot()].kind == CARRIER
+        || game.actor(target).state == DEAD
+        || game.actor(attacker).kind == CARRIER
     {
         return false;
     }
@@ -169,17 +169,9 @@ fn swing_at(game: &mut Game, swing: &Swing, j: usize) -> bool {
 /// little random wobble.
 fn weapon_tip(game: &mut Game, attacker: ActorRef, facing: i32, strength: i16) -> (i16, i16) {
     let reach = (strength + strength) as i32;
-    let xs = (step_x(
-        game.actors.list[attacker.slot()].abs_x as i32,
-        facing,
-        reach,
-    ) + rand8(&mut game.rng)
+    let xs = (step_x(game.actor(attacker).abs_x as i32, facing, reach) + rand8(&mut game.rng)
         - TIP_NOISE) as i16;
-    let ys = (step_y(
-        game.actors.list[attacker.slot()].abs_y as i32,
-        facing,
-        reach,
-    ) + rand8(&mut game.rng)
+    let ys = (step_y(game.actor(attacker).abs_y as i32, facing, reach) + rand8(&mut game.rng)
         - TIP_NOISE) as i16;
 
     (xs, ys)

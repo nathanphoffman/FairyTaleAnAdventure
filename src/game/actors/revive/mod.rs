@@ -42,8 +42,8 @@ pub fn revive(game: &mut Game, new: i16) {
     reset_raft_setfig(game);
 
     let hero = ActorRef::new(0);
-    game.actors.list[hero.slot()].kind = PHIL;
-    game.actors.list[hero.slot()].goal = USER; // yes, we can usurp control from the user
+    game.actor_mut(hero).kind = PHIL;
+    game.actor_mut(hero).goal = USER; // yes, we can usurp control from the user
 
     reset_input();
     game.actors.battle_flag = 0;

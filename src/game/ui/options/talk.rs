@@ -72,13 +72,13 @@ pub(super) fn talk_option(game: &mut Game, chosen_entry: i16) -> bool {
 /// What the Talk code needs to know about the actor the hero is talking to.
 fn describe_target(game: &mut Game, actor: ActorRef) -> Target {
     // Masks with PERSON_MASK, keeping only the bits that matter here.
-    let person = game.actors.list[actor.slot()].race & PERSON_MASK;
+    let person = game.actor(actor).race & PERSON_MASK;
     let can_talk = (setfig_table[person as usize]).can_talk != 0;
 
     Target {
-        kind: game.actors.list[actor.slot()].kind,
-        state: game.actors.list[actor.slot()].state,
-        race: game.actors.list[actor.slot()].race,
+        kind: game.actor(actor).kind,
+        state: game.actor(actor).state,
+        race: game.actor(actor).race,
         can_talk,
     }
 }
@@ -90,16 +90,12 @@ fn carry_out(game: &mut Game, action: TalkAction, actor: ActorRef) {
         TalkAction::TooCloseToYell => speak(game, SPEECH_TOO_CLOSE_TO_YELL),
         TalkAction::Person { starts_talking } => {
             if starts_talking {
-                game.actors.list[actor.slot()].state = TALKING;
-                game.actors.list[actor.slot()].tactic = TACTIC_TALK;
+                game.actor_mut(actor).state = TALKING;
+                game.actor_mut(actor).tactic = TACTIC_TALK;
             }
 
             // Masks with PERSON_MASK, keeping only the bits that matter here.
-            person_speaks(
-                game,
-                game.actors.list[actor.slot()].race & PERSON_MASK,
-                actor,
-            );
+            person_speaks(game, game.actor(actor).race & PERSON_MASK, actor);
         }
 
         TalkAction::TurtleHasShell => speak(game, SPEECH_TURTLE_HAS_SHELL),

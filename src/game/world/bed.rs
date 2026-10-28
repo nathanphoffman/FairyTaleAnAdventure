@@ -29,12 +29,12 @@ const BED_Y_MASK: u16 = 0x1f;
 pub fn check_bed(game: &mut Game) {
     let hero = ActorRef::new(0);
 
-    if game.actors.list[hero.slot()].state != STILL {
+    if game.actor(hero).state != STILL {
         game.world.bed_wait = 0;
     }
 
-    game.hero.x = game.actors.list[hero.slot()].abs_x;
-    game.hero.y = game.actors.list[hero.slot()].abs_y;
+    game.hero.x = game.actor(hero).abs_x;
+    game.hero.y = game.actor(hero).abs_y;
 
     if game.world.region == INSIDE_REGION {
         let tile = game.memory.sector_byte(tile_index(
@@ -58,9 +58,9 @@ pub fn check_bed(game: &mut Game) {
             BedAction::NotTired => show_event(game, EVENT_NOT_TIRED),
             BedAction::FallAsleep => {
                 show_event(game, EVENT_SLEEPING);
-                game.actors.list[hero.slot()].abs_y |= BED_Y_MASK;
-                game.hero.y = game.actors.list[hero.slot()].abs_y;
-                game.actors.list[hero.slot()].state = SLEEP;
+                game.actor_mut(hero).abs_y |= BED_Y_MASK;
+                game.hero.y = game.actor(hero).abs_y;
+                game.actor_mut(hero).state = SLEEP;
             }
         }
     }

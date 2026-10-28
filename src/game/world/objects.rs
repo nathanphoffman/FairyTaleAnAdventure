@@ -267,7 +267,7 @@ fn add_object(game: &mut Game, object: &mut WorldObject, index: i16, f: i32) {
         (add_item_actor(game, object, index, f), ystart)
     };
 
-    let actor = &mut game.actors.list[actor.slot()];
+    let actor = &mut game.actor_mut(actor);
     actor.abs_x = object.xc;
     actor.abs_y = object.yc;
     actor.rel_x = xstart as u16;

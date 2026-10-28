@@ -66,30 +66,22 @@ pub(super) fn cheat_move(game: &mut Game, key: i8) -> bool {
         CHEAT_PRQ_3 => queue_print(game, PRQ_DEBUG_SECTOR),
         CHEAT_TIME => game.world.day_clock = game.world.day_clock.wrapping_add(CHEAT_TIME_STEP),
         CHEAT_NORTH => {
-            game.actors.list[hero.slot()].abs_y = game.actors.list[hero.slot()]
-                .abs_y
-                .wrapping_sub(CHEAT_STEP_Y);
+            game.actor_mut(hero).abs_y = game.actor(hero).abs_y.wrapping_sub(CHEAT_STEP_Y);
             game.world.map_y = game.world.map_y.wrapping_sub(CHEAT_STEP_Y);
         }
 
         CHEAT_SOUTH => {
-            game.actors.list[hero.slot()].abs_y = game.actors.list[hero.slot()]
-                .abs_y
-                .wrapping_add(CHEAT_STEP_Y);
+            game.actor_mut(hero).abs_y = game.actor(hero).abs_y.wrapping_add(CHEAT_STEP_Y);
             game.world.map_y = game.world.map_y.wrapping_add(CHEAT_STEP_Y);
         }
 
         CHEAT_EAST => {
-            game.actors.list[hero.slot()].abs_x = game.actors.list[hero.slot()]
-                .abs_x
-                .wrapping_add(CHEAT_STEP_X);
+            game.actor_mut(hero).abs_x = game.actor(hero).abs_x.wrapping_add(CHEAT_STEP_X);
             game.world.map_x = game.world.map_x.wrapping_add(CHEAT_STEP_X);
         }
 
         CHEAT_WEST => {
-            game.actors.list[hero.slot()].abs_x = game.actors.list[hero.slot()]
-                .abs_x
-                .wrapping_sub(CHEAT_STEP_X);
+            game.actor_mut(hero).abs_x = game.actor(hero).abs_x.wrapping_sub(CHEAT_STEP_X);
             game.world.map_x = game.world.map_x.wrapping_sub(CHEAT_STEP_X);
         }
 

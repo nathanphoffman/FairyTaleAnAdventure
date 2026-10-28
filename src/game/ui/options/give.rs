@@ -27,7 +27,7 @@ pub(super) fn give_option(game: &mut Game, chosen_entry: i16) -> bool {
     }
 
     let person = ActorRef::new(game.actors.nearest_person as usize);
-    let race = game.actors.list[person.slot()].race;
+    let race = game.actor(person).race;
 
     if chosen_entry == GIVE_GOLD && game.hero.wealth > GOLD_GIVEN {
         game.hero.wealth -= GOLD_GIVEN;
@@ -40,10 +40,7 @@ pub(super) fn give_option(game: &mut Game, chosen_entry: i16) -> bool {
         queue_print(game, PRQ_VITALITY);
 
         if race == BEGGAR_RACE {
-            speak(
-                game,
-                BEGGAR_SPEECH + game.actors.list[person.slot()].goal as i32,
-            );
+            speak(game, BEGGAR_SPEECH + game.actor(person).goal as i32);
         } else {
             speak(game, BEGGAR_THANKS);
         }

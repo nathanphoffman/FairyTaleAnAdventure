@@ -76,7 +76,7 @@ pub(super) fn person_speaks(game: &mut Game, person: u8, actor: ActorRef) {
                 fatigue: game.hero.fatigue,
                 day_period: game.world.day_period,
                 region: game.world.region,
-                goal: game.actors.list[actor.slot()].goal as i32,
+                goal: game.actor(actor).goal as i32,
                 princess_freed: game.objects.region[8][PRINCESS_FREED_SLOT].ob_stat != 0,
             };
 

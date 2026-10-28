@@ -45,9 +45,9 @@ const EGG_Y: i32 = 5667;
 pub fn run_tactic(game: &mut Game, i: i32, tactic: i32) {
     let mut acts_now = fta_rand(&mut game.rng) & ACTS_ONE_IN_8 == 0;
     let actor = actor_at(i);
-    game.actors.list[actor.slot()].tactic = tactic as i8;
+    game.actor_mut(actor).tactic = tactic as i8;
 
-    if game.actors.list[actor.slot()].goal == ATTACK2 {
+    if game.actor(actor).goal == ATTACK2 {
         acts_now = fta_rand(&mut game.rng) & ACTS_ONE_IN_4 == 0;
     }
 
@@ -63,7 +63,7 @@ pub fn run_tactic(game: &mut Game, i: i32, tactic: i32) {
         EVADE => evade_neighbour(game, i, acts_now),
         EGG_SEEK => {
             steer_if(game, acts_now, i, EGG_X, EGG_Y, COURSE_TOWARD);
-            game.actors.list[actor.slot()].state = WALKING;
+            game.actor_mut(actor).state = WALKING;
         }
 
         _ => {}
@@ -80,10 +80,8 @@ fn steer_if(game: &mut Game, acts_now: bool, i: i32, x: i32, y: i32, mode: i32) 
 /// An archer lines up with the hero (same row, column or diagonal) and aims, otherwise approaches.
 fn engage_target(game: &mut Game, i: i32, actor: ActorRef, hx: i32, hy: i32) {
     let hero = actor_at(HERO as i32);
-    let xd = (game.actors.list[actor.slot()].abs_x as i32
-        - game.actors.list[hero.slot()].abs_x as i32) as i16;
-    let yd = (game.actors.list[actor.slot()].abs_y as i32
-        - game.actors.list[hero.slot()].abs_y as i32) as i16;
+    let xd = (game.actor(actor).abs_x as i32 - game.actor(hero).abs_x as i32) as i16;
+    let yd = (game.actor(actor).abs_y as i32 - game.actor(hero).abs_y as i32) as i16;
     let (xd, yd) = (xd.wrapping_abs(), yd.wrapping_abs());
     let lined_up = xd < SHOOT_CLOSE
         || yd < SHOOT_CLOSE
@@ -94,8 +92,8 @@ fn engage_target(game: &mut Game, i: i32, actor: ActorRef, hx: i32, hy: i32) {
     if fta_rand(&mut game.rng) & 1 != 0 && lined_up {
         steer_actor(game, i, hx, hy, COURSE_TURN_ONLY);
 
-        if game.actors.list[actor.slot()].state < SHOOT1 {
-            game.actors.list[actor.slot()].state = SHOOT1;
+        if game.actor(actor).state < SHOOT1 {
+            game.actor_mut(actor).state = SHOOT1;
         }
     } else {
         steer_actor(game, i, hx, hy, COURSE_TOWARD);
@@ -106,10 +104,10 @@ fn engage_target(game: &mut Game, i: i32, actor: ActorRef, hx: i32, hy: i32) {
 fn wander(game: &mut Game, actor: ActorRef, acts_now: bool) {
     if acts_now {
         // Masks with FACING_MASK, keeping only the bits that matter here.
-        game.actors.list[actor.slot()].facing = (fta_rand(&mut game.rng) & FACING_MASK) as i8;
+        game.actor_mut(actor).facing = (fta_rand(&mut game.rng) & FACING_MASK) as i8;
     }
 
-    game.actors.list[actor.slot()].state = WALKING;
+    game.actor_mut(actor).state = WALKING;
 }
 
 /// Stay near the leader (an enemy cannot follow itself, so it wanders instead).
@@ -117,7 +115,7 @@ fn follow_leader(game: &mut Game, i: i32, actor: ActorRef, acts_now: bool) {
     let leader_slot = game.actors.leader as i32;
 
     if i == leader_slot {
-        game.actors.list[actor.slot()].tactic = RANDOM as i8; // can't follow self
+        game.actor_mut(actor).tactic = RANDOM as i8; // can't follow self
     }
 
     if acts_now {
@@ -144,8 +142,8 @@ fn steer_toward_actor(game: &mut Game, i: i32, target: i32, mode: i32) {
     steer_actor(
         game,
         i,
-        game.actors.list[target.slot()].abs_x as i32,
-        game.actors.list[target.slot()].abs_y as i32 + FOLLOW_OFFSET,
+        game.actor(target).abs_x as i32,
+        game.actor(target).abs_y as i32 + FOLLOW_OFFSET,
         mode,
     );
 }

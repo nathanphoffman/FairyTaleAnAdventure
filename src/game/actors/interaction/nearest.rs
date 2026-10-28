@@ -15,8 +15,8 @@ pub fn find_nearest_figure(game: &mut Game, constraint: c_char, mut dist: i16) -
     for i in 1..game.actors.drawn as i32 {
         let a = actor_at(i);
 
-        if game.actors.list[a.slot()].kind == OBJECTS
-            && (constraint != 0 || game.actors.list[a.slot()].index == ALWAYS_COUNTED_OBJECT)
+        if game.actor(a).kind == OBJECTS
+            && (constraint != 0 || game.actor(a).index == ALWAYS_COUNTED_OBJECT)
         {
             continue;
         }

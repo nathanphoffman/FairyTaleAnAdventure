@@ -72,9 +72,9 @@ pub(super) fn choose_image(
     i: i32,
     passmode: bool,
 ) -> Option<Sprite> {
-    let inum = game.actors.list[actor.slot()].index as i16;
-    let xstart = game.actors.list[actor.slot()].rel_x as i16;
-    let ystart = game.actors.list[actor.slot()].rel_y as i16;
+    let inum = game.actor(actor).index as i16;
+    let xstart = game.actor(actor).rel_x as i16;
+    let ystart = game.actor(actor).rel_y as i16;
     let ground = ystart.wrapping_add(SPRITE_GROUND_OFFSET);
     let blank = Sprite {
         atype: OBJECTS,
@@ -102,18 +102,18 @@ pub(super) fn choose_image(
 /// The actor's own sprite sheet and image for this animation frame. `None` means nothing is drawn
 /// (a burnt body, or an object with no image).
 fn body_image(game: &mut Game, actor: ActorRef, i: i32, mut inum: i16) -> Option<(i16, i16)> {
-    let mut atype = game.actors.list[actor.slot()].kind as i16;
+    let mut atype = game.actor(actor).kind as i16;
 
-    if (atype == ENEMY && game.actors.list[actor.slot()].race != RACE_SPECTRE) || atype == PHIL {
-        if game.actors.fiery_death != 0 && game.actors.list[actor.slot()].environ > 0 {
-            if game.actors.list[actor.slot()].state == DEAD {
+    if (atype == ENEMY && game.actor(actor).race != RACE_SPECTRE) || atype == PHIL {
+        if game.actors.fiery_death != 0 && game.actor(actor).environ > 0 {
+            if game.actor(actor).state == DEAD {
                 return None;
-            } else if game.actors.list[actor.slot()].state == DYING {
+            } else if game.actor(actor).state == DYING {
                 // a body burning in the lava: nothing more to work out
                 return Some((OBJECTS, OBJ_BURNING));
             }
-        } else if game.actors.list[actor.slot()].state == FALL {
-            atype = if game.actors.list[actor.slot()].tactic < FALL_AS_ENEMY_STEPS {
+        } else if game.actor(actor).state == FALL {
+            atype = if game.actor(actor).tactic < FALL_AS_ENEMY_STEPS {
                 ENEMY
             } else {
                 OBJECTS
@@ -125,7 +125,7 @@ fn body_image(game: &mut Game, actor: ActorRef, i: i32, mut inum: i16) -> Option
         inum = pick_of_pair(game, actor, i, inum);
     }
 
-    if atype == OBJECTS && game.actors.list[actor.slot()].race == 0 {
+    if atype == OBJECTS && game.actor(actor).race == 0 {
         return None;
     }
 
@@ -140,13 +140,13 @@ fn body_image(game: &mut Game, actor: ActorRef, i: i32, mut inum: i16) -> Option
 /// Snakes use their own pictures; other enemies have two pictures per figure, picked by the race
 /// (the hero, actor 0, has just the one).
 fn pick_of_pair(game: &mut Game, actor: ActorRef, i: i32, inum: i16) -> i16 {
-    if game.actors.list[actor.slot()].race == RACE_SNAKE {
-        if game.actors.list[actor.slot()].state < DYING {
+    if game.actor(actor).race == RACE_SNAKE {
+        if game.actor(actor).state < DYING {
             return inum + SNAKE_FIRST_IMAGE;
         }
     } else if i > 0 {
         // Masks off the low bits (a cheap remainder or a flag test).
-        if game.actors.list[actor.slot()].race & 1 != 0 {
+        if game.actor(actor).race & 1 != 0 {
             return inum | IMAGE_PAIR_BIT;
         }
 
@@ -182,7 +182,7 @@ pub(super) fn adjust_for_depth(
     passmode: bool,
     sprite: &mut Sprite,
 ) -> bool {
-    let depth = game.actors.list[actor.slot()].environ as i16;
+    let depth = game.actor(actor).environ as i16;
 
     if !passmode && sprite.atype != OBJECTS {
         sink_body(game, actor, i, cycle, depth, sprite)
@@ -206,7 +206,7 @@ fn sink_body(
     } else if depth == SHALLOW_DEPTH {
         sprite.ystop -= SHALLOW_HIDDEN_LINES;
     } else if depth > UNDER_SURFACE_DEPTH {
-        if game.actors.list[actor.slot()].state == DEAD {
+        if game.actor(actor).state == DEAD {
             return false;
         }
 

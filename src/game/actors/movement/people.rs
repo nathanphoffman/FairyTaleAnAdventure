@@ -21,7 +21,7 @@ impl Ctx {
         let actor = self.actor;
 
         // Masks with PERSON_MASK, keeping only the bits that matter here.
-        self.terrain = (game.actors.list[actor.slot()].race & PERSON_MASK) as i16;
+        self.terrain = (game.actor(actor).race & PERSON_MASK) as i16;
         let entry = &setfig_table[self.terrain as usize];
         self.image = entry.image_base as i16;
         let witch = self.terrain == SETFIG_WITCH;
@@ -32,15 +32,14 @@ impl Ctx {
             self.image += PERSON_DEAD_OFFSET + witch_extra(witch);
         } else if witch {
             steer_actor(game, self.slot, game.hero.x as i32, game.hero.y as i32, 0);
-            self.image = (game.actors.list[actor.slot()].facing / 2) as i16;
+            self.image = (game.actor(actor).facing / 2) as i16;
             game.witch.on_screen = 1;
         } else if self.state == TALKING {
             self.image += rand2(&mut game.rng) as i16;
-            game.actors.list[actor.slot()].tactic =
-                game.actors.list[actor.slot()].tactic.wrapping_sub(1);
+            game.actor_mut(actor).tactic = game.actor(actor).tactic.wrapping_sub(1);
 
-            if game.actors.list[actor.slot()].tactic == 0 {
-                game.actors.list[actor.slot()].state = STILL;
+            if game.actor(actor).tactic == 0 {
+                game.actor_mut(actor).state = STILL;
             }
         } else {
             return Pc::Statc;

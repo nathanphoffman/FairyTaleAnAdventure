@@ -320,10 +320,10 @@ impl Ctx {
             return (c, Pc::Statc);
         }
 
-        c.environ = game.actors.list[actor.slot()].environ;
-        c.facing = game.actors.list[actor.slot()].facing as i16;
-        c.state = game.actors.list[actor.slot()].state as i16;
-        c.image = game.actors.list[actor.slot()].index as i16;
+        c.environ = game.actor(actor).environ;
+        c.facing = game.actor(actor).facing as i16;
+        c.state = game.actor(actor).state as i16;
+        c.image = game.actor(actor).index as i16;
         c.frame_base = diroff(c.facing);
         c.missile = MissileRef::new(game.actors.next_missile as usize);
 
@@ -335,7 +335,7 @@ impl Ctx {
     /// Picks the code for this kind of actor and state (the `if` chain at the top of the C).
     fn dispatch(&mut self, game: &mut Game) -> Pc {
         let actor = self.actor;
-        let kind = game.actors.list[actor.slot()].kind;
+        let kind = game.actor(actor).kind;
 
         if kind == OBJECTS {
             self.terrain = 0;
@@ -350,7 +350,7 @@ impl Ctx {
         } else if kind == RAFT {
             self.raft(game)
         } else if self.state == SINK {
-            if game.actors.list[actor.slot()].vitality > 0 {
+            if game.actor(actor).vitality > 0 {
                 self.image = FRAME_SINK;
             }
 

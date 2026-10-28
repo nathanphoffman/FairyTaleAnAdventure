@@ -40,9 +40,9 @@ pub(super) fn choose_tactic(
     yd: i16,
 ) -> (i16, i16) {
     let facts = TacticFacts {
-        race: game.actors.list[actor.slot()].race,
-        weapon: game.actors.list[actor.slot()].weapon,
-        vitality: game.actors.list[actor.slot()].vitality,
+        race: game.actor(actor).race,
+        weapon: game.actor(actor).weapon,
+        vitality: game.actor(actor).vitality,
         eggs_to_guard: game.actors.turtle_eggs != 0,
     };
 
@@ -104,9 +104,9 @@ pub(super) fn hostile_action(
     yd: i16,
 ) {
     match hostile_choice(
-        game.actors.list[actor.slot()].race,
-        game.actors.list[actor.slot()].weapon,
-        game.actors.list[actor.slot()].vitality,
+        game.actor(actor).race,
+        game.actor(actor).weapon,
+        game.actor(actor).vitality,
         mode,
         xd,
         yd,
@@ -114,14 +114,14 @@ pub(super) fn hostile_action(
         Hostile::Strike => {
             steer_actor(game, i as i32, game.hero.x as i32, game.hero.y as i32, 0);
 
-            if game.actors.list[actor.slot()].state >= WALKING {
-                game.actors.list[actor.slot()].state = FIGHTING;
+            if game.actor(actor).state >= WALKING {
+                game.actor_mut(actor).state = FIGHTING;
             }
         }
 
         Hostile::KnightGuard => {
-            game.actors.list[actor.slot()].state = STILL;
-            game.actors.list[actor.slot()].facing = DKNIGHT_FACING;
+            game.actor_mut(actor).state = STILL;
+            game.actor_mut(actor).facing = DKNIGHT_FACING;
         }
 
         Hostile::Tactic => run_tactic(game, i as i32, tactic as i32),

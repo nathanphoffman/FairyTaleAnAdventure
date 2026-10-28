@@ -21,21 +21,19 @@ pub(super) const NO_RACE: u8 = 0xff;
 /// way it flies, a rock, or the spent rock left behind.
 fn add_missile_actor(game: &mut Game, ms: MissileRef, (xstart, ystart): (i16, i16)) {
     let actor = ActorRef::new(game.actors.drawn as usize);
-    game.actors.list[actor.slot()].abs_x = game.actors.missiles[ms.slot()].abs_x;
-    game.actors.list[actor.slot()].abs_y = game.actors.missiles[ms.slot()].abs_y;
-    game.actors.list[actor.slot()].rel_x = xstart as u16;
-    game.actors.list[actor.slot()].rel_y = ystart as u16;
-    game.actors.list[actor.slot()].kind = OBJECTS;
-    game.actors.list[actor.slot()].weapon = 0;
-    game.actors.list[actor.slot()].index = game.actors.missiles[ms.slot()].direction;
-    game.actors.list[actor.slot()].race = NO_RACE;
+    game.actor_mut(actor).abs_x = game.missile(ms).abs_x;
+    game.actor_mut(actor).abs_y = game.missile(ms).abs_y;
+    game.actor_mut(actor).rel_x = xstart as u16;
+    game.actor_mut(actor).rel_y = ystart as u16;
+    game.actor_mut(actor).kind = OBJECTS;
+    game.actor_mut(actor).weapon = 0;
+    game.actor_mut(actor).index = game.missile(ms).direction;
+    game.actor_mut(actor).race = NO_RACE;
 
-    if game.actors.missiles[ms.slot()].missile_type == MISSILE_SPENT {
-        game.actors.list[actor.slot()].index = MISSILE_SPENT_IMAGE;
-    } else if game.actors.missiles[ms.slot()].missile_type == MISSILE_ROCK {
-        game.actors.list[actor.slot()].index = game.actors.list[actor.slot()]
-            .index
-            .wrapping_add(MISSILE_ROCK_IMAGE);
+    if game.missile(ms).missile_type == MISSILE_SPENT {
+        game.actor_mut(actor).index = MISSILE_SPENT_IMAGE;
+    } else if game.missile(ms).missile_type == MISSILE_ROCK {
+        game.actor_mut(actor).index = game.actor(actor).index.wrapping_add(MISSILE_ROCK_IMAGE);
     }
 }
 
@@ -44,18 +42,16 @@ fn add_missile_actor(game: &mut Game, ms: MissileRef, (xstart, ystart): (i16, i1
 pub fn queue_missile_sprites(game: &mut Game) {
     for i in 0..MISSILES {
         let ms = MissileRef::new(i);
-        let t = game.actors.missiles[ms.slot()].missile_type;
+        let t = game.missile(ms).missile_type;
 
         if t == MISSILE_NONE {
             continue;
         }
 
-        let xstart = (game.actors.missiles[ms.slot()].abs_x as i32
-            - game.world.map_x as i32
-            - SPRITE_OFFSET.0) as i16;
-        let ystart = (game.actors.missiles[ms.slot()].abs_y as i32
-            - game.world.map_y as i32
-            - SPRITE_OFFSET.1) as i16;
+        let xstart =
+            (game.missile(ms).abs_x as i32 - game.world.map_x as i32 - SPRITE_OFFSET.0) as i16;
+        let ystart =
+            (game.missile(ms).abs_y as i32 - game.world.map_y as i32 - SPRITE_OFFSET.1) as i16;
 
         if xstart > SCREEN_LEFT
             && xstart < SCREEN_RIGHT

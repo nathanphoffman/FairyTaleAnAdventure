@@ -66,13 +66,13 @@ pub(super) fn take_nearest(game: &mut Game) {
 
     let actor = ActorRef::new(game.actors.nearest_object as usize);
 
-    if game.actors.list[actor.slot()].kind == OBJECTS {
+    if game.actor(actor).kind == OBJECTS {
         if take_object(game) {
             finish_pickup(game);
         }
-    } else if game.actors.list[actor.slot()].weapon < 0 {
+    } else if game.actor(actor).weapon < 0 {
         // already searched
-    } else if game.actors.list[actor.slot()].vitality == 0 || game.world.freeze_timer != 0 {
+    } else if game.actor(actor).vitality == 0 || game.world.freeze_timer != 0 {
         search_body(game);
     } else {
         show_event(game, EVENT_ALIVE);
@@ -102,10 +102,10 @@ fn finish_pickup(game: &mut Game) {
 /// Handles taking the object `nearest_object`. Returns true if it was taken (so it must be removed).
 fn take_object(game: &mut Game) -> bool {
     let actor = ActorRef::new(game.actors.nearest_object as usize);
-    let id = game.actors.list[actor.slot()].index as u8 as u32;
+    let id = game.actor(actor).index as u8 as u32;
 
     // Masks with OWNER_MASK, keeping only the bits that matter here.
-    let owner = game.actors.list[actor.slot()].vitality as u32 & OWNER_MASK;
+    let owner = game.actor(actor).vitality as u32 & OWNER_MASK;
 
     match classify_take(id, game.hero.hunger, game.world.region) {
         Take::Gold => {

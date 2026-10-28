@@ -14,10 +14,7 @@ pub(super) fn search_body(game: &mut Game) {
     let actor = ActorRef::new(game.actors.nearest_object as usize);
     print_wrapped(game, "% searched the body and found");
     print(game, "");
-    let (body_weapon, hero_weapon) = (
-        game.actors.list[actor.slot()].weapon,
-        game.actors.list[0].weapon,
-    );
+    let (body_weapon, hero_weapon) = (game.actor(actor).weapon, game.actors.list[0].weapon);
     let game_cell = std::cell::RefCell::new(&mut *game);
     let loot = body_loot(
         body_weapon,
@@ -26,7 +23,7 @@ pub(super) fn search_body(game: &mut Game) {
         || roll_body_treasure(&mut game_cell.borrow_mut(), actor),
     );
 
-    game.actors.list[actor.slot()].weapon = -1;
+    game.actor_mut(actor).weapon = -1;
 
     take_found_weapon(game, &loot);
 
@@ -152,11 +149,11 @@ fn roll_body_treasure(game: &mut Game, actor: ActorRef) -> u32 {
     const SETFIG_RACE_BIT: u8 = 0x80;
     const TREASURE_CLASS_SIZE: i32 = 8;
     // Masks with SETFIG_RACE_BIT, keeping only the bits that matter here.
-    if game.actors.list[actor.slot()].race & SETFIG_RACE_BIT != 0 {
+    if game.actor(actor).race & SETFIG_RACE_BIT != 0 {
         return 0;
     }
 
-    let class = (encounter_chart[game.actors.list[actor.slot()].race as usize]).treasure;
+    let class = (encounter_chart[game.actor(actor).race as usize]).treasure;
 
     treasure_probs[(class as i32 * TREASURE_CLASS_SIZE + rand8(&mut game.rng)) as usize] as i32
         as u32

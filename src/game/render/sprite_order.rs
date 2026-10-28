@@ -32,8 +32,8 @@ pub fn sort_actors(game: &mut Game) {
         let actor = ActorRef::new(i);
 
         if i != 0
-            && game.actors.list[actor.slot()].kind != OBJECTS
-            && game.actors.list[actor.slot()].state != DEAD
+            && game.actor(actor).kind != OBJECTS
+            && game.actor(actor).state != DEAD
             && game.hero.riding != BIRD
         {
             let dist = actor_distance(game, i as i32, 0) as i16;
@@ -56,28 +56,22 @@ fn bubble_step(game: &mut Game, j: usize) {
     let k2 = game.actors.draw_order[j];
     let a = ActorRef::new(k1 as usize);
     let b = ActorRef::new(k2 as usize);
-    let mut y1 = game.actors.list[a.slot()].abs_y as i16;
-    let mut y2 = game.actors.list[b.slot()].abs_y as i16;
+    let mut y1 = game.actor(a).abs_y as i16;
+    let mut y2 = game.actor(b).abs_y as i16;
 
-    if game.actors.list[a.slot()].state == DEAD
-        || (k2 == 0 && game.hero.riding != 0)
-        || k1 == RAFT_ACTOR
-    {
+    if game.actor(a).state == DEAD || (k2 == 0 && game.hero.riding != 0) || k1 == RAFT_ACTOR {
         y1 = y1.wrapping_sub(DRAW_LOWER);
     }
 
-    if game.actors.list[b.slot()].state == DEAD
-        || (k1 == 0 && game.hero.riding != 0)
-        || k2 == RAFT_ACTOR
-    {
+    if game.actor(b).state == DEAD || (k1 == 0 && game.hero.riding != 0) || k2 == RAFT_ACTOR {
         y2 = y2.wrapping_sub(DRAW_LOWER);
     }
 
-    if game.actors.list[a.slot()].environ > WADING {
+    if game.actor(a).environ > WADING {
         y1 = y1.wrapping_add(DRAW_LOWER);
     }
 
-    if game.actors.list[b.slot()].environ > WADING {
+    if game.actor(b).environ > WADING {
         y2 = y2.wrapping_add(DRAW_LOWER);
     }
 

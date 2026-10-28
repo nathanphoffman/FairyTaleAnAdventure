@@ -63,22 +63,17 @@ pub fn hit_actor(game: &mut Game, i: i32, j: i32, fc: i32, wt: i16) {
     let hero_weapon = game.actors.list[actor_at(HERO as i32).slot()].weapon;
     let has_spirit_item = game.hero.stuff()[SPIRIT_HURT_ITEM] != 0;
 
-    if too_weak_to_hurt(
-        game.actors.list[target.slot()].race,
-        hero_weapon,
-        has_spirit_item,
-    ) {
+    if too_weak_to_hurt(game.actor(target).race, hero_weapon, has_spirit_item) {
         speak(game, MESSAGE_NEEDS_WEAPON);
 
         return;
     }
 
-    if RACE_UNHITTABLE.contains(&game.actors.list[target.slot()].race) {
+    if RACE_UNHITTABLE.contains(&game.actor(target).race) {
         return;
     }
 
-    game.actors.list[target.slot()].vitality =
-        vitality_after_hit(game.actors.list[target.slot()].vitality, wt);
+    game.actor_mut(target).vitality = vitality_after_hit(game.actor(target).vitality, wt);
 
     match hit_sound(i, j) {
         HitSound::Arrow => {
@@ -101,7 +96,7 @@ pub fn hit_actor(game: &mut Game, i: i32, j: i32, fc: i32, wt: i16) {
     }
 
     // push back the foe
-    if can_be_pushed(game.actors.list[target.slot()].kind)
+    if can_be_pushed(game.actor(target).kind)
         && step_figure(game, j as i16, fc as i16, KNOCKBACK) != 0
         && i >= 0
     {
@@ -210,13 +205,13 @@ fn count_casualties(game: &mut Game) -> (i32, i32) {
     for i in FIRST_MONSTER_SLOT..game.actors.active as i32 {
         let a = actor_at(i);
 
-        if game.actors.list[a.slot()].kind != ENEMY {
+        if game.actor(a).kind != ENEMY {
             continue;
         }
 
-        if game.actors.list[a.slot()].state == DEAD {
+        if game.actor(a).state == DEAD {
             dead += 1;
-        } else if game.actors.list[a.slot()].goal == FLEE {
+        } else if game.actor(a).goal == FLEE {
             fled += 1;
         }
     }

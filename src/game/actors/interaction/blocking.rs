@@ -24,8 +24,7 @@ const SOFT_TERRAIN: [i32; 2] = [8, 9];
 pub fn blocked_at(game: &mut Game, x: i16, y: i16, i: i16) -> i32 {
     let me = actor_at(i as i32);
 
-    if game.actors.list[me.slot()].kind != ENEMY || game.actors.list[me.slot()].race != RACE_WRAITH
-    {
+    if game.actor(me).kind != ENEMY || game.actor(me).race != RACE_WRAITH {
         let mut terrain = probe_collision(game, x as i32, y as i32);
 
         if i == 0 && SOFT_TERRAIN.contains(&terrain) {
@@ -51,14 +50,14 @@ fn blocked_by_actor(game: &mut Game, x: i16, y: i16, i: i16, j: i32) -> bool {
 
     if i as i32 == j
         || j == RAFT_SLOT as i32
-        || game.actors.list[other.slot()].kind == RAFT_TYPE
-        || game.actors.list[other.slot()].state == DEAD
+        || game.actor(other).kind == RAFT_TYPE
+        || game.actor(other).state == DEAD
     {
         return false;
     }
 
-    let dx = x as i32 - game.actors.list[other.slot()].abs_x as i32;
-    let dy = y as i32 - game.actors.list[other.slot()].abs_y as i32;
+    let dx = x as i32 - game.actor(other).abs_x as i32;
+    let dy = y as i32 - game.actor(other).abs_y as i32;
 
     dx < BLOCK_HALF_WIDTH
         && dx > -BLOCK_HALF_WIDTH
@@ -69,23 +68,15 @@ fn blocked_by_actor(game: &mut Game, x: i16, y: i16, i: i16, j: i32) -> bool {
 /// Moves an actor `dist` in direction `dir` if nothing blocks it. Returns TRUE if it moved.
 pub fn step_figure(game: &mut Game, fig: i16, dir: i16, dist: i16) -> i32 {
     let a = actor_at(fig as i32);
-    let xtest = step_x(
-        game.actors.list[a.slot()].abs_x as i32,
-        dir as i32,
-        dist as i32,
-    ) as u16;
-    let ytest = step_y(
-        game.actors.list[a.slot()].abs_y as i32,
-        dir as i32,
-        dist as i32,
-    ) as u16;
+    let xtest = step_x(game.actor(a).abs_x as i32, dir as i32, dist as i32) as u16;
+    let ytest = step_y(game.actor(a).abs_y as i32, dir as i32, dist as i32) as u16;
 
     if blocked_at(game, xtest as i16, ytest as i16, fig) != 0 {
         return 0;
     }
 
-    game.actors.list[a.slot()].abs_x = xtest;
-    game.actors.list[a.slot()].abs_y = ytest;
+    game.actor_mut(a).abs_x = xtest;
+    game.actor_mut(a).abs_y = ytest;
 
     1
 }

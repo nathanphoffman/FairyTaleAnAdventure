@@ -158,11 +158,11 @@ fn stone_target(sector: i16, px: u16, py: u16, facing: i8, list: &[u8]) -> Stone
 pub(super) fn heal(game: &mut Game) {
     let hero = ActorRef::new(0);
     let (vitality, capped) = healed_vitality(
-        game.actors.list[hero.slot()].vitality,
+        game.actor(hero).vitality,
         game.hero.brave,
         rand8(&mut game.rng),
     );
-    game.actors.list[hero.slot()].vitality = vitality;
+    game.actor_mut(hero).vitality = vitality;
 
     if !capped {
         print(game, "That feels a lot better!");
@@ -196,8 +196,8 @@ pub(super) fn scare_enemies(game: &mut Game) {
     while i < game.actors.active as usize {
         let actor = ActorRef::new(i);
 
-        if is_scared_by_fear_spell(&game.actors.list[actor.slot()]) {
-            game.actors.list[actor.slot()].vitality = 0;
+        if is_scared_by_fear_spell(game.actor(actor)) {
+            game.actor_mut(actor).vitality = 0;
             check_death(game, i as i32, 0);
             game.hero.brave -= 1;
         }

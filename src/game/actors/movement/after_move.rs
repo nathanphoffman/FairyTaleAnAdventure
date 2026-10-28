@@ -39,7 +39,7 @@ impl Ctx {
             self.image = FRAME_OSCIL;
         } else if s == SLEEP {
             self.image = FRAME_SLEEP;
-        } else if s == FALL && game.actors.list[actor.slot()].tactic < FALL_STEPS {
+        } else if s == FALL && game.actor(actor).tactic < FALL_STEPS {
             self.falling_frame(game);
         }
 
@@ -53,20 +53,20 @@ impl Ctx {
         let d = self.facing;
         let facing_back = d == 0 || d > DYING_FACING_LIMIT;
 
-        if game.actors.list[actor.slot()].tactic > DYING_FIRST_HALF {
+        if game.actor(actor).tactic > DYING_FIRST_HALF {
             self.image = if facing_back {
                 FRAME_DYING.0
             } else {
                 FRAME_DYING.1
             };
-        } else if game.actors.list[actor.slot()].tactic > 0 {
+        } else if game.actor(actor).tactic > 0 {
             self.image = if facing_back {
                 FRAME_DYING.1
             } else {
                 FRAME_DYING.0
             };
         } else {
-            game.actors.list[actor.slot()].state = DEAD as i8;
+            game.actor_mut(actor).state = DEAD as i8;
             self.image = FRAME_FLAT;
         }
 
@@ -76,31 +76,27 @@ impl Ctx {
     /// One step of the fall into the pit: the next falling frame, and the slide slows down.
     fn falling_frame(&mut self, game: &mut Game) {
         let actor = self.actor;
-        self.terrain = game.actors.list[actor.slot()].tactic as i16 / FALL_STEPS_PER_FRAME
+        self.terrain = game.actor(actor).tactic as i16 / FALL_STEPS_PER_FRAME
             + game.hero.brother * FALL_FRAMES;
         self.image = fallstates.get(self.terrain as usize).copied().unwrap_or(0) as i16;
-        game.actors.list[actor.slot()].tactic += 1;
-        game.actors.list[actor.slot()].vel_x =
-            (game.actors.list[actor.slot()].vel_x as i32 * FALL_DRAG.0 / FALL_DRAG.1) as i8;
-        game.actors.list[actor.slot()].vel_y =
-            (game.actors.list[actor.slot()].vel_y as i32 * FALL_DRAG.0 / FALL_DRAG.1) as i8;
+        game.actor_mut(actor).tactic += 1;
+        game.actor_mut(actor).vel_x =
+            (game.actor(actor).vel_x as i32 * FALL_DRAG.0 / FALL_DRAG.1) as i8;
+        game.actor_mut(actor).vel_y =
+            (game.actor(actor).vel_y as i32 * FALL_DRAG.0 / FALL_DRAG.1) as i8;
     }
 
     /// Works out the terrain under the actor, and carries on sliding if it is on ice.
     pub(super) fn cpx(&mut self, game: &mut Game) -> Pc {
         let actor = self.actor;
-        self.terrain = terrain(
-            game,
-            game.actors.list[actor.slot()].abs_x,
-            game.actors.list[actor.slot()].abs_y,
-        );
+        self.terrain = terrain(game, game.actor(actor).abs_x, game.actor(actor).abs_y);
 
         if self.environ == ENVIRON_ICE {
-            game.actors.list[actor.slot()].abs_x = (game.actors.list[actor.slot()].abs_x as i32
-                + game.actors.list[actor.slot()].vel_x as i32 / VELOCITY_QUARTER)
+            game.actor_mut(actor).abs_x = (game.actor(actor).abs_x as i32
+                + game.actor(actor).vel_x as i32 / VELOCITY_QUARTER)
                 as u16;
-            game.actors.list[actor.slot()].abs_y = (game.actors.list[actor.slot()].abs_y as i32
-                + game.actors.list[actor.slot()].vel_y as i32 / VELOCITY_QUARTER)
+            game.actor_mut(actor).abs_y = (game.actor(actor).abs_y as i32
+                + game.actor(actor).vel_y as i32 / VELOCITY_QUARTER)
                 as u16;
         }
 
@@ -117,7 +113,7 @@ impl Ctx {
         self.settle_environ(game);
 
         if self.environ == 0 && self.state == SINK {
-            game.actors.list[self.actor.slot()].state = STILL;
+            game.actor_mut(self.actor).state = STILL;
         }
 
         Pc::Raise
@@ -129,21 +125,20 @@ impl Ctx {
         let actor = self.actor;
         let i = self.slot;
 
-        game.actors.list[actor.slot()].tactic =
-            game.actors.list[actor.slot()].tactic.wrapping_sub(1);
+        game.actor_mut(actor).tactic = game.actor(actor).tactic.wrapping_sub(1);
 
-        if game.actors.list[actor.slot()].tactic == 0 {
-            game.actors.list[actor.slot()].state = DEAD as i8;
+        if game.actor(actor).tactic == 0 {
+            game.actor_mut(actor).state = DEAD as i8;
 
-            if game.actors.list[actor.slot()].race == RACE_WITCH {
-                game.actors.list[actor.slot()].race = RACE_WITCH_BODY;
-                game.actors.list[actor.slot()].vitality = WITCH_BODY_VITALITY;
-                game.actors.list[actor.slot()].state = STILL;
-                game.actors.list[actor.slot()].weapon = 0;
+            if game.actor(actor).race == RACE_WITCH {
+                game.actor_mut(actor).race = RACE_WITCH_BODY;
+                game.actor_mut(actor).vitality = WITCH_BODY_VITALITY;
+                game.actor_mut(actor).state = STILL;
+                game.actor_mut(actor).weapon = 0;
                 leave_item(game, i as i16, TALISMAN);
             }
 
-            if game.actors.list[actor.slot()].race == RACE_LASSO_CARRIER {
+            if game.actor(actor).race == RACE_LASSO_CARRIER {
                 leave_item(game, i as i16, LASSO);
             }
         }
@@ -167,10 +162,10 @@ impl Ctx {
         } else if j == TERRAIN_BACKWARDS {
             self.environ = ENVIRON_BACKWARDS;
         } else if j == TERRAIN_PIT && i == 0 && game.world.extent_type == PIT_XTYPE {
-            if game.actors.list[actor.slot()].state as i16 != FALL {
+            if game.actor(actor).state as i16 != FALL {
                 self.image = fallstates[(game.hero.brother * FALL_FRAMES) as usize] as i16;
-                game.actors.list[actor.slot()].state = FALL as i8;
-                game.actors.list[actor.slot()].tactic = 0;
+                game.actor_mut(actor).state = FALL as i8;
+                game.actor_mut(actor).tactic = 0;
                 game.hero.luck = game.hero.luck.wrapping_sub(PIT_LUCK_COST);
                 set_mood(game, 1);
             }
@@ -192,26 +187,26 @@ impl Ctx {
         let i = self.slot;
 
         if game.world.new_region >= NO_REGION {
-            game.actors.list[actor.slot()].environ = self.environ;
+            game.actor_mut(actor).environ = self.environ;
         }
 
-        let race = game.actors.list[actor.slot()].race as i8;
+        let race = game.actor(actor).race as i8;
 
-        if game.actors.list[actor.slot()].kind == ENEMY {
+        if game.actor(actor).kind == ENEMY {
             self.enemy_frame(game, race);
         }
 
-        game.actors.list[actor.slot()].index = self.image as i8;
+        game.actor_mut(actor).index = self.image as i8;
 
         if i == 0 {
             self.hero_wrap(game);
-            game.hero.x = game.actors.list[actor.slot()].abs_x;
-            game.hero.y = game.actors.list[actor.slot()].abs_y;
+            game.hero.x = game.actor(actor).abs_x;
+            game.hero.y = game.actor(actor).abs_y;
             move_camera_to(game, game.hero.x as i32, game.hero.y as i32);
             game.hero.safe_flag = self.terrain as i8;
         }
 
-        if game.actors.list[actor.slot()].vitality == 0 {
+        if game.actor(actor).vitality == 0 {
             return Pc::Statc;
         }
 
@@ -229,12 +224,11 @@ impl Ctx {
 
         if game.actors.fiery_death != 0 {
             if i == 0 && game.hero.stuff()[STUFF_FIREPROOF] != 0 {
-                game.actors.list[actor.slot()].environ = 0;
-            } else if game.actors.list[actor.slot()].environ > ENVIRON_SINKING {
-                game.actors.list[actor.slot()].vitality = 0;
-            } else if game.actors.list[actor.slot()].environ > ENVIRON_SHALLOW {
-                game.actors.list[actor.slot()].vitality =
-                    game.actors.list[actor.slot()].vitality.wrapping_sub(1);
+                game.actor_mut(actor).environ = 0;
+            } else if game.actor(actor).environ > ENVIRON_SINKING {
+                game.actor_mut(actor).vitality = 0;
+            } else if game.actor(actor).environ > ENVIRON_SHALLOW {
+                game.actor_mut(actor).vitality = game.actor(actor).vitality.wrapping_sub(1);
             }
 
             check_death(game, i, DEATH_LAVA);
@@ -247,15 +241,14 @@ impl Ctx {
         let actor = self.actor;
         let i = self.slot;
         let cycle = self.cycle as i32;
-        let race = game.actors.list[actor.slot()].race as i8;
+        let race = game.actor(actor).race as i8;
 
-        if game.actors.list[actor.slot()].environ == ENVIRON_DROWNED
+        if game.actor(actor).environ == ENVIRON_DROWNED
                 // Masks with DROWN_PERIOD_MASK, keeping only the bits that matter here.
                 && (cycle & DROWN_PERIOD_MASK) == 0
                 && !DROWN_IMMUNE_RACES.contains(&race)
         {
-            game.actors.list[actor.slot()].vitality =
-                game.actors.list[actor.slot()].vitality.wrapping_sub(1);
+            game.actor_mut(actor).vitality = game.actor(actor).vitality.wrapping_sub(1);
             check_death(game, i, DEATH_DROWN);
         }
     }
@@ -264,7 +257,7 @@ impl Ctx {
     fn enemy_frame(&mut self, game: &mut Game, race: i8) {
         let actor = self.actor;
         let cycle = self.cycle as i32;
-        let state = game.actors.list[actor.slot()].state as i16;
+        let state = game.actor(actor).state as i16;
 
         if race == RACE_SNAKE as i8 && state < WALKING {
             // Masks off the low bits (a cheap remainder or a flag test).
@@ -274,7 +267,7 @@ impl Ctx {
             self.image = (((cycle / 2) & 1) + diroff(self.facing) as i32) as i16;
         } else if race == RACE_SPECTRE {
             if state == DEAD {
-                game.actors.list[actor.slot()].abs_x = 0;
+                game.actor_mut(actor).abs_x = 0;
             } else if state == DYING {
                 self.image = SPECTRE_DEAD_FRAME;
             } else {
@@ -291,7 +284,7 @@ impl Ctx {
                     _ => self.image += SPECTRE_BASE_FRAMES.2,
                 }
             }
-        } else if race == RACE_SPECTRE_ALIVE && game.actors.list[actor.slot()].vitality == 0 {
+        } else if race == RACE_SPECTRE_ALIVE && game.actor(actor).vitality == 0 {
             // The original has `an->state == STILL` here: a comparison that does nothing (an
             // assignment may have been meant). Kept as it was.
             self.image = 1;
@@ -307,44 +300,41 @@ impl Ctx {
             return;
         }
 
-        if game.actors.list[actor.slot()].abs_x < WORLD_MIN {
-            game.actors.list[actor.slot()].abs_x = WORLD_MAX;
-        } else if game.actors.list[actor.slot()].abs_x > WORLD_MAX {
-            game.actors.list[actor.slot()].abs_x = WORLD_MIN;
-        } else if game.actors.list[actor.slot()].abs_y < WORLD_MIN {
-            game.actors.list[actor.slot()].abs_y = WORLD_MAX;
-        } else if game.actors.list[actor.slot()].abs_y > WORLD_MAX {
-            game.actors.list[actor.slot()].abs_y = WORLD_MIN;
+        if game.actor(actor).abs_x < WORLD_MIN {
+            game.actor_mut(actor).abs_x = WORLD_MAX;
+        } else if game.actor(actor).abs_x > WORLD_MAX {
+            game.actor_mut(actor).abs_x = WORLD_MIN;
+        } else if game.actor(actor).abs_y < WORLD_MIN {
+            game.actor_mut(actor).abs_y = WORLD_MAX;
+        } else if game.actor(actor).abs_y > WORLD_MAX {
+            game.actor_mut(actor).abs_y = WORLD_MIN;
         } else {
             return;
         }
 
         if game.hero.riding > 1 {
-            game.actors.list[CARRIER_SLOT].abs_x = game.actors.list[actor.slot()].abs_x;
-            game.actors.list[CARRIER_SLOT].abs_y = game.actors.list[actor.slot()].abs_y;
+            game.actors.list[CARRIER_SLOT].abs_x = game.actor(actor).abs_x;
+            game.actors.list[CARRIER_SLOT].abs_y = game.actor(actor).abs_y;
         }
     }
 
     /// Where the actor is on screen: relative to the map, with the sprite's anchor offset.
     pub(super) fn statc(&mut self, game: &mut Game) {
         let actor = self.actor;
-        let (ox, oy) =
-            if game.actors.list[actor.slot()].kind == CARRIER && game.hero.riding == RIDING_SWAN {
-                ANCHOR_SWAN
-            } else if game.actors.list[actor.slot()].kind == RAFT
-                || game.actors.list[actor.slot()].kind == CARRIER
-                || game.actors.list[actor.slot()].kind == DRAGON
-            {
-                ANCHOR_LARGE
-            } else {
-                ANCHOR_PERSON
-            };
+        let (ox, oy) = if game.actor(actor).kind == CARRIER && game.hero.riding == RIDING_SWAN {
+            ANCHOR_SWAN
+        } else if game.actor(actor).kind == RAFT
+            || game.actor(actor).kind == CARRIER
+            || game.actor(actor).kind == DRAGON
+        {
+            ANCHOR_LARGE
+        } else {
+            ANCHOR_PERSON
+        };
 
-        game.actors.list[actor.slot()].rel_x = wrap_coordinate(
-            game.actors.list[actor.slot()].abs_x as i32 - game.world.map_x as i32 - ox,
-        ) as u16;
-        game.actors.list[actor.slot()].rel_y = wrap_coordinate(
-            game.actors.list[actor.slot()].abs_y as i32 - game.world.map_y as i32 - oy,
-        ) as u16;
+        game.actor_mut(actor).rel_x =
+            wrap_coordinate(game.actor(actor).abs_x as i32 - game.world.map_x as i32 - ox) as u16;
+        game.actor_mut(actor).rel_y =
+            wrap_coordinate(game.actor(actor).abs_y as i32 - game.world.map_y as i32 - oy) as u16;
     }
 }

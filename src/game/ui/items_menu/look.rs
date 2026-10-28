@@ -19,8 +19,8 @@ pub(super) fn look_around(game: &mut Game) {
     for i in 0..game.actors.drawn as i32 {
         let actor = ActorRef::new(i as usize);
 
-        if game.actors.list[actor.slot()].kind == OBJECTS
-            && game.actors.list[actor.slot()].race == 0
+        if game.actor(actor).kind == OBJECTS
+            && game.actor(actor).race == 0
             && actor_distance(game, i, 0) < LOOK_RANGE
         {
             found = true;

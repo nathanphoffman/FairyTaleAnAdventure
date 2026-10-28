@@ -69,11 +69,11 @@ pub(super) fn fighting_state(game: &mut Game, state: i8) -> i8 {
     }
 
     if game.ui.compass_lit_direction < NOT_WALKING {
-        game.actors.list[hero.slot()].facing = game.ui.compass_lit_direction as i8;
+        game.actor_mut(hero).facing = game.ui.compass_lit_direction as i8;
     }
 
     if state >= WALKING {
-        return fighting_state_for(state, game.actors.list[hero.slot()].weapon);
+        return fighting_state_for(state, game.actor(hero).weapon);
     }
 
     state
@@ -95,10 +95,7 @@ fn enter_shooting_zone(game: &mut Game, state: i8) -> i8 {
 /// On the bird, the fight button tries to land: not over lava, not when moving too fast, and only
 /// where there is room to stand.
 fn try_to_dismount(game: &mut Game, hero: ActorRef) {
-    let (dif_x, dif_y) = (
-        game.actors.list[hero.slot()].vel_x,
-        game.actors.list[hero.slot()].vel_y,
-    );
+    let (dif_x, dif_y) = (game.actor(hero).vel_x, game.actor(hero).vel_y);
 
     if game.actors.fiery_death != 0 {
         show_event(game, EVENT_LAVA);
@@ -107,25 +104,18 @@ fn try_to_dismount(game: &mut Game, hero: ActorRef) {
         && dif_y > -DISMOUNT_SPEED
         && dif_y < DISMOUNT_SPEED
     {
-        let ytest = game.actors.list[hero.slot()]
-            .abs_y
-            .wrapping_sub(DISMOUNT_STEP);
+        let ytest = game.actor(hero).abs_y.wrapping_sub(DISMOUNT_STEP);
 
-        if blocked_at(
-            game,
-            game.actors.list[hero.slot()].abs_x as i16,
-            ytest as i16,
-            0,
-        ) == 0
+        if blocked_at(game, game.actor(hero).abs_x as i16, ytest as i16, 0) == 0
             && blocked_at(
                 game,
-                game.actors.list[hero.slot()].abs_x as i16,
+                game.actor(hero).abs_x as i16,
                 ytest.wrapping_add(DISMOUNT_CHECK) as i16,
                 0,
             ) == 0
         {
             game.hero.riding = 0;
-            game.actors.list[hero.slot()].abs_y = ytest;
+            game.actor_mut(hero).abs_y = ytest;
         }
     } else {
         show_event(game, EVENT_TOO_FAST);

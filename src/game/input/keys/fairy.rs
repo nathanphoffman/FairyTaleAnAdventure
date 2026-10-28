@@ -44,20 +44,20 @@ pub(super) fn fairy_revival(game: &mut Game, state: i8, cycle: i16) -> i8 {
 fn place_fairy(game: &mut Game, cycle: i16) {
     let fairy = ActorRef::new(FAIRY_SLOT);
     game.actors.active = NO_ACTORS_LOADED;
-    game.actors.list[fairy.slot()].abs_x = game
+    game.actor_mut(fairy).abs_x = game
         .hero
         .x
         .wrapping_add(game.hero.good_fairy_timer as u16 * FAIRY_SPEED)
         .wrapping_sub(FAIRY_X_OFFSET);
-    game.actors.list[fairy.slot()].abs_y = game.hero.y;
-    game.actors.list[fairy.slot()].kind = OBJECTS;
+    game.actor_mut(fairy).abs_y = game.hero.y;
+    game.actor_mut(fairy).kind = OBJECTS;
 
     // Masks with FAIRY_IMAGE, keeping only the bits that matter here.
-    game.actors.list[fairy.slot()].index = FAIRY_IMAGE + (cycle & 1) as i8;
-    game.actors.list[fairy.slot()].state = STILL;
-    game.actors.list[fairy.slot()].weapon = 0;
-    game.actors.list[fairy.slot()].environ = 0;
-    game.actors.list[fairy.slot()].race = FAIRY_RACE;
+    game.actor_mut(fairy).index = FAIRY_IMAGE + (cycle & 1) as i8;
+    game.actor_mut(fairy).state = STILL;
+    game.actor_mut(fairy).weapon = 0;
+    game.actor_mut(fairy).environ = 0;
+    game.actor_mut(fairy).race = FAIRY_RACE;
     game.actors.on_screen = 1;
     game.actors.battle_flag = 0;
 }

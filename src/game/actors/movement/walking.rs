@@ -110,16 +110,8 @@ impl Ctx {
             self.environ,
         );
 
-        game.actors.test_x = pos_x(
-            game.actors.list[actor.slot()].abs_x as i32,
-            self.facing,
-            self.step,
-        );
-        game.actors.test_y = pos_y(
-            game.actors.list[actor.slot()].abs_y as i32,
-            self.facing,
-            self.step,
-        );
+        game.actors.test_x = pos_x(game.actor(actor).abs_x as i32, self.facing, self.step);
+        game.actors.test_y = pos_y(game.actor(actor).abs_y as i32, self.facing, self.step);
         self.terrain = blocked_at(
             game,
             game.actors.test_x as i16,
@@ -163,28 +155,26 @@ impl Ctx {
 
         let (nvx, nvy) = ice_velocity_toward(
             self.facing,
-            game.actors.list[actor.slot()].vel_x,
-            game.actors.list[actor.slot()].vel_y,
+            game.actor(actor).vel_x,
+            game.actor(actor).vel_y,
         );
 
         if nvx.abs() < self.step - ICE_X_MARGIN {
-            game.actors.list[actor.slot()].vel_x = nvx as i8;
+            game.actor_mut(actor).vel_x = nvx as i8;
         }
 
         if nvy.abs() < self.step {
-            game.actors.list[actor.slot()].vel_y = nvy as i8;
+            game.actor_mut(actor).vel_y = nvy as i8;
         }
 
-        game.actors.test_x = (game.actors.list[actor.slot()].abs_x as i32
-            + game.actors.list[actor.slot()].vel_x as i32 / VELOCITY_SCALE)
-            as u16;
-        game.actors.test_y = (game.actors.list[actor.slot()].abs_y as i32
-            + game.actors.list[actor.slot()].vel_y as i32 / VELOCITY_SCALE)
-            as u16;
+        game.actors.test_x = (game.actor(actor).abs_x as i32
+            + game.actor(actor).vel_x as i32 / VELOCITY_SCALE) as u16;
+        game.actors.test_y = (game.actor(actor).abs_y as i32
+            + game.actor(actor).vel_y as i32 / VELOCITY_SCALE) as u16;
 
         if game.hero.riding == RIDING_SWAN {
             steer_actor(game, 0, -(nvx as i32), -(nvy as i32), STEER_OFFSET);
-            self.facing = game.actors.list[actor.slot()].facing as i16;
+            self.facing = game.actor(actor).facing as i16;
 
             return Some(Pc::NewLoc);
         }
@@ -208,16 +198,8 @@ impl Ctx {
 
         // Masks with FACING_MASK, keeping only the bits that matter here.
         self.facing = (self.facing + 1) & FACING_MASK;
-        game.actors.test_x = pos_x(
-            game.actors.list[actor.slot()].abs_x as i32,
-            self.facing,
-            self.step,
-        );
-        game.actors.test_y = pos_y(
-            game.actors.list[actor.slot()].abs_y as i32,
-            self.facing,
-            self.step,
-        );
+        game.actors.test_x = pos_x(game.actor(actor).abs_x as i32, self.facing, self.step);
+        game.actors.test_y = pos_y(game.actor(actor).abs_y as i32, self.facing, self.step);
 
         if blocked_at(
             game,
@@ -238,16 +220,8 @@ impl Ctx {
 
         // Masks with FACING_MASK, keeping only the bits that matter here.
         self.facing = (self.facing - 2) & FACING_MASK;
-        game.actors.test_x = pos_x(
-            game.actors.list[actor.slot()].abs_x as i32,
-            self.facing,
-            self.step,
-        );
-        game.actors.test_y = pos_y(
-            game.actors.list[actor.slot()].abs_y as i32,
-            self.facing,
-            self.step,
-        );
+        game.actors.test_x = pos_x(game.actor(actor).abs_x as i32, self.facing, self.step);
+        game.actors.test_y = pos_y(game.actor(actor).abs_y as i32, self.facing, self.step);
 
         if blocked_at(
             game,
@@ -295,13 +269,11 @@ impl Ctx {
     /// the wraiths keep their one frame).
     fn pick_walking_frame(&mut self, game: &mut Game) {
         let actor = self.actor;
-        game.actors.list[actor.slot()].facing = self.facing as i8;
+        game.actor_mut(actor).facing = self.facing as i8;
         self.frame_base = diroff(self.facing);
         self.image = self.frame_base;
 
-        if !(game.hero.riding != 0 && self.slot == 0)
-            && game.actors.list[actor.slot()].race != RACE_WRAITH
-        {
+        if !(game.hero.riding != 0 && self.slot == 0) && game.actor(actor).race != RACE_WRAITH {
             self.image = (self.image as i32
                 // Masks with WALK_FRAMES_MASK, keeping only the bits that matter here.
                 + ((self.cycle as i32 + self.slot) & WALK_FRAMES_MASK))
@@ -315,13 +287,11 @@ impl Ctx {
         let actor = self.actor;
         self.terrain = terrain(game, game.actors.test_x, game.actors.test_y);
 
-        if game.actors.list[actor.slot()].race == RACE_WRAITH
-            || game.actors.list[actor.slot()].race == RACE_SNAKE
-        {
+        if game.actor(actor).race == RACE_WRAITH || game.actor(actor).race == RACE_SNAKE {
             self.terrain = 0;
         }
 
-        if game.actors.list[actor.slot()].race == RACE_SNAKE {
+        if game.actor(actor).race == RACE_SNAKE {
             // Snake pictures: two frames (bit 1 of the cycle) for each pair of facings, starting at image 0x24.
             self.image = (self.cycle & 2) + ((self.facing & 0xfe) << 2) + SNAKE_FIRST_FRAME;
         }
@@ -330,20 +300,14 @@ impl Ctx {
     /// Moves to the new place, remembering the step as the velocity (for sliding on ice).
     fn take_the_step(&mut self, game: &mut Game) {
         let actor = self.actor;
-        game.actors.list[actor.slot()].vel_x = ((game
-            .actors
-            .test_x
-            .wrapping_sub(game.actors.list[actor.slot()].abs_x)
+        game.actor_mut(actor).vel_x = ((game.actors.test_x.wrapping_sub(game.actor(actor).abs_x)
             as i16 as i32)
             * VELOCITY_SCALE) as i8;
-        game.actors.list[actor.slot()].vel_y = ((game
-            .actors
-            .test_y
-            .wrapping_sub(game.actors.list[actor.slot()].abs_y)
+        game.actor_mut(actor).vel_y = ((game.actors.test_y.wrapping_sub(game.actor(actor).abs_y)
             as i16 as i32)
             * VELOCITY_SCALE) as i8;
-        game.actors.list[actor.slot()].abs_x = game.actors.test_x;
-        game.actors.list[actor.slot()].abs_y = game.actors.test_y;
+        game.actor_mut(actor).abs_x = game.actors.test_x;
+        game.actor_mut(actor).abs_y = game.actors.test_y;
         game.actors.frustration = 0;
     }
 
@@ -360,7 +324,7 @@ impl Ctx {
             return Pc::Cpx;
         }
 
-        game.actors.list[self.actor.slot()].tactic = FRUST;
+        game.actor_mut(self.actor).tactic = FRUST;
 
         Pc::Still
     }
@@ -375,8 +339,8 @@ impl Ctx {
 
         self.terrain = terrain(
             game,
-            game.actors.list[self.actor.slot()].abs_x,
-            game.actors.list[self.actor.slot()].abs_y,
+            game.actor(self.actor).abs_x,
+            game.actor(self.actor).abs_y,
         );
 
         Pc::Tail
@@ -387,7 +351,7 @@ impl Ctx {
         let actor = self.actor;
         self.frame_base = diroff(self.facing + 8);
         let next = swing_transitions[self.state as usize][rand4(&mut game.rng) as usize] as i16;
-        game.actors.list[actor.slot()].state = next as i8;
+        game.actor_mut(actor).state = next as i8;
         self.state = next;
 
         if (self.slot > FIRST_NPC_SLOT && self.state == SWING_STATE_FIRST)

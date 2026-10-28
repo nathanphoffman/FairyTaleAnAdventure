@@ -59,28 +59,26 @@ pub fn advance_missiles(game: &mut Game) {
 
 /// One missile's flight for this frame.
 pub(super) fn fly(game: &mut Game, i: usize, ms: MissileRef) {
-    let mut s = game.actors.missiles[ms.slot()].speed as i16 * 2;
+    let mut s = game.missile(ms).speed as i16 * 2;
 
-    if missile_expired(&mut game.actors.missiles[ms.slot()], s) {
-        game.actors.missiles[ms.slot()].missile_type = MISSILE_NONE;
+    if missile_expired(game.missile_mut(ms), s) {
+        game.missile_mut(ms).missile_type = MISSILE_NONE;
 
         return;
     }
 
-    let xs = game.actors.missiles[ms.slot()].abs_x as i16;
-    let ys = game.actors.missiles[ms.slot()].abs_y as i16;
+    let xs = game.missile(ms).abs_x as i16;
+    let ys = game.missile(ms).abs_y as i16;
 
     if WALL_TERRAIN.contains(&terrain_at(game, xs as i32, ys as i32)) {
-        game.actors.missiles[ms.slot()].missile_type = MISSILE_NONE;
+        game.missile_mut(ms).missile_type = MISSILE_NONE;
         s = 0;
     }
 
-    let fc = game.actors.missiles[ms.slot()].direction as i32;
+    let fc = game.missile(ms).direction as i32;
     hit_first_actor_in_path(game, i, ms, xs, ys);
-    game.actors.missiles[ms.slot()].abs_x =
-        step_x(game.actors.missiles[ms.slot()].abs_x as i32, fc, s as i32) as u16;
-    game.actors.missiles[ms.slot()].abs_y =
-        step_y(game.actors.missiles[ms.slot()].abs_y as i32, fc, s as i32) as u16;
+    game.missile_mut(ms).abs_x = step_x(game.missile(ms).abs_x as i32, fc, s as i32) as u16;
+    game.missile_mut(ms).abs_y = step_y(game.missile(ms).abs_y as i32, fc, s as i32) as u16;
 }
 
 /// Whether the missile is unused, spent, standing still (`s` is its doubled speed) or has been in
@@ -101,8 +99,8 @@ pub(super) fn missile_expired(ms: &mut Missile, s: i16) -> bool {
 /// `i` is the missile's own index; the hero (actor 0) gets a dodge chance from `brave`, others a
 /// fixed one.
 pub(super) fn hit_first_actor_in_path(game: &mut Game, i: usize, ms: MissileRef, xs: i16, ys: i16) {
-    let fc = game.actors.missiles[ms.slot()].direction as i32;
-    let is_rock = game.actors.missiles[ms.slot()].missile_type == MISSILE_ROCK;
+    let fc = game.missile(ms).direction as i32;
+    let is_rock = game.missile(ms).missile_type == MISSILE_ROCK;
     let range = if is_rock {
         FIREBALL_HIT_RANGE
     } else {
@@ -130,10 +128,10 @@ pub(super) fn hit_first_actor_in_path(game: &mut Game, i: usize, ms: MissileRef,
             let damage = (rand8(&mut game.rng) + MISSILE_DAMAGE_BASE) as i16;
             hit_actor(game, by, target as i32, fc, damage);
 
-            game.actors.missiles[ms.slot()].speed = 0;
+            game.missile_mut(ms).speed = 0;
 
             if is_rock {
-                game.actors.missiles[ms.slot()].missile_type = MISSILE_SPENT;
+                game.missile_mut(ms).missile_type = MISSILE_SPENT;
             }
 
             return;
@@ -146,9 +144,9 @@ fn missile_can_hit(game: &mut Game, ms: MissileRef, target: usize) -> bool {
     let actor = ActorRef::new(target);
 
     !(target == RAFT
-        || game.actors.missiles[ms.slot()].archer as i16 == target as i16
-        || game.actors.list[actor.slot()].state == DEAD
-        || game.actors.list[actor.slot()].kind == CARRIER)
+        || game.missile(ms).archer as i16 == target as i16
+        || game.actor(actor).state == DEAD
+        || game.actor(actor).kind == CARRIER)
 }
 
 /// The current number of actors (the loop bound is read again each time, as in the original).

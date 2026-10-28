@@ -44,16 +44,14 @@ pub fn raft_proximity(game: &mut Game) {
 
     let carrier = ActorRef::new(game.actors.carrier_slot as usize);
     let hero = ActorRef::new(0);
-    let dx = (game.actors.list[hero.slot()].abs_x as i32
-        - game.actors.list[carrier.slot()].abs_x as i32
-        - CARRIER_OFFSET) as i16;
-    let dy = (game.actors.list[hero.slot()].abs_y as i32
-        - game.actors.list[carrier.slot()].abs_y as i32
-        - CARRIER_OFFSET) as i16;
+    let dx =
+        (game.actor(hero).abs_x as i32 - game.actor(carrier).abs_x as i32 - CARRIER_OFFSET) as i16;
+    let dy =
+        (game.actor(hero).abs_y as i32 - game.actor(carrier).abs_y as i32 - CARRIER_OFFSET) as i16;
     game.actors.raft_nearness = nearness(dx, dy);
 
     if game.hero.riding == BIRD {
-        game.actors.list[hero.slot()].environ = TURTLE_ENVIRON;
+        game.actor_mut(hero).environ = TURTLE_ENVIRON;
     }
 }
 

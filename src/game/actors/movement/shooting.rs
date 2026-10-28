@@ -44,8 +44,8 @@ impl Ctx {
             return pc;
         }
 
-        game.actors.missiles[self.missile.slot()].missile_type =
-            game.actors.list[self.actor.slot()].weapon - MISSILE_WEAPON_BASE;
+        game.missile_mut(self.missile).missile_type =
+            game.actor(self.actor).weapon - MISSILE_WEAPON_BASE;
 
         Pc::DragShoot
     }
@@ -56,14 +56,14 @@ impl Ctx {
         let actor = self.actor;
         let d8 = self.facing + SHOOTING_FACING_OFFSET;
 
-        if game.actors.list[actor.slot()].weapon == WEAPON_FIREBALL {
+        if game.actor(actor).weapon == WEAPON_FIREBALL {
             self.image = diroff(d8);
 
             return Some(Pc::Cpx);
         }
 
         self.image = diroff(d8) + BOW_RELEASED_FRAME;
-        game.actors.list[actor.slot()].state = STILL;
+        game.actor_mut(actor).state = STILL;
 
         if self.slot == 0 {
             if game.hero.stuff()[STUFF_ARROWS] == 0 {
@@ -73,7 +73,7 @@ impl Ctx {
             game.hero.stuff_mut()[STUFF_ARROWS] -= 1;
         }
 
-        game.actors.missiles[self.missile.slot()].speed = MISSILE_SPEED_ARROW;
+        game.missile_mut(self.missile).speed = MISSILE_SPEED_ARROW;
         game.actors.next_missile = game.actors.next_missile.wrapping_add(1);
         let pitch = EFFECT_ARROW_PITCH + rand256(&mut game.rng);
         play_effect(game, EFFECT_ARROW, pitch);
@@ -88,16 +88,16 @@ impl Ctx {
         let d8 = self.facing + SHOOTING_FACING_OFFSET;
 
         self.image = diroff(d8)
-            + if game.actors.list[actor.slot()].kind == ENEMY {
+            + if game.actor(actor).kind == ENEMY {
                 ENEMY_BOW_DRAWN_FRAME
             } else {
                 HERO_BOW_DRAWN_FRAME
             };
 
-        if game.actors.list[actor.slot()].weapon == WEAPON_FIREBALL {
-            game.actors.missiles[self.missile.slot()].speed = MISSILE_SPEED_FIREBALL;
+        if game.actor(actor).weapon == WEAPON_FIREBALL {
+            game.missile_mut(self.missile).speed = MISSILE_SPEED_FIREBALL;
             game.actors.next_missile = game.actors.next_missile.wrapping_add(1);
-            game.actors.list[actor.slot()].state = SHOOT3 as i8;
+            game.actor_mut(actor).state = SHOOT3 as i8;
             self.image = diroff(d8);
             let pitch = EFFECT_FIREBALL_PITCH + rand256(&mut game.rng);
             play_effect(game, EFFECT_FIREBALL, pitch);
@@ -106,7 +106,7 @@ impl Ctx {
 
             return Some(Pc::Cpx);
         } else {
-            game.actors.missiles[self.missile.slot()].speed = 0;
+            game.missile_mut(self.missile).speed = 0;
         }
 
         None

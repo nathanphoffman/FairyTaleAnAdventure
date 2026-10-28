@@ -83,8 +83,7 @@ pub(super) fn drawn_in_front(
         return true;
     }
 
-    game.actors.list[actor.slot()].race == RACE_NO_MASK_A
-        || game.actors.list[actor.slot()].race == RACE_NO_MASK_B
+    game.actor(actor).race == RACE_NO_MASK_A || game.actor(actor).race == RACE_NO_MASK_B
 }
 
 /// What a terrain tile does to a sprite drawn behind it.
@@ -179,7 +178,7 @@ impl SpriteTiles {
             // Masks with TERRAIN_TYPE_MASK, keeping only the bits that matter here.
             (game.memory.terrain_byte(cm as usize + 1) & TERRAIN_TYPE_MASK) as i16;
 
-        if game.actors.list[self.actor.slot()].state == FALL {
+        if game.actor(self.actor).state == FALL {
             if cm <= FALL_TILE_LIMIT {
                 return None;
             }

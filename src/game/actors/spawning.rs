@@ -163,9 +163,8 @@ fn place_in_dead_slots(game: &mut Game) {
     while i < LAST_ENEMY_ACTOR as usize && game.encounter.number != 0 {
         let actor = ActorRef::new(i);
 
-        if game.actors.list[actor.slot()].state == DEAD
-            && (game.actors.list[actor.slot()].visible == 0
-                || game.actors.list[actor.slot()].race == WRAITH)
+        if game.actor(actor).state == DEAD
+            && (game.actor(actor).visible == 0 || game.actor(actor).race == WRAITH)
         {
             place_encounter(game, i as u16, SPREAD);
             game.encounter.number -= 1;

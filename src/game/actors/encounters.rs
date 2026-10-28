@@ -104,18 +104,20 @@ pub fn place_encounter(game: &mut Game, i: u16, spread: u16) -> i32 {
         return 0;
     };
 
-    game.actors.list[actor.slot()].abs_x = xtest;
-    game.actors.list[actor.slot()].abs_y = ytest;
-    game.actors.list[actor.slot()].kind = ENEMY;
+    game.actor_mut(actor).abs_x = xtest;
+    game.actor_mut(actor).abs_y = ytest;
+    game.actor_mut(actor).kind = ENEMY;
     let race = encounter_race(game);
-    game.actors.list[actor.slot()].race = race as u8;
+    game.actor_mut(actor).race = race as u8;
     arm_enemy(game, actor, race);
 
-    game.actors.list[actor.slot()].rel_x = game.actors.list[actor.slot()]
+    game.actor_mut(actor).rel_x = game
+        .actor(actor)
         .abs_x
         .wrapping_sub(game.world.map_x)
         .wrapping_sub(ENEMY_ANCHOR.0);
-    game.actors.list[actor.slot()].rel_y = game.actors.list[actor.slot()]
+    game.actor_mut(actor).rel_y = game
+        .actor(actor)
         .abs_y
         .wrapping_sub(game.world.map_y)
         .wrapping_sub(ENEMY_ANCHOR.1);
@@ -133,19 +135,19 @@ fn arm_enemy(game: &mut Game, actor: ActorRef, race: i32) {
 
     let chart = &encounter_chart[race as usize];
     let w = (chart.arms as i32 * WEAPON_CHOICES) + game.encounter.weapon_type as i32;
-    game.actors.list[actor.slot()].weapon = weapon_probs[w as usize];
-    game.actors.list[actor.slot()].state = STILL;
-    game.actors.list[actor.slot()].environ = 0;
-    game.actors.list[actor.slot()].facing = 0;
+    game.actor_mut(actor).weapon = weapon_probs[w as usize];
+    game.actor_mut(actor).state = STILL;
+    game.actor_mut(actor).environ = 0;
+    game.actor_mut(actor).facing = 0;
 
     // Masks with BOW_BIT, keeping only the bits that matter here.
-    if game.actors.list[actor.slot()].weapon & BOW_BIT != 0 {
-        game.actors.list[actor.slot()].goal = ARCHER1 + chart.cleverness;
+    if game.actor(actor).weapon & BOW_BIT != 0 {
+        game.actor_mut(actor).goal = ARCHER1 + chart.cleverness;
     } else {
-        game.actors.list[actor.slot()].goal = ATTACK1 + chart.cleverness;
+        game.actor_mut(actor).goal = ATTACK1 + chart.cleverness;
     }
 
-    game.actors.list[actor.slot()].vitality = chart.hitpoints as i16;
+    game.actor_mut(actor).vitality = chart.hitpoints as i16;
 }
 
 /// Finds a place near the encounter point for actor `i`, trying up to `MAX_TRY` random spots
@@ -256,7 +258,7 @@ fn start_dying(i: i32, actor: &mut Shape, hero: &mut Hero) -> Option<Death> {
 pub fn load_carrier(game: &mut Game, n: i16) {
     let actor = ActorRef::new(FIRST_CARRIER_SLOT);
 
-    game.actors.list[actor.slot()].kind = if n == CARRIER_DRAGON { DRAGON } else { CARRIER };
+    game.actor_mut(actor).kind = if n == CARRIER_DRAGON { DRAGON } else { CARRIER };
     let extent = if n == CARRIER_DRAGON {
         2
     } else if n == CARRIER_TURTLE {
@@ -268,22 +270,22 @@ pub fn load_carrier(game: &mut Game, n: i16) {
     if game.actors.loaded_actor_file != n {
         game.memory.nextshape = game.memory.seq_list[SEQ_ENEMY].location;
         load_sprite_file(game, n as i32);
-        finish_sprite_load(game, game.actors.list[actor.slot()].kind as i16);
+        finish_sprite_load(game, game.actor(actor).kind as i16);
         motor_off();
     }
 
-    let e = &game.extents[extent];
-    game.actors.list[actor.slot()].abs_x = e.x1.wrapping_add(CARRIER_OFFSET.0);
-    game.actors.list[actor.slot()].abs_y = e.y1.wrapping_add(CARRIER_OFFSET.1);
-    game.actors.list[actor.slot()].index = 0;
-    game.actors.list[actor.slot()].weapon = 0;
-    game.actors.list[actor.slot()].environ = 0;
-    game.actors.list[actor.slot()].state = STILL;
-    game.actors.list[actor.slot()].vitality = VITALITY_CARRIER;
+    let e = game.extents[extent];
+    game.actor_mut(actor).abs_x = e.x1.wrapping_add(CARRIER_OFFSET.0);
+    game.actor_mut(actor).abs_y = e.y1.wrapping_add(CARRIER_OFFSET.1);
+    game.actor_mut(actor).index = 0;
+    game.actor_mut(actor).weapon = 0;
+    game.actor_mut(actor).environ = 0;
+    game.actor_mut(actor).state = STILL;
+    game.actor_mut(actor).vitality = VITALITY_CARRIER;
     game.actors.active = ACTORS_WITH_CARRIER;
     game.actors.active_carrier = n;
     game.actors.loaded_actor_file = n;
-    game.actors.list[actor.slot()].race = n as u8;
+    game.actor_mut(actor).race = n as u8;
 }
 
 /// The actors' sprite file the monsters of this encounter need: sets how many appear and, if that

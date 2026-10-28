@@ -180,7 +180,7 @@ pub struct Actors {
 }
 
 /// A way to name one actor of `Game::actors.list` by its number, so that code can hold on to "that
-/// actor" while it calls others that change the list. Read it with `game.actors.list[r.slot()]`.
+/// actor" while it calls others that change the list. Read it with `game.actor(r)` or `game.actor_mut(r)`.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct ActorRef(usize);
 
@@ -201,10 +201,6 @@ pub struct MissileRef(usize);
 impl MissileRef {
     pub fn new(index: usize) -> MissileRef {
         MissileRef(index)
-    }
-
-    pub fn slot(self) -> usize {
-        self.0
     }
 }
 
@@ -371,6 +367,24 @@ pub struct Game {
 }
 
 impl Game {
+    /// The actor `r` names.
+    pub fn actor(&self, r: ActorRef) -> &Shape {
+        &self.actors.list[r.0]
+    }
+
+    pub fn actor_mut(&mut self, r: ActorRef) -> &mut Shape {
+        &mut self.actors.list[r.0]
+    }
+
+    /// The missile `r` names.
+    pub fn missile(&self, r: MissileRef) -> &Missile {
+        &self.actors.missiles[r.0]
+    }
+
+    pub fn missile_mut(&mut self, r: MissileRef) -> &mut Missile {
+        &mut self.actors.missiles[r.0]
+    }
+
     pub fn new() -> Game {
         Game {
             witch: Witch {

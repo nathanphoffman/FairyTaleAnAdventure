@@ -77,19 +77,19 @@ const HERO_SET_FILE: i16 = 13;
 /// Puts the raft and the first person back where they start.
 pub(super) fn reset_raft_setfig(game: &mut Game) {
     let raft = ActorRef::new(1);
-    game.actors.list[raft.slot()].kind = RAFT;
-    game.actors.list[raft.slot()].abs_x = RAFT_START.0;
-    game.actors.list[raft.slot()].abs_y = RAFT_START.1;
-    game.actors.list[raft.slot()].index = 0;
-    game.actors.list[raft.slot()].weapon = 0;
-    game.actors.list[raft.slot()].environ = 0;
+    game.actor_mut(raft).kind = RAFT;
+    game.actor_mut(raft).abs_x = RAFT_START.0;
+    game.actor_mut(raft).abs_y = RAFT_START.1;
+    game.actor_mut(raft).index = 0;
+    game.actor_mut(raft).weapon = 0;
+    game.actor_mut(raft).environ = 0;
 
     let setfig = ActorRef::new(2);
-    game.actors.list[setfig.slot()].kind = SETFIG;
-    game.actors.list[setfig.slot()].abs_x = SETFIG_START.0;
-    game.actors.list[setfig.slot()].abs_y = SETFIG_START.1;
-    game.actors.list[setfig.slot()].index = 0;
-    game.actors.list[setfig.slot()].weapon = 0;
+    game.actor_mut(setfig).kind = SETFIG;
+    game.actor_mut(setfig).abs_x = SETFIG_START.0;
+    game.actor_mut(setfig).abs_y = SETFIG_START.1;
+    game.actor_mut(setfig).index = 0;
+    game.actor_mut(setfig).weapon = 0;
 }
 
 /// The fallen brother's body is left where he died, and his ghost appears.

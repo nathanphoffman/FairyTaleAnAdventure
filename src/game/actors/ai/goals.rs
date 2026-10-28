@@ -87,11 +87,11 @@ pub fn update_enemy_goals(game: &mut Game) {
 fn think(game: &mut Game, i: usize, battle2: i8) {
     let actor = ActorRef::new(i);
 
-    if game.actors.list[actor.slot()].kind == CARRIER {
+    if game.actor(actor).kind == CARRIER {
         aim_carrier(game, i);
 
         return;
-    } else if game.actors.list[actor.slot()].kind == SETFIG {
+    } else if game.actor(actor).kind == SETFIG {
         return;
     }
 
@@ -101,12 +101,12 @@ fn think(game: &mut Game, i: usize, battle2: i8) {
         return;
     }
 
-    let tactic = game.actors.list[actor.slot()].tactic as i16;
+    let tactic = game.actor(actor).tactic as i16;
     let new_tactic_roll = bitrand(&mut game.rng, NEW_TACTIC_ODDS - 1) == 0;
-    let mode = adjust_mode_for_situation(game, actor, game.actors.list[actor.slot()].goal as i16);
+    let mode = adjust_mode_for_situation(game, actor, game.actor(actor).goal as i16);
     let mode = act_on_goal(game, i, actor, mode, tactic, (xd, yd), new_tactic_roll);
 
-    game.actors.list[actor.slot()].goal = mode as i8;
+    game.actor_mut(actor).goal = mode as i8;
 
     if game.actors.leader == 0 {
         game.actors.leader = i as i16;
@@ -129,8 +129,8 @@ fn aim_carrier(game: &mut Game, i: usize) {
 
 /// How far the actor is from the hero along each axis, never negative.
 fn distance_from_hero(game: &mut Game, actor: ActorRef) -> (i16, i16) {
-    let xd = (game.actors.list[actor.slot()].abs_x as i32 - game.hero.x as i32) as i16;
-    let yd = (game.actors.list[actor.slot()].abs_y as i32 - game.hero.y as i32) as i16;
+    let xd = (game.actor(actor).abs_x as i32 - game.hero.x as i32) as i16;
+    let yd = (game.actor(actor).abs_y as i32 - game.hero.y as i32) as i16;
 
     (xd.wrapping_abs(), yd.wrapping_abs())
 }
@@ -141,11 +141,11 @@ fn notice_actor(game: &mut Game, actor: ActorRef, xd: i16, yd: i16, battle2: i8)
     if on_screen(xd, yd) {
         game.actors.on_screen = 1;
 
-        if game.actors.list[actor.slot()].vitality < 1 {
+        if game.actor(actor).vitality < 1 {
             return false;
         }
 
-        if game.actors.list[actor.slot()].visible != 0 || battle2 != 0 {
+        if game.actor(actor).visible != 0 || battle2 != 0 {
             game.actors.battle_flag = 1;
         }
     }
@@ -156,7 +156,7 @@ fn notice_actor(game: &mut Game, actor: ActorRef, xd: i16, yd: i16, battle2: i8)
 /// A stuck actor picks a new tactic: archers one of the ranged ones, the others a melee one.
 fn try_something_else(game: &mut Game, i: usize, actor: ActorRef) {
     // Masks with BOW_BIT, keeping only the bits that matter here.
-    if game.actors.list[actor.slot()].weapon & BOW_BIT != 0 {
+    if game.actor(actor).weapon & BOW_BIT != 0 {
         let tactic = rand4(&mut game.rng) + ARCHER_FRUSTRATION_TACTIC;
         run_tactic(game, i as i32, tactic);
     } else {
@@ -180,8 +180,8 @@ fn act_on_goal(
 ) -> i16 {
     if tactic == FRUST || tactic == SHOOTFRUST {
         try_something_else(game, i, actor);
-    } else if game.actors.list[actor.slot()].state == SHOOT1 {
-        game.actors.list[actor.slot()].state = SHOOT3;
+    } else if game.actor(actor).state == SHOOT1 {
+        game.actor_mut(actor).state = SHOOT3;
     } else if mode <= ARCHER2 {
         // Masks off the low bits (a cheap remainder or a flag test).
         if mode & 2 == 0 {
@@ -199,9 +199,9 @@ fn act_on_goal(
         run_tactic(game, i as i32, FOLLOW);
     } else if mode == STAND {
         steer_actor(game, i as i32, game.hero.x as i32, game.hero.y as i32, 0);
-        game.actors.list[actor.slot()].state = STILL;
+        game.actor_mut(actor).state = STILL;
     } else if mode == WAIT {
-        game.actors.list[actor.slot()].state = STILL;
+        game.actor_mut(actor).state = STILL;
     }
 
     mode
@@ -214,9 +214,9 @@ fn adjust_mode_for_situation(game: &mut Game, actor: ActorRef, mode: i16) -> i16
         mode,
         game.actors.list[0].state,
         game.actors.leader,
-        game.actors.list[actor.slot()].vitality,
+        game.actor(actor).vitality,
         game.world.extent_type,
-        game.actors.list[actor.slot()].race,
+        game.actor(actor).race,
         game.extents[game.world.extent].v3,
     )
 }

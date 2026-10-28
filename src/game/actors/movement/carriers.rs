@@ -78,15 +78,15 @@ impl Ctx {
             game.actors.carrier_slot,
             game.hero.stuff()[STUFF_SWAN_ITEM] != 0,
         ) {
-            self.facing = game.actors.list[hero.slot()].facing as i16;
-            game.actors.list[actor.slot()].abs_x = game.actors.list[hero.slot()].abs_x;
-            game.actors.test_x = game.actors.list[hero.slot()].abs_x;
-            game.actors.list[actor.slot()].abs_y = game.actors.list[hero.slot()].abs_y;
-            game.actors.test_y = game.actors.list[hero.slot()].abs_y;
+            self.facing = game.actor(hero).facing as i16;
+            game.actor_mut(actor).abs_x = game.actor(hero).abs_x;
+            game.actors.test_x = game.actor(hero).abs_x;
+            game.actor_mut(actor).abs_y = game.actor(hero).abs_y;
+            game.actors.test_y = game.actor(hero).abs_y;
             game.hero.riding = RIDING_SWAN;
         } else {
-            game.actors.test_x = game.actors.list[actor.slot()].abs_x;
-            game.actors.test_y = game.actors.list[actor.slot()].abs_y;
+            game.actors.test_x = game.actor(actor).abs_x;
+            game.actors.test_y = game.actor(actor).abs_y;
         }
 
         self.image = self.facing;
@@ -99,13 +99,13 @@ impl Ctx {
         let hero = ActorRef::new(0);
 
         if turtle_carries(game.actors.raft_nearness, game.actors.carrier_slot) {
-            self.facing = game.actors.list[hero.slot()].facing as i16;
-            game.actors.test_x = game.actors.list[hero.slot()].abs_x;
-            game.actors.test_y = game.actors.list[hero.slot()].abs_y;
+            self.facing = game.actor(hero).facing as i16;
+            game.actors.test_x = game.actor(hero).abs_x;
+            game.actors.test_y = game.actor(hero).abs_y;
             game.hero.riding = RIDING_TURTLE;
             self.image = self.facing + self.facing;
 
-            if game.actors.list[hero.slot()].state as i16 == WALKING {
+            if game.actor(hero).state as i16 == WALKING {
                 // Masks off the low bits (a cheap remainder or a flag test).
                 self.image += self.cycle & 1;
             }
@@ -116,8 +116,8 @@ impl Ctx {
         self.terrain = terrain(game, game.actors.test_x, game.actors.test_y);
 
         if self.terrain == TURTLE_WATER {
-            game.actors.list[actor.slot()].abs_x = game.actors.test_x;
-            game.actors.list[actor.slot()].abs_y = game.actors.test_y;
+            game.actor_mut(actor).abs_x = game.actors.test_x;
+            game.actor_mut(actor).abs_y = game.actors.test_y;
         }
 
         self.step = 1;
@@ -128,8 +128,8 @@ impl Ctx {
     fn turtle_swims(&mut self, game: &mut Game) {
         let actor = self.actor;
         let (ax, ay) = (
-            game.actors.list[actor.slot()].abs_x as i32,
-            game.actors.list[actor.slot()].abs_y as i32,
+            game.actor(actor).abs_x as i32,
+            game.actor(actor).abs_y as i32,
         );
         self.facing = turtle_heading(self.facing, |dir| {
             terrain(
@@ -164,8 +164,8 @@ impl Ctx {
             return Pc::Statc;
         }
 
-        game.actors.list[actor.slot()].abs_x = game.actors.test_x;
-        game.actors.list[actor.slot()].abs_y = game.actors.test_y;
+        game.actor_mut(actor).abs_x = game.actors.test_x;
+        game.actor_mut(actor).abs_y = game.actors.test_y;
         game.hero.riding = RIDING_RAFT;
 
         Pc::Statc

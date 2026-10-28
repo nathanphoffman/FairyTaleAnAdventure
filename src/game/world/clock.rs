@@ -96,7 +96,7 @@ fn heal_due(clock: u16, vitality: i16, bravery: i16, state: i8) -> bool {
 pub fn day_night_tick(game: &mut Game) {
     let hero = ActorRef::new(0);
 
-    if game.actors.list[hero.slot()].state == SLEEP {
+    if game.actor(hero).state == SLEEP {
         sleep_tick(game, hero);
     }
 
@@ -104,9 +104,9 @@ pub fn day_night_tick(game: &mut Game) {
         game.world.day_clock,
         game.world.freeze_timer != 0,
         game.world.day_period,
-        game.actors.list[hero.slot()].vitality,
+        game.actor(hero).vitality,
         game.hero.brave,
-        game.actors.list[hero.slot()].state,
+        game.actor(hero).state,
     );
 
     game.world.day_clock = tick.clock;
@@ -122,7 +122,7 @@ pub fn day_night_tick(game: &mut Game) {
     day_fade(game);
 
     if tick.heal {
-        game.actors.list[hero.slot()].vitality += 1;
+        game.actor_mut(hero).vitality += 1;
         queue_print(game, PRQ_STATS);
     }
 }
@@ -199,9 +199,9 @@ fn sleep_tick(game: &mut Game, hero: ActorRef) {
     game.hero.fatigue = tired;
 
     if wake {
-        game.actors.list[hero.slot()].state = STILL;
-        game.actors.list[hero.slot()].abs_y &= WAKE_Y_MASK;
-        game.hero.y = game.actors.list[hero.slot()].abs_y;
+        game.actor_mut(hero).state = STILL;
+        game.actor_mut(hero).abs_y &= WAKE_Y_MASK;
+        game.hero.y = game.actor(hero).abs_y;
     }
 }
 
