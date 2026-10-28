@@ -4,12 +4,11 @@ use super::shop::FIRST_MENU_ENTRY;
 use super::{ITEMS, KEYBASE, KEYS};
 use crate::game::actors::interaction::summon_turtle;
 use crate::game::data::state::Game;
-use crate::game::data::state::the_actors;
 use crate::game::ui::items_menu::item_name;
 use crate::game::ui::menus::go_to_menu;
 use crate::game::ui::messages::{print, print_cont, print_wrapped};
 use crate::game::ui::text::speak;
-use crate::game::world::key_doors::{bumped_locked_door, open_door_near};
+use crate::game::world::key_doors::open_door_near;
 use crate::game::world::map::{step_x, step_y};
 
 // Use menu entries.
@@ -34,75 +33,71 @@ fn in_no_turtle_area(game: &mut Game) -> bool {
 }
 
 /// Picks a weapon, the key menu, the turtle shell, or the sunstone.
-pub(super) unsafe fn use_option(game: &mut Game, chosen_entry: i16) -> bool {
-    unsafe {
-        if chosen_entry == KEY_ENTRY {
-            if game.ui.menu_hit_enabled != 0 {
-                go_to_menu(game, KEYS as i16);
-            } else {
-                print_wrapped(game, "% has no keys!");
-            }
-
-            return false;
+pub(super) fn use_option(game: &mut Game, chosen_entry: i16) -> bool {
+    if chosen_entry == KEY_ENTRY {
+        if game.ui.menu_hit_enabled != 0 {
+            go_to_menu(game, KEYS as i16);
+        } else {
+            print_wrapped(game, "% has no keys!");
         }
 
-        if chosen_entry < WEAPONS {
-            if game.ui.menu_hit_enabled != 0 {
-                the_actors.list[0].weapon = (chosen_entry + 1) as i8;
-            } else {
-                print_wrapped(game, "% doesn't have one.");
-            }
-        }
-
-        if chosen_entry == SHELL_ENTRY && game.ui.menu_hit_enabled != 0 {
-            if in_no_turtle_area(game) {
-                return true;
-            }
-
-            summon_turtle(game);
-        }
-
-        if chosen_entry == SUNSTONE_ENTRY && game.witch.on_screen != 0 {
-            speak(game, SUNSTONE_SPEECH);
-        }
-
-        go_to_menu(game, ITEMS as i16);
-
-        true
+        return false;
     }
+
+    if chosen_entry < WEAPONS {
+        if game.ui.menu_hit_enabled != 0 {
+            game.actors.list[0].weapon = (chosen_entry + 1) as i8;
+        } else {
+            print_wrapped(game, "% doesn't have one.");
+        }
+    }
+
+    if chosen_entry == SHELL_ENTRY && game.ui.menu_hit_enabled != 0 {
+        if in_no_turtle_area(game) {
+            return true;
+        }
+
+        summon_turtle(game);
+    }
+
+    if chosen_entry == SUNSTONE_ENTRY && game.witch.on_screen != 0 {
+        speak(game, SUNSTONE_SPEECH);
+    }
+
+    go_to_menu(game, ITEMS as i16);
+
+    true
 }
 
 /// Tries a key on every door and chest around the hero.
-pub(super) unsafe fn keys_option(game: &mut Game, chosen_entry: i16) -> bool {
-    unsafe {
-        let key = (chosen_entry - FIRST_MENU_ENTRY) as usize;
-        bumped_locked_door = 0;
+pub(super) fn keys_option(game: &mut Game, chosen_entry: i16) -> bool {
+    let key = (chosen_entry - FIRST_MENU_ENTRY) as usize;
+    game.bumped_locked_door = 0;
 
-        if game.hero.stuff()[key + KEYBASE] != 0 {
-            let mut direction = 0;
+    if game.hero.stuff()[key + KEYBASE] != 0 {
+        let mut direction = 0;
 
-            while direction < DIRECTIONS {
-                let x = step_x(game.hero.x as i32, direction, DOOR_REACH) as u16;
-                let y = step_y(game.hero.y as i32, direction, DOOR_REACH) as u16;
+        while direction < DIRECTIONS {
+            let x = step_x(game.hero.x as i32, direction, DOOR_REACH) as u16;
+            let y = step_y(game.hero.y as i32, direction, DOOR_REACH) as u16;
 
-                if open_door_near(game, x, y, key as u32 + 1) != 0 {
-                    game.hero.stuff_mut()[key + KEYBASE] -= 1;
-                    break;
-                }
-
-                direction += 1;
+            if open_door_near(game, x, y, key as u32 + 1) != 0 {
+                game.hero.stuff_mut()[key + KEYBASE] -= 1;
+                break;
             }
 
-            if direction >= DIRECTIONS {
-                print_wrapped(game, "% tried a ");
-                print_cont(game, item_name(KEYBASE + key));
-                print_cont(game, " but it didn't");
-                print(game, "fit.");
-            }
+            direction += 1;
         }
 
-        go_to_menu(game, ITEMS as i16);
-
-        true
+        if direction >= DIRECTIONS {
+            print_wrapped(game, "% tried a ");
+            print_cont(game, item_name(KEYBASE + key));
+            print_cont(game, " but it didn't");
+            print(game, "fit.");
+        }
     }
+
+    go_to_menu(game, ITEMS as i16);
+
+    true
 }

@@ -13,7 +13,6 @@ use game_loop::main_loop;
 use intro::start_up;
 use open_close::{close_all, open_all};
 
-use crate::game::data::state::the_world;
 use crate::game::ui::text::show_error;
 
 use crate::platform::audio::stopscore;
@@ -21,24 +20,22 @@ use crate::platform::audio::stopscore;
 /// The game: the original `main`. Called once from `src/main.rs`.
 pub fn run_game() {
     let mut game = Game::new();
-    unsafe {
-        the_world.light_timer = 0;
-        let err = open_all(&mut game);
+    game.world.light_timer = 0;
+    let err = open_all(&mut game);
 
-        if err != 0 {
-            show_error(&mut game, err);
-            quit_all();
-
-            return;
-        }
-
-        if start_up(&mut game) {
-            main_loop(&mut game);
-            stopscore();
-        }
-
+    if err != 0 {
+        show_error(&mut game, err);
         quit_all();
+
+        return;
     }
+
+    if start_up(&mut game) {
+        main_loop(&mut game);
+        stopscore();
+    }
+
+    quit_all();
 }
 
 /// The end of the program (the `quit_all` label).

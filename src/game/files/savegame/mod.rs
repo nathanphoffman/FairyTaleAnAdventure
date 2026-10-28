@@ -7,7 +7,6 @@ mod transfer;
 
 use self::transfer::{Transfer, transfer_all};
 use crate::game::data::state::Game;
-use crate::game::data::state::the_actors;
 use crate::game::files::loading::load_start_sprites;
 use crate::game::render::screen::FontKind;
 use crate::game::ui::menus::update_menu_availability;
@@ -76,18 +75,16 @@ fn set_current_font(game: &mut Game, kind: FontKind) {
 
 /// After loading a game: clears the encounter state and redraws the status panel for the new hero.
 fn reset_after_load(game: &mut Game) {
-    unsafe {
-        game.encounter.weapon_type = 0;
-        game.encounter.number = 0;
-        load_start_sprites(game);
-        update_menu_availability(game);
-        game.screen.view_status = VIEW_CORRUPT;
-        queue_print(PRINT_VITALITY);
-        queue_print(PRINT_STATS);
-        print(game, "");
-        print(game, "");
-        print(game, "");
-        game.encounter.kind = 0;
-        the_actors.loading = 0;
-    }
+    game.encounter.weapon_type = 0;
+    game.encounter.number = 0;
+    load_start_sprites(game);
+    update_menu_availability(game);
+    game.screen.view_status = VIEW_CORRUPT;
+    queue_print(game, PRINT_VITALITY);
+    queue_print(game, PRINT_STATS);
+    print(game, "");
+    print(game, "");
+    print(game, "");
+    game.encounter.kind = 0;
+    game.actors.loading = 0;
 }

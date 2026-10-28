@@ -43,7 +43,13 @@ fn container_key(roll: i32) -> i32 {
 
 /// What was inside a container. Returns true (the container is always used up).
 pub(super) fn container_contents(game: &mut Game) -> bool {
-    match roll_contents(rand4, rand8) {
+    let rng = std::cell::RefCell::new(&mut game.rng);
+    let contents = roll_contents(
+        || rand4(&mut rng.borrow_mut()),
+        || rand8(&mut rng.borrow_mut()),
+    );
+
+    match contents {
         Contents::Nothing => print(game, "nothing."),
         Contents::One(i) => {
             print(game, "a ");

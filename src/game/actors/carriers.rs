@@ -3,7 +3,6 @@
 
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::the_actors;
 
 // Actor kinds and states (csrc/ftale.h).
 const BIRD: i16 = 11;
@@ -35,24 +34,26 @@ fn nearness(dx: i16, dy: i16) -> i16 {
 /// How close the hero is to the raft or turtle (`raft_nearness` 1 = near, 2 = very near). Riding the
 /// bird sets the hero's environ.
 pub fn raft_proximity(game: &mut Game) {
-    unsafe {
-        the_actors.raft_nearness = 0;
-        the_actors.turtle_nearness = 0;
-        the_actors.carrier_slot = if the_actors.active_carrier != 0 {
-            CARRIER_SLOT
-        } else {
-            RAFT_SLOT
-        };
+    game.actors.raft_nearness = 0;
+    game.actors.turtle_nearness = 0;
+    game.actors.carrier_slot = if game.actors.active_carrier != 0 {
+        CARRIER_SLOT
+    } else {
+        RAFT_SLOT
+    };
 
-        let carrier = ActorRef::new(the_actors.carrier_slot as usize);
-        let mut hero = ActorRef::new(0);
-        let dx = (hero.abs_x as i32 - carrier.abs_x as i32 - CARRIER_OFFSET) as i16;
-        let dy = (hero.abs_y as i32 - carrier.abs_y as i32 - CARRIER_OFFSET) as i16;
-        the_actors.raft_nearness = nearness(dx, dy);
+    let carrier = ActorRef::new(game.actors.carrier_slot as usize);
+    let hero = ActorRef::new(0);
+    let dx = (game.actors.list[hero.slot()].abs_x as i32
+        - game.actors.list[carrier.slot()].abs_x as i32
+        - CARRIER_OFFSET) as i16;
+    let dy = (game.actors.list[hero.slot()].abs_y as i32
+        - game.actors.list[carrier.slot()].abs_y as i32
+        - CARRIER_OFFSET) as i16;
+    game.actors.raft_nearness = nearness(dx, dy);
 
-        if game.hero.riding == BIRD {
-            hero.environ = TURTLE_ENVIRON;
-        }
+    if game.hero.riding == BIRD {
+        game.actors.list[hero.slot()].environ = TURTLE_ENVIRON;
     }
 }
 

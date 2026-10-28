@@ -2,9 +2,8 @@
 
 use super::hunger::{eats_fruit, hunger_due, hunger_effects};
 use super::{MOOD_PERIOD_MASK, STARVING_AT, safe_check_due};
-use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::{Hero, the_actors, the_world};
+use crate::game::data::state::Hero;
 use crate::game::data::types::Shape;
 use crate::game::ui::music::set_mood;
 use crate::game::ui::text::{queue_print, show_event};
@@ -28,24 +27,22 @@ fn mood_due(clock: u16, battle: bool) -> bool {
 
 /// Notes a safe spot, picks the music, and makes the hero hungrier and more tired.
 pub fn survival_tick(game: &mut Game) {
-    unsafe {
-        let facts = SurvivalFacts {
-            clock: the_world.day_clock,
-            region: the_world.region,
-            actors_on_screen: the_actors.on_screen != 0,
-            actors_loading: the_actors.loading != 0,
-            witch_on_screen: game.witch.on_screen != 0,
-            battle: the_actors.battle_flag != 0,
-        };
+    let facts = SurvivalFacts {
+        clock: game.world.day_clock,
+        region: game.world.region,
+        actors_on_screen: game.actors.on_screen != 0,
+        actors_loading: game.actors.loading != 0,
+        witch_on_screen: game.witch.on_screen != 0,
+        battle: game.actors.battle_flag != 0,
+    };
 
-        let steps = survival_step(&facts, &mut game.hero, &mut (ActorRef::new(0)));
+    let steps = survival_step(&facts, &mut game.hero, &mut game.actors.list[0]);
 
-        for step in steps {
-            match step {
-                SurvivalStep::Event(e) => show_event(game, e),
-                SurvivalStep::RedrawStats => queue_print(PRQ_STATS),
-                SurvivalStep::PickMusic => set_mood(game, 0),
-            }
+    for step in steps {
+        match step {
+            SurvivalStep::Event(e) => show_event(game, e),
+            SurvivalStep::RedrawStats => queue_print(game, PRQ_STATS),
+            SurvivalStep::PickMusic => set_mood(game, 0),
         }
     }
 }
@@ -139,9 +136,9 @@ mod tests {
 
     /// A hero with an empty pack, standing in a calm place on a safe-check frame.
     fn calm_hero() -> (SurvivalFacts, Hero, Shape) {
-        let mut hero: Hero = unsafe { std::mem::zeroed() };
+        let mut hero: Hero = Default::default();
 
-        let mut body: Shape = unsafe { std::mem::zeroed() };
+        let mut body: Shape = Default::default();
         hero.brother = 1;
         hero.x = 1234;
         hero.y = 5678;

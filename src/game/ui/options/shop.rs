@@ -4,7 +4,6 @@ use super::{ARROWS, PRQ_VITALITY};
 use crate::game::actors::interaction::eat_food;
 use crate::game::data::object_tables::jtrans;
 use crate::game::data::state::Game;
-use crate::game::data::state::the_actors;
 use crate::game::ui::items_menu::{add_stuff, item_name};
 use crate::game::ui::messages::{print, print_cont, print_wrapped};
 use crate::game::ui::text::{queue_print, show_event};
@@ -87,33 +86,31 @@ fn purchase(wealth: i16, price: i16, item: usize) -> Purchase {
 }
 
 /// Buys what the bartender sells, if the hero can pay.
-pub(super) unsafe fn buy_option(game: &mut Game, chosen_entry: i16) -> bool {
-    unsafe {
-        the_actors.nearest_object = the_actors.nearest_person;
-        let near = the_actors.nearest_object;
-        let race = if near == 0 {
-            0
-        } else {
-            the_actors.list[near as usize].race
-        };
+pub(super) fn buy_option(game: &mut Game, chosen_entry: i16) -> bool {
+    game.actors.nearest_object = game.actors.nearest_person;
+    let near = game.actors.nearest_object;
+    let race = if near == 0 {
+        0
+    } else {
+        game.actors.list[near as usize].race
+    };
 
-        let (item, price) = match buy_gate(near, race, chosen_entry, &jtrans) {
-            BuyGate::Nothing => return true,
-            BuyGate::NotHandled => return false,
-            BuyGate::Offer { item, price } => (item, price),
-        };
+    let (item, price) = match buy_gate(near, race, chosen_entry, &jtrans) {
+        BuyGate::Nothing => return true,
+        BuyGate::NotHandled => return false,
+        BuyGate::Offer { item, price } => (item, price),
+    };
 
-        match purchase(game.hero.wealth, price, item) {
-            Purchase::TooPoor => print(game, "Not enough money!"),
-            Purchase::Bought { wealth_left, what } => {
-                game.hero.wealth = wealth_left;
-                queue_print(PRQ_VITALITY);
-                receive_purchase(game, item, what);
-            }
+    match purchase(game.hero.wealth, price, item) {
+        Purchase::TooPoor => print(game, "Not enough money!"),
+        Purchase::Bought { wealth_left, what } => {
+            game.hero.wealth = wealth_left;
+            queue_print(game, PRQ_VITALITY);
+            receive_purchase(game, item, what);
         }
-
-        true
     }
+
+    true
 }
 
 /// Hands over what was bought: food is eaten at once, arrows come in a bundle, anything else is

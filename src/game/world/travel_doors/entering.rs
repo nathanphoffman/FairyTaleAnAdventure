@@ -1,9 +1,7 @@
 //! Going in through a door from outdoors: finding the door and where to arrive.
 
 use super::{CAVE, DOORCOUNT, LOWER_HALF_BIT, TILE_COLUMN_MASK, TILE_WIDTH};
-use crate::game::data::object_tables::page_colors;
 use crate::game::data::state::Game;
-use crate::game::data::state::the_world;
 use crate::game::data::tables::door_list;
 use crate::game::data::types::Door;
 use crate::game::render::screen_fx::fade_page;
@@ -67,70 +65,60 @@ fn region_inside(d: &Door) -> u16 {
     }
 }
 
-pub(super) unsafe fn door_at(j: i32) -> &'static Door {
-    unsafe { &*(&raw const door_list).cast::<Door>().add(j as usize) }
+pub(super) fn door_at(j: i32) -> &'static Door {
+    &door_list[j as usize]
 }
 
-pub(super) unsafe fn enter_door(game: &mut Game, xtest: u16, ytest: u16) {
-    unsafe {
-        let Some(index) = find_outdoor_door(xtest, ytest) else {
-            return;
-        };
+pub(super) fn enter_door(game: &mut Game, xtest: u16, ytest: u16) {
+    let Some(index) = find_outdoor_door(xtest, ytest) else {
+        return;
+    };
 
-        let d = door_at(index);
-        let statues = game.hero.stuff()[STATBASE];
+    let d = door_at(index);
+    let statues = game.hero.stuff()[STATBASE];
 
-        if may_enter(d, game.hero.x, game.hero.y, statues) {
-            let (x, y) = inside_spot(d);
-            the_world.new_region = region_inside(d);
-            transfer_hero(game, x, y, 0);
-            find_place(game, 2);
-            fade_page(
-                game,
-                FADE_WHITE,
-                FADE_WHITE,
-                FADE_WHITE,
-                1,
-                &*(&raw const page_colors),
-            );
-        }
+    if may_enter(d, game.hero.x, game.hero.y, statues) {
+        let (x, y) = inside_spot(d);
+        game.world.new_region = region_inside(d);
+        transfer_hero(game, x, y, 0);
+        find_place(game, 2);
+        let colors = game.page_colors;
+        fade_page(game, FADE_WHITE, FADE_WHITE, FADE_WHITE, 1, &colors);
     }
 }
 
 /// Binary search of the (sorted) outdoor doors for the one whose entrance covers the point.
 /// A door matches within 16 pixels to the right of its x; vertical doors need the exact x.
-unsafe fn find_outdoor_door(xtest: u16, ytest: u16) -> Option<i32> {
-    unsafe {
-        let mut low = 0;
-        let mut high = DOORCOUNT - 1;
+fn find_outdoor_door(xtest: u16, ytest: u16) -> Option<i32> {
+    let mut low = 0;
+    let mut high = DOORCOUNT - 1;
 
-        while high >= low {
-            let j = (high + low) / 2;
-            let d = door_at(j);
+    while high >= low {
+        let j = (high + low) / 2;
+        let d = door_at(j);
 
-            if d.xc1 > xtest {
-                high = j - 1;
-            } else if d.xc1 as i32 + TILE_WIDTH < xtest as i32 {
-                low = j + 1;
+        if d.xc1 > xtest {
+            high = j - 1;
+        } else if d.xc1 as i32 + TILE_WIDTH < xtest as i32 {
+            low = j + 1;
 
-            // Masks off the low bits (a cheap remainder or a flag test).
-            } else if d.xc1 < xtest && d.kind & 1 == 0 {
-                low = j + 1; // vertical door: its x must match exactly
-            } else if d.yc1 > ytest {
-                high = j - 1;
-            } else if d.yc1 < ytest {
-                low = j + 1;
-            } else {
-                return Some(j);
-            }
-
-            if low >= DOORCOUNT || high < 0 {
-                break;
-            }
+        // Masks off the low bits (a cheap remainder or a flag test).
+        } else if d.xc1 < xtest && d.kind & 1 == 0 {
+            low = j + 1; // vertical door: its x must match exactly
+        } else if d.yc1 > ytest {
+            high = j - 1;
+        } else if d.yc1 < ytest {
+            low = j + 1;
+        } else {
+            return Some(j);
         }
 
-        None
+        if low >= DOORCOUNT || high < 0 {
+            break;
+        }
     }
+
+    None
 }
 
 #[cfg(test)]
@@ -177,26 +165,22 @@ mod tests {
 
     #[test]
     fn every_other_door_is_found_at_its_own_entrance() {
-        unsafe {
-            for j in (0..DOORCOUNT).filter(|j| !UNREACHABLE.contains(j)) {
-                let d = door_at(j);
-                let found = find_outdoor_door(d.xc1, d.yc1)
-                    .unwrap_or_else(|| panic!("door {j} at {},{} not found", d.xc1, d.yc1));
-                let f = door_at(found);
-                assert_eq!((f.xc1, f.yc1), (d.xc1, d.yc1));
-            }
+        for j in (0..DOORCOUNT).filter(|j| !UNREACHABLE.contains(j)) {
+            let d = door_at(j);
+            let found = find_outdoor_door(d.xc1, d.yc1)
+                .unwrap_or_else(|| panic!("door {j} at {},{} not found", d.xc1, d.yc1));
+            let f = door_at(found);
+            assert_eq!((f.xc1, f.yc1), (d.xc1, d.yc1));
+        }
 
-            for j in UNREACHABLE {
-                let d = door_at(*j);
-                assert_eq!(find_outdoor_door(d.xc1, d.yc1), None);
-            }
+        for j in UNREACHABLE {
+            let d = door_at(*j);
+            assert_eq!(find_outdoor_door(d.xc1, d.yc1), None);
         }
     }
 
     #[test]
     fn empty_ground_has_no_door() {
-        unsafe {
-            assert_eq!(find_outdoor_door(1, 1), None);
-        }
+        assert_eq!(find_outdoor_door(1, 1), None);
     }
 }

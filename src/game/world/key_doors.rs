@@ -5,12 +5,8 @@
 //! which tiles to swap in and which key is needed.
 
 use crate::game::data::state::Game;
-use crate::game::data::tables::loaded_blocks;
 use crate::game::ui::messages::print;
 use crate::game::world::map::{terrain_at, tile_index};
-
-/// Set after a locked door was bumped, so "It's locked." is only said once until the hero moves on.
-pub static mut bumped_locked_door: i8 = 0;
 
 /// The terrain type that marks a door.
 const DOOR_TERRAIN: i32 = 15;
@@ -105,34 +101,32 @@ fn set_tile(game: &mut Game, x: i32, y: i32, value: u8) {
 /// the door's top-left tile. Returns 1 if a door opened, 0 if not ("It's locked." is said the
 /// first time).
 pub fn open_door_near(game: &mut Game, x: u16, y: u16, keytype: u32) -> i32 {
-    unsafe {
-        let Some((x, y)) = find_door_corner(game, x, y) else {
-            return 0;
-        };
+    let Some((x, y)) = find_door_corner(game, x, y) else {
+        return 0;
+    };
 
-        // we know where the door starts; now which type is it?
-        let sector_id = tile(game, x, y);
+    // we know where the door starts; now which type is it?
+    let sector_id = tile(game, x, y);
 
-        // Shifts by MAP_SET_SHIFT, converting between pixels, tiles, sectors or bytes.
-        let map_id = loaded_blocks.image[(sector_id >> MAP_SET_SHIFT) as usize];
+    // Shifts by MAP_SET_SHIFT, converting between pixels, tiles, sectors or bytes.
+    let map_id = game.loaded_blocks.image[(sector_id >> MAP_SET_SHIFT) as usize];
 
-        if let Some(open) = find_open(sector_id, map_id, keytype) {
-            swap_in_open_door_tiles(game, open, x, y);
-            game.screen.view_status = REDRAW_MAP;
-            game.ui.held_direction = 0;
-            print(game, "It opened.");
+    if let Some(open) = find_open(sector_id, map_id, keytype) {
+        swap_in_open_door_tiles(game, open, x, y);
+        game.screen.view_status = REDRAW_MAP;
+        game.ui.held_direction = 0;
+        print(game, "It opened.");
 
-            return 1;
-        }
-
-        if bumped_locked_door == 0 && keytype == 0 {
-            print(game, "It's locked.");
-        }
-
-        bumped_locked_door = 1;
-
-        0
+        return 1;
     }
+
+    if game.bumped_locked_door == 0 && keytype == 0 {
+        print(game, "It's locked.");
+    }
+
+    game.bumped_locked_door = 1;
+
+    0
 }
 
 /// Looks for a door tile at the point, 4 pixels right of it, or 4 pixels left of it, then moves to

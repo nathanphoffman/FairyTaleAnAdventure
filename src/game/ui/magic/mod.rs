@@ -5,9 +5,7 @@ mod effects;
 
 use self::effects::{heal, scare_enemies, show_map, stone_jump};
 use crate::game::data::state::Game;
-use crate::game::data::state::current_extent;
 
-use crate::game::data::state::the_world;
 use crate::game::ui::menus::update_menu_availability;
 use crate::game::ui::text::{show_event, speak};
 
@@ -37,83 +35,77 @@ const RIDING_BIG: i16 = 1;
 
 /// Handles an entry of the Magic menu. Returns false if `update_menu_availability` should not follow
 /// (the spell did not work, so the stone is not used up).
-pub unsafe fn magic_option(game: &mut Game, chosen_entry: i16) -> bool {
-    unsafe {
-        if let Some(result) = refuse_spell(game, chosen_entry) {
-            return result;
-        }
-
-        if !cast_spell(game, chosen_entry) {
-            return false;
-        }
-
-        use_up_one(game, chosen_entry);
-
-        true
+pub fn magic_option(game: &mut Game, chosen_entry: i16) -> bool {
+    if let Some(result) = refuse_spell(game, chosen_entry) {
+        return result;
     }
+
+    if !cast_spell(game, chosen_entry) {
+        return false;
+    }
+
+    use_up_one(game, chosen_entry);
+
+    true
 }
 
 /// Checks that the spell can be cast here and now. Gives `Some(result)` for `magic_option` to
 /// return when it cannot, and `None` when the spell goes ahead.
-unsafe fn refuse_spell(game: &mut Game, chosen_entry: i16) -> Option<bool> {
-    unsafe {
-        let count = if chosen_entry < FIRST_SPELL {
-            0
-        } else {
-            game.hero.stuff()[SPELL_SLOT_BASE + chosen_entry as usize]
-        };
+fn refuse_spell(game: &mut Game, chosen_entry: i16) -> Option<bool> {
+    let count = if chosen_entry < FIRST_SPELL {
+        0
+    } else {
+        game.hero.stuff()[SPELL_SLOT_BASE + chosen_entry as usize]
+    };
 
-        let gate = spell_gate(
-            chosen_entry,
-            count,
-            current_extent().v3,
-            game.hero.riding,
-            game.ui.cheat_enabled,
-            the_world.region,
-        );
+    let gate = spell_gate(
+        chosen_entry,
+        count,
+        game.extents[game.world.extent].v3,
+        game.hero.riding,
+        game.ui.cheat_enabled,
+        game.world.region,
+    );
 
-        match gate {
-            SpellGate::NoSpell => {
-                show_event(game, NO_SPELL_EVENT);
+    match gate {
+        SpellGate::NoSpell => {
+            show_event(game, NO_SPELL_EVENT);
 
-                Some(true)
-            }
-
-            SpellGate::QuietZone => {
-                speak(game, NO_MAGIC_SPEECH);
-
-                Some(true)
-            }
-
-            SpellGate::Refused => Some(false),
-            SpellGate::Proceed => None,
+            Some(true)
         }
+
+        SpellGate::QuietZone => {
+            speak(game, NO_MAGIC_SPEECH);
+
+            Some(true)
+        }
+
+        SpellGate::Refused => Some(false),
+        SpellGate::Proceed => None,
     }
 }
 
 /// Casts the spell. Returns false if it did not work (the stone ring only works in a circle).
-unsafe fn cast_spell(game: &mut Game, chosen_entry: i16) -> bool {
-    unsafe {
-        match chosen_entry {
-            SPELL_LIGHT => the_world.light_timer += LIGHT_TIME,
-            SPELL_SECRET => the_world.secret_timer += SECRET_TIME,
-            SPELL_FREEZE => the_world.freeze_timer += FREEZE_TIME,
-            SPELL_MAP => show_map(game),
-            SPELL_STONE => {
-                if !stone_jump(game) {
-                    return false;
-                }
-
-                heal(game);
+fn cast_spell(game: &mut Game, chosen_entry: i16) -> bool {
+    match chosen_entry {
+        SPELL_LIGHT => game.world.light_timer += LIGHT_TIME,
+        SPELL_SECRET => game.world.secret_timer += SECRET_TIME,
+        SPELL_FREEZE => game.world.freeze_timer += FREEZE_TIME,
+        SPELL_MAP => show_map(game),
+        SPELL_STONE => {
+            if !stone_jump(game) {
+                return false;
             }
 
-            SPELL_HEAL => heal(game),
-            SPELL_FEAR => scare_enemies(game),
-            _ => {}
+            heal(game);
         }
 
-        true
+        SPELL_HEAL => heal(game),
+        SPELL_FEAR => scare_enemies(game),
+        _ => {}
     }
+
+    true
 }
 
 /// Takes one of the spell's stones from the stack, and updates the menu when the last is gone.

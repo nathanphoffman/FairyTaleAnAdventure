@@ -2,11 +2,9 @@
 //! sorceress gives luck).
 
 use super::{PRQ_STATS, PRQ_VITALITY};
-use crate::game::data::object_tables::{ob_list8, ob_listg};
 use crate::game::data::random::rand64;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::{the_actors, the_world};
 use crate::game::ui::text::{queue_print, speak};
 
 const WRIT: usize = 28;
@@ -68,24 +66,22 @@ const RANGER_SWAMP_REGION: u16 = 2;
 
 /// What each kind of person says. Some of them also change the world (the priest heals, the
 /// sorceress gives luck).
-pub(super) unsafe fn person_speaks(game: &mut Game, person: u8, actor: ActorRef) {
-    unsafe {
-        match person {
-            PRIEST => priest_speaks(game),
-            SORCERESS => sorceress_speaks(game),
-            _ => {
-                let facts = Talker {
-                    kindness: game.hero.kindness,
-                    fatigue: game.hero.fatigue,
-                    day_period: the_world.day_period,
-                    region: the_world.region,
-                    goal: actor.goal as i32,
-                    princess_freed: ob_list8[PRINCESS_FREED_SLOT].ob_stat != 0,
-                };
+pub(super) fn person_speaks(game: &mut Game, person: u8, actor: ActorRef) {
+    match person {
+        PRIEST => priest_speaks(game),
+        SORCERESS => sorceress_speaks(game),
+        _ => {
+            let facts = Talker {
+                kindness: game.hero.kindness,
+                fatigue: game.hero.fatigue,
+                day_period: game.world.day_period,
+                region: game.world.region,
+                goal: game.actors.list[actor.slot()].goal as i32,
+                princess_freed: game.objects.region[8][PRINCESS_FREED_SLOT].ob_stat != 0,
+            };
 
-                if let Some(line) = plain_speech(person, &facts) {
-                    speak(game, line);
-                }
+            if let Some(line) = plain_speech(person, &facts) {
+                speak(game, line);
             }
         }
     }
@@ -136,21 +132,19 @@ fn plain_speech(person: u8, t: &Talker) -> Option<i32> {
 }
 
 /// The sorceress gives luck once she has been freed; before that she asks for help.
-unsafe fn sorceress_speaks(game: &mut Game) {
-    unsafe {
-        let freed = ob_listg[SORCERESS_SLOT].ob_stat != 0;
+fn sorceress_speaks(game: &mut Game) {
+    let freed = game.objects.global[SORCERESS_SLOT].ob_stat != 0;
 
-        match sorceress_action(freed, game.hero.luck, || rand64() as i16) {
-            SorceressAction::GiveLuck => game.hero.luck += SORCERESS_LUCK,
-            SorceressAction::Nothing => {}
-            SorceressAction::AskForHelp => {
-                speak(game, SPEECH_SORCERESS_HELP);
-                ob_listg[SORCERESS_SLOT].ob_stat = 1;
-            }
+    match sorceress_action(freed, game.hero.luck, || rand64(&mut game.rng) as i16) {
+        SorceressAction::GiveLuck => game.hero.luck += SORCERESS_LUCK,
+        SorceressAction::Nothing => {}
+        SorceressAction::AskForHelp => {
+            speak(game, SPEECH_SORCERESS_HELP);
+            game.objects.global[SORCERESS_SLOT].ob_stat = 1;
         }
-
-        queue_print(PRQ_VITALITY);
     }
+
+    queue_print(game, PRQ_VITALITY);
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -175,29 +169,26 @@ fn sorceress_action(freed: bool, luck: i16, roll: impl FnOnce() -> i16) -> Sorce
 }
 
 /// The priest gives the writ's reward, scolds the unkind, or heals.
-unsafe fn priest_speaks(game: &mut Game) {
-    unsafe {
-        let has_writ = game.hero.stuff()[WRIT] != 0;
+fn priest_speaks(game: &mut Game) {
+    let has_writ = game.hero.stuff()[WRIT] != 0;
 
-        match priest_action(
-            has_writ,
-            ob_listg[PRIEST_WRIT_SLOT].ob_stat,
-            game.hero.kindness,
-            the_world.day_clock,
-        ) {
-            PriestAction::WritReward => {
-                speak(game, SPEECH_PRIEST_WRIT_REWARD);
-                ob_listg[PRIEST_WRIT_SLOT].ob_stat = 1;
-            }
+    match priest_action(
+        has_writ,
+        game.objects.global[PRIEST_WRIT_SLOT].ob_stat,
+        game.hero.kindness,
+        game.world.day_clock,
+    ) {
+        PriestAction::WritReward => {
+            speak(game, SPEECH_PRIEST_WRIT_REWARD);
+            game.objects.global[PRIEST_WRIT_SLOT].ob_stat = 1;
+        }
 
-            PriestAction::WritAgain => speak(game, SPEECH_PRIEST_WRIT_AGAIN),
-            PriestAction::Scold => speak(game, SPEECH_PRIEST_SCOLD),
-            PriestAction::Bless { speech } => {
-                speak(game, speech);
-                the_actors.list[0].vitality =
-                    FULL_VITALITY_BASE + game.hero.brave / BRAVERY_DIVISOR;
-                queue_print(PRQ_STATS);
-            }
+        PriestAction::WritAgain => speak(game, SPEECH_PRIEST_WRIT_AGAIN),
+        PriestAction::Scold => speak(game, SPEECH_PRIEST_SCOLD),
+        PriestAction::Bless { speech } => {
+            speak(game, speech);
+            game.actors.list[0].vitality = FULL_VITALITY_BASE + game.hero.brave / BRAVERY_DIVISOR;
+            queue_print(game, PRQ_STATS);
         }
     }
 }

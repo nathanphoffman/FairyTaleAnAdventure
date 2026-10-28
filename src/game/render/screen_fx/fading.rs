@@ -1,10 +1,8 @@
 //! Fading the page colours: with the time of day, to and from black, and the teleport flicker.
 
 use super::COLOR_COUNT;
-use crate::game::data::object_tables::page_colors;
 use crate::game::data::random::bitrand;
 use crate::game::data::state::Game;
-use crate::game::data::state::the_world;
 use crate::game::render::display::delay;
 use crate::game::render::screen::ViewPortId;
 
@@ -48,37 +46,33 @@ const RANDOM_COLOR_MASK: i32 = 0xfff;
 /// the bluish moonlight. The light spell (`light_timer`) makes reds as bright as greens.
 /// Colour 31 is changed first because it depends on where the hero is (swamp, secret room).
 pub fn fade_page(game: &mut Game, r: i16, g: i16, b: i16, limit: i16, colors: &[u16]) {
-    unsafe {
-        page_colors[COLOR_31] = color_31_here();
+    game.page_colors[COLOR_31] = color_31_here(game);
 
-        let ((r, g, b), g2) = clamp_levels((r as i32, g as i32, b as i32), limit != 0);
+    let ((r, g, b), g2) = clamp_levels((r as i32, g as i32, b as i32), limit != 0);
 
-        let mut faded = [0u16; COLOR_COUNT];
+    let mut faded = [0u16; COLOR_COUNT];
 
-        for (i, slot) in faded.iter_mut().enumerate() {
-            *slot = faded_color(
-                i,
-                colors[i],
-                (r, g, b),
-                g2,
-                limit != 0,
-                the_world.light_timer != 0,
-            );
-        }
-
-        game.screen.load_colors(ViewPortId::Page, &faded);
+    for (i, slot) in faded.iter_mut().enumerate() {
+        *slot = faded_color(
+            i,
+            colors[i],
+            (r, g, b),
+            g2,
+            limit != 0,
+            game.world.light_timer != 0,
+        );
     }
+
+    game.screen.load_colors(ViewPortId::Page, &faded);
 }
 
 /// Colour 31 depends on where the hero is: the swamp, the secret room (open or shut), or neither.
-unsafe fn color_31_here() -> u16 {
-    unsafe {
-        match the_world.region {
-            REGION_SWAMP => SWAMP_COLOR,
-            REGION_SECRET if the_world.secret_timer != 0 => SECRET_OPEN_COLOR,
-            REGION_SECRET => SECRET_SHUT_COLOR,
-            _ => DEFAULT_COLOR_31,
-        }
+fn color_31_here(game: &mut Game) -> u16 {
+    match game.world.region {
+        REGION_SWAMP => SWAMP_COLOR,
+        REGION_SECRET if game.world.secret_timer != 0 => SECRET_OPEN_COLOR,
+        REGION_SECRET => SECRET_SHUT_COLOR,
+        _ => DEFAULT_COLOR_31,
     }
 }
 
@@ -148,7 +142,7 @@ pub fn flicker_colors(game: &mut Game) {
         let mut flash = [0u16; COLOR_COUNT];
 
         for slot in flash.iter_mut().skip(1) {
-            *slot = bitrand(RANDOM_COLOR_MASK) as u16;
+            *slot = bitrand(&mut game.rng, RANDOM_COLOR_MASK) as u16;
         }
 
         game.screen.load_colors(ViewPortId::Page, &flash);
@@ -163,9 +157,8 @@ const FADE_STEP: usize = 5;
 /// Fades the page out to black.
 pub fn fade_down(game: &mut Game) {
     for level in (0..=FULL_LEVEL).rev().step_by(FADE_STEP) {
-        fade_page(game, level as i16, level as i16, level as i16, 0, unsafe {
-            &*(&raw const page_colors)
-        });
+        let colors = game.page_colors;
+        fade_page(game, level as i16, level as i16, level as i16, 0, &colors);
 
         delay(game, 1);
     }
@@ -174,9 +167,8 @@ pub fn fade_down(game: &mut Game) {
 /// Fades the page back in from black.
 pub fn fade_normal(game: &mut Game) {
     for level in (0..=FULL_LEVEL).step_by(FADE_STEP) {
-        fade_page(game, level as i16, level as i16, level as i16, 0, unsafe {
-            &*(&raw const page_colors)
-        });
+        let colors = game.page_colors;
+        fade_page(game, level as i16, level as i16, level as i16, 0, &colors);
 
         delay(game, 1);
     }
@@ -198,37 +190,35 @@ const VIEW_REBUILD: i8 = 97;
 /// Updates the page colours for the time of day, every fourth tick. `light_level` follows the sun;
 /// inside buildings (regions 8 and 9) it is always bright.
 pub fn day_fade(game: &mut Game) {
-    unsafe {
-        let bonus = if the_world.light_timer != 0 {
-            LIGHT_SPELL_BONUS
+    let bonus = if game.world.light_timer != 0 {
+        LIGHT_SPELL_BONUS
+    } else {
+        0
+    };
+
+    // Masks with FADE_TICK_MASK, keeping only the bits that matter here.
+    if game.world.day_clock & FADE_TICK_MASK == 0 || game.screen.view_status > VIEW_REBUILD {
+        let colors = game.page_colors;
+
+        if game.world.region < FIRST_INDOOR_REGION {
+            let level = game.world.light_level as i32;
+            fade_page(
+                game,
+                (level - DAY_DARKEN.0 + bonus) as i16,
+                (level - DAY_DARKEN.1) as i16,
+                (level - DAY_DARKEN.2) as i16,
+                1,
+                &colors,
+            );
         } else {
-            0
-        };
-
-        // Masks with FADE_TICK_MASK, keeping only the bits that matter here.
-        if the_world.day_clock & FADE_TICK_MASK == 0 || game.screen.view_status > VIEW_REBUILD {
-            let colors = &*(&raw const page_colors);
-
-            if the_world.region < FIRST_INDOOR_REGION {
-                let level = the_world.light_level as i32;
-                fade_page(
-                    game,
-                    (level - DAY_DARKEN.0 + bonus) as i16,
-                    (level - DAY_DARKEN.1) as i16,
-                    (level - DAY_DARKEN.2) as i16,
-                    1,
-                    colors,
-                );
-            } else {
-                fade_page(
-                    game,
-                    FULL_LEVEL as i16,
-                    FULL_LEVEL as i16,
-                    FULL_LEVEL as i16,
-                    1,
-                    colors,
-                );
-            }
+            fade_page(
+                game,
+                FULL_LEVEL as i16,
+                FULL_LEVEL as i16,
+                FULL_LEVEL as i16,
+                1,
+                &colors,
+            );
         }
     }
 }

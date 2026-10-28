@@ -15,7 +15,8 @@ git clone https://github.com/viridia/faery-tale-amiga
 The game is fully ported to Rust and playable: intro, map, fighting, shops, doors, magic, music,
 save and load. No C is compiled any more; `csrc/` is the original C kept as a reference. The code has
 been cleaned up (short functions, named constants, unit tests) and the Amiga structs and raw pointers
-are gone. What is left is the shared game state (`static mut`), then the optional "modern engine"
+are gone, and all the game state lives in one `Game` value (no `static mut`, no `unsafe` in the game
+code). What is left is separating the rules from the drawing, then the optional "modern engine"
 steps. The detailed status and plan are in [modern_engine_plan.md](modern_engine_plan.md)
 (start at "Where we are"); the history of the port is in [plan.md](plan.md).
 

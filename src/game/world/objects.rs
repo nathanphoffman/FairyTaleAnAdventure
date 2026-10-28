@@ -11,16 +11,12 @@
 //! The actor's `vitality` field is borrowed to remember which list entry it came from (the entry
 //! number, plus 0x80 for the global list), so `change_object` can find the entry again later.
 
-use crate::game::actors::interaction::turtle_eggs;
-use crate::game::data::object_tables::{
-    CHEST, TURTLE, dstobs, glbobs, global_objects, mapobs, rand_treasure, region_objects,
-};
-use crate::game::data::state::Game;
+use crate::game::data::object_tables::{CHEST, ObjectList, TURTLE, glbobs, rand_treasure};
+use crate::game::data::state::{ActorRef, Game};
 
 use crate::game::data::random::bitrand;
-use crate::game::data::state::{the_actors, the_world};
 use crate::game::data::tables::setfig_table;
-use crate::game::data::types::{Shape, WorldObject};
+use crate::game::data::types::WorldObject;
 use crate::game::files::disk::motor_off;
 use crate::game::files::loading::sprite_files;
 use crate::game::files::loading::{finish_sprite_load, load_sprite_file};
@@ -86,9 +82,6 @@ const PERSON_RAISE: i16 = 18;
 /// Actor `race` for a person is their id plus this.
 const PERSON_RACE_BASE: i32 = 0x80;
 
-/// First free actor slot for people while the object lists are walked.
-pub static mut J1: i16 = 0;
-
 /// Whether `value` is strictly between the two limits.
 fn inside(value: i16, (low, high): (i16, i16)) -> bool {
     value > low && value < high
@@ -97,19 +90,13 @@ fn inside(value: i16, (low, high): (i16, i16)) -> bool {
 /// Turns the global and current region's object lists into actors.
 /// Called when the screen changes (new region, scrolling far, after loading a game).
 pub fn spawn_object_actors(game: &mut Game) {
-    unsafe {
-        J1 = FIRST_OBJECT_ACTOR;
-        add_objects_near(game, global_objects(), glbobs, GLOBAL_LIST_BIT as i32);
-        add_objects_near(
-            game,
-            region_objects(the_world.region as usize),
-            mapobs[the_world.region as usize],
-            0,
-        );
+    game.j1 = FIRST_OBJECT_ACTOR;
+    add_objects_near(game, ObjectList::Global, glbobs, GLOBAL_LIST_BIT as i32);
+    let region = game.world.region as usize;
+    add_objects_near(game, ObjectList::Region(region), game.mapobs[region], 0);
 
-        if J1 > FIRST_MONSTER_SLOT {
-            the_actors.active = J1;
-        }
+    if game.j1 > FIRST_MONSTER_SLOT {
+        game.actors.active = game.j1;
     }
 }
 
@@ -131,97 +118,85 @@ const TREASURE_KINDS: i32 = 16;
 
 /// Drops `object` where actor `i` stands (slot 0 of the global list is used for this).
 /// That slot is reused for each item the hero or a monster leaves behind.
-pub fn leave_item(i: i16, object: i16) {
-    unsafe {
-        let drop = &mut global_objects()[0];
-        let actor = &(*(&raw const the_actors.list))[i as usize];
-        drop.xc = actor.abs_x;
-        drop.yc = actor.abs_y.wrapping_add(DROP_OFFSET_Y);
-        drop.ob_id = object as i8;
-        drop.ob_stat = STAT_SHOWN;
-    }
+pub fn leave_item(game: &mut Game, i: i16, object: i16) {
+    let drop = &mut game.objects.global[0];
+    let actor = &game.actors.list[i as usize];
+    drop.xc = actor.abs_x;
+    drop.yc = actor.abs_y.wrapping_add(DROP_OFFSET_Y);
+    drop.ob_id = object as i8;
+    drop.ob_stat = STAT_SHOWN;
 }
 
 /// Changes the object that actor `id` stands for: `flag` 1 = show, 2 = take. A chest opens
 /// instead (its id changes to the opened chest, rather than its state).
-pub fn change_object(id: i32, flag: i32) {
-    unsafe {
-        let vitality = (*(&raw const the_actors.list))[id as usize].vitality;
+pub fn change_object(game: &mut Game, id: i32, flag: i32) {
+    let vitality = game.actors.list[id as usize].vitality;
 
-        // Masks with OBJECT_INDEX_MASK, keeping only the bits that matter here.
-        let index = (vitality & OBJECT_INDEX_MASK) as usize;
+    // Masks with OBJECT_INDEX_MASK, keeping only the bits that matter here.
+    let index = (vitality & OBJECT_INDEX_MASK) as usize;
 
-        // Masks with GLOBAL_LIST_BIT, keeping only the bits that matter here.
-        let object = if vitality & GLOBAL_LIST_BIT != 0 {
-            &mut global_objects()[index]
-        } else {
-            &mut region_objects(the_world.region as usize)[index]
-        };
+    // Masks with GLOBAL_LIST_BIT, keeping only the bits that matter here.
+    let object = if vitality & GLOBAL_LIST_BIT != 0 {
+        &mut game.objects.global[index]
+    } else {
+        &mut game.objects.region(game.world.region as usize)[index]
+    };
 
-        if object.ob_id == CHEST as i8 {
-            object.ob_id = OPENED_CHEST;
-        } else {
-            object.ob_stat = flag as i8;
-        }
+    if object.ob_id == CHEST as i8 {
+        object.ob_id = OPENED_CHEST;
+    } else {
+        object.ob_stat = flag as i8;
     }
 }
 
 /// Scatters random treasure over a region the first time it is visited: 10 items at random
 /// spots, retrying until the spot is not blocked (terrain type 0 means clear), with the item picked
 /// from `rand_treasure`. `dstobs` remembers that it has been done.
-unsafe fn distribute_treasure(game: &mut Game) {
-    unsafe {
-        let region = the_world.region as usize;
-        let objects = region_objects(region);
+fn distribute_treasure(game: &mut Game) {
+    let region = game.world.region as usize;
+    for _ in 0..RANDOM_TREASURES {
+        let (mut x, mut y);
 
-        for _ in 0..RANDOM_TREASURES {
-            let (mut x, mut y);
+        loop {
+            // Masks with REGION_WIDTH, keeping only the bits that matter here.
+            x = (bitrand(&mut game.rng, REGION_WIDTH - 1)
+                + ((game.world.region & 1) as i32 * REGION_WIDTH)) as i16;
 
-            loop {
-                // Masks with REGION_WIDTH, keeping only the bits that matter here.
-                x = (bitrand(REGION_WIDTH - 1) + ((the_world.region & 1) as i32 * REGION_WIDTH))
-                    as i16;
+            // Masks with REGION_HEIGHT, keeping only the bits that matter here.
+            y = (bitrand(&mut game.rng, REGION_HEIGHT - 1)
+                + ((game.world.region & 6) as i32 * REGION_ROW_STEP)) as i16;
 
-                // Masks with REGION_HEIGHT, keeping only the bits that matter here.
-                y = (bitrand(REGION_HEIGHT - 1) + ((the_world.region & 6) as i32 * REGION_ROW_STEP))
-                    as i16;
-
-                if terrain_at(game, x as i32, y as i32) == 0 {
-                    break;
-                }
+            if terrain_at(game, x as i32, y as i32) == 0 {
+                break;
             }
-
-            let k = mapobs[region] as usize;
-            mapobs[region] += 1;
-            let object = &mut objects[k];
-            object.xc = x as u16;
-            object.yc = y as u16;
-            object.ob_id = rand_treasure[bitrand(TREASURE_KINDS - 1) as usize] as i8;
-            object.ob_stat = STAT_SHOWN;
         }
 
-        dstobs[region] = 1; // mark this region as distributed
+        let k = game.mapobs[region] as usize;
+        game.mapobs[region] += 1;
+        let kind = rand_treasure[bitrand(&mut game.rng, TREASURE_KINDS - 1) as usize] as i8;
+        let object = &mut game.objects.region(region)[k];
+        object.xc = x as u16;
+        object.yc = y as u16;
+        object.ob_id = kind;
+        object.ob_stat = STAT_SHOWN;
     }
+
+    game.dstobs[region] = 1; // mark this region as distributed
 }
 
 /// Makes sure the sprite file for the kind of person `id` is loaded. Several kinds share one
 /// file, so it is only reloaded when the needed file differs from the loaded one.
-unsafe fn load_set_figure(game: &mut Game, id: i8) {
-    unsafe {
-        let entry = (*(&raw const setfig_table)
-            .cast::<SetFigEntry>()
-            .add(id as usize))
-        .cfile_entry;
+fn load_set_figure(game: &mut Game, id: i8) {
+    let entry = (setfig_table[id as usize]).cfile_entry;
 
-        if sprite_files[entry as usize].file_id
-            != sprite_files[the_actors.loaded_setfig_file as usize].file_id
-        {
-            the_actors.loaded_setfig_file = entry as i16;
-            game.memory.nextshape = game.memory.seq_list[SETFIG as usize].location;
-            load_sprite_file(game, entry as i32);
-            finish_sprite_load(game, SETFIG as i16);
-            motor_off();
-        }
+    if sprite_files[entry as usize].file_id
+        != sprite_files[game.actors.loaded_setfig_file as usize].file_id
+    {
+        game.actors.loaded_setfig_file = entry as i16;
+        game.memory.nextshape = game.memory.seq_list[SETFIG as usize].location;
+        load_sprite_file(game, entry as i32);
+        finish_sprite_load(game, SETFIG as i16);
+        motor_off();
     }
 }
 
@@ -232,160 +207,146 @@ unsafe fn load_set_figure(game: &mut Game, id: i8) {
 /// centre it); people are only loaded if within about 100-400 pixels, and shown if within the
 /// screen; items that are hidden or taken are skipped. A person already in the actor list at the
 /// same place is not added twice (and is marked dead if its actor died).
-pub fn add_objects_near(game: &mut Game, list: &mut [WorldObject], mut length: i16, f: i32) {
-    unsafe {
-        turtle_eggs = 0;
-        game.witch.on_screen = 0;
+pub fn add_objects_near(game: &mut Game, which: ObjectList, mut length: i16, f: i32) {
+    game.turtle_eggs = 0;
+    game.witch.on_screen = 0;
 
-        if dstobs[the_world.region as usize] == 0 && the_world.new_region >= NO_REGION {
-            distribute_treasure(game);
+    if game.dstobs[game.world.region as usize] == 0 && game.world.new_region >= NO_REGION {
+        distribute_treasure(game);
+    }
+
+    let mut index: i16 = 0;
+
+    while length > 0 {
+        length -= 1;
+
+        if game.actors.drawn >= MAX_ACTORS {
+            return;
         }
 
-        let mut index: i16 = 0;
-
-        while length > 0 {
-            length -= 1;
-
-            if the_actors.drawn >= MAX_ACTORS {
-                return;
-            }
-
-            add_object(game, &mut list[index as usize], index, f);
-            index += 1;
-        }
+        let mut object = game.objects.list(which)[index as usize];
+        add_object(game, &mut object, index, f);
+        game.objects.list(which)[index as usize] = object;
+        index += 1;
     }
 }
 
 /// Adds one object of a list as an actor, if it is near enough and not hidden or taken.
-unsafe fn add_object(game: &mut Game, object: &mut WorldObject, index: i16, f: i32) {
-    unsafe {
-        let xstart =
-            (object.xc as i32 - the_world.map_x as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
-        let ystart =
-            (object.yc as i32 - the_world.map_y as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
+fn add_object(game: &mut Game, object: &mut WorldObject, index: i16, f: i32) {
+    let xstart = (object.xc as i32 - game.world.map_x as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
+    let ystart = (object.yc as i32 - game.world.map_y as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
 
-        // States 3 and 4 are people; everything else is an item.
-        let is_person = object.ob_stat == STAT_PERSON || object.ob_stat == STAT_DEAD_PERSON;
+    // States 3 and 4 are people; everything else is an item.
+    let is_person = object.ob_stat == STAT_PERSON || object.ob_stat == STAT_DEAD_PERSON;
 
-        if is_person && !load_person_if_near(game, object, xstart, ystart) {
-            return;
-        }
-
-        if object.ob_stat == STAT_TAKEN || object.ob_stat == STAT_HIDDEN {
-            return;
-        }
-
-        if !(inside(xstart, SHOWN_X) && inside(ystart, SHOWN_Y)) {
-            return;
-        }
-
-        let (actor, ystart) = if is_person {
-            match add_person_actor(object, index, ystart) {
-                Some(placed) => placed,
-                None => return,
-            }
-        } else {
-            (add_item_actor(object, index, f), ystart)
-        };
-
-        actor.abs_x = object.xc;
-        actor.abs_y = object.yc;
-        actor.rel_x = xstart as u16;
-        actor.rel_y = ystart as u16;
+    if is_person && !load_person_if_near(game, object, xstart, ystart) {
+        return;
     }
+
+    if object.ob_stat == STAT_TAKEN || object.ob_stat == STAT_HIDDEN {
+        return;
+    }
+
+    if !(inside(xstart, SHOWN_X) && inside(ystart, SHOWN_Y)) {
+        return;
+    }
+
+    let (actor, ystart) = if is_person {
+        match add_person_actor(game, object, index, ystart) {
+            Some(placed) => placed,
+            None => return,
+        }
+    } else {
+        (add_item_actor(game, object, index, f), ystart)
+    };
+
+    let actor = &mut game.actors.list[actor.slot()];
+    actor.abs_x = object.xc;
+    actor.abs_y = object.yc;
+    actor.rel_x = xstart as u16;
+    actor.rel_y = ystart as u16;
 }
 
 /// A person close enough to the screen gets their pictures loaded (the witch also marks herself as
 /// on screen). Returns false if the person is too far away.
-unsafe fn load_person_if_near(
-    game: &mut Game,
-    object: &WorldObject,
-    xstart: i16,
-    ystart: i16,
-) -> bool {
-    unsafe {
-        if !(inside(xstart, PERSON_LOAD_X) && inside(ystart, PERSON_LOAD_Y)) {
-            return false;
-        }
-
-        load_set_figure(game, object.ob_id);
-
-        if object.ob_id == WITCH && object.ob_stat == STAT_PERSON {
-            game.witch.on_screen = 1;
-        }
-
-        true
+fn load_person_if_near(game: &mut Game, object: &WorldObject, xstart: i16, ystart: i16) -> bool {
+    if !(inside(xstart, PERSON_LOAD_X) && inside(ystart, PERSON_LOAD_Y)) {
+        return false;
     }
+
+    load_set_figure(game, object.ob_id);
+
+    if object.ob_id == WITCH && object.ob_stat == STAT_PERSON {
+        game.witch.on_screen = 1;
+    }
+
+    true
 }
 
 /// Makes a person (a set figure) out of a world object. Returns the actor and the screen row to use
 /// (people stand a little higher than the object's spot), or `None` if the person is already
 /// there as an actor (the object is then marked dead if the actor died).
-unsafe fn add_person_actor(
+fn add_person_actor(
+    game: &mut Game,
     object: &mut WorldObject,
     index: i16,
     ystart: i16,
-) -> Option<(&'static mut Shape, i16)> {
-    unsafe {
-        let id = object.ob_id;
-        let actor = &mut (*(&raw mut the_actors.list))[J1 as usize];
-        J1 += 1;
+) -> Option<(ActorRef, i16)> {
+    let id = object.ob_id;
+    let slot = game.j1 as usize;
+    let actor = &mut game.actors.list[slot];
+    game.j1 += 1;
 
-        if actor.abs_x == object.xc && actor.abs_y == object.yc {
-            if actor.state == DEAD {
-                object.ob_stat = STAT_DEAD_PERSON;
-            }
-
-            return None;
+    if actor.abs_x == object.xc && actor.abs_y == object.yc {
+        if actor.state == DEAD {
+            object.ob_stat = STAT_DEAD_PERSON;
         }
 
-        actor.kind = SETFIG;
-        actor.index = (*(&raw const setfig_table)
-            .cast::<SetFigEntry>()
-            .add(id as usize))
-        .image_base;
-        actor.weapon = 0;
-        actor.vitality = 2 + id as i16 + id as i16;
-        actor.goal = index as i8;
-        actor.environ = 0;
-        actor.state = if object.ob_stat == STAT_DEAD_PERSON {
-            DEAD
-        } else {
-            STILL
-        };
-
-        // A person's race is 0x80 plus their kind, so they can be told from monsters.
-        actor.race = (id as i32 + PERSON_RACE_BASE) as u8;
-
-        if J1 > the_actors.drawn {
-            the_actors.drawn = J1;
-        }
-
-        Some((actor, ystart - PERSON_RAISE))
+        return None;
     }
+
+    actor.kind = SETFIG;
+    actor.index = (setfig_table[id as usize]).image_base;
+    actor.weapon = 0;
+    actor.vitality = 2 + id as i16 + id as i16;
+    actor.goal = index as i8;
+    actor.environ = 0;
+    actor.state = if object.ob_stat == STAT_DEAD_PERSON {
+        DEAD
+    } else {
+        STILL
+    };
+
+    // A person's race is 0x80 plus their kind, so they can be told from monsters.
+    actor.race = (id as i32 + PERSON_RACE_BASE) as u8;
+
+    if game.j1 > game.actors.drawn {
+        game.actors.drawn = game.j1;
+    }
+
+    Some((ActorRef::new(slot), ystart - PERSON_RAISE))
 }
 
 /// Makes an item lying about (or the turtle's eggs, a raft...) out of a world object.
-unsafe fn add_item_actor(object: &WorldObject, index: i16, f: i32) -> &'static mut Shape {
-    unsafe {
-        if object.ob_id == TURTLE as i8 {
-            turtle_eggs = the_actors.drawn as i8;
-        }
-
-        let actor = &mut (*(&raw mut the_actors.list))[the_actors.drawn as usize];
-        the_actors.drawn += 1;
-        actor.kind = OBJECTS;
-        actor.index = object.ob_id;
-        actor.weapon = 0;
-        actor.vitality = (index as i32 + f) as i16;
-        actor.race = match object.ob_stat {
-            STAT_SECOND_ITEM => 2,
-            STAT_RAFT_ITEM => 0,
-            _ => 1,
-        };
-
-        actor
+fn add_item_actor(game: &mut Game, object: &WorldObject, index: i16, f: i32) -> ActorRef {
+    if object.ob_id == TURTLE as i8 {
+        game.turtle_eggs = game.actors.drawn as i8;
     }
+
+    let slot = game.actors.drawn as usize;
+    let actor = &mut game.actors.list[slot];
+    game.actors.drawn += 1;
+    actor.kind = OBJECTS;
+    actor.index = object.ob_id;
+    actor.weapon = 0;
+    actor.vitality = (index as i32 + f) as i16;
+    actor.race = match object.ob_stat {
+        STAT_SECOND_ITEM => 2,
+        STAT_RAFT_ITEM => 0,
+        _ => 1,
+    };
+
+    ActorRef::new(slot)
 }
 
 #[cfg(test)]

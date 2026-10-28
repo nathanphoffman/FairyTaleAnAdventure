@@ -22,7 +22,6 @@ mod water;
 
 use crate::game::data::state::Game;
 use crate::game::data::state::{ActorRef, MissileRef};
-use crate::game::data::state::{the_actors, the_world};
 use crate::game::data::tables::facing_frame_offsets;
 use crate::game::world::map::{step_x, step_y, terrain_at};
 
@@ -232,11 +231,6 @@ enum Pc {
     Statc,
 }
 
-/// `xtest`/`ytest` stay static: a dead actor reads them without setting them, so they carry over from
-/// the previous actor.
-static mut XTEST: u16 = 0;
-static mut YTEST: u16 = 0;
-
 /// The working variables of one `move_actor` call (the C locals).
 struct Ctx {
     pub(super) actor: ActorRef,
@@ -261,7 +255,7 @@ struct Ctx {
 
 fn diroff(d: i16) -> i16 {
     // Like the C this does not check the range; facings are 0-7 (+8 for shooting).
-    unsafe { facing_frame_offsets[d as usize] as i16 }
+    facing_frame_offsets[d as usize] as i16
 }
 
 fn pos_x(x: i32, dir: i16, speed: i16) -> u16 {
@@ -280,105 +274,99 @@ fn terrain(game: &Game, x: u16, y: u16) -> i16 {
 /// carries the last terrain value from one actor to the next (a dead actor reads it without setting
 /// it), so it is passed in and written back.
 pub fn move_actor(game: &mut Game, i: i32, cycle: i16, jp: &mut i16) {
-    unsafe {
-        let (mut c, mut pc) = Ctx::start(i, cycle, *jp);
+    let (mut c, mut pc) = Ctx::start(game, i, cycle, *jp);
 
-        loop {
-            pc = match pc {
-                Pc::Dispatch => c.dispatch(game),
-                Pc::CheckDev1 => c.check_dev1(game),
-                Pc::CheckDev2 => c.check_dev2(game),
-                Pc::NewLoc => c.new_loc(game),
-                Pc::Blocked => c.blocked(),
-                Pc::Still => c.still(game),
-                Pc::DragShoot => c.drag_shoot(),
-                Pc::Cpx => c.cpx(game),
-                Pc::Tail => c.tail(game),
-                Pc::Raise => c.raise(game),
-                Pc::Statc => break,
-            };
-        }
-
-        c.statc(game);
-        *jp = c.terrain;
+    loop {
+        pc = match pc {
+            Pc::Dispatch => c.dispatch(game),
+            Pc::CheckDev1 => c.check_dev1(game),
+            Pc::CheckDev2 => c.check_dev2(game),
+            Pc::NewLoc => c.new_loc(game),
+            Pc::Blocked => c.blocked(game),
+            Pc::Still => c.still(game),
+            Pc::DragShoot => c.drag_shoot(game),
+            Pc::Cpx => c.cpx(game),
+            Pc::Tail => c.tail(game),
+            Pc::Raise => c.raise(game),
+            Pc::Statc => break,
+        };
     }
+
+    c.statc(game);
+    *jp = c.terrain;
 }
 
 impl Ctx {
     /// Sets up the working variables for actor `i`, and where to start: frozen enemies skip straight
     /// to the end, everyone else is dispatched on their kind and state. `terrain` is what the last
     /// actor left in the main loop's `j`.
-    unsafe fn start(i: i32, cycle: i16, terrain: i16) -> (Ctx, Pc) {
-        unsafe {
-            let actor = ActorRef::new(i as usize);
-            let mut c = Ctx {
-                actor,
-                missile: MissileRef::new(0),
-                slot: i,
-                cycle,
-                environ: 0,
-                facing: 0,
-                state: 0,
-                image: 0,
-                frame_base: 0,
-                terrain,
-                step: 0,
-            };
+    fn start(game: &mut Game, i: i32, cycle: i16, terrain: i16) -> (Ctx, Pc) {
+        let actor = ActorRef::new(i as usize);
+        let mut c = Ctx {
+            actor,
+            missile: MissileRef::new(0),
+            slot: i,
+            cycle,
+            environ: 0,
+            facing: 0,
+            state: 0,
+            image: 0,
+            frame_base: 0,
+            terrain,
+            step: 0,
+        };
 
-            if the_world.freeze_timer != 0 && i > 0 {
-                return (c, Pc::Statc);
-            }
-
-            c.environ = actor.environ;
-            c.facing = actor.facing as i16;
-            c.state = actor.state as i16;
-            c.image = actor.index as i16;
-            c.frame_base = diroff(c.facing);
-            c.missile = MissileRef::new(the_actors.next_missile as usize);
-
-            (c, Pc::Dispatch)
+        if game.world.freeze_timer != 0 && i > 0 {
+            return (c, Pc::Statc);
         }
+
+        c.environ = game.actors.list[actor.slot()].environ;
+        c.facing = game.actors.list[actor.slot()].facing as i16;
+        c.state = game.actors.list[actor.slot()].state as i16;
+        c.image = game.actors.list[actor.slot()].index as i16;
+        c.frame_base = diroff(c.facing);
+        c.missile = MissileRef::new(game.actors.next_missile as usize);
+
+        (c, Pc::Dispatch)
     }
 }
 
 impl Ctx {
     /// Picks the code for this kind of actor and state (the `if` chain at the top of the C).
-    unsafe fn dispatch(&mut self, game: &mut Game) -> Pc {
-        unsafe {
-            let actor = self.actor;
-            let kind = actor.kind;
+    fn dispatch(&mut self, game: &mut Game) -> Pc {
+        let actor = self.actor;
+        let kind = game.actors.list[actor.slot()].kind;
 
-            if kind == OBJECTS {
-                self.terrain = 0;
+        if kind == OBJECTS {
+            self.terrain = 0;
 
-                Pc::Raise
-            } else if kind == DRAGON {
-                self.dragon()
-            } else if kind == CARRIER {
-                self.carrier(game)
-            } else if kind == SETFIG {
-                self.setfig(game)
-            } else if kind == RAFT {
-                self.raft(game)
-            } else if self.state == SINK {
-                if actor.vitality > 0 {
-                    self.image = FRAME_SINK;
-                }
-
-                the_actors.frustration = 0;
-
-                Pc::Cpx
-            } else if self.state == WALKING {
-                self.walking(game)
-            } else if self.state == STILL as i16 {
-                Pc::Still
-            } else if self.state >= SHOOT1 {
-                self.shooting(game)
-            } else if self.state <= LAST_FIGHT_STATE {
-                self.fighting()
-            } else {
-                self.other_states(game)
+            Pc::Raise
+        } else if kind == DRAGON {
+            self.dragon(game)
+        } else if kind == CARRIER {
+            self.carrier(game)
+        } else if kind == SETFIG {
+            self.setfig(game)
+        } else if kind == RAFT {
+            self.raft(game)
+        } else if self.state == SINK {
+            if game.actors.list[actor.slot()].vitality > 0 {
+                self.image = FRAME_SINK;
             }
+
+            game.actors.frustration = 0;
+
+            Pc::Cpx
+        } else if self.state == WALKING {
+            self.walking(game)
+        } else if self.state == STILL as i16 {
+            Pc::Still
+        } else if self.state >= SHOOT1 {
+            self.shooting(game)
+        } else if self.state <= LAST_FIGHT_STATE {
+            self.fighting(game)
+        } else {
+            self.other_states(game)
         }
     }
 }

@@ -1,10 +1,8 @@
 //! Hiding the part of a sprite that scenery (trees, walls, roofs) is in front of.
 
 use super::{CARRIER, FALL, OBJECTS, RAFT_SLOT};
-use crate::game::data::object_tables::minimap;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::the_world;
 use crate::game::render::blit::{add_scenery_mask, clear_memory};
 
 /// The mask buffer (the mask region) is cleared before each sprite: 96 lines of 64 words, plus 5.
@@ -62,32 +60,31 @@ pub(super) fn clear_scenery_mask(game: &mut Game) {
 
 /// True for sprites drawn in front of everything: carriers, the hero when riding the swan or in
 /// certain places, arrows and some special races.
-pub(super) unsafe fn drawn_in_front(
+pub(super) fn drawn_in_front(
     game: &mut Game,
     actor: ActorRef,
     i: i32,
     atype: i16,
     inum: i16,
 ) -> bool {
-    unsafe {
-        if atype == CARRIER
-            || (i == 0
-                && (game.hero.riding == RIDING_SWAN
-                    || the_world.extent_type == NO_MASK_XTYPE
-                    || (game.hero.x > FRONT_AREA_X.0
-                        && game.hero.x < FRONT_AREA_X.1
-                        && game.hero.y > FRONT_AREA_Y.0
-                        && game.hero.y < FRONT_AREA_Y.1)))
-        {
-            return true;
-        }
-
-        if atype == OBJECTS && FRONT_OBJECTS.contains(&inum) {
-            return true;
-        }
-
-        actor.race == RACE_NO_MASK_A || actor.race == RACE_NO_MASK_B
+    if atype == CARRIER
+        || (i == 0
+            && (game.hero.riding == RIDING_SWAN
+                || game.world.extent_type == NO_MASK_XTYPE
+                || (game.hero.x > FRONT_AREA_X.0
+                    && game.hero.x < FRONT_AREA_X.1
+                    && game.hero.y > FRONT_AREA_Y.0
+                    && game.hero.y < FRONT_AREA_Y.1)))
+    {
+        return true;
     }
+
+    if atype == OBJECTS && FRONT_OBJECTS.contains(&inum) {
+        return true;
+    }
+
+    game.actors.list[actor.slot()].race == RACE_NO_MASK_A
+        || game.actors.list[actor.slot()].race == RACE_NO_MASK_B
 }
 
 /// What a terrain tile does to a sprite drawn behind it.
@@ -138,7 +135,7 @@ struct SpriteTiles {
 /// Cuts out the parts of the sprite that scenery (trees, walls, roofs) should hide, one map tile at a
 /// time, by marking them in the mask buffer.
 #[allow(clippy::too_many_arguments)] // the tile loop of the original, kept as one call
-pub(super) unsafe fn mask_against_scenery(
+pub(super) fn mask_against_scenery(
     game: &mut Game,
     actor: ActorRef,
     i: i32,
@@ -148,25 +145,23 @@ pub(super) unsafe fn mask_against_scenery(
     ystop1: i16,
     blitwide: i8,
 ) {
-    unsafe {
-        // Shifts by TILE_ROW_SHIFT, converting between pixels, tiles, sectors or bytes.
-        let ym1 = (ystart1 >> TILE_ROW_SHIFT) as u8;
+    // Shifts by TILE_ROW_SHIFT, converting between pixels, tiles, sectors or bytes.
+    let ym1 = (ystart1 >> TILE_ROW_SHIFT) as u8;
 
-        // Shifts by TILE_ROW_SHIFT, converting between pixels, tiles, sectors or bytes.
-        let ym2 = ((ystop1 >> TILE_ROW_SHIFT) as u8).wrapping_sub(ym1);
-        let tiles = SpriteTiles {
-            actor,
-            i,
-            ground,
-            xbw,
-            ym1,
-        };
+    // Shifts by TILE_ROW_SHIFT, converting between pixels, tiles, sectors or bytes.
+    let ym2 = ((ystop1 >> TILE_ROW_SHIFT) as u8).wrapping_sub(ym1);
+    let tiles = SpriteTiles {
+        actor,
+        i,
+        ground,
+        xbw,
+        ym1,
+    };
 
-        for xm in 0..blitwide.max(0) as i32 {
-            for ym in 0..=ym2 as i32 {
-                if let Some(mask) = tiles.mask_of_tile(game, xm, ym) {
-                    add_scenery_mask(game, xm, ym, blitwide as i32, mask);
-                }
+    for xm in 0..blitwide.max(0) as i32 {
+        for ym in 0..=ym2 as i32 {
+            if let Some(mask) = tiles.mask_of_tile(game, xm, ym) {
+                add_scenery_mask(game, xm, ym, blitwide as i32, mask);
             }
         }
     }
@@ -175,35 +170,32 @@ pub(super) unsafe fn mask_against_scenery(
 impl SpriteTiles {
     /// The mask byte to cut out of the sprite for the tile at column `xm` and row `ym` of the
     /// sprite, or `None` when that tile does not hide it.
-    unsafe fn mask_of_tile(&self, game: &mut Game, xm: i32, ym: i32) -> Option<i32> {
-        unsafe {
-            // Back from tile rows to pixels.
-            let ystop = self.ground - (((ym + self.ym1 as i32) << TILE_ROW_SHIFT) as i16);
-            let mut cm =
-                ((xm + self.xbw as i32) * MINIMAP_COLUMN_TILES + ym + self.ym1 as i32) as i16;
-            cm = (minimap[cm as usize] as i32 * TERRAIN_ENTRY_BYTES) as i16;
-            let mut k =
-                // Masks with TERRAIN_TYPE_MASK, keeping only the bits that matter here.
-                (game.memory.terrain_byte(cm as usize + 1) & TERRAIN_TYPE_MASK) as i16;
+    fn mask_of_tile(&self, game: &mut Game, xm: i32, ym: i32) -> Option<i32> {
+        // Back from tile rows to pixels.
+        let ystop = self.ground - (((ym + self.ym1 as i32) << TILE_ROW_SHIFT) as i16);
+        let mut cm = ((xm + self.xbw as i32) * MINIMAP_COLUMN_TILES + ym + self.ym1 as i32) as i16;
+        cm = (game.minimap[cm as usize] as i32 * TERRAIN_ENTRY_BYTES) as i16;
+        let mut k =
+            // Masks with TERRAIN_TYPE_MASK, keeping only the bits that matter here.
+            (game.memory.terrain_byte(cm as usize + 1) & TERRAIN_TYPE_MASK) as i16;
 
-            if self.actor.state == FALL {
-                if cm <= FALL_TILE_LIMIT {
-                    return None;
-                }
-
-                k = TYPE_BRIDGE;
+        if game.actors.list[self.actor.slot()].state == FALL {
+            if cm <= FALL_TILE_LIMIT {
+                return None;
             }
 
-            let on_bridge = game.hero.sector == BRIDGE_SECTOR && self.i != RAFT_SLOT;
-
-            match scenery_rule(k, xm, ym, ystop, on_bridge) {
-                SceneryRule::Skip => return None,
-                SceneryRule::UseFullMask => cm = TILE_FULL_MASK,
-                SceneryRule::UseTileMask => {}
-            }
-
-            Some(game.memory.terrain_byte(cm as usize) as i32)
+            k = TYPE_BRIDGE;
         }
+
+        let on_bridge = game.hero.sector == BRIDGE_SECTOR && self.i != RAFT_SLOT;
+
+        match scenery_rule(k, xm, ym, ystop, on_bridge) {
+            SceneryRule::Skip => return None,
+            SceneryRule::UseFullMask => cm = TILE_FULL_MASK,
+            SceneryRule::UseTileMask => {}
+        }
+
+        Some(game.memory.terrain_byte(cm as usize) as i32)
     }
 }
 

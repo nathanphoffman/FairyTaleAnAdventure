@@ -1,6 +1,6 @@
 //! Loading the music scores and sound effects from disk, and playing a sound effect.
 
-use crate::game::data::tables::menus;
+use crate::game::data::state::Game;
 use crate::game::files::disk::read_blocks;
 use crate::platform::audio::{Track, playsample};
 use crate::platform::paths::resolve;
@@ -122,9 +122,9 @@ pub fn read_sample() {
 }
 
 /// Plays sound effect `num` at the pitch `speed`, unless sound effects are switched off.
-pub fn play_effect(num: i16, speed: i32) {
+pub fn play_effect(game: &mut Game, num: i16, speed: i32) {
     // Masks with GAME_MENU, keeping only the bits that matter here.
-    if unsafe { menus[GAME_MENU].enabled[SOUND_ENTRY] } & 1 != 0
+    if { game.menus[GAME_MENU].enabled[SOUND_ENTRY] } & 1 != 0
         && let Some(sample) = sounds().samples.get(num as usize)
     {
         playsample(sample, speed);

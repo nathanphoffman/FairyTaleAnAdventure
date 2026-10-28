@@ -2,7 +2,6 @@
 
 use super::{CARRIER, CFileInfo, DRAGON, cfile};
 use crate::game::data::state::Game;
-use crate::game::data::state::{the_actors, the_world};
 use crate::game::data::types::SeqInfo;
 use crate::game::files::disk::{
     is_last_read_pending, last_read_finished, load_track_range, mark_read_unused, motor_off,
@@ -66,26 +65,24 @@ const RAFT_FILE: i32 = 4;
 /// Loads the sprite sets the game starts with: objects, the current brother, the raft, the
 /// current monsters and set figures, then the region.
 pub fn load_start_sprites(game: &mut Game) {
-    unsafe {
-        game.memory.nextshape = 0;
-        load_sprite_file(game, OBJECTS_FILE);
-        finish_sprite_load(game, OBJECTS as i16);
-        load_sprite_file(game, game.hero.brother as i32 - 1);
-        finish_sprite_load(game, PHIL as i16);
-        load_sprite_file(game, RAFT_FILE);
-        finish_sprite_load(game, RAFT as i16);
-        sequence(game, ENEMY).location = game.memory.nextshape;
-        load_sprite_file(game, the_actors.loaded_actor_file as i32);
-        finish_sprite_load(
-            game,
-            sprite_files[the_actors.loaded_actor_file as usize].seq_num as i16,
-        );
-        load_sprite_file(game, the_actors.loaded_setfig_file as i32);
-        finish_sprite_load(game, SETFIG as i16);
-        the_world.new_region = the_world.region;
-        load_region_now(game);
-        motor_off();
-    }
+    game.memory.nextshape = 0;
+    load_sprite_file(game, OBJECTS_FILE);
+    finish_sprite_load(game, OBJECTS as i16);
+    load_sprite_file(game, game.hero.brother as i32 - 1);
+    finish_sprite_load(game, PHIL as i16);
+    load_sprite_file(game, RAFT_FILE);
+    finish_sprite_load(game, RAFT as i16);
+    sequence(game, ENEMY).location = game.memory.nextshape;
+    load_sprite_file(game, game.actors.loaded_actor_file as i32);
+    finish_sprite_load(
+        game,
+        sprite_files[game.actors.loaded_actor_file as usize].seq_num as i16,
+    );
+    load_sprite_file(game, game.actors.loaded_setfig_file as i32);
+    finish_sprite_load(game, SETFIG as i16);
+    game.world.new_region = game.world.region;
+    load_region_now(game);
+    motor_off();
 }
 
 /// The `seq_list` entry for a sprite slot (PHIL, OBJECTS, ENEMY ...).

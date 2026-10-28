@@ -15,7 +15,6 @@
 //! 6 SW, 7 W. The value 9 means "not walking".
 
 use crate::game::data::state::Game;
-use crate::game::data::tables::compass_lit_direction;
 use crate::game::render::screen_fx::draw_compass;
 use std::collections::VecDeque;
 use std::sync::Mutex;
@@ -224,25 +223,23 @@ pub fn read_walk_direction(game: &mut Game) {
         (handler.qualifier, handler.pointer)
     };
 
-    unsafe {
-        let dir = if qualifier & (LEFT_BUTTON | RIGHT_BUTTON) != 0 {
-            compass_direction(pointer.0 as i32, pointer.1 as i32)
+    let dir = if qualifier & (LEFT_BUTTON | RIGHT_BUTTON) != 0 {
+        compass_direction(pointer.0 as i32, pointer.1 as i32)
+    } else {
+        let dir = game.ui.held_direction.wrapping_sub(KEYDIR_BASE);
+
+        if (0..DIRECTION_COUNT).contains(&dir) {
+            dir
         } else {
-            let dir = game.ui.held_direction.wrapping_sub(KEYDIR_BASE);
+            game.ui.held_direction = 0;
 
-            if (0..DIRECTION_COUNT).contains(&dir) {
-                dir
-            } else {
-                game.ui.held_direction = 0;
-
-                DIR_NONE
-            }
-        };
-
-        if dir != compass_lit_direction {
-            compass_lit_direction = dir;
-            draw_compass(game, dir);
+            DIR_NONE
         }
+    };
+
+    if dir != game.compass_lit_direction {
+        game.compass_lit_direction = dir;
+        draw_compass(game, dir);
     }
 }
 

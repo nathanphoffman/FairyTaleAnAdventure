@@ -5,7 +5,6 @@ use crate::game::actors::interaction::hit_actor;
 use crate::game::data::random::{bitrand, rand8};
 use crate::game::data::state::Game;
 use crate::game::data::state::{ActorRef, MissileRef};
-use crate::game::data::state::{the_actors, the_world};
 use crate::game::data::types::Missile;
 use crate::game::world::map::{step_x, step_y, terrain_at};
 
@@ -48,40 +47,40 @@ pub(super) const BY_FIREBALL: i32 = -2;
 /// Moves the six arrows and fireballs; they hit actors in the way and stop at walls. Nothing
 /// moves while time is frozen.
 pub fn advance_missiles(game: &mut Game) {
-    unsafe {
-        if the_world.freeze_timer != 0 {
-            return;
-        }
+    if game.world.freeze_timer != 0 {
+        return;
+    }
 
-        for i in 0..MISSILES {
-            let ms = MissileRef::new(i);
-            fly(game, i, ms);
-        }
+    for i in 0..MISSILES {
+        let ms = MissileRef::new(i);
+        fly(game, i, ms);
     }
 }
 
 /// One missile's flight for this frame.
-pub(super) fn fly(game: &mut Game, i: usize, mut ms: MissileRef) {
-    let mut s = ms.speed as i16 * 2;
+pub(super) fn fly(game: &mut Game, i: usize, ms: MissileRef) {
+    let mut s = game.actors.missiles[ms.slot()].speed as i16 * 2;
 
-    if missile_expired(&mut ms, s) {
-        ms.missile_type = MISSILE_NONE;
+    if missile_expired(&mut game.actors.missiles[ms.slot()], s) {
+        game.actors.missiles[ms.slot()].missile_type = MISSILE_NONE;
 
         return;
     }
 
-    let xs = ms.abs_x as i16;
-    let ys = ms.abs_y as i16;
+    let xs = game.actors.missiles[ms.slot()].abs_x as i16;
+    let ys = game.actors.missiles[ms.slot()].abs_y as i16;
 
     if WALL_TERRAIN.contains(&terrain_at(game, xs as i32, ys as i32)) {
-        ms.missile_type = MISSILE_NONE;
+        game.actors.missiles[ms.slot()].missile_type = MISSILE_NONE;
         s = 0;
     }
 
-    let fc = ms.direction as i32;
+    let fc = game.actors.missiles[ms.slot()].direction as i32;
     hit_first_actor_in_path(game, i, ms, xs, ys);
-    ms.abs_x = step_x(ms.abs_x as i32, fc, s as i32) as u16;
-    ms.abs_y = step_y(ms.abs_y as i32, fc, s as i32) as u16;
+    game.actors.missiles[ms.slot()].abs_x =
+        step_x(game.actors.missiles[ms.slot()].abs_x as i32, fc, s as i32) as u16;
+    game.actors.missiles[ms.slot()].abs_y =
+        step_y(game.actors.missiles[ms.slot()].abs_y as i32, fc, s as i32) as u16;
 }
 
 /// Whether the missile is unused, spent, standing still (`s` is its doubled speed) or has been in
@@ -101,15 +100,9 @@ pub(super) fn missile_expired(ms: &mut Missile, s: i16) -> bool {
 /// Hits the first actor close enough to the missile at (`xs`, `ys`) and stops the missile.
 /// `i` is the missile's own index; the hero (actor 0) gets a dodge chance from `brave`, others a
 /// fixed one.
-pub(super) fn hit_first_actor_in_path(
-    game: &mut Game,
-    i: usize,
-    mut ms: MissileRef,
-    xs: i16,
-    ys: i16,
-) {
-    let fc = ms.direction as i32;
-    let is_rock = ms.missile_type == MISSILE_ROCK;
+pub(super) fn hit_first_actor_in_path(game: &mut Game, i: usize, ms: MissileRef, xs: i16, ys: i16) {
+    let fc = game.actors.missiles[ms.slot()].direction as i32;
+    let is_rock = game.actors.missiles[ms.slot()].missile_type == MISSILE_ROCK;
     let range = if is_rock {
         FIREBALL_HIT_RANGE
     } else {
@@ -118,32 +111,29 @@ pub(super) fn hit_first_actor_in_path(
 
     let mut j = 0;
 
-    while j < actor_count() {
+    while j < actor_count(game) {
         let dodge = if j == 0 { game.hero.brave } else { OTHER_DODGE };
         let target = j;
         j += 1;
 
-        if !missile_can_hit(ms, target) {
+        if !missile_can_hit(game, ms, target) {
             continue;
         }
 
-        let dist = distance_to_point(ActorRef::new(target), xs, ys);
+        let dist = distance_to_point(game, ActorRef::new(target), xs, ys);
 
         // the original tests the missile's own index here, not the target's
-        if missile_connects(i, dist, range, dodge, || bitrand(DODGE_RANGE)) {
+        if missile_connects(i, dist, range, dodge, || {
+            bitrand(&mut game.rng, DODGE_RANGE)
+        }) {
             let by = if is_rock { BY_FIREBALL } else { BY_ARROW };
-            hit_actor(
-                game,
-                by,
-                target as i32,
-                fc,
-                (rand8() + MISSILE_DAMAGE_BASE) as i16,
-            );
+            let damage = (rand8(&mut game.rng) + MISSILE_DAMAGE_BASE) as i16;
+            hit_actor(game, by, target as i32, fc, damage);
 
-            ms.speed = 0;
+            game.actors.missiles[ms.slot()].speed = 0;
 
             if is_rock {
-                ms.missile_type = MISSILE_SPENT;
+                game.actors.missiles[ms.slot()].missile_type = MISSILE_SPENT;
             }
 
             return;
@@ -152,18 +142,18 @@ pub(super) fn hit_first_actor_in_path(
 }
 
 /// A missile cannot hit the raft, its own archer, the dead or a carrier.
-fn missile_can_hit(ms: MissileRef, target: usize) -> bool {
+fn missile_can_hit(game: &mut Game, ms: MissileRef, target: usize) -> bool {
     let actor = ActorRef::new(target);
 
     !(target == RAFT
-        || ms.archer as i16 == target as i16
-        || actor.state == DEAD
-        || actor.kind == CARRIER)
+        || game.actors.missiles[ms.slot()].archer as i16 == target as i16
+        || game.actors.list[actor.slot()].state == DEAD
+        || game.actors.list[actor.slot()].kind == CARRIER)
 }
 
 /// The current number of actors (the loop bound is read again each time, as in the original).
-pub fn actor_count() -> usize {
-    unsafe { the_actors.active as usize }
+pub fn actor_count(game: &mut Game) -> usize {
+    game.actors.active as usize
 }
 
 #[cfg(test)]
@@ -172,12 +162,12 @@ mod tests {
     use crate::game::data::types::Missile;
 
     fn missile(kind: i8, speed: i8, time_of_flight: i8) -> Missile {
-        let mut ms: Missile = unsafe { std::mem::zeroed() };
-        ms.missile_type = kind;
-        ms.speed = speed;
-        ms.time_of_flight = time_of_flight;
-
-        ms
+        Missile {
+            missile_type: kind,
+            speed,
+            time_of_flight,
+            ..Default::default()
+        }
     }
 
     #[test]

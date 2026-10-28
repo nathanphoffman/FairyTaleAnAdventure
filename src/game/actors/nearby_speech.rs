@@ -1,9 +1,7 @@
 //! What the people near the hero say when the hero comes close (from the main loop in
 //! csrc/fmain.c).
 
-use crate::game::data::object_tables::ob_list8;
 use crate::game::data::state::Game;
-use crate::game::data::state::the_actors;
 use crate::game::ui::text::speak;
 
 const BEGGAR: i16 = 0x8d;
@@ -22,25 +20,23 @@ const SPEECH_DKNIGHT: i32 = 41;
 
 /// The nearest person says something when they come near (once per person).
 pub fn speak_nearby(game: &mut Game) {
-    unsafe {
-        let race = the_actors.list[the_actors.nearest_person as usize].race as i16;
+    let race = game.actors.list[game.actors.nearest_person as usize].race as i16;
 
-        if the_actors.nearest_person != 0 && race != the_actors.last_person {
-            match race {
-                BEGGAR => speak(game, SPEECH_BEGGAR),
-                WITCH => speak(game, SPEECH_WITCH),
-                PRINCESS => {
-                    if ob_list8[PRINCESS_FREED_SLOT].ob_stat != 0 {
-                        speak(game, SPEECH_PRINCESS);
-                    }
+    if game.actors.nearest_person != 0 && race != game.actors.last_person {
+        match race {
+            BEGGAR => speak(game, SPEECH_BEGGAR),
+            WITCH => speak(game, SPEECH_WITCH),
+            PRINCESS => {
+                if game.objects.region[8][PRINCESS_FREED_SLOT].ob_stat != 0 {
+                    speak(game, SPEECH_PRINCESS);
                 }
-
-                NECROMANCER => speak(game, SPEECH_NECROMANCER),
-                DKNIGHT => speak(game, SPEECH_DKNIGHT),
-                _ => {}
             }
 
-            the_actors.last_person = race;
+            NECROMANCER => speak(game, SPEECH_NECROMANCER),
+            DKNIGHT => speak(game, SPEECH_DKNIGHT),
+            _ => {}
         }
+
+        game.actors.last_person = race;
     }
 }

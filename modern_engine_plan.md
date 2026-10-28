@@ -32,24 +32,26 @@ Both engines share the rules. They differ only in how they draw and read input.
    lists are plain data. No `*mut` / `*const` left in the game code (details in "Owned memory instead
    of Amiga structs and raw pointers" at the end).
 
+8. One `Game` value (`data/state.rs`) holds all the game state: `hero`, `world`, `actors`, `ui`,
+   `encounter`, `witch`, `memory`, `screen`, `rng`, the menus, extents, object lists, page colours and
+   the small work variables. `run_game` creates it and passes `&mut Game` down. There is no
+   `static mut` left and no `unsafe` in `src/game/` (one `unsafe` remains in `platform/`). The
+   constant tables (`tables.rs`, `object_tables.rs`) are plain `static` data; the ones that change
+   (menus, extents, object lists, page colours) are copied into `Game` at the start from
+   `initial_*`. `ActorRef` and `MissileRef` are plain slot numbers: read an actor with
+   `game.actors.list[r.slot()]`.
+
 **Not done.**
-- The shared game state is still `static mut` structs (`the_hero`, `the_world`, `the_actors`,
-  `the_ui`, `the_memory`, `the_screen`, ...), reached from everywhere. That is the remaining source of
-  the roughly 500 `unsafe` mentions. The accessors `screen()`, `memory()`, `player()`,
-  `current_extent()` and the `ActorRef` handles are stop-gaps: they hide the `unsafe` but a function
-  can still hold two `&mut` to the same thing. They are safe in practice because the game is single
-  threaded and no caller keeps one across a call that re-fetches it.
+- `Game` still holds the Amiga-flavoured pieces (`screen`, `memory`, blitter work variables like
+  `current_sshape`) next to the rules state, and the `platform/` display code takes `&mut Game` for
+  its test hooks. Rules and drawing are not separated yet.
 - Steps 5 to 7 below (classic/modern engines, remastered, reimagined) have not been started.
 
 **Plan for what comes next, in order.**
-1. *One `Game` value.* Move the statics into a `Game { hero, world, actors, ui, memory, screen, ... }`
-   and pass `&mut Game` (or the parts a function needs) down from `run_game`. Do it one subsystem at a
-   time, smallest first (`Witch`, `Ui`, `Encounters`), so the game runs after every step. At the end
-   there is no `static mut` and `unsafe` is only left in `platform/`. Accept pure functions first:
-   the rules that already take values (hunger, tactics, hits) need no change.
-2. *Separate rules from drawing* (the "core idea" above): `Game` without SDL or bitmaps, a renderer
-   that reads it. This is what steps 5 and 6 need.
-3. Step 5 (classic engine, improved options), step 6 (modern renderer: RGBA tiles, zoom, bigger view),
+1. *Separate rules from drawing* (the "core idea" above): a `Game` without SDL or bitmaps, and a
+   renderer that reads it. Move `screen`, `memory` and the blitter variables out of `Game` into a
+   separate render state, and make the platform hooks work on that. This is what steps 5 and 6 need.
+2. Step 5 (classic engine, improved options), step 6 (modern renderer: RGBA tiles, zoom, bigger view),
    step 7 (data files for items, enemies, spells and text).
 
 Each step keeps the rule: tests pass before each commit, behaviour is unchanged unless the step says

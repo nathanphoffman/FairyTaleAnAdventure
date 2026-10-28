@@ -7,8 +7,6 @@ use crate::game::actors::steering::steer_actor;
 use crate::game::data::random::{bitrand, rand2, rand4};
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::current_extent;
-use crate::game::data::state::{the_actors, the_world};
 use crate::game::ui::music::set_mood;
 use crate::game::ui::text::queue_print;
 
@@ -58,117 +56,112 @@ const PRQ_VITALITY: i32 = 7;
 
 /// Decides each enemy's goal and tactic, and starts or ends the battle mood.
 pub fn update_enemy_goals(game: &mut Game) {
-    unsafe {
-        the_actors.on_screen = 0;
-        the_actors.leader = 0;
-        let battle2 = the_actors.battle_flag;
-        the_actors.battle_flag = 0;
-        let mut i = FIRST_AI_ACTOR;
+    game.actors.on_screen = 0;
+    game.actors.leader = 0;
+    let battle2 = game.actors.battle_flag;
+    game.actors.battle_flag = 0;
+    let mut i = FIRST_AI_ACTOR;
 
-        while i < the_actors.active as usize {
-            if game.hero.good_fairy_timer != 0 && game.hero.good_fairy_timer < FAIRY_ARRIVES {
-                break;
-            }
-
-            think(game, i, battle2);
-            i += 1;
+    while i < game.actors.active as usize {
+        if game.hero.good_fairy_timer != 0 && game.hero.good_fairy_timer < FAIRY_ARRIVES {
+            break;
         }
 
-        if battle2 == 0 && the_actors.battle_flag != 0 {
-            set_mood(game, 1);
-        }
+        think(game, i, battle2);
+        i += 1;
+    }
 
-        if the_actors.battle_flag == 0 && battle2 != 0 {
-            queue_print(PRQ_VITALITY);
-            queue_print(PRQ_STATS);
-            report_battle_result(game);
-        }
+    if battle2 == 0 && game.actors.battle_flag != 0 {
+        set_mood(game, 1);
+    }
+
+    if game.actors.battle_flag == 0 && battle2 != 0 {
+        queue_print(game, PRQ_VITALITY);
+        queue_print(game, PRQ_STATS);
+        report_battle_result(game);
     }
 }
 
 /// One actor's decision. Returns early (skipping the goal update) for carriers, people and
 /// anyone out of hit points who is on screen.
-unsafe fn think(game: &mut Game, i: usize, battle2: i8) {
-    unsafe {
-        let mut actor = ActorRef::new(i);
+fn think(game: &mut Game, i: usize, battle2: i8) {
+    let actor = ActorRef::new(i);
 
-        if actor.kind == CARRIER {
-            aim_carrier(game, i);
+    if game.actors.list[actor.slot()].kind == CARRIER {
+        aim_carrier(game, i);
 
-            return;
-        } else if actor.kind == SETFIG {
-            return;
-        }
+        return;
+    } else if game.actors.list[actor.slot()].kind == SETFIG {
+        return;
+    }
 
-        let (xd, yd) = distance_from_hero(game, actor);
+    let (xd, yd) = distance_from_hero(game, actor);
 
-        if !notice_actor(actor, xd, yd, battle2) {
-            return;
-        }
+    if !notice_actor(game, actor, xd, yd, battle2) {
+        return;
+    }
 
-        let tactic = actor.tactic as i16;
-        let new_tactic_roll = bitrand(NEW_TACTIC_ODDS - 1) == 0;
-        let mode = adjust_mode_for_situation(actor, actor.goal as i16);
-        let mode = act_on_goal(game, i, actor, mode, tactic, (xd, yd), new_tactic_roll);
+    let tactic = game.actors.list[actor.slot()].tactic as i16;
+    let new_tactic_roll = bitrand(&mut game.rng, NEW_TACTIC_ODDS - 1) == 0;
+    let mode = adjust_mode_for_situation(game, actor, game.actors.list[actor.slot()].goal as i16);
+    let mode = act_on_goal(game, i, actor, mode, tactic, (xd, yd), new_tactic_roll);
 
-        actor.goal = mode as i8;
+    game.actors.list[actor.slot()].goal = mode as i8;
 
-        if the_actors.leader == 0 {
-            the_actors.leader = i as i16;
-        }
+    if game.actors.leader == 0 {
+        game.actors.leader = i as i16;
     }
 }
 
 /// A carrier (raft, turtle, swan) keeps steering toward the hero every few frames.
-unsafe fn aim_carrier(game: &mut Game, i: usize) {
-    unsafe {
-        // Masks with CARRIER_AIM_MASK, keeping only the bits that matter here.
-        if the_world.day_clock & CARRIER_AIM_MASK == 0 {
-            steer_actor(
-                i as i32,
-                game.hero.x as i32,
-                game.hero.y as i32,
-                CARRIER_AIM_MODE,
-            );
-        }
+fn aim_carrier(game: &mut Game, i: usize) {
+    // Masks with CARRIER_AIM_MASK, keeping only the bits that matter here.
+    if game.world.day_clock & CARRIER_AIM_MASK == 0 {
+        steer_actor(
+            game,
+            i as i32,
+            game.hero.x as i32,
+            game.hero.y as i32,
+            CARRIER_AIM_MODE,
+        );
     }
 }
 
 /// How far the actor is from the hero along each axis, never negative.
 fn distance_from_hero(game: &mut Game, actor: ActorRef) -> (i16, i16) {
-    let xd = (actor.abs_x as i32 - game.hero.x as i32) as i16;
-    let yd = (actor.abs_y as i32 - game.hero.y as i32) as i16;
+    let xd = (game.actors.list[actor.slot()].abs_x as i32 - game.hero.x as i32) as i16;
+    let yd = (game.actors.list[actor.slot()].abs_y as i32 - game.hero.y as i32) as i16;
 
     (xd.wrapping_abs(), yd.wrapping_abs())
 }
 
 /// Notes that an actor is on screen, and that a battle is on if it is awake and in view. Returns
 /// false for an actor that is on screen but out of hit points (it does nothing more).
-unsafe fn notice_actor(actor: ActorRef, xd: i16, yd: i16, battle2: i8) -> bool {
-    unsafe {
-        if on_screen(xd, yd) {
-            the_actors.on_screen = 1;
+fn notice_actor(game: &mut Game, actor: ActorRef, xd: i16, yd: i16, battle2: i8) -> bool {
+    if on_screen(xd, yd) {
+        game.actors.on_screen = 1;
 
-            if actor.vitality < 1 {
-                return false;
-            }
-
-            if actor.visible != 0 || battle2 != 0 {
-                the_actors.battle_flag = 1;
-            }
+        if game.actors.list[actor.slot()].vitality < 1 {
+            return false;
         }
 
-        true
+        if game.actors.list[actor.slot()].visible != 0 || battle2 != 0 {
+            game.actors.battle_flag = 1;
+        }
     }
+
+    true
 }
 
 /// A stuck actor picks a new tactic: archers one of the ranged ones, the others a melee one.
 fn try_something_else(game: &mut Game, i: usize, actor: ActorRef) {
     // Masks with BOW_BIT, keeping only the bits that matter here.
-    if actor.weapon & BOW_BIT != 0 {
-        run_tactic(game, i as i32, rand4() + ARCHER_FRUSTRATION_TACTIC);
+    if game.actors.list[actor.slot()].weapon & BOW_BIT != 0 {
+        let tactic = rand4(&mut game.rng) + ARCHER_FRUSTRATION_TACTIC;
+        run_tactic(game, i as i32, tactic);
     } else {
-        run_tactic(game, i as i32, rand2() + MELEE_FRUSTRATION_TACTIC);
+        let tactic = rand2(&mut game.rng) + MELEE_FRUSTRATION_TACTIC;
+        run_tactic(game, i as i32, tactic);
     }
 }
 
@@ -176,60 +169,56 @@ fn try_something_else(game: &mut Game, i: usize, actor: ActorRef) {
 /// picks a tactic now and then and acts on it, the others flee, follow, stand or wait. Returns the
 /// goal for next frame, which a hostile actor may change.
 #[allow(clippy::too_many_arguments)] // the whole situation of one actor, plus the game state
-unsafe fn act_on_goal(
+fn act_on_goal(
     game: &mut Game,
     i: usize,
-    mut actor: ActorRef,
+    actor: ActorRef,
     mut mode: i16,
     mut tactic: i16,
     (xd, yd): (i16, i16),
     mut new_tactic_roll: bool,
 ) -> i16 {
-    unsafe {
-        if tactic == FRUST || tactic == SHOOTFRUST {
-            try_something_else(game, i, actor);
-        } else if actor.state == SHOOT1 {
-            actor.state = SHOOT3;
-        } else if mode <= ARCHER2 {
-            // Masks off the low bits (a cheap remainder or a flag test).
-            if mode & 2 == 0 {
-                new_tactic_roll = rand4() == 0;
-            }
-
-            if new_tactic_roll {
-                (mode, tactic) = choose_tactic(actor, mode, xd, yd);
-            }
-
-            hostile_action(game, i, actor, mode, tactic, xd, yd);
-        } else if mode == FLEE {
-            run_tactic(game, i as i32, BACKUP);
-        } else if mode == FOLLOWER {
-            run_tactic(game, i as i32, FOLLOW);
-        } else if mode == STAND {
-            steer_actor(i as i32, game.hero.x as i32, game.hero.y as i32, 0);
-            actor.state = STILL;
-        } else if mode == WAIT {
-            actor.state = STILL;
+    if tactic == FRUST || tactic == SHOOTFRUST {
+        try_something_else(game, i, actor);
+    } else if game.actors.list[actor.slot()].state == SHOOT1 {
+        game.actors.list[actor.slot()].state = SHOOT3;
+    } else if mode <= ARCHER2 {
+        // Masks off the low bits (a cheap remainder or a flag test).
+        if mode & 2 == 0 {
+            new_tactic_roll = rand4(&mut game.rng) == 0;
         }
 
-        mode
+        if new_tactic_roll {
+            (mode, tactic) = choose_tactic(game, actor, mode, xd, yd);
+        }
+
+        hostile_action(game, i, actor, mode, tactic, xd, yd);
+    } else if mode == FLEE {
+        run_tactic(game, i as i32, BACKUP);
+    } else if mode == FOLLOWER {
+        run_tactic(game, i as i32, FOLLOW);
+    } else if mode == STAND {
+        steer_actor(game, i as i32, game.hero.x as i32, game.hero.y as i32, 0);
+        game.actors.list[actor.slot()].state = STILL;
+    } else if mode == WAIT {
+        game.actors.list[actor.slot()].state = STILL;
     }
+
+    mode
 }
 
 /// Overrides an actor's mode when the situation demands: flee or follow when the hero is down,
 /// flee when nearly dead.
-unsafe fn adjust_mode_for_situation(actor: ActorRef, mode: i16) -> i16 {
-    unsafe {
-        adjusted_mode(
-            mode,
-            the_actors.list[0].state,
-            the_actors.leader,
-            actor.vitality,
-            the_world.extent_type,
-            actor.race,
-            current_extent().v3,
-        )
-    }
+fn adjust_mode_for_situation(game: &mut Game, actor: ActorRef, mode: i16) -> i16 {
+    adjusted_mode(
+        mode,
+        game.actors.list[0].state,
+        game.actors.leader,
+        game.actors.list[actor.slot()].vitality,
+        game.world.extent_type,
+        game.actors.list[actor.slot()].race,
+        game.extents[game.world.extent].v3,
+    )
 }
 
 /// Whether an actor `xd`, `yd` (absolute) pixels from the hero counts as on screen.

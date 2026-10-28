@@ -59,9 +59,6 @@ const EGG_SEEK: i32 = 10;
 const HERO: usize = 0;
 const RAFT_SLOT: usize = 1;
 
-/// Set when turtle eggs are in view; the slot of the eggs' actor (see `report_battle_result`).
-pub static mut turtle_eggs: i8 = 0;
-
 /// Eats: lowers hunger by `amt`. If that would go below zero the hero is simply full
 /// (message 13); otherwise "Yum!".
 pub fn eat_food(game: &mut Game, amt: i32) {

@@ -10,7 +10,7 @@ use crate::game::world::objects::SetFigEntry;
 use crate::game::data::types::{Bro, Door, Extent, InvItem, Letter, Menu, Need, StateEntry};
 
 /// The kinds of people (setfigs): which sprite file, the first image, and whether they can talk.
-pub static mut setfig_table: [SetFigEntry; 14] = [
+pub static setfig_table: [SetFigEntry; 14] = [
     SetFigEntry { cfile_entry: 13, image_base: 0, can_talk: 1 },
     SetFigEntry { cfile_entry: 13, image_base: 4, can_talk: 1 },
     SetFigEntry { cfile_entry: 14, image_base: 0, can_talk: 0 },
@@ -28,7 +28,7 @@ pub static mut setfig_table: [SetFigEntry; 14] = [
 ];
 
 /// The monsters: hit points, aggression, weapon row, cleverness, treasure and sprite file.
-pub static mut encounter_chart: [Encounter; 11] = [
+pub static encounter_chart: [Encounter; 11] = [
     Encounter { hitpoints: 18, agressive: 1, arms: 2, cleverness: 0, treasure: 2, file_id: 6 },
     Encounter { hitpoints: 12, agressive: 1, arms: 4, cleverness: 1, treasure: 1, file_id: 6 },
     Encounter { hitpoints: 16, agressive: 1, arms: 6, cleverness: 1, treasure: 4, file_id: 7 },
@@ -43,7 +43,7 @@ pub static mut encounter_chart: [Encounter; 11] = [
 ];
 
 /// Next state of a weapon swing, for each state and each of 4 random picks.
-pub static mut swing_transitions: [[i8; 4]; 9] = [
+pub static swing_transitions: [[i8; 4]; 9] = [
     [1, 8, 0, 1],
     [2, 0, 1, 0],
     [3, 1, 2, 8],
@@ -56,7 +56,7 @@ pub static mut swing_transitions: [[i8; 4]; 9] = [
 ];
 
 /// What to draw for each animation state: the figure image, the weapon image, and where the weapon is.
-pub static mut animation_frames: [StateEntry; 87] = [
+pub static animation_frames: [StateEntry; 87] = [
     StateEntry { figure: 0, wpn_no: 11, wpn_x: -2, wpn_y: 11 },
     StateEntry { figure: 1, wpn_no: 11, wpn_x: -3, wpn_y: 11 },
     StateEntry { figure: 2, wpn_no: 11, wpn_x: -3, wpn_y: 10 },
@@ -147,7 +147,7 @@ pub static mut animation_frames: [StateEntry; 87] = [
 ];
 
 /// Every door: where it is outside, where it leads inside, its kind and the sectors it joins.
-pub static mut door_list: [Door; 86] = [
+pub static door_list: [Door; 86] = [
     Door { xc1: 4464, yc1: 20576, xc2: 10352, yc2: 35680, kind: 1, secs: 1 },
     Door { xc1: 4464, yc1: 20576, xc2: 10352, yc2: 35680, kind: 1, secs: 1 },
     Door { xc1: 4464, yc1: 20576, xc2: 10352, yc2: 35680, kind: 1, secs: 1 },
@@ -237,7 +237,7 @@ pub static mut door_list: [Door; 86] = [
 ];
 
 /// Rectangles of the world with a meaning: where monsters appear, peaceful places, the carriers.
-pub static mut extent_list: [Extent; 23] = [
+pub static initial_extents: [Extent; 23] = [
     Extent { x1: 2118, y1: 27237, x2: 2618, y2: 27637, etype: 70, v1: 0, v2: 1, v3: 11 },
     Extent { x1: 0, y1: 0, x2: 0, y2: 0, etype: 70, v1: 0, v2: 1, v3: 5 },
     Extent { x1: 6749, y1: 34951, x2: 7249, y2: 35351, etype: 70, v1: 0, v2: 1, v3: 10 },
@@ -264,7 +264,7 @@ pub static mut extent_list: [Extent; 23] = [
 ];
 
 /// The stone ring positions, as sector x, y pairs.
-pub static mut stone_ring_sectors: [u8; 22] = [54, 43, 71, 77, 78, 102, 66, 121, 12, 85, 79, 40, 107, 38, 73, 21, 12, 26, 26, 53, 84, 60];
+pub static stone_ring_sectors: [u8; 22] = [54, 43, 71, 77, 78, 102, 66, 121, 12, 85, 79, 40, 107, 38, 73, 21, 12, 26, 26, 53, 84, 60];
 
 /// Every item: its picture, where it sits on the item list, how many show, and its name.
 pub static item_list: [InvItem; 36] = [
@@ -333,15 +333,11 @@ pub static labelA: &[u8] = b"Gold Book Writ Bone \0";
 pub static labelB: &[u8] = b"  A    B    C    D    E    F    G    H  \0";
 
 /// The colour of each key in the key menu.
-pub static mut key_colors: [i8; 6] = [8, 6, 4, 2, 14, 1];
+pub static key_colors: [i8; 6] = [8, 6, 4, 2, 14, 1];
 
-/// The ten menus: labels, entry count, colour, and each entry's state (see `Menu`).
-/// The `enabled` flags of entry `entry` of menu `menu`.
-pub fn menu_entry(menu: usize, entry: usize) -> &'static mut i8 {
-    unsafe { &mut (*(&raw mut menus))[menu].enabled[entry] }
-}
-
-pub static mut menus: [Menu; 10] = [
+/// The ten menus at the start of the game: labels, entry count, colour, and each entry's state (see
+/// `Menu`). The game works on its own copy, `Game::menus`.
+pub static initial_menus: [Menu; 10] = [
     Menu { label_list: label2, num: 10, color: 6, enabled: [3, 2, 2, 2, 2, 10, 10, 10, 10, 10, 0, 0] },
     Menu { label_list: label6, num: 12, color: 5, enabled: [2, 3, 2, 2, 2, 8, 8, 8, 8, 8, 8, 8] },
     Menu { label_list: label3, num: 8, color: 9, enabled: [2, 2, 3, 2, 2, 10, 10, 10, 0, 0, 0, 0] },
@@ -355,7 +351,7 @@ pub static mut menus: [Menu; 10] = [
 ];
 
 /// Keyboard shortcuts: the key, the menu and the entry it picks.
-pub static mut menu_shortcuts: [Letter; 37] = [
+pub static menu_shortcuts: [Letter; 37] = [
     Letter { letter: 73, menu: 0, choice: 5 },
     Letter { letter: 84, menu: 0, choice: 6 },
     Letter { letter: 63, menu: 0, choice: 7 },
@@ -399,7 +395,7 @@ pub static mut menu_shortcuts: [Letter; 37] = [
 pub static brother_names: [&str; 3] = ["Julian", "Phillip", "Kevin"];
 
 /// The disk blocks each of the ten map regions needs.
-pub static mut region_disk_blocks: [Need; 10] = [
+pub static region_disk_blocks: [Need; 10] = [
     Need { image: [320, 480, 520, 560], terra1: 0, terra2: 1, sector: 32, region: 160, setchar: 22 },
     Need { image: [320, 360, 400, 440], terra1: 2, terra2: 3, sector: 32, region: 160, setchar: 21 },
     Need { image: [320, 360, 520, 560], terra1: 2, terra2: 1, sector: 32, region: 168, setchar: 22 },
@@ -412,25 +408,15 @@ pub static mut region_disk_blocks: [Need; 10] = [
     Need { image: [680, 760, 800, 840], terra1: 10, terra2: 9, sector: 96, region: 192, setchar: 0 },
 ];
 
-/// What the region loader has loaded so far (starts as "nothing useful").
-pub static mut loaded_blocks: Need = Need { image: [0, 0, 0, 0], terra1: 1, terra2: 2, sector: 0, region: 0, setchar: 0 };
-
 /// The font the text panel asks for.
 /// The instrument waveforms for the music, as pairs of values.
-pub static mut instrument_waves: [i16; 12] = [0x0000, 0x0000, 0x0000, 0x0000, 0x0005, 0x0202, 0x0101, 0x0103, 0x0004, 0x0504, 0x0100, 0x0500];
-
-/// The random number seeds the game starts with.
-pub static mut seed1: i32 = 19837325;
-pub static mut seed2: i32 = 23098324;
-
-/// The direction the compass shows (9 = none).
-pub static mut compass_lit_direction: i16 = 9;
+pub static instrument_waves: [i16; 12] = [0x0000, 0x0000, 0x0000, 0x0000, 0x0005, 0x0202, 0x0101, 0x0103, 0x0004, 0x0504, 0x0100, 0x0500];
 
 /// The first sprite image of each facing (16 entries: walking, then fighting).
-pub static mut facing_frame_offsets: [i8; 16] = [16, 16, 24, 24, 0, 0, 8, 8, 56, 56, 68, 68, 32, 32, 44, 44];
+pub static facing_frame_offsets: [i8; 16] = [16, 16, 24, 24, 0, 0, 8, 8, 56, 56, 68, 68, 32, 32, 44, 44];
 
 /// The brothers' starting stats and their item lists.
-pub static mut brother_stats: [Bro; 3] = {
+pub static brother_stats: [Bro; 3] = {
     [
     Bro { brave: 35, luck: 20, kind: 15, wealth: 20 },
     Bro { brave: 20, luck: 35, kind: 15, wealth: 15 },
@@ -445,7 +431,7 @@ mod tests {
 
     #[test]
     fn doors_are_sorted_by_x_for_the_binary_search() {
-        let doors = unsafe { &*(&raw const door_list) };
+        let doors = { &door_list };
 
         for pair in doors.windows(2) {
             assert!(pair[0].xc1 <= pair[1].xc1, "door at x {} is out of order", pair[1].xc1);
@@ -458,7 +444,7 @@ mod tests {
 
     #[test]
     fn extents_are_proper_rectangles() {
-        let extents = unsafe { &*(&raw const extent_list) };
+        let extents = { &initial_extents };
 
         for (n, e) in extents.iter().enumerate() {
             if n == INVERTED_EXTENT {
@@ -472,7 +458,7 @@ mod tests {
     #[test]
     fn menu_labels_cover_all_the_entries() {
         // Entries 0-4 are the menu names; every entry after that has a 5 character label.
-        let all_menus = unsafe { &*(&raw const menus) };
+        let all_menus = { &initial_menus };
 
         for (n, menu) in all_menus.iter().enumerate() {
             let needed = (menu.num as usize).saturating_sub(5) * 5;
@@ -483,9 +469,9 @@ mod tests {
 
     #[test]
     fn every_shortcut_key_picks_a_real_entry() {
-        let all_menus = unsafe { &*(&raw const menus) };
+        let all_menus = { &initial_menus };
 
-        let shortcuts = unsafe { &*(&raw const menu_shortcuts) };
+        let shortcuts = { &menu_shortcuts };
         let mut seen = HashSet::new();
 
         for shortcut in shortcuts {
@@ -497,7 +483,7 @@ mod tests {
 
     #[test]
     fn swing_transitions_lead_to_swing_states() {
-        let transitions = unsafe { &*(&raw const swing_transitions) };
+        let transitions = { &swing_transitions };
 
         for (state, next) in transitions.iter().enumerate() {
             for &to in next {
@@ -524,7 +510,7 @@ mod tests {
 
     #[test]
     fn monsters_use_the_enemy_sprite_files() {
-        let chart = unsafe { &*(&raw const encounter_chart) };
+        let chart = { &encounter_chart };
 
         for (n, monster) in chart.iter().enumerate() {
             assert!((6..=9).contains(&monster.file_id), "monster {n}");

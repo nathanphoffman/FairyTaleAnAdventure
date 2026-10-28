@@ -5,7 +5,7 @@
 //! has the matching item (`item_menu_state`).
 
 use crate::game::data::state::Game;
-use crate::game::data::tables::{key_colors, label1, menus};
+use crate::game::data::tables::{key_colors, label1};
 use crate::game::input::handler::forget_last_menu;
 use crate::game::render::screen::PortId;
 use crate::game::ui::text::item_menu_state;
@@ -55,37 +55,35 @@ const GIVE_GOLD_MIN: i16 = 2;
 
 /// Switches the use, magic, keys and give entries on or off to match what the hero is carrying.
 pub fn update_menu_availability(game: &mut Game) {
-    unsafe {
-        for i in 0..MAGIC_ITEMS {
-            menus[MAGIC].enabled[i + ITEM_ENTRIES_START] =
-                item_menu_state(game, i as i32 + MAGIC_ITEM_BASE) as i8;
-            menus[USE].enabled[i] = item_menu_state(game, i as i32) as i8;
-        }
-
-        // "use a key" is available if any key slot reports available
-        let mut keys = GREYED;
-
-        for i in 0..KEY_ITEMS {
-            let flag = item_menu_state(game, i as i32 + KEY_ITEM_BASE) as i8;
-            menus[KEYS].enabled[i + ITEM_ENTRIES_START] = flag;
-
-            if flag == AVAILABLE {
-                keys = AVAILABLE;
-            }
-        }
-
-        menus[USE].enabled[USE_KEY_ENTRY] = keys;
-        menus[USE].enabled[USE_SUNSTONE_ENTRY] = item_menu_state(game, SUNSTONE) as i8;
-        menus[GIVE].enabled[GIVE_GOLD_ENTRY] = if game.hero.wealth > GIVE_GOLD_MIN {
-            AVAILABLE
-        } else {
-            GREYED
-        }; // gold
-
-        menus[GIVE].enabled[GIVE_BOOK_ENTRY] = GREYED;
-        menus[GIVE].enabled[GIVE_WRIT_ENTRY] = item_menu_state(game, WRIT) as i8;
-        menus[GIVE].enabled[GIVE_BONE_ENTRY] = item_menu_state(game, BONE) as i8;
+    for i in 0..MAGIC_ITEMS {
+        game.menus[MAGIC].enabled[i + ITEM_ENTRIES_START] =
+            item_menu_state(game, i as i32 + MAGIC_ITEM_BASE) as i8;
+        game.menus[USE].enabled[i] = item_menu_state(game, i as i32) as i8;
     }
+
+    // "use a key" is available if any key slot reports available
+    let mut keys = GREYED;
+
+    for i in 0..KEY_ITEMS {
+        let flag = item_menu_state(game, i as i32 + KEY_ITEM_BASE) as i8;
+        game.menus[KEYS].enabled[i + ITEM_ENTRIES_START] = flag;
+
+        if flag == AVAILABLE {
+            keys = AVAILABLE;
+        }
+    }
+
+    game.menus[USE].enabled[USE_KEY_ENTRY] = keys;
+    game.menus[USE].enabled[USE_SUNSTONE_ENTRY] = item_menu_state(game, SUNSTONE) as i8;
+    game.menus[GIVE].enabled[GIVE_GOLD_ENTRY] = if game.hero.wealth > GIVE_GOLD_MIN {
+        AVAILABLE
+    } else {
+        GREYED
+    }; // gold
+
+    game.menus[GIVE].enabled[GIVE_BOOK_ENTRY] = GREYED;
+    game.menus[GIVE].enabled[GIVE_WRIT_ENTRY] = item_menu_state(game, WRIT) as i8;
+    game.menus[GIVE].enabled[GIVE_BONE_ENTRY] = item_menu_state(game, BONE) as i8;
 }
 
 /// Most entries a menu shows at once (two columns of six).
@@ -97,31 +95,29 @@ const SHOWN: i8 = 2;
 /// Draws the current menu (`current_menu`): the entries that are switched on, in the order they are shown,
 /// and blanks over the slots that are left. `slot_entries` remembers which entry each slot is.
 pub fn print_options(game: &mut Game) {
-    unsafe {
-        let menu = &menus[game.ui.current_menu as usize];
-        let mut slot = 0usize;
+    let menu = game.menus[game.ui.current_menu as usize];
+    let mut slot = 0usize;
 
-        for entry in 0..menu.num as usize {
-            let enabled = menu.enabled[entry];
+    for entry in 0..menu.num as usize {
+        let enabled = menu.enabled[entry];
 
-            // Masks with SHOWN, keeping only the bits that matter here.
-            if enabled & SHOWN == 0 {
-                continue;
-            }
-
-            game.ui.slot_entries[slot] = entry as i8;
-
-            // Masks off the low bits (a cheap remainder or a flag test).
-            print_menu_entry(game, slot as i16, (enabled & 1) as i16);
-            slot += 1;
-
-            if slot > SLOTS - 1 {
-                break;
-            }
+        // Masks with SHOWN, keeping only the bits that matter here.
+        if enabled & SHOWN == 0 {
+            continue;
         }
 
-        blank_slots_from(game, slot);
+        game.ui.slot_entries[slot] = entry as i8;
+
+        // Masks off the low bits (a cheap remainder or a flag test).
+        print_menu_entry(game, slot as i16, (enabled & 1) as i16);
+        slot += 1;
+
+        if slot > SLOTS - 1 {
+            break;
+        }
     }
+
+    blank_slots_from(game, slot);
 }
 
 /// Blanks the slots from `first` to the last one: nothing is shown there.
@@ -147,16 +143,14 @@ fn blank_slots_from(game: &mut Game, first: usize) {
 
 /// Switches to menu `mode` and redraws it, unless the game is paused.
 pub fn go_to_menu(game: &mut Game, mode: i16) {
-    unsafe {
-        // Masks with GAME, keeping only the bits that matter here.
-        if menus[GAME].enabled[PAUSE_ENTRY] & 1 != 0 {
-            return;
-        }
-
-        game.ui.current_menu = mode;
-        forget_last_menu();
-        print_options(game);
+    // Masks with GAME, keeping only the bits that matter here.
+    if game.menus[GAME].enabled[PAUSE_ENTRY] & 1 != 0 {
+        return;
     }
+
+    game.ui.current_menu = mode;
+    forget_last_menu();
+    print_options(game);
 }
 
 // Where the menu entries are drawn in the text panel: two columns, a row every 9 pixels.
@@ -181,49 +175,45 @@ const MAIN_PEN: u32 = 4;
 /// Draws entry slot `j` (0-11) of the current menu in the panel. `pena` is the text colour:
 /// 1 for a selected entry, 0 for a plain one. The box colour depends on the menu.
 pub fn print_menu_entry(game: &mut Game, j: i16, pena: i16) {
-    unsafe {
-        let entry = game.ui.slot_entries[j as usize] as i32;
-        game.screen.set_a_pen(PortId::Text2, pena as u8);
-        let box_pen = entry_box_pen(game, entry) as u8;
-        game.screen.set_b_pen(PortId::Text2, box_pen);
+    let entry = game.ui.slot_entries[j as usize] as i32;
+    game.screen.set_a_pen(PortId::Text2, pena as u8);
+    let box_pen = entry_box_pen(game, entry) as u8;
+    game.screen.set_b_pen(PortId::Text2, box_pen);
 
-        let offset = entry * LABEL_LEN;
+    let offset = entry * LABEL_LEN;
 
-        // Masks off the low bits (a cheap remainder or a flag test).
-        let x = if j & 1 != 0 {
-            RIGHT_COLUMN_X
-        } else {
-            LEFT_COLUMN_X
-        };
+    // Masks off the low bits (a cheap remainder or a flag test).
+    let x = if j & 1 != 0 {
+        RIGHT_COLUMN_X
+    } else {
+        LEFT_COLUMN_X
+    };
 
-        let y = (j as i32 / 2) * ROW_HEIGHT + FIRST_ROW_Y;
-        let label = entry_label(game, offset);
-        game.screen.move_to(PortId::Text2, x, y);
-        game.screen.text(PortId::Text2, BOX);
-        game.screen.move_to(PortId::Text2, x + TEXT_INSET, y);
-        game.screen.text(PortId::Text2, label);
-    }
+    let y = (j as i32 / 2) * ROW_HEIGHT + FIRST_ROW_Y;
+    let label = entry_label(game, offset);
+    game.screen.move_to(PortId::Text2, x, y);
+    game.screen.text(PortId::Text2, BOX);
+    game.screen.move_to(PortId::Text2, x + TEXT_INSET, y);
+    game.screen.text(PortId::Text2, label);
 }
 
 /// The colour of the box behind an entry of the current menu: fixed for the use and file menus and
 /// the main names, from a table for keys and the save slots, else the menu's own.
-unsafe fn entry_box_pen(game: &mut Game, entry: i32) -> u32 {
-    unsafe {
-        let menu = game.ui.current_menu as usize;
+fn entry_box_pen(game: &mut Game, entry: i32) -> u32 {
+    let menu = game.ui.current_menu as usize;
 
-        if menu == USE {
-            USE_PEN
-        } else if menu == FILE {
-            FILE_PEN
-        } else if entry < MAIN_ENTRIES {
-            MAIN_PEN
-        } else if menu == KEYS {
-            key_colors[(entry - MAIN_ENTRIES) as usize] as u32
-        } else if menu == SAVEX {
-            entry as u32
-        } else {
-            menus[menu].color as u32
-        }
+    if menu == USE {
+        USE_PEN
+    } else if menu == FILE {
+        FILE_PEN
+    } else if entry < MAIN_ENTRIES {
+        MAIN_PEN
+    } else if menu == KEYS {
+        key_colors[(entry - MAIN_ENTRIES) as usize] as u32
+    } else if menu == SAVEX {
+        entry as u32
+    } else {
+        game.menus[menu].color as u32
     }
 }
 
@@ -231,7 +221,7 @@ unsafe fn entry_box_pen(game: &mut Game, entry: i32) -> u32 {
 /// the other menus have their own list, which for the first 5 slots is skipped over.
 fn entry_label(game: &mut Game, offset: i32) -> &'static [u8] {
     let current = game.ui.current_menu as usize;
-    let labels = unsafe { menus[current].label_list };
+    let labels = { game.menus[current].label_list };
 
     let (list, from) = if current >= USE {
         (labels, offset)

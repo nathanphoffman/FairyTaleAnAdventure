@@ -143,7 +143,7 @@ pub static sun_colors: [i16; 53] = [
 
 /// The 32 page colours at full brightness (colour 31 changes with the region).
 /// Each is 12 bits: red, green and blue in 4 bits each.
-pub static mut page_colors: [u16; 32] = [
+pub static initial_page_colors: [u16; 32] = [
     0x0000,0x0FFF,0x0E96,0x0B63,0x0631,0x07BF,0x0333,0x0DB8,
     0x0223,0x0445,0x0889,0x0BBC,0x0521,0x0941,0x0F82,0x0FC7,
     0x0040,0x0070,0x00B0,0x06F6,0x0005,0x0009,0x000D,0x037F,
@@ -231,7 +231,7 @@ const BLANK: WorldObject = obj(0, 0, 0, 0);
 // 4 a dead person, 5 hidden until looked for, 6 cabinet items.
 
 /// Global objects.
-pub static mut ob_listg: [WorldObject; 11] = [
+pub static initial_ob_listg: [WorldObject; 11] = [
    // global objects
     obj(0, 0, 0, 0), // special item (for 'give')
     obj(0, 0, 28, 0), // dead brother 1 - to be filled in later
@@ -247,7 +247,7 @@ pub static mut ob_listg: [WorldObject; 11] = [
 ];
 
 /// Snow land objects.
-pub static mut ob_list0: [WorldObject; 13] = [
+pub static initial_ob_list0: [WorldObject; 13] = [
    // snow land objects
     obj(3340, 6735, 12, 3), // ranger west
     obj(9678, 7035, 12, 3), // ranger east
@@ -256,7 +256,7 @@ pub static mut ob_list0: [WorldObject; 13] = [
 ];
 
 /// Maze forest (north) objects.
-pub static mut ob_list1: [WorldObject; 11] = [
+pub static initial_ob_list1: [WorldObject; 11] = [
    // maze forest (north) objects
     // {23297,5797,TURTLE,1},
     obj(23087, 5667, TURTLE, 1),
@@ -264,7 +264,7 @@ pub static mut ob_list1: [WorldObject; 11] = [
 ];
 
 /// Swamp land objects.
-pub static mut ob_list2: [WorldObject; 15] = [
+pub static initial_ob_list2: [WorldObject; 15] = [
    // swamp land objects
     obj(13668, 15000, 0, 3), // wizard
     obj(10627, 13154, 0, 3), // wizard
@@ -275,7 +275,7 @@ pub static mut ob_list2: [WorldObject; 15] = [
 ];
 
 /// Maze forest (south) and manor objects (and tambry).
-pub static mut ob_list3: [WorldObject; 22] = [
+pub static initial_ob_list3: [WorldObject; 22] = [
    // maze forest (south) and manor objects (and tambry)
     obj(19298, 16128, CHEST, 1),
     obj(18310, 15969, 13, 3), // beggar
@@ -295,7 +295,7 @@ pub static mut ob_list3: [WorldObject; 22] = [
 ];
 
 /// Desert objects.
-pub static mut ob_list4: [WorldObject; 13] = [
+pub static initial_ob_list4: [WorldObject; 13] = [
    // desert objects
     obj(0, 0, 0, 0), // dummy
     obj(0, 0, 0, 0), // dummy
@@ -304,7 +304,7 @@ pub static mut ob_list4: [WorldObject; 13] = [
 ];
 
 /// Farm and city objects.
-pub static mut ob_list5: [WorldObject; 15] = [
+pub static initial_ob_list5: [WorldObject; 15] = [
    // farm and city objects
     obj(22184, 21156, 13, 3), // beggar
     obj(18734, 17595, G_RING, 1),
@@ -315,21 +315,21 @@ pub static mut ob_list5: [WorldObject; 15] = [
 ];
 
 /// Lava plain objects.
-pub static mut ob_list6: [WorldObject; 11] = [
+pub static initial_ob_list6: [WorldObject; 11] = [
    // lava plain objects
     obj(24794, 13102, 13, 3), // DUMMY OBJECT
     BLANK, BLANK, BLANK, BLANK, BLANK, BLANK, BLANK, BLANK, BLANK, BLANK,
 ];
 
 /// Southern mountain land objects.
-pub static mut ob_list7: [WorldObject; 11] = [
+pub static initial_ob_list7: [WorldObject; 11] = [
    // southern mountain land objects
     obj(23297, 5797, TURTLE, 1), // dummy object
     BLANK, BLANK, BLANK, BLANK, BLANK, BLANK, BLANK, BLANK, BLANK, BLANK,
 ];
 
 /// Interiors of buildings.
-pub static mut ob_list8: [WorldObject; 78] = [
+pub static initial_ob_list8: [WorldObject; 78] = [
    // interiors of buildings
     obj(6700, 33756, 1, 3), // priest in chapel
     obj(5491, 33780, 5, 3), // king on throne - never mask
@@ -418,7 +418,7 @@ pub static mut ob_list8: [WorldObject; 78] = [
 ];
 
 /// Underground areas.
-pub static mut ob_list9: [WorldObject; 9] = [
+pub static initial_ob_list9: [WorldObject; 9] = [
    // underground areas
     obj(7540, 38528, M_WAND, 1),
     obj(9624, 36559, M_WAND, 1),
@@ -431,80 +431,83 @@ pub static mut ob_list9: [WorldObject; 9] = [
     obj(3723, 39340, 128+10, 1), // king's bone
 ];
 
-/// The object list of region `region` (the global list is separate). The lists have room to grow:
-/// random treasure is added after the objects in use.
-pub fn region_objects(region: usize) -> &'static mut [WorldObject] {
-    unsafe {
-        match region {
-            0 => &mut *(&raw mut ob_list0),
-            1 => &mut *(&raw mut ob_list1),
-            2 => &mut *(&raw mut ob_list2),
-            3 => &mut *(&raw mut ob_list3),
-            4 => &mut *(&raw mut ob_list4),
-            5 => &mut *(&raw mut ob_list5),
-            6 => &mut *(&raw mut ob_list6),
-            7 => &mut *(&raw mut ob_list7),
-            8 => &mut *(&raw mut ob_list8),
-            9 => &mut *(&raw mut ob_list9),
-            _ => &mut [],
+/// The object lists the game works on: one for each region and the global one. The lists have room
+/// to grow: random treasure is added after the objects in use.
+pub struct ObjectLists {
+    pub region: [Vec<WorldObject>; 10],
+    pub global: Vec<WorldObject>,
+}
+
+/// One of the object lists: the global one or the list of a region.
+#[derive(Clone, Copy)]
+pub enum ObjectList {
+    Global,
+    Region(usize),
+}
+
+impl ObjectLists {
+    /// The objects of `which`.
+    pub fn list(&mut self, which: ObjectList) -> &mut [WorldObject] {
+        match which {
+            ObjectList::Global => &mut self.global,
+            ObjectList::Region(region) => self.region(region),
+        }
+    }
+
+    /// The lists as they are at the start of the game.
+    pub fn new() -> ObjectLists {
+        ObjectLists {
+            region: [
+                initial_ob_list0.to_vec(),
+                initial_ob_list1.to_vec(),
+                initial_ob_list2.to_vec(),
+                initial_ob_list3.to_vec(),
+                initial_ob_list4.to_vec(),
+                initial_ob_list5.to_vec(),
+                initial_ob_list6.to_vec(),
+                initial_ob_list7.to_vec(),
+                initial_ob_list8.to_vec(),
+                initial_ob_list9.to_vec(),
+            ],
+            global: initial_ob_listg.to_vec(),
+        }
+    }
+
+    /// The list of region `region` (empty for a region without one).
+    pub fn region(&mut self, region: usize) -> &mut [WorldObject] {
+        match self.region.get_mut(region) {
+            Some(list) => list,
+            None => &mut [],
         }
     }
 }
-
-/// The global object list.
-pub fn global_objects() -> &'static mut [WorldObject] {
-    unsafe { &mut *(&raw mut ob_listg) }
-}
-
-/// How many entries of each region's list are in use.
-pub static mut mapobs: [i16; 10] = [3, 1, 5, 12, 3, 5, 1, 1, 61 + 16, 9];
-
-/// Whether random treasure has been scattered over each region yet (1 = done).
-pub static mut dstobs: [i16; 10] = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1];
 
 /// Entries in the global object list.
 pub static glbobs: i16 = 11;
 
 // ---- shared work areas ----
 
-/// The 32 colours being faded to (scratch space for `fade_page`).
-pub static mut fader: [u16; 32] = [0; 32];
-
-/// The print queue: requests for the text panel, filled by `queue_print` and emptied by `handle_print_request`.
-pub static mut print_que: [i8; 32] = [0; 32];
-pub static mut prec: i16 = 0;
-pub static mut pplay: i16 = 0;
-
-/// The tile numbers of the visible map (19 columns of 6), plus spare room.
-pub static mut minimap: [i16; 120] = [0; 120];
-
-/// The typed answer and where it is shown (the copy protection riddle, now skipped).
-pub static mut answr: [i8; 10] = [0; 10];
-pub static mut xx: i16 = 0;
-pub static mut yy: i16 = 0;
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::data::state::Game;
 
     #[test]
     fn every_region_has_room_for_its_used_objects() {
+        let game = &mut Game::new();
         let capacity = [13, 11, 15, 22, 13, 15, 11, 11, 78, 9];
-        unsafe {
-            for (region, room) in capacity.iter().enumerate() {
-                assert!(mapobs[region] <= *room, "region {region}");
-            }
+        for (region, room) in capacity.iter().enumerate() {
+            assert!(game.mapobs[region] <= *room, "region {region}");
         }
     }
 
     #[test]
     fn regions_with_random_treasure_have_ten_spare_entries() {
+        let game = &mut Game::new();
         // regions not yet distributed (dstobs 0) get 10 new objects when first visited
         let capacity = [13, 11, 15, 22, 13, 15, 11, 11];
-        unsafe {
-            for (region, room) in capacity.iter().enumerate() {
-                assert!(mapobs[region] + 10 <= *room, "region {region}");
-            }
+        for (region, room) in capacity.iter().enumerate() {
+            assert!(game.mapobs[region] + 10 <= *room, "region {region}");
         }
     }
 

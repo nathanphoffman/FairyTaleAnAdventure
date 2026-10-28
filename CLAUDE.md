@@ -4,8 +4,8 @@
   finished and the tests pass, leave the changes in the working tree, list what changed in a few
   lines, and suggest a one-line commit message. Only commit if the user explicitly asks in that message.
 - The C to Rust port is finished and no C is built. Current status and the plan are in
-  `modern_engine_plan.md`, section "Where we are" (next: replace the `static mut` game state with one
-  `Game` value). The old HANDOFF/Roadmap notes in section 4a are history.
+  `modern_engine_plan.md`, section "Where we are" (next: separate the game rules from the drawing; the
+  game state is already one `Game` value). The old HANDOFF/Roadmap notes in section 4a are history.
 - `csrc/` is the reference and is not edited or built.
 - Check a change with `cargo build`, `cargo clippy`, `cargo test`, `tests/regress.sh` and
   `tests/state_regress.sh` (run the last two in the background, one at a time, never rebuild while

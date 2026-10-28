@@ -2,9 +2,7 @@
 //! the minimap.
 
 use super::drawing::{SCREEN_COLUMNS, SCREEN_ROWS};
-use crate::game::data::object_tables::minimap;
 use crate::game::data::state::Game;
-use crate::game::data::state::the_world;
 
 /// Sectors are 16 x 8 tiles of 128 bytes; the region map has 128 sector bytes per row.
 pub(super) const SECTOR_BYTES: usize = 128;
@@ -88,7 +86,7 @@ pub(super) fn clamp_secy(v: i16) -> u16 {
 
 /// The sector number for a sector column and row of the region map.
 pub(super) fn sector_at(game: &Game, col: u16, row: u16) -> u8 {
-    let origin_x = unsafe { the_world.origin_x };
+    let origin_x = { game.world.origin_x };
 
     game.memory
         .map_byte((row as usize * MAP_ROW_BYTES + col as usize + origin_x as usize) as u16 as usize)
@@ -163,104 +161,95 @@ pub fn probe_collision(game: &mut Game, x: i32, y: i32) -> i32 {
 /// Index into the sector table of the tile byte for a tile position (wraps vertically too).
 pub fn tile_index(game: &Game, imx: i32, imy: i32) -> usize {
     let (ux, uy) = (imx as u16, imy as u16);
-    unsafe {
-        // Pixel column to sector column: 16 pixels to a tile, 16 tiles to a sector.
-        let col = wrap_secx((ux >> TILE_WIDTH_SHIFT).wrapping_sub(the_world.origin_x));
+    // Pixel column to sector column: 16 pixels to a tile, 16 tiles to a sector.
+    let col = wrap_secx((ux >> TILE_WIDTH_SHIFT).wrapping_sub(game.world.origin_x));
 
-        // Pixel row to sector row: 8 tiles to a sector, so 8 times 32 divided by 32.
-        let mut row = (uy >> SECTOR_HEIGHT_SHIFT).wrapping_sub(the_world.origin_y);
+    // Pixel row to sector row: 8 tiles to a sector, so 8 times 32 divided by 32.
+    let mut row = (uy >> SECTOR_HEIGHT_SHIFT).wrapping_sub(game.world.origin_y);
 
-        // Masks with ROW_OFF_MAP, keeping only the bits that matter here.
-        if row & ROW_OFF_MAP != 0 {
-            // Masks with ROW_OFF_LOW_SIDE, keeping only the bits that matter here.
-            row = if row & ROW_OFF_LOW_SIDE != 0 {
-                0
-            } else {
-                LAST_SECTOR_ROW
-            };
-        }
-
-        let sec = sector_at(game, col, row) as usize;
-
-        (sec * SECTOR_BYTES
-            // Masks with TILE_ROW_MASK, keeping only the bits that matter here.
-            + (uy as usize & TILE_ROW_MASK) * SECTOR_ROW_TILES
-            // Masks with TILE_COLUMN_MASK, keeping only the bits that matter here.
-            + (ux as usize & TILE_COLUMN_MASK)) as u16 as usize
+    // Masks with ROW_OFF_MAP, keeping only the bits that matter here.
+    if row & ROW_OFF_MAP != 0 {
+        // Masks with ROW_OFF_LOW_SIDE, keeping only the bits that matter here.
+        row = if row & ROW_OFF_LOW_SIDE != 0 {
+            0
+        } else {
+            LAST_SECTOR_ROW
+        };
     }
+
+    let sec = sector_at(game, col, row) as usize;
+
+    (sec * SECTOR_BYTES
+        // Masks with TILE_ROW_MASK, keeping only the bits that matter here.
+        + (uy as usize & TILE_ROW_MASK) * SECTOR_ROW_TILES
+        // Masks with TILE_COLUMN_MASK, keeping only the bits that matter here.
+        + (ux as usize & TILE_COLUMN_MASK)) as u16 as usize
 }
 
 /// Fills `minimap` (19 columns of 6 tile numbers, column by column) for the area starting at
 /// tile (tile_x, tile_y), and works out which sector the hero is in.
 pub fn fill_minimap(game: &mut Game, tile_x: i32, tile_y: i32) {
-    unsafe {
-        let mut x = tile_x as u16;
-        let mut next = 0;
+    let mut x = tile_x as u16;
+    let mut next = 0;
 
-        for _ in 0..SCREEN_COLUMNS {
-            x &= TILE_COLUMN_WRAP;
+    for _ in 0..SCREEN_COLUMNS {
+        x &= TILE_COLUMN_WRAP;
 
-            for j in 0..SCREEN_ROWS as i32 {
-                // Masks with TILE_ROW_WRAP, keeping only the bits that matter here.
-                minimap[next] = tile_number(game, x, (tile_y + j) as u16 & TILE_ROW_WRAP) as i16;
-                next += 1;
-            }
-
-            x += 1;
+        for j in 0..SCREEN_ROWS as i32 {
+            // Masks with TILE_ROW_WRAP, keeping only the bits that matter here.
+            game.minimap[next] = tile_number(game, x, (tile_y + j) as u16 & TILE_ROW_WRAP) as i16;
+            next += 1;
         }
 
-        game.hero.sector = hero_sector(game);
+        x += 1;
     }
+
+    game.hero.sector = hero_sector(game);
 }
 
 /// The tile number at tile column `x` and row `y` of the world.
 fn tile_number(game: &Game, x: u16, y: u16) -> u8 {
-    unsafe {
-        // Tile column to sector column: 16 tiles to a sector.
-        let col = wrap_secx((x >> SECTOR_WIDTH_SHIFT).wrapping_sub(the_world.origin_x))
-            .wrapping_add(the_world.origin_x);
+    // Tile column to sector column: 16 tiles to a sector.
+    let col = wrap_secx((x >> SECTOR_WIDTH_SHIFT).wrapping_sub(game.world.origin_x))
+        .wrapping_add(game.world.origin_x);
 
-        // Tile row to sector row: 8 tiles to a sector.
-        let row = clamp_secy((y >> SECTOR_HEIGHT_SHIFT).wrapping_sub(the_world.origin_y) as i16);
-        // The region map has 128 sectors in each row.
-        let sec = game
-            .memory
-            .map_byte(((row as usize) << MAP_ROW_SHIFT).wrapping_add(col as usize) as u16 as usize)
-            as usize;
+    // Tile row to sector row: 8 tiles to a sector.
+    let row = clamp_secy((y >> SECTOR_HEIGHT_SHIFT).wrapping_sub(game.world.origin_y) as i16);
+    // The region map has 128 sectors in each row.
+    let sec = game
+        .memory
+        .map_byte(((row as usize) << MAP_ROW_SHIFT).wrapping_add(col as usize) as u16 as usize)
+        as usize;
 
-        game.memory.sector_byte(
-            (sec * SECTOR_BYTES
-                // Masks with TILE_ROW_MASK, keeping only the bits that matter here.
-                + (y as usize & TILE_ROW_MASK) * SECTOR_ROW_TILES
-                // Masks with TILE_COLUMN_MASK, keeping only the bits that matter here.
-                + (x as usize & TILE_COLUMN_MASK)) as u16 as usize,
-        )
-    }
+    game.memory.sector_byte(
+        (sec * SECTOR_BYTES
+            // Masks with TILE_ROW_MASK, keeping only the bits that matter here.
+            + (y as usize & TILE_ROW_MASK) * SECTOR_ROW_TILES
+            // Masks with TILE_COLUMN_MASK, keeping only the bits that matter here.
+            + (x as usize & TILE_COLUMN_MASK)) as u16 as usize,
+    )
 }
 
 /// The sector the hero is in; the second half of the sector table is used from region 8 on.
-unsafe fn hero_sector(game: &mut Game) -> i16 {
-    unsafe {
-        // the assembly read the high byte of hero_x and hero_y (68000 is big-endian)
-        let hx = (game.hero.x >> SECTOR_POSITION_SHIFT) as i32;
+fn hero_sector(game: &mut Game) -> i16 {
+    // the assembly read the high byte of hero_x and hero_y (68000 is big-endian)
+    let hx = (game.hero.x >> SECTOR_POSITION_SHIFT) as i32;
 
-        // The hero's sector row: 256 pixels to a sector.
-        let hy =
-            // Shifts by SECTOR_POSITION_SHIFT, converting between pixels, tiles, sectors or bytes.
-            ((game.hero.y >> SECTOR_POSITION_SHIFT).wrapping_sub(the_world.origin_y)) as i16 as i32;
-        // The region map has 128 sectors in each row.
-        let mut sec = game
-            .memory
-            .map_byte(((hy << MAP_ROW_SHIFT).wrapping_add(hx)) as u16 as usize)
-            as i32;
+    // The hero's sector row: 256 pixels to a sector.
+    let hy =
+        // Shifts by SECTOR_POSITION_SHIFT, converting between pixels, tiles, sectors or bytes.
+        ((game.hero.y >> SECTOR_POSITION_SHIFT).wrapping_sub(game.world.origin_y)) as i16 as i32;
+    // The region map has 128 sectors in each row.
+    let mut sec =
+        game.memory
+            .map_byte(((hy << MAP_ROW_SHIFT).wrapping_add(hx)) as u16 as usize) as i32;
 
-        // Masks with REGION_BYTE_MASK, keeping only the bits that matter here.
-        if the_world.region & REGION_BYTE_MASK > LAST_FIRST_HALF_REGION {
-            sec += SECOND_HALF_OFFSET;
-        }
-
-        sec as i16
+    // Masks with REGION_BYTE_MASK, keeping only the bits that matter here.
+    if game.world.region & REGION_BYTE_MASK > LAST_FIRST_HALF_REGION {
+        sec += SECOND_HALF_OFFSET;
     }
+
+    sec as i16
 }
 
 #[cfg(test)]

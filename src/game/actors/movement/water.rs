@@ -6,7 +6,6 @@ use super::{
 };
 use crate::game::data::state::Game;
 
-use crate::game::data::state::the_world;
 use crate::game::world::places::{find_place, transfer_hero};
 
 /// Depth of water that starts to matter, and how deep each wadeable terrain may be before the
@@ -70,32 +69,30 @@ fn wade_step(depth: i8, j: i16, dead_or_dying: bool) -> (i8, Wading) {
 impl Ctx {
     /// In water (terrain 4 is shallow, 5 deep): the depth moves one step towards its limit, and the
     /// actor sinks, or at the pit sector falls through to the dungeon.
-    pub(super) unsafe fn wade(&mut self, game: &mut Game, j: i16) {
-        unsafe {
-            let mut actor = self.actor;
-            let (depth, outcome) =
-                wade_step(self.environ, j, self.state == DYING || self.state == DEAD);
-            self.environ = depth;
+    pub(super) fn wade(&mut self, game: &mut Game, j: i16) {
+        let actor = self.actor;
+        let (depth, outcome) =
+            wade_step(self.environ, j, self.state == DYING || self.state == DEAD);
+        self.environ = depth;
 
-            match outcome {
-                Wading::Nothing => {}
-                Wading::Drowned => {
-                    if game.hero.sector == PIT_SECTOR {
-                        if self.slot == 0 {
-                            self.environ = 0;
-                            the_world.new_region = DUNGEON_REGION;
-                            transfer_hero(game, DUNGEON_ARRIVAL.0, DUNGEON_ARRIVAL.1, 0);
-                            find_place(game, 1);
-                        } else {
-                            actor.vitality = 0;
-                        }
+        match outcome {
+            Wading::Nothing => {}
+            Wading::Drowned => {
+                if game.hero.sector == PIT_SECTOR {
+                    if self.slot == 0 {
+                        self.environ = 0;
+                        game.world.new_region = DUNGEON_REGION;
+                        transfer_hero(game, DUNGEON_ARRIVAL.0, DUNGEON_ARRIVAL.1, 0);
+                        find_place(game, 1);
+                    } else {
+                        game.actors.list[actor.slot()].vitality = 0;
                     }
-
-                    actor.state = STILL;
                 }
 
-                Wading::Sinking => actor.state = SINK as i8,
+                game.actors.list[actor.slot()].state = STILL;
             }
+
+            Wading::Sinking => game.actors.list[actor.slot()].state = SINK as i8,
         }
     }
 }

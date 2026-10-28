@@ -9,8 +9,6 @@ use self::entering::enter_door;
 use self::leaving::leave_door;
 use crate::game::data::state::Game;
 
-use crate::game::data::state::the_world;
-
 const DOORCOUNT: i32 = 86;
 const CAVE: i8 = 18;
 const FIRST_INSIDE_REGION: u16 = 8;
@@ -29,21 +27,19 @@ const TILE_WIDTH: i32 = 16;
 /// search; indoors they are searched in turn. If so, the hero is moved to the other side.
 /// Riding disables doors.
 pub fn check_door(game: &mut Game) {
-    unsafe {
-        if game.hero.riding != 0 {
-            return;
-        }
+    if game.hero.riding != 0 {
+        return;
+    }
 
-        // Masks with TILE_X_MASK, keeping only the bits that matter here.
-        let xtest = game.hero.x & TILE_X_MASK;
+    // Masks with TILE_X_MASK, keeping only the bits that matter here.
+    let xtest = game.hero.x & TILE_X_MASK;
 
-        // Masks with TILE_Y_MASK, keeping only the bits that matter here.
-        let ytest = game.hero.y & TILE_Y_MASK;
+    // Masks with TILE_Y_MASK, keeping only the bits that matter here.
+    let ytest = game.hero.y & TILE_Y_MASK;
 
-        if the_world.region < FIRST_INSIDE_REGION {
-            enter_door(game, xtest, ytest);
-        } else {
-            leave_door(game, xtest, ytest);
-        }
+    if game.world.region < FIRST_INSIDE_REGION {
+        enter_door(game, xtest, ytest);
+    } else {
+        leave_door(game, xtest, ytest);
     }
 }

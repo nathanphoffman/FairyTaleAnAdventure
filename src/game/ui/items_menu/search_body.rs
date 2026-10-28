@@ -1,56 +1,55 @@
 //! Searching a dead enemy: the weapon it carried and any treasure.
 
 use super::{ARROWS, GOLDBASE, add_stuff, item, item_name};
-use crate::game::actors::encounters::Encounter;
 use crate::game::data::object_tables::treasure_probs;
 use crate::game::data::random::rand8;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::the_actors;
 use crate::game::data::tables::encounter_chart;
 use crate::game::ui::messages::{print, print_cont, print_wrapped};
 use crate::game::ui::text::print_number;
 
 /// Searches the dead body `nearest_object`: takes its weapon and any treasure.
-pub(super) unsafe fn search_body(game: &mut Game) {
-    unsafe {
-        let mut actor = ActorRef::new(the_actors.nearest_object as usize);
-        print_wrapped(game, "% searched the body and found");
-        print(game, "");
-        let loot = body_loot(
-            actor.weapon,
-            the_actors.list[0].weapon,
-            || rand8() + EXTRA_ARROWS_MIN,
-            || roll_body_treasure(actor),
-        );
+pub(super) fn search_body(game: &mut Game) {
+    let actor = ActorRef::new(game.actors.nearest_object as usize);
+    print_wrapped(game, "% searched the body and found");
+    print(game, "");
+    let (body_weapon, hero_weapon) = (
+        game.actors.list[actor.slot()].weapon,
+        game.actors.list[0].weapon,
+    );
+    let game_cell = std::cell::RefCell::new(&mut *game);
+    let loot = body_loot(
+        body_weapon,
+        hero_weapon,
+        || rand8(&mut game_cell.borrow_mut().rng) + EXTRA_ARROWS_MIN,
+        || roll_body_treasure(&mut game_cell.borrow_mut(), actor),
+    );
 
-        actor.weapon = -1;
+    game.actors.list[actor.slot()].weapon = -1;
 
-        take_found_weapon(game, &loot);
+    take_found_weapon(game, &loot);
 
-        if let Some(arrows) = loot.arrows {
-            print_cont(game, " and ");
-            print_number(game, arrows, 1);
-            print_cont(game, " Arrows.");
-            add_stuff(game, ARROWS, arrows as u8);
+    if let Some(arrows) = loot.arrows {
+        print_cont(game, " and ");
+        print_number(game, arrows, 1);
+        print_cont(game, " Arrows.");
+        add_stuff(game, ARROWS, arrows as u8);
 
-            return;
-        }
-
-        take_treasure(game, &loot);
-        print_cont(game, ".");
+        return;
     }
+
+    take_treasure(game, &loot);
+    print_cont(game, ".");
 }
 
 /// Says what weapon was found, adds it to the pack, and arms the hero with it if it is better.
-unsafe fn take_found_weapon(game: &mut Game, loot: &BodyLoot) {
-    unsafe {
-        if loot.weapon != 0 {
-            print_cont(game, "a ");
-            print_cont(game, item_name(loot.weapon as usize - 1));
-            add_stuff(game, loot.weapon as usize - 1, 1);
-            the_actors.list[0].weapon = loot.hero_weapon;
-        }
+fn take_found_weapon(game: &mut Game, loot: &BodyLoot) {
+    if loot.weapon != 0 {
+        print_cont(game, "a ");
+        print_cont(game, item_name(loot.weapon as usize - 1));
+        add_stuff(game, loot.weapon as usize - 1, 1);
+        game.actors.list[0].weapon = loot.hero_weapon;
     }
 }
 
@@ -149,22 +148,18 @@ fn better_weapon(current: i8, found: u32) -> i8 {
 
 /// Picks what a dead enemy carries besides its weapon, from the treasure table for its race.
 /// Returns an item number (0 for nothing); characters like shopkeepers (a set figure) carry none.
-unsafe fn roll_body_treasure(actor: ActorRef) -> u32 {
+fn roll_body_treasure(game: &mut Game, actor: ActorRef) -> u32 {
     const SETFIG_RACE_BIT: u8 = 0x80;
     const TREASURE_CLASS_SIZE: i32 = 8;
-    unsafe {
-        // Masks with SETFIG_RACE_BIT, keeping only the bits that matter here.
-        if actor.race & SETFIG_RACE_BIT != 0 {
-            return 0;
-        }
-
-        let class = (*(&raw const encounter_chart)
-            .cast::<Encounter>()
-            .add(actor.race as usize))
-        .treasure;
-
-        treasure_probs[(class as i32 * TREASURE_CLASS_SIZE + rand8()) as usize] as i32 as u32
+    // Masks with SETFIG_RACE_BIT, keeping only the bits that matter here.
+    if game.actors.list[actor.slot()].race & SETFIG_RACE_BIT != 0 {
+        return 0;
     }
+
+    let class = (encounter_chart[game.actors.list[actor.slot()].race as usize]).treasure;
+
+    treasure_probs[(class as i32 * TREASURE_CLASS_SIZE + rand8(&mut game.rng)) as usize] as i32
+        as u32
 }
 
 #[cfg(test)]

@@ -1,7 +1,6 @@
 //! Showing the list of the things the hero carries, with their pictures.
 
 use super::{GOLDBASE, OBJECTS, item};
-use crate::game::data::object_tables::page_colors;
 use crate::game::data::state::Game;
 use crate::game::render::screen::{BitmapId, PortId, ViewPortId};
 use crate::game::render::screen_fx::show_still_screen;
@@ -30,7 +29,7 @@ const VIEW_ITEMS: i8 = 4;
 pub(super) const VIEW_GAME_OVER: i8 = 2;
 
 /// Draws every item the hero has, stacked, on a black page and shows it.
-pub(super) unsafe fn show_item_list(game: &mut Game) {
+pub(super) fn show_item_list(game: &mut Game) {
     let page = game.screen.drawing_bitmap_id();
     game.screen.port_mut(PortId::Map).target = Some(page);
     game.screen.clear(PortId::Map, 0);
@@ -42,11 +41,10 @@ pub(super) unsafe fn show_item_list(game: &mut Game) {
     game.screen
         .set_color(ViewPortId::Page, BACKGROUND_PEN, (0, 0, 0));
     show_still_screen(game);
-    game.screen
-        .load_colors(ViewPortId::Page, unsafe { &*(&raw const page_colors) });
+    game.screen.load_colors(ViewPortId::Page, &game.page_colors);
 
     game.screen.view_status = VIEW_ITEMS;
-    queue_print(PRQ_LIST);
+    queue_print(game, PRQ_LIST);
 }
 
 /// The pictures of the objects as one long bitmap: the object sprite sheet holds each plane of an

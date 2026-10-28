@@ -2,7 +2,7 @@
 //! from csrc/asm_text.c): turn the actor and start it walking.
 
 use crate::game::data::random::fta_rand;
-use crate::game::data::state::the_actors;
+use crate::game::data::state::Game;
 
 // Actor states (csrc/ftale.h).
 const WALKING: i8 = 12;
@@ -118,29 +118,27 @@ fn wobble(mode: i32, close: i16) -> i32 {
 /// Points an actor toward (or away from) a target and sets it walking (see `steer` for modes).
 /// The random number is only drawn when the actor moves, as in the original, so recorded games
 /// stay in step.
-pub fn steer_actor(object: i32, target_x: i32, target_y: i32, mode: i32) {
+pub fn steer_actor(game: &mut Game, object: i32, target_x: i32, target_y: i32, mode: i32) {
     // Masks with MODE_MASK, keeping only the bits that matter here.
     let mode = mode & MODE_MASK;
-    unsafe {
-        let actor = &mut (*(&raw mut the_actors.list))[object as usize];
-        let (xdif, ydif) = if mode == STEER_OFFSET {
-            (target_x as i16, target_y as i16)
-        } else {
-            (
-                (actor.abs_x as i32 - target_x) as i16,
-                (actor.abs_y as i32 - target_y) as i16,
-            )
-        };
+    let actor = &mut game.actors.list[object as usize];
+    let (xdif, ydif) = if mode == STEER_OFFSET {
+        (target_x as i16, target_y as i16)
+    } else {
+        (
+            (actor.abs_x as i32 - target_x) as i16,
+            (actor.abs_y as i32 - target_y) as i16,
+        )
+    };
 
-        // Masks off the low bits (a cheap remainder or a flag test).
-        match steer(xdif, ydif, mode, || fta_rand() & 2 != 0) {
-            Course::Stop => actor.state = STILL,
-            Course::Face { facing } => {
-                actor.facing = facing as i8;
+    // Masks off the low bits (a cheap remainder or a flag test).
+    match steer(xdif, ydif, mode, || fta_rand(&mut game.rng) & 2 != 0) {
+        Course::Stop => actor.state = STILL,
+        Course::Face { facing } => {
+            actor.facing = facing as i8;
 
-                if mode != STEER_TURN_ONLY {
-                    actor.state = WALKING;
-                }
+            if mode != STEER_TURN_ONLY {
+                actor.state = WALKING;
             }
         }
     }

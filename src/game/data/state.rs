@@ -2,8 +2,11 @@
 //!
 //! Each struct has one `static mut` instance (`the_hero`, `the_world`, ...).
 //! They start out zero apart from the few values listed below.
-use crate::game::data::tables::extent_list;
-use crate::game::data::types::{Extent, Missile, SeqInfo, Shape};
+use crate::game::data::object_tables::{ObjectLists, initial_page_colors};
+use crate::game::data::random::Rng;
+use crate::game::data::tables::{initial_extents, initial_menus};
+use crate::game::data::types::{Extent, Menu, Missile, Need, SeqInfo, Shape};
+use crate::game::render::blit::SShape;
 use crate::game::render::screen::Screen;
 
 /// How many items a brother can carry (the size of the `stuff` list).
@@ -51,6 +54,34 @@ pub struct Hero {
     pub good_fairy_timer: u8,
 }
 
+impl Default for Hero {
+    fn default() -> Hero {
+        Hero {
+            x: 0,
+            y: 0,
+            sector: 0,
+            place: 0,
+            brave: 0,
+            luck: 0,
+            kindness: 0,
+            wealth: 0,
+            hunger: 0,
+            fatigue: 0,
+            riding: 0,
+            flying: 0,
+            brother: 0,
+            julstuff: [0; STUFF_SLOTS],
+            kevstuff: [0; STUFF_SLOTS],
+            philstuff: [0; STUFF_SLOTS],
+            safe_flag: 0,
+            safe_r: 0,
+            safe_x: 0,
+            safe_y: 0,
+            good_fairy_timer: 0,
+        }
+    }
+}
+
 impl Hero {
     /// The item counts of the brother who is playing (brothers are numbered from 1).
     pub fn stuff(&self) -> &[u8; STUFF_SLOTS] {
@@ -71,6 +102,7 @@ impl Hero {
 }
 
 /// The world around the hero: the map position, region, clock, light and magic timers.
+#[derive(Default)]
 pub struct World {
     pub map_x: u16,
     pub map_y: u16,
@@ -97,18 +129,8 @@ pub struct World {
     pub bed_wait: i16,
 }
 
-/// The extent (special rectangle of the world) the hero is in.
-pub fn current_extent() -> &'static mut Extent {
-    unsafe { &mut (*(&raw mut extent_list))[the_world.extent] }
-}
-
-pub static mut the_world: World = World {
-    region: 3,
-
-    ..unsafe { std::mem::zeroed() }
-};
-
 /// The monster encounter being set up and how dangerous the place is.
+#[derive(Default)]
 pub struct Encounters {
     pub number: u8,
     pub kind: u16,
@@ -120,6 +142,7 @@ pub struct Encounters {
 }
 
 /// The actors on the map, the missiles in flight, and who is near the hero.
+#[derive(Default)]
 pub struct Actors {
     pub list: [Shape; ACTOR_SLOTS],
     pub active: i16,
@@ -145,10 +168,8 @@ pub struct Actors {
     pub fiery_death: i8,
 }
 
-pub static mut the_actors: Actors = unsafe { std::mem::zeroed() };
-
-/// A way to reach one actor of `the_actors.list` by its number, so that code can hold on to "that
-/// actor" while it calls others that change the list. Each use looks the actor up again.
+/// A way to name one actor of `Game::actors.list` by its number, so that code can hold on to "that
+/// actor" while it calls others that change the list. Read it with `game.actors.list[r.slot()]`.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct ActorRef(usize);
 
@@ -156,19 +177,9 @@ impl ActorRef {
     pub fn new(index: usize) -> ActorRef {
         ActorRef(index)
     }
-}
 
-impl std::ops::Deref for ActorRef {
-    type Target = Shape;
-
-    fn deref(&self) -> &Shape {
-        unsafe { &(*(&raw const the_actors.list))[self.0] }
-    }
-}
-
-impl std::ops::DerefMut for ActorRef {
-    fn deref_mut(&mut self) -> &mut Shape {
-        unsafe { &mut (*(&raw mut the_actors.list))[self.0] }
+    pub fn slot(self) -> usize {
+        self.0
     }
 }
 
@@ -180,19 +191,9 @@ impl MissileRef {
     pub fn new(index: usize) -> MissileRef {
         MissileRef(index)
     }
-}
 
-impl std::ops::Deref for MissileRef {
-    type Target = Missile;
-
-    fn deref(&self) -> &Missile {
-        unsafe { &(*(&raw const the_actors.missiles))[self.0] }
-    }
-}
-
-impl std::ops::DerefMut for MissileRef {
-    fn deref_mut(&mut self) -> &mut Missile {
-        unsafe { &mut (*(&raw mut the_actors.missiles))[self.0] }
+    pub fn slot(self) -> usize {
+        self.0
     }
 }
 
@@ -266,6 +267,7 @@ impl Memory {
 }
 
 /// The menus, the keyboard and mouse state, and test and debug switches.
+#[derive(Default)]
 pub struct Ui {
     pub current_menu: i16,
     pub chosen_entry: i8,
@@ -295,6 +297,41 @@ pub struct Game {
     pub encounter: Encounters,
     pub memory: Memory,
     pub screen: Screen,
+    pub compass_lit_direction: i16,
+    pub rng: Rng,
+    pub extents: [Extent; 23],
+    pub menus: [Menu; 10],
+    pub page_colors: [u16; 32],
+    pub objects: ObjectLists,
+    pub loaded_blocks: Need,
+    pub dstobs: [i16; 10],
+    pub mapobs: [i16; 10],
+    pub minimap: [i16; 120],
+    pub pplay: i16,
+    pub prec: i16,
+    pub print_que: [i8; 32],
+    pub j1: i16,
+    pub intro_skip_requested: i8,
+    pub bumped_locked_door: i8,
+    pub ytest: u16,
+    pub xtest: u16,
+    pub side_flag_2: i16,
+    pub side_flag_1: i16,
+    pub side_2: i16,
+    pub side_1: i16,
+    pub turtle_eggs: i8,
+    pub last_word_mask: i16,
+    pub current_sshape: SShape,
+    pub sprite_x_shift: i16,
+    pub princesses_rescued: i16,
+    pub save_padding_3: u16,
+    pub save_padding_2: u16,
+    pub save_padding_1: u16,
+    pub sprite_mask_offset: i16,
+    pub sprite_mask_modulo: i16,
+    pub shadow_mask_offset: i16,
+    pub actors: Actors,
+    pub world: World,
     pub hero: Hero,
 }
 
@@ -306,10 +343,55 @@ impl Game {
                 on_screen: 0,
                 angle: 0,
             },
-            ui: unsafe { std::mem::zeroed() },
-            encounter: unsafe { std::mem::zeroed() },
+            ui: Default::default(),
+            encounter: Default::default(),
             screen: Screen::new(),
-            hero: unsafe { std::mem::zeroed() },
+            compass_lit_direction: 9,
+            rng: Rng::new(),
+            extents: initial_extents,
+            menus: initial_menus,
+            page_colors: initial_page_colors,
+            objects: ObjectLists::new(),
+            loaded_blocks: Need {
+                image: [0, 0, 0, 0],
+                terra1: 1,
+                terra2: 2,
+                sector: 0,
+                region: 0,
+                setchar: 0,
+            },
+            dstobs: [0, 0, 0, 0, 0, 0, 0, 0, 1, 1],
+            mapobs: [3, 1, 5, 12, 3, 5, 1, 1, 61 + 16, 9],
+            minimap: [0; 120],
+            pplay: 0,
+            prec: 0,
+            print_que: [0; 32],
+            j1: 0,
+            intro_skip_requested: 0,
+            bumped_locked_door: 0,
+            ytest: 0,
+            xtest: 0,
+            side_flag_2: 0,
+            side_flag_1: 0,
+            side_2: 0,
+            side_1: 0,
+            turtle_eggs: 0,
+            last_word_mask: Default::default(),
+            current_sshape: SShape::new(),
+            sprite_x_shift: Default::default(),
+            princesses_rescued: Default::default(),
+            save_padding_3: Default::default(),
+            save_padding_2: Default::default(),
+            save_padding_1: Default::default(),
+            sprite_mask_offset: Default::default(),
+            sprite_mask_modulo: Default::default(),
+            shadow_mask_offset: Default::default(),
+            actors: Default::default(),
+            world: World {
+                region: 3,
+                ..Default::default()
+            },
+            hero: Default::default(),
             memory: Memory::new(),
         }
     }

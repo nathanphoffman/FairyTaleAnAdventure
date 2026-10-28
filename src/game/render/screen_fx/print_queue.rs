@@ -1,8 +1,6 @@
 //! The print queue: requests for the text panel (stats, vitality, menu, debug information).
 
-use crate::game::data::object_tables::{pplay, prec, print_que};
 use crate::game::data::state::Game;
-use crate::game::data::state::{the_actors, the_world};
 use crate::game::render::display::delay;
 use crate::game::ui::menus::print_options;
 use crate::game::ui::messages::print;
@@ -37,27 +35,25 @@ const WEALTH_X: i32 = 321;
 /// Requests: 2 and 3 debug information, 4 the vitality figure, 5 the menu, 7 the stats line
 /// (bravery, luck, kindness, wealth), 10 "Take What?".
 pub fn handle_print_request(game: &mut Game) {
-    unsafe {
-        if prec == pplay {
-            delay(game, 1);
+    if game.prec == game.pplay {
+        delay(game, 1);
 
-            return;
-        }
+        return;
+    }
 
-        let request = (*(&raw const print_que))[pplay as usize] as i32;
+    let request = game.print_que[game.pplay as usize] as i32;
 
-        // Masks with QUEUE_MASK, keeping only the bits that matter here.
-        pplay = (pplay + 1) & QUEUE_MASK;
+    // Masks with QUEUE_MASK, keeping only the bits that matter here.
+    game.pplay = (game.pplay + 1) & QUEUE_MASK;
 
-        match request {
-            REQUEST_DEBUG_COORDS => show_debug_coords(game),
-            REQUEST_DEBUG_SECTOR => show_debug_sector(game),
-            REQUEST_VITALITY => draw_vitality(game),
-            REQUEST_OPTIONS => print_options(game),
-            REQUEST_STATS => draw_stats(game),
-            REQUEST_TAKE_WHAT => print(game, "Take What?"),
-            _ => {}
-        }
+    match request {
+        REQUEST_DEBUG_COORDS => show_debug_coords(game),
+        REQUEST_DEBUG_SECTOR => show_debug_sector(game),
+        REQUEST_VITALITY => draw_vitality(game),
+        REQUEST_OPTIONS => print_options(game),
+        REQUEST_STATS => draw_stats(game),
+        REQUEST_TAKE_WHAT => print(game, "Take What?"),
+        _ => {}
     }
 }
 
@@ -71,25 +67,21 @@ fn show_debug_coords(game: &mut Game) {
 }
 
 /// Debug information: the hero's sector and the type of the extent the hero is in.
-unsafe fn show_debug_sector(game: &mut Game) {
-    unsafe {
-        print(game, "You are at: ");
-        print_number(game, game.hero.x as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
-        print_number(game, game.hero.y as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
-        print(game, "H/Sector = ");
-        print_number(game, game.hero.sector as i32, SECTOR_DIGITS);
-        draw_text(game, b" Extent = ");
-        print_number(game, the_world.extent_type as i32, EXTENT_DIGITS);
-    }
+fn show_debug_sector(game: &mut Game) {
+    print(game, "You are at: ");
+    print_number(game, game.hero.x as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
+    print_number(game, game.hero.y as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
+    print(game, "H/Sector = ");
+    print_number(game, game.hero.sector as i32, SECTOR_DIGITS);
+    draw_text(game, b" Extent = ");
+    print_number(game, game.world.extent_type as i32, EXTENT_DIGITS);
 }
 
 /// The hero's vitality on the stats line.
-unsafe fn draw_vitality(game: &mut Game) {
-    unsafe {
-        move_to(game, VITALITY_POSITION.0, VITALITY_POSITION.1);
-        draw_text(game, b"Vit:");
-        print_number(game, the_actors.list[0].vitality as i32, VITALITY_DIGITS);
-    }
+fn draw_vitality(game: &mut Game) {
+    move_to(game, VITALITY_POSITION.0, VITALITY_POSITION.1);
+    draw_text(game, b"Vit:");
+    print_number(game, game.actors.list[0].vitality as i32, VITALITY_DIGITS);
 }
 
 /// Draws the hero's four stats (bravery, luck, kindness, wealth) along the stats line.

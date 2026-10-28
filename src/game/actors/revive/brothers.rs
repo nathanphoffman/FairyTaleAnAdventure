@@ -1,9 +1,8 @@
 //! Handing over from a fallen brother to the next: his body, the placards and the new stats.
 
-use crate::game::data::object_tables::{ob_list8, ob_listg};
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::{Hero, World, the_actors, the_world};
+use crate::game::data::state::{Hero, World};
 use crate::game::data::tables::brother_stats;
 use crate::game::data::types::{Bro, Shape};
 use crate::game::files::loading::load_start_sprites;
@@ -76,50 +75,46 @@ const HERO_SPRITE_FILE: i16 = 6;
 const HERO_SET_FILE: i16 = 13;
 
 /// Puts the raft and the first person back where they start.
-pub(super) fn reset_raft_setfig() {
-    let mut raft = ActorRef::new(1);
-    raft.kind = RAFT;
-    raft.abs_x = RAFT_START.0;
-    raft.abs_y = RAFT_START.1;
-    raft.index = 0;
-    raft.weapon = 0;
-    raft.environ = 0;
+pub(super) fn reset_raft_setfig(game: &mut Game) {
+    let raft = ActorRef::new(1);
+    game.actors.list[raft.slot()].kind = RAFT;
+    game.actors.list[raft.slot()].abs_x = RAFT_START.0;
+    game.actors.list[raft.slot()].abs_y = RAFT_START.1;
+    game.actors.list[raft.slot()].index = 0;
+    game.actors.list[raft.slot()].weapon = 0;
+    game.actors.list[raft.slot()].environ = 0;
 
-    let mut setfig = ActorRef::new(2);
-    setfig.kind = SETFIG;
-    setfig.abs_x = SETFIG_START.0;
-    setfig.abs_y = SETFIG_START.1;
-    setfig.index = 0;
-    setfig.weapon = 0;
+    let setfig = ActorRef::new(2);
+    game.actors.list[setfig.slot()].kind = SETFIG;
+    game.actors.list[setfig.slot()].abs_x = SETFIG_START.0;
+    game.actors.list[setfig.slot()].abs_y = SETFIG_START.1;
+    game.actors.list[setfig.slot()].index = 0;
+    game.actors.list[setfig.slot()].weapon = 0;
 }
 
 /// The fallen brother's body is left where he died, and his ghost appears.
-pub(super) unsafe fn leave_fallen_brother(game: &mut Game) {
-    unsafe {
-        if game.hero.brother > 0 && game.hero.brother < KEVIN {
-            ob_listg[game.hero.brother as usize].xc = game.hero.x;
-            ob_listg[game.hero.brother as usize].yc = game.hero.y;
-            ob_listg[game.hero.brother as usize].ob_stat = ON_GROUND;
-            ob_listg[game.hero.brother as usize + DEAD_BROTHER_PERSON].ob_stat = PERSON;
-        }
-
-        ob_list8[SPECTRE_SLOT].ob_stat = PERSON;
+pub(super) fn leave_fallen_brother(game: &mut Game) {
+    if game.hero.brother > 0 && game.hero.brother < KEVIN {
+        game.objects.global[game.hero.brother as usize].xc = game.hero.x;
+        game.objects.global[game.hero.brother as usize].yc = game.hero.y;
+        game.objects.global[game.hero.brother as usize].ob_stat = ON_GROUND;
+        game.objects.global[game.hero.brother as usize + DEAD_BROTHER_PERSON].ob_stat = PERSON;
     }
+
+    game.objects.region[8][SPECTRE_SLOT].ob_stat = PERSON;
 }
 
 /// The next brother takes over: his stats and item list, nothing in the timers, and the first
 /// safe spot.
-pub(super) unsafe fn take_over_next_brother(game: &mut Game, mut hero: ActorRef) {
-    unsafe {
-        let stats = &brother_stats[game.hero.brother as usize];
-        start_next_brother(&mut game.hero, &mut hero, stats);
+pub(super) fn take_over_next_brother(game: &mut Game, hero: ActorRef) {
+    let stats = &brother_stats[game.hero.brother as usize];
+    start_next_brother(&mut game.hero, &mut game.actors.list[hero.slot()], stats);
 
-        reset_for_next_brother(&mut game.hero, &mut *(&raw mut the_world));
-        move_camera_to(game.hero.safe_x as i32, game.hero.safe_y as i32);
-        game.screen.view_status = VIEW_REDRAW;
-        the_actors.on_screen = 1;
-        the_actors.loading = 0;
-    }
+    reset_for_next_brother(&mut game.hero, &mut game.world);
+    move_camera_to(game, game.hero.safe_x as i32, game.hero.safe_y as i32);
+    game.screen.view_status = VIEW_REDRAW;
+    game.actors.on_screen = 1;
+    game.actors.loading = 0;
 }
 
 /// No spells running, and the next brother starts from the first safe spot in the first region.
@@ -204,28 +199,26 @@ fn show_follow_up_placard(game: &mut Game) {
 }
 
 /// Loads the brother's sprites and tells where the story starts.
-pub(super) unsafe fn announce_brother(game: &mut Game) {
-    unsafe {
-        let current = game.screen.current_port;
-        game.screen.set_font_kind(current, FontKind::Panel);
-        game.screen.current_port = PortId::Text;
+pub(super) fn announce_brother(game: &mut Game) {
+    let current = game.screen.current_port;
+    game.screen.set_font_kind(current, FontKind::Panel);
+    game.screen.current_port = PortId::Text;
 
-        the_actors.loaded_actor_file = HERO_SPRITE_FILE;
-        the_actors.loaded_setfig_file = HERO_SET_FILE;
-        load_start_sprites(game);
+    game.actors.loaded_actor_file = HERO_SPRITE_FILE;
+    game.actors.loaded_setfig_file = HERO_SET_FILE;
+    load_start_sprites(game);
 
-        if game.hero.brother <= LAST_BROTHER {
-            message_off(game);
-            game.hero.place = START_PLACE;
-            show_event(game, EVENT_SETTING_OUT);
+    if game.hero.brother <= LAST_BROTHER {
+        message_off(game);
+        game.hero.place = START_PLACE;
+        show_event(game, EVENT_SETTING_OUT);
 
-            if game.hero.brother == JULIAN {
-                print_cont(game, ".");
-            } else if game.hero.brother == PHILLIP {
-                show_event(game, EVENT_PHILLIP_SETS_OUT);
-            } else if game.hero.brother == KEVIN {
-                show_event(game, EVENT_KEVIN_SETS_OUT);
-            }
+        if game.hero.brother == JULIAN {
+            print_cont(game, ".");
+        } else if game.hero.brother == PHILLIP {
+            show_event(game, EVENT_PHILLIP_SETS_OUT);
+        } else if game.hero.brother == KEVIN {
+            show_event(game, EVENT_KEVIN_SETS_OUT);
         }
     }
 }

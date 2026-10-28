@@ -4,7 +4,6 @@ use super::weapons::weapon_image;
 use super::{CARRIER, DEAD, DYING, ENEMY, FALL, OBJECTS, PHIL, RAFT, Sprite};
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::the_actors;
 use crate::game::data::tables::animation_frames;
 use crate::game::data::types::{SeqInfo, StateEntry};
 
@@ -47,13 +46,8 @@ const BUBBLES_HEIGHT: i16 = 7;
 const OBJ_BURNING: i16 = 0x58;
 const OBJ_SUNK: i16 = 97;
 
-pub(super) unsafe fn state_entry(inum: i16) -> &'static StateEntry {
-    // Not range checked, like the C table lookup.
-    unsafe {
-        &*(&raw const animation_frames)
-            .cast::<StateEntry>()
-            .offset(inum as isize)
-    }
+pub(super) fn state_entry(inum: i16) -> &'static StateEntry {
+    &animation_frames[inum as usize]
 }
 
 pub(super) fn byte_of(table: &[i8; 32], inum: i16) -> i16 {
@@ -72,96 +66,87 @@ pub(super) fn sprite_sheet(game: &Game, atype: i16) -> &SeqInfo {
 
 /// Picks the image for this pass: the weapon's (`passmode`) or the actor's own, and where its top
 /// left corner is on the screen. `None` means nothing is drawn.
-pub(super) unsafe fn choose_image(
+pub(super) fn choose_image(
     game: &mut Game,
     actor: ActorRef,
     i: i32,
     passmode: bool,
 ) -> Option<Sprite> {
-    unsafe {
-        let inum = actor.index as i16;
-        let xstart = actor.rel_x as i16;
-        let ystart = actor.rel_y as i16;
-        let ground = ystart.wrapping_add(SPRITE_GROUND_OFFSET);
-        let blank = Sprite {
-            atype: OBJECTS,
-            inum,
-            xstart,
-            ystart,
-            xstop: 0,
-            ystop: 0,
-            ground,
-        };
+    let inum = game.actors.list[actor.slot()].index as i16;
+    let xstart = game.actors.list[actor.slot()].rel_x as i16;
+    let ystart = game.actors.list[actor.slot()].rel_y as i16;
+    let ground = ystart.wrapping_add(SPRITE_GROUND_OFFSET);
+    let blank = Sprite {
+        atype: OBJECTS,
+        inum,
+        xstart,
+        ystart,
+        xstop: 0,
+        ystop: 0,
+        ground,
+    };
 
-        if passmode {
-            return Some(weapon_image(actor, blank));
-        }
-
-        let (atype, inum) = body_image(game, actor, i, inum)?;
-
-        Some(Sprite {
-            atype,
-            inum,
-            ..blank
-        })
+    if passmode {
+        return Some(weapon_image(game, actor, blank));
     }
+
+    let (atype, inum) = body_image(game, actor, i, inum)?;
+
+    Some(Sprite {
+        atype,
+        inum,
+        ..blank
+    })
 }
 
 /// The actor's own sprite sheet and image for this animation frame. `None` means nothing is drawn
 /// (a burnt body, or an object with no image).
-unsafe fn body_image(
-    game: &mut Game,
-    actor: ActorRef,
-    i: i32,
-    mut inum: i16,
-) -> Option<(i16, i16)> {
-    unsafe {
-        let mut atype = actor.kind as i16;
+fn body_image(game: &mut Game, actor: ActorRef, i: i32, mut inum: i16) -> Option<(i16, i16)> {
+    let mut atype = game.actors.list[actor.slot()].kind as i16;
 
-        if (atype == ENEMY && actor.race != RACE_SPECTRE) || atype == PHIL {
-            if the_actors.fiery_death != 0 && actor.environ > 0 {
-                if actor.state == DEAD {
-                    return None;
-                } else if actor.state == DYING {
-                    // a body burning in the lava: nothing more to work out
-                    return Some((OBJECTS, OBJ_BURNING));
-                }
-            } else if actor.state == FALL {
-                atype = if actor.tactic < FALL_AS_ENEMY_STEPS {
-                    ENEMY
-                } else {
-                    OBJECTS
-                };
-            } else {
-                inum = state_entry(inum).figure as i16;
+    if (atype == ENEMY && game.actors.list[actor.slot()].race != RACE_SPECTRE) || atype == PHIL {
+        if game.actors.fiery_death != 0 && game.actors.list[actor.slot()].environ > 0 {
+            if game.actors.list[actor.slot()].state == DEAD {
+                return None;
+            } else if game.actors.list[actor.slot()].state == DYING {
+                // a body burning in the lava: nothing more to work out
+                return Some((OBJECTS, OBJ_BURNING));
             }
-
-            inum = pick_of_pair(actor, i, inum);
+        } else if game.actors.list[actor.slot()].state == FALL {
+            atype = if game.actors.list[actor.slot()].tactic < FALL_AS_ENEMY_STEPS {
+                ENEMY
+            } else {
+                OBJECTS
+            };
+        } else {
+            inum = state_entry(inum).figure as i16;
         }
 
-        if atype == OBJECTS && actor.race == 0 {
-            return None;
-        }
-
-        if atype == CARRIER && game.hero.riding == 0 && the_actors.loaded_actor_file == SWAN_FILE {
-            atype = RAFT;
-            inum = RAFT_IMAGE;
-        }
-
-        Some((atype, inum))
+        inum = pick_of_pair(game, actor, i, inum);
     }
+
+    if atype == OBJECTS && game.actors.list[actor.slot()].race == 0 {
+        return None;
+    }
+
+    if atype == CARRIER && game.hero.riding == 0 && game.actors.loaded_actor_file == SWAN_FILE {
+        atype = RAFT;
+        inum = RAFT_IMAGE;
+    }
+
+    Some((atype, inum))
 }
 
 /// Snakes use their own pictures; other enemies have two pictures per figure, picked by the race
 /// (the hero, actor 0, has just the one).
-fn pick_of_pair(actor: ActorRef, i: i32, inum: i16) -> i16 {
-    if actor.race == RACE_SNAKE {
-        if actor.state < DYING {
+fn pick_of_pair(game: &mut Game, actor: ActorRef, i: i32, inum: i16) -> i16 {
+    if game.actors.list[actor.slot()].race == RACE_SNAKE {
+        if game.actors.list[actor.slot()].state < DYING {
             return inum + SNAKE_FIRST_IMAGE;
         }
     } else if i > 0 {
         // Masks off the low bits (a cheap remainder or a flag test).
-        if actor.race & 1 != 0 {
+        if game.actors.list[actor.slot()].race & 1 != 0 {
             return inum | IMAGE_PAIR_BIT;
         }
 
@@ -197,7 +182,7 @@ pub(super) fn adjust_for_depth(
     passmode: bool,
     sprite: &mut Sprite,
 ) -> bool {
-    let depth = actor.environ as i16;
+    let depth = game.actors.list[actor.slot()].environ as i16;
 
     if !passmode && sprite.atype != OBJECTS {
         sink_body(game, actor, i, cycle, depth, sprite)
@@ -221,7 +206,7 @@ fn sink_body(
     } else if depth == SHALLOW_DEPTH {
         sprite.ystop -= SHALLOW_HIDDEN_LINES;
     } else if depth > UNDER_SURFACE_DEPTH {
-        if actor.state == DEAD {
+        if game.actors.list[actor.slot()].state == DEAD {
             return false;
         }
 

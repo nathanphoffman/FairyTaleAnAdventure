@@ -13,8 +13,7 @@ use crate::game::data::state::Game;
 use crate::game::render::screen::FontKind;
 
 use crate::game::actors::interaction::{eat_food, find_nearest_figure};
-use crate::game::data::object_tables::{itrans, ob_listg};
-use crate::game::data::state::{the_actors, the_world};
+use crate::game::data::object_tables::itrans;
 use crate::game::render::screen_fx::{map_message, win_colors};
 use crate::game::ui::messages::{announce_container, announce_treasure, print_cont};
 use crate::game::ui::text::{queue_print, show_event};
@@ -54,87 +53,81 @@ const EVENT_FRUIT_KEPT: i32 = 36;
 const FIRST_INDOOR_REGION: u16 = 7;
 
 /// Takes the nearest object, or searches the nearest dead body.
-pub(super) unsafe fn take_nearest(game: &mut Game) {
-    unsafe {
-        queue_print(PRQ_VITALITY);
-        find_nearest_figure(0, TAKE_RANGE);
+pub(super) fn take_nearest(game: &mut Game) {
+    queue_print(game, PRQ_VITALITY);
+    find_nearest_figure(game, 0, TAKE_RANGE);
 
-        game.hero.stuff_mut()[ARROWBASE] = 0;
-        if the_actors.nearest_object == 0 {
-            queue_print(PRQ_NOTHING_NEAR);
+    game.hero.stuff_mut()[ARROWBASE] = 0;
+    if game.actors.nearest_object == 0 {
+        queue_print(game, PRQ_NOTHING_NEAR);
 
-            return;
+        return;
+    }
+
+    let actor = ActorRef::new(game.actors.nearest_object as usize);
+
+    if game.actors.list[actor.slot()].kind == OBJECTS {
+        if take_object(game) {
+            finish_pickup(game);
         }
-
-        let actor = ActorRef::new(the_actors.nearest_object as usize);
-
-        if actor.kind == OBJECTS {
-            if take_object(game) {
-                finish_pickup(game);
-            }
-        } else if actor.weapon < 0 {
-            // already searched
-        } else if actor.vitality == 0 || the_world.freeze_timer != 0 {
-            search_body(game);
-        } else {
-            show_event(game, EVENT_ALIVE);
-        }
+    } else if game.actors.list[actor.slot()].weapon < 0 {
+        // already searched
+    } else if game.actors.list[actor.slot()].vitality == 0 || game.world.freeze_timer != 0 {
+        search_body(game);
+    } else {
+        show_event(game, EVENT_ALIVE);
     }
 }
 
 /// Removes the picked-up object from the world, turns any arrows picked up into the arrow
 /// count, and ends the game if the talisman was found.
-unsafe fn finish_pickup(game: &mut Game) {
-    unsafe {
-        change_object(the_actors.nearest_object as i32, 2);
-        add_stuff(
-            game,
-            ARROWS,
-            (game.hero.stuff()[ARROWBASE] as u32 * ARROWS_PER_QUIVER) as u8,
-        );
+fn finish_pickup(game: &mut Game) {
+    change_object(game, game.actors.nearest_object as i32, 2);
+    add_stuff(
+        game,
+        ARROWS,
+        (game.hero.stuff()[ARROWBASE] as u32 * ARROWS_PER_QUIVER) as u8,
+    );
 
-        if game.hero.stuff()[TALISMAN] != 0 {
-            game.ui.quit_requested = 1;
-            game.screen.view_status = VIEW_GAME_OVER;
-            map_message(game);
-            let current = game.screen.current_port;
-            game.screen.set_font_kind(current, FontKind::Story);
-            win_colors(game);
-        }
+    if game.hero.stuff()[TALISMAN] != 0 {
+        game.ui.quit_requested = 1;
+        game.screen.view_status = VIEW_GAME_OVER;
+        map_message(game);
+        let current = game.screen.current_port;
+        game.screen.set_font_kind(current, FontKind::Story);
+        win_colors(game);
     }
 }
 
 /// Handles taking the object `nearest_object`. Returns true if it was taken (so it must be removed).
-unsafe fn take_object(game: &mut Game) -> bool {
-    unsafe {
-        let actor = ActorRef::new(the_actors.nearest_object as usize);
-        let id = actor.index as u8 as u32;
+fn take_object(game: &mut Game) -> bool {
+    let actor = ActorRef::new(game.actors.nearest_object as usize);
+    let id = game.actors.list[actor.slot()].index as u8 as u32;
 
-        // Masks with OWNER_MASK, keeping only the bits that matter here.
-        let owner = actor.vitality as u32 & OWNER_MASK;
+    // Masks with OWNER_MASK, keeping only the bits that matter here.
+    let owner = game.actors.list[actor.slot()].vitality as u32 & OWNER_MASK;
 
-        match classify_take(id, game.hero.hunger, the_world.region) {
-            Take::Gold => {
-                announce_treasure(game, "50 gold pieces");
-                game.hero.wealth += GOLD_FOUND;
+    match classify_take(id, game.hero.hunger, game.world.region) {
+        Take::Gold => {
+            announce_treasure(game, "50 gold pieces");
+            game.hero.wealth += GOLD_FOUND;
 
-                true
-            }
-
-            Take::Paper { indoors } => read_paper(game, indoors),
-            Take::Fruit { keep } => take_fruit(game, keep),
-            Take::Eggs => false, // not taken
-            Take::Bones => take_brothers_goods(game, owner),
-
-            Take::Container(name) => {
-                announce_container(game, name);
-
-                container_contents(game)
-            }
-
-            Take::Left => false,
-            Take::Plain => take_plain_item(game, id),
+            true
         }
+
+        Take::Paper { indoors } => read_paper(game, indoors),
+        Take::Fruit { keep } => take_fruit(game, keep),
+        Take::Eggs => false, // not taken
+        Take::Bones => take_brothers_goods(game, owner),
+
+        Take::Container(name) => {
+            announce_container(game, name);
+
+            container_contents(game)
+        }
+
+        Take::Left => false,
+        Take::Plain => take_plain_item(game, id),
     }
 }
 
@@ -167,24 +160,22 @@ fn take_fruit(game: &mut Game, keep: bool) -> bool {
 
 /// Picks up a fallen brother's bones and everything he carried (`owner` 1 is Julian, otherwise
 /// Phillip).
-unsafe fn take_brothers_goods(game: &mut Game, owner: u32) -> bool {
-    unsafe {
-        announce_treasure(game, "his brother's bones.");
-        ob_listg[BONES.0].ob_stat = 0;
-        ob_listg[BONES.1].ob_stat = 0;
+fn take_brothers_goods(game: &mut Game, owner: u32) -> bool {
+    announce_treasure(game, "his brother's bones.");
+    game.objects.global[BONES.0].ob_stat = 0;
+    game.objects.global[BONES.1].ob_stat = 0;
 
-        for slot in 0..GOLDBASE {
-            let other = if owner == 1 {
-                game.hero.julstuff[slot]
-            } else {
-                game.hero.philstuff[slot]
-            };
+    for slot in 0..GOLDBASE {
+        let other = if owner == 1 {
+            game.hero.julstuff[slot]
+        } else {
+            game.hero.philstuff[slot]
+        };
 
-            add_stuff(game, slot, other);
-        }
-
-        true
+        add_stuff(game, slot, other);
     }
+
+    true
 }
 
 /// What taking an object does, from its id.

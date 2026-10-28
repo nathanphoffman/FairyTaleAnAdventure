@@ -1,7 +1,6 @@
 //! Switching between the play view and the map page that shows messages.
 
 use super::fading::fade_down;
-use crate::game::data::object_tables::page_colors;
 use crate::game::data::state::Game;
 use crate::game::render::display::flip_pages;
 use crate::game::render::screen::{HIRES, PortId, SPRITES, VP_HIDE, ViewPortId};
@@ -34,8 +33,7 @@ pub fn map_message(game: &mut Game) {
 
     game.screen.vp_text.modes = HIRES | SPRITES | VP_HIDE;
     show_still_screen(game);
-    game.screen
-        .load_colors(ViewPortId::Page, unsafe { &*(&raw const page_colors) });
+    game.screen.load_colors(ViewPortId::Page, &game.page_colors);
 
     game.screen.view_status = VIEW_MESSAGE;
 }

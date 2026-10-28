@@ -11,45 +11,42 @@ use crate::game::data::state::Game;
 
 use crate::game::actors::interaction::blocked_at;
 use crate::game::data::random::{fta_rand, rand4};
-use crate::game::data::state::{ActorRef, the_actors, the_world};
-use crate::game::data::tables::compass_lit_direction;
+use crate::game::data::state::ActorRef;
 use crate::game::input::handler::{joystick_fire, mouse_buttons};
 use crate::game::ui::text::show_event;
 
 /// Counts the timers down and sets the hero's state from the controls: the good fairy when dead
 /// or falling, shooting, riding, fighting or walking. `cycle` is the main loop's frame counter.
 pub fn update_hero(game: &mut Game, cycle: i16) {
-    unsafe {
-        the_world.light_timer = timer_step(the_world.light_timer);
-        the_world.secret_timer = timer_step(the_world.secret_timer);
-        the_world.freeze_timer = timer_step(the_world.freeze_timer);
+    game.world.light_timer = timer_step(game.world.light_timer);
+    game.world.secret_timer = timer_step(game.world.secret_timer);
+    game.world.freeze_timer = timer_step(game.world.freeze_timer);
 
-        the_actors.fiery_death = (the_world.map_x > LAVA_X.0
-            && the_world.map_x < LAVA_X.1
-            && the_world.map_y > LAVA_Y.0
-            && the_world.map_y < LAVA_Y.1) as i8;
+    game.actors.fiery_death = (game.world.map_x > LAVA_X.0
+        && game.world.map_x < LAVA_X.1
+        && game.world.map_y > LAVA_Y.0
+        && game.world.map_y < LAVA_Y.1) as i8;
 
-        let mut state = the_actors.list[0].state;
+    let mut state = game.actors.list[0].state;
 
-        if state == DEAD || state == FALL {
-            state = fairy_revival(game, state, cycle);
-        } else if state == DYING || state == SINK || state == SLEEP {
-            // nothing to do
-        } else if mouse_buttons() & RIGHT_BUTTON != 0
+    if state == DEAD || state == FALL {
+        state = fairy_revival(game, state, cycle);
+    } else if state == DYING || state == SINK || state == SLEEP {
+        // nothing to do
+    } else if mouse_buttons() & RIGHT_BUTTON != 0
 
-            || game.ui.fight_key_held != 0
-            // Masks with keeping only the bits that matter here.
-            || joystick_fire()
-        {
-            state = fighting_state(game, state);
-        } else if state == SHOOT1 {
-            state = SHOOT3; // release the arrow
-        } else {
-            state = walking_state(game, state);
-        }
-
-        the_actors.list[0].state = state;
+        || game.ui.fight_key_held != 0
+        // Masks with keeping only the bits that matter here.
+        || joystick_fire()
+    {
+        state = fighting_state(game, state);
+    } else if state == SHOOT1 {
+        state = SHOOT3; // release the arrow
+    } else {
+        state = walking_state(game, state);
     }
+
+    game.actors.list[0].state = state;
 }
 
 /// A light, secret or freeze timer after one frame: it counts down to 0 and stays there.
@@ -58,76 +55,80 @@ pub(super) fn timer_step(timer: i16) -> i16 {
 }
 
 /// The fight button is down: shoot in a shooting zone, dismount, or fight with the weapon held.
-pub(super) unsafe fn fighting_state(game: &mut Game, state: i8) -> i8 {
-    unsafe {
-        let mut hero = ActorRef::new(0);
+pub(super) fn fighting_state(game: &mut Game, state: i8) -> i8 {
+    let hero = ActorRef::new(0);
 
-        if the_world.extent_type > SHOOTING_ZONE {
-            return enter_shooting_zone(game, state);
-        }
-
-        if game.hero.riding == BIRD {
-            try_to_dismount(game, hero);
-
-            return state;
-        }
-
-        if compass_lit_direction < NOT_WALKING {
-            hero.facing = compass_lit_direction as i8;
-        }
-
-        if state >= WALKING {
-            return fighting_state_for(state, hero.weapon);
-        }
-
-        state
+    if game.world.extent_type > SHOOTING_ZONE {
+        return enter_shooting_zone(game, state);
     }
+
+    if game.hero.riding == BIRD {
+        try_to_dismount(game, hero);
+
+        return state;
+    }
+
+    if game.compass_lit_direction < NOT_WALKING {
+        game.actors.list[hero.slot()].facing = game.compass_lit_direction as i8;
+    }
+
+    if state >= WALKING {
+        return fighting_state_for(state, game.actors.list[hero.slot()].weapon);
+    }
+
+    state
 }
 
 /// In a shooting zone the hero shoots; the two special zones say so the first time.
-unsafe fn enter_shooting_zone(game: &mut Game, state: i8) -> i8 {
-    unsafe {
-        if state != SHOOT1 && the_world.extent_type == ZONE_ARROW_SLOW {
-            show_event(game, EVENT_ZONE_81);
-        }
-
-        if state != SHOOT1 && the_world.extent_type == ZONE_ARROW_FAST {
-            show_event(game, EVENT_ZONE_82);
-        }
-
-        SHOOT1
+fn enter_shooting_zone(game: &mut Game, state: i8) -> i8 {
+    if state != SHOOT1 && game.world.extent_type == ZONE_ARROW_SLOW {
+        show_event(game, EVENT_ZONE_81);
     }
+
+    if state != SHOOT1 && game.world.extent_type == ZONE_ARROW_FAST {
+        show_event(game, EVENT_ZONE_82);
+    }
+
+    SHOOT1
 }
 
 /// On the bird, the fight button tries to land: not over lava, not when moving too fast, and only
 /// where there is room to stand.
-fn try_to_dismount(game: &mut Game, mut hero: ActorRef) {
-    unsafe {
-        let (dif_x, dif_y) = (hero.vel_x, hero.vel_y);
+fn try_to_dismount(game: &mut Game, hero: ActorRef) {
+    let (dif_x, dif_y) = (
+        game.actors.list[hero.slot()].vel_x,
+        game.actors.list[hero.slot()].vel_y,
+    );
 
-        if the_actors.fiery_death != 0 {
-            show_event(game, EVENT_LAVA);
-        } else if dif_x > -DISMOUNT_SPEED
-            && dif_x < DISMOUNT_SPEED
-            && dif_y > -DISMOUNT_SPEED
-            && dif_y < DISMOUNT_SPEED
+    if game.actors.fiery_death != 0 {
+        show_event(game, EVENT_LAVA);
+    } else if dif_x > -DISMOUNT_SPEED
+        && dif_x < DISMOUNT_SPEED
+        && dif_y > -DISMOUNT_SPEED
+        && dif_y < DISMOUNT_SPEED
+    {
+        let ytest = game.actors.list[hero.slot()]
+            .abs_y
+            .wrapping_sub(DISMOUNT_STEP);
+
+        if blocked_at(
+            game,
+            game.actors.list[hero.slot()].abs_x as i16,
+            ytest as i16,
+            0,
+        ) == 0
+            && blocked_at(
+                game,
+                game.actors.list[hero.slot()].abs_x as i16,
+                ytest.wrapping_add(DISMOUNT_CHECK) as i16,
+                0,
+            ) == 0
         {
-            let ytest = hero.abs_y.wrapping_sub(DISMOUNT_STEP);
-
-            if blocked_at(game, hero.abs_x as i16, ytest as i16, 0) == 0
-                && blocked_at(
-                    game,
-                    hero.abs_x as i16,
-                    ytest.wrapping_add(DISMOUNT_CHECK) as i16,
-                    0,
-                ) == 0
-            {
-                game.hero.riding = 0;
-                hero.abs_y = ytest;
-            }
-        } else {
-            show_event(game, EVENT_TOO_FAST);
+            game.hero.riding = 0;
+            game.actors.list[hero.slot()].abs_y = ytest;
         }
+    } else {
+        show_event(game, EVENT_TOO_FAST);
     }
 }
 
@@ -142,29 +143,28 @@ pub(super) fn fighting_state_for(state: i8, weapon: i8) -> i8 {
 }
 
 /// No fight button: walk the way the controls point (stumbling when starving), or stand still.
-pub(super) unsafe fn walking_state(game: &mut Game, state: i8) -> i8 {
-    unsafe {
-        if compass_lit_direction >= NOT_WALKING {
-            return STILL;
-        }
-
-        compass_lit_direction = stumble(
-            compass_lit_direction,
-            game.hero.hunger,
-            || rand4() == 0,
-            // Masks off the low bits (a cheap remainder or a flag test).
-            || fta_rand() & 1 != 0,
-        );
-
-        the_actors.list[0].facing = compass_lit_direction as i8;
-
-        // Masks with LEFT_BUTTON, keeping only the bits that matter here.
-        if mouse_buttons() & LEFT_BUTTON != 0 || game.ui.held_direction != 0 {
-            return WALKING;
-        }
-
-        state
+pub(super) fn walking_state(game: &mut Game, state: i8) -> i8 {
+    if game.compass_lit_direction >= NOT_WALKING {
+        return STILL;
     }
+
+    let rng = std::cell::RefCell::new(&mut game.rng);
+    game.compass_lit_direction = stumble(
+        game.compass_lit_direction,
+        game.hero.hunger,
+        || rand4(&mut rng.borrow_mut()) == 0,
+        // Masks off the low bits (a cheap remainder or a flag test).
+        || fta_rand(&mut rng.borrow_mut()) & 1 != 0,
+    );
+
+    game.actors.list[0].facing = game.compass_lit_direction as i8;
+
+    // Masks with LEFT_BUTTON, keeping only the bits that matter here.
+    if mouse_buttons() & LEFT_BUTTON != 0 || game.ui.held_direction != 0 {
+        return WALKING;
+    }
+
+    state
 }
 
 /// A starving hero sometimes stumbles one step off the direction walked. `trips` and `turns_right`

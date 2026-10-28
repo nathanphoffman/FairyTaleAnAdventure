@@ -10,6 +10,7 @@ use crate::game::render::blit::{Loc, SShape};
 /// `kind` says what sort of thing it is (see the sequence numbers in csrc/ftale.h) and `race` its
 /// species. `state` is what it is doing now (walking, fighting, dead ...), `goal` and `tactic` are
 /// what an enemy is trying to do and how. `facing` is a direction 0-7.
+#[derive(Default)]
 pub struct Shape {
     pub abs_x: u16,
     pub abs_y: u16,
@@ -32,6 +33,7 @@ pub struct Shape {
 
 /// A rectangle of the world with a special meaning, for example where a kind of monster appears
 /// (`struct extent`). `etype` says what it is; `v1`-`v3` are extra values for that type.
+#[derive(Clone, Copy)]
 pub struct Extent {
     pub x1: u16,
     pub y1: u16,
@@ -46,6 +48,7 @@ pub struct Extent {
 /// An item or person standing in the world (`struct object`).
 /// `ob_stat` is its state: 0 does not exist, 1 on the ground, 2 taken, 3 a person, 4 a dead
 /// person, 5 hidden until looked for.
+#[derive(Clone, Copy)]
 pub struct WorldObject {
     pub xc: u16,
     pub yc: u16,
@@ -54,6 +57,7 @@ pub struct WorldObject {
 }
 
 /// An arrow, rock or fireball in flight (`struct missile`).
+#[derive(Default)]
 pub struct Missile {
     pub abs_x: u16,
     pub abs_y: u16,
@@ -151,6 +155,7 @@ pub struct Need {
 /// One of the game's menus (`struct menu`): the text labels, how many entries it has, the colour
 /// of the entries, and for each entry whether it is enabled. In `enabled`, bit 0 means selected,
 /// and the value (2 = plain, 3 = on, 8-10 = from an item the hero has) says how it is drawn.
+#[derive(Clone, Copy)]
 pub struct Menu {
     pub label_list: &'static [u8],
     pub num: i8,

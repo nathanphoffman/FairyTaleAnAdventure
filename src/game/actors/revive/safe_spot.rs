@@ -2,7 +2,7 @@
 
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::{Hero, World, the_actors, the_world};
+use crate::game::data::state::{Hero, World};
 use crate::game::data::types::Shape;
 use crate::game::ui::menus::update_menu_availability;
 use crate::game::ui::text::queue_print;
@@ -32,12 +32,14 @@ const PRQ_STATS: i32 = 4;
 const PRQ_VITALITY: i32 = 7;
 
 /// The hero (re)appears at the last safe spot, and the region there is loaded.
-pub(super) unsafe fn put_hero_at_safe_spot(game: &mut Game, mut hero: ActorRef) {
-    unsafe {
-        move_to_safe_spot(&mut game.hero, &mut hero, &mut *(&raw mut the_world));
+pub(super) fn put_hero_at_safe_spot(game: &mut Game, hero: ActorRef) {
+    move_to_safe_spot(
+        &mut game.hero,
+        &mut game.actors.list[hero.slot()],
+        &mut game.world,
+    );
 
-        load_region_now(game);
-    }
+    load_region_now(game);
 }
 
 /// The hero's position becomes the safe spot, the camera is centred on it, and its region is the
@@ -53,15 +55,17 @@ pub(super) fn move_to_safe_spot(hero: &mut Hero, body: &mut Shape, world: &mut W
 }
 
 /// Fresh health, a new day, and no hunger or tiredness.
-pub(super) unsafe fn restore_hero(game: &mut Game, mut hero: ActorRef) {
-    unsafe {
-        restore_stats(&mut game.hero, &mut hero, &mut *(&raw mut the_world));
+pub(super) fn restore_hero(game: &mut Game, hero: ActorRef) {
+    restore_stats(
+        &mut game.hero,
+        &mut game.actors.list[hero.slot()],
+        &mut game.world,
+    );
 
-        the_actors.active = START_ACTORS;
-        update_menu_availability(game);
-        queue_print(PRQ_VITALITY);
-        queue_print(PRQ_STATS);
-    }
+    game.actors.active = START_ACTORS;
+    update_menu_availability(game);
+    queue_print(game, PRQ_VITALITY);
+    queue_print(game, PRQ_STATS);
 }
 
 /// Full health for the bravery, standing still on dry land, the morning clock, and no hunger or

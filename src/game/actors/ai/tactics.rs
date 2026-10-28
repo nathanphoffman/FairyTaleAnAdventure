@@ -1,7 +1,7 @@
 //! Choosing a tactic for an enemy that wants to fight, and what a hostile enemy does about it.
 
 use super::{BACKUP, BOW_BIT, STILL};
-use crate::game::actors::interaction::{run_tactic, turtle_eggs};
+use crate::game::actors::interaction::run_tactic;
 use crate::game::actors::steering::steer_actor;
 use crate::game::data::random::rand2;
 use crate::game::data::state::ActorRef;
@@ -32,17 +32,21 @@ const WEAK: i16 = 6;
 const DKNIGHT_FACING: i8 = 5;
 
 /// A hostile enemy picks a new tactic. May also change its mode to wandering if it has no weapon.
-pub(super) unsafe fn choose_tactic(actor: ActorRef, mode: i16, xd: i16, yd: i16) -> (i16, i16) {
-    unsafe {
-        let facts = TacticFacts {
-            race: actor.race,
-            weapon: actor.weapon,
-            vitality: actor.vitality,
-            eggs_to_guard: turtle_eggs != 0,
-        };
+pub(super) fn choose_tactic(
+    game: &mut Game,
+    actor: ActorRef,
+    mode: i16,
+    xd: i16,
+    yd: i16,
+) -> (i16, i16) {
+    let facts = TacticFacts {
+        race: game.actors.list[actor.slot()].race,
+        weapon: game.actors.list[actor.slot()].weapon,
+        vitality: game.actors.list[actor.slot()].vitality,
+        eggs_to_guard: game.turtle_eggs != 0,
+    };
 
-        pick_tactic(&facts, mode, xd, yd, || rand2() != 0)
-    }
+    pick_tactic(&facts, mode, xd, yd, || rand2(&mut game.rng) != 0)
 }
 
 /// What `pick_tactic` needs to know about the enemy.
@@ -93,24 +97,31 @@ fn pick_tactic(
 pub(super) fn hostile_action(
     game: &mut Game,
     i: usize,
-    mut actor: ActorRef,
+    actor: ActorRef,
     mode: i16,
     tactic: i16,
     xd: i16,
     yd: i16,
 ) {
-    match hostile_choice(actor.race, actor.weapon, actor.vitality, mode, xd, yd) {
+    match hostile_choice(
+        game.actors.list[actor.slot()].race,
+        game.actors.list[actor.slot()].weapon,
+        game.actors.list[actor.slot()].vitality,
+        mode,
+        xd,
+        yd,
+    ) {
         Hostile::Strike => {
-            steer_actor(i as i32, game.hero.x as i32, game.hero.y as i32, 0);
+            steer_actor(game, i as i32, game.hero.x as i32, game.hero.y as i32, 0);
 
-            if actor.state >= WALKING {
-                actor.state = FIGHTING;
+            if game.actors.list[actor.slot()].state >= WALKING {
+                game.actors.list[actor.slot()].state = FIGHTING;
             }
         }
 
         Hostile::KnightGuard => {
-            actor.state = STILL;
-            actor.facing = DKNIGHT_FACING;
+            game.actors.list[actor.slot()].state = STILL;
+            game.actors.list[actor.slot()].facing = DKNIGHT_FACING;
         }
 
         Hostile::Tactic => run_tactic(game, i as i32, tactic as i32),

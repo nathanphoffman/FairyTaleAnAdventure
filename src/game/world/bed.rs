@@ -3,7 +3,6 @@
 
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::the_world;
 use crate::game::ui::text::show_event;
 use crate::game::world::map::tile_index;
 
@@ -28,42 +27,40 @@ const BED_Y_MASK: u16 = 0x1f;
 
 /// Copies the hero's position, and puts the hero to bed after standing on a bed for 30 ticks.
 pub fn check_bed(game: &mut Game) {
-    unsafe {
-        let mut hero = ActorRef::new(0);
+    let hero = ActorRef::new(0);
 
-        if hero.state != STILL {
-            the_world.bed_wait = 0;
-        }
+    if game.actors.list[hero.slot()].state != STILL {
+        game.world.bed_wait = 0;
+    }
 
-        game.hero.x = hero.abs_x;
-        game.hero.y = hero.abs_y;
+    game.hero.x = game.actors.list[hero.slot()].abs_x;
+    game.hero.y = game.actors.list[hero.slot()].abs_y;
 
-        if the_world.region == INSIDE_REGION {
-            let tile = game.memory.sector_byte(tile_index(
-                game,
-                // Shifts by TILE_WIDTH_SHIFT, converting between pixels, tiles, sectors or bytes.
-                (game.hero.x >> TILE_WIDTH_SHIFT) as i32,
-                // Shifts by TILE_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
-                (game.hero.y >> TILE_HEIGHT_SHIFT) as i32,
-            ));
+    if game.world.region == INSIDE_REGION {
+        let tile = game.memory.sector_byte(tile_index(
+            game,
+            // Shifts by TILE_WIDTH_SHIFT, converting between pixels, tiles, sectors or bytes.
+            (game.hero.x >> TILE_WIDTH_SHIFT) as i32,
+            // Shifts by TILE_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
+            (game.hero.y >> TILE_HEIGHT_SHIFT) as i32,
+        ));
 
-            let (wait, action) = bed_step(
-                the_world.bed_wait,
-                BED_TILES.contains(&tile),
-                game.hero.fatigue,
-            );
+        let (wait, action) = bed_step(
+            game.world.bed_wait,
+            BED_TILES.contains(&tile),
+            game.hero.fatigue,
+        );
 
-            the_world.bed_wait = wait;
+        game.world.bed_wait = wait;
 
-            match action {
-                BedAction::Nothing => {}
-                BedAction::NotTired => show_event(game, EVENT_NOT_TIRED),
-                BedAction::FallAsleep => {
-                    show_event(game, EVENT_SLEEPING);
-                    hero.abs_y |= BED_Y_MASK;
-                    game.hero.y = hero.abs_y;
-                    hero.state = SLEEP;
-                }
+        match action {
+            BedAction::Nothing => {}
+            BedAction::NotTired => show_event(game, EVENT_NOT_TIRED),
+            BedAction::FallAsleep => {
+                show_event(game, EVENT_SLEEPING);
+                game.actors.list[hero.slot()].abs_y |= BED_Y_MASK;
+                game.hero.y = game.actors.list[hero.slot()].abs_y;
+                game.actors.list[hero.slot()].state = SLEEP;
             }
         }
     }

@@ -1,6 +1,5 @@
 //! Drawing the map into the play field: single tiles, whole screens, new edges and scrolling.
 
-use crate::game::data::object_tables::minimap;
 use crate::game::data::state::Game;
 
 /// One bitplane of 256 tiles, 64 bytes per tile.
@@ -34,21 +33,19 @@ pub(super) fn draw_tile(game: &mut Game, tile: i32, dst: usize) {
 }
 
 /// Draws the tile at minimap position (col, row) to its place on screen.
-pub(super) unsafe fn draw_minimap_tile(game: &mut Game, col: usize, row: usize) {
-    unsafe {
-        draw_tile(
-            game,
-            minimap[col * SCREEN_ROWS + row] as i32,
-            row * TILE_LINES * ROW_BYTES + col * 2,
-        )
-    };
+pub(super) fn draw_minimap_tile(game: &mut Game, col: usize, row: usize) {
+    draw_tile(
+        game,
+        game.minimap[col * SCREEN_ROWS + row] as i32,
+        row * TILE_LINES * ROW_BYTES + col * 2,
+    )
 }
 
 /// The whole screen, 19 x 6 tiles.
 pub fn draw_map(game: &mut Game) {
     for col in 0..SCREEN_COLUMNS {
         for row in 0..SCREEN_ROWS {
-            unsafe { draw_minimap_tile(game, col, row) };
+            draw_minimap_tile(game, col, row);
         }
     }
 }
@@ -56,14 +53,14 @@ pub fn draw_map(game: &mut Game) {
 /// One column of tiles; `x` is the byte offset on screen (0 or 36).
 pub fn draw_map_column(game: &mut Game, x: i32) {
     for row in 0..SCREEN_ROWS {
-        unsafe { draw_minimap_tile(game, x as usize / 2, row) };
+        draw_minimap_tile(game, x as usize / 2, row);
     }
 }
 
 /// One row of tiles; `r` is twice the row number (0 or 10).
 pub fn draw_map_row(game: &mut Game, r: i32) {
     for col in 0..SCREEN_COLUMNS {
-        unsafe { draw_minimap_tile(game, col, r as usize / 2) };
+        draw_minimap_tile(game, col, r as usize / 2);
     }
 }
 

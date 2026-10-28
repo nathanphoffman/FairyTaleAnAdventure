@@ -9,7 +9,6 @@
 //! Message lists are zero-terminated strings stored one after another; picking message `n` means
 //! skipping `n` zero bytes.
 
-use crate::game::data::object_tables::{pplay, prec, print_que};
 use crate::game::data::state::Game;
 use crate::game::data::story_text::{EVENT_MSG, PLACARD_MSGS, SPEECHES};
 use crate::game::render::screen::PortId;
@@ -132,18 +131,16 @@ pub fn speak(game: &mut Game, n: i32) {
 
 /// Adds a request to the print queue (ignored if the queue is full). `handle_print_request` handles them one
 /// per tick, which spreads the redrawing work over several frames.
-pub fn queue_print(x: i32) {
-    unsafe {
-        // Masks with PRINT_QUEUE_MASK, keeping only the bits that matter here.
-        let next = (prec + 1) & PRINT_QUEUE_MASK;
+pub fn queue_print(game: &mut Game, x: i32) {
+    // Masks with PRINT_QUEUE_MASK, keeping only the bits that matter here.
+    let next = (game.prec + 1) & PRINT_QUEUE_MASK;
 
-        if next == pplay {
-            return;
-        }
-
-        (*(&raw mut print_que))[prec as usize] = x as i8;
-        prec = next;
+    if next == game.pplay {
+        return;
     }
+
+    game.print_que[game.prec as usize] = x as i8;
+    game.prec = next;
 }
 
 // The decorative border drawn on story pages.

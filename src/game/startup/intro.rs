@@ -8,8 +8,8 @@ use crate::game::data::tables::{black_colors, text_colors};
 use crate::game::files::disk::load_track_range;
 use crate::game::files::iff_picture::load_picture;
 use crate::game::files::loading::{
-    copy_protection_check, copy_protection_riddle, intro_skip_requested, intro_skipped,
-    read_sample, read_score, show_story_page, track,
+    copy_protection_check, copy_protection_riddle, intro_skipped, read_sample, read_score,
+    show_story_page, track,
 };
 use crate::game::input::handler::reset_key_buffer;
 use crate::game::render::display::{delay, flip_pages};
@@ -87,7 +87,7 @@ pub(super) fn start_up(game: &mut Game) -> bool {
         return false;
     }
 
-    if intro_skipped() == 0 {
+    if intro_skipped(game) == 0 {
         play_intro(game);
     }
 
@@ -235,12 +235,12 @@ fn play_intro(game: &mut Game) {
 
     game.screen.pages[1].ras = 1;
 
-    if intro_skipped() == 0 {
+    if intro_skipped(game) == 0 {
         for (first, second, first_wait, second_wait) in STORY_PAGES {
             show_story_page(game, first, second, first_wait, second_wait);
         }
 
-        if unsafe { intro_skip_requested } == 0 {
+        if { game.intro_skip_requested } == 0 {
             delay(game, INTRO_PAGES_WAIT);
         }
     }

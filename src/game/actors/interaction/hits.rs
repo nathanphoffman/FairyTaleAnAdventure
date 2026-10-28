@@ -2,11 +2,11 @@
 
 use super::blocking::step_figure;
 use super::extents::summon_turtle;
-use super::{DEAD, DRAGON, ENEMY, FLEE, HERO, SETFIG, turtle_eggs};
+use super::{DEAD, DRAGON, ENEMY, FLEE, HERO, SETFIG};
 use crate::game::actors::encounters::check_death;
 use crate::game::data::random::{bitrand, rand64, rand256};
+use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::{ActorRef, the_actors, the_world};
 use crate::game::files::loading::play_effect;
 use crate::game::ui::messages::{print, print_cont};
 use crate::game::ui::text::{print_number, speak};
@@ -59,34 +59,49 @@ pub(super) fn actor_at(i: i32) -> ActorRef {
 /// holds the item in inventory slot 7 (the sun stone). Races 0x8a and 0x8b (the spectre and the
 /// ghost brothers) are never hurt. Dragons and people are not pushed back.
 pub fn hit_actor(game: &mut Game, i: i32, j: i32, fc: i32, wt: i16) {
-    let mut target = actor_at(j);
-    let hero_weapon = actor_at(HERO as i32).weapon;
+    let target = actor_at(j);
+    let hero_weapon = game.actors.list[actor_at(HERO as i32).slot()].weapon;
     let has_spirit_item = game.hero.stuff()[SPIRIT_HURT_ITEM] != 0;
 
-    if too_weak_to_hurt(target.race, hero_weapon, has_spirit_item) {
+    if too_weak_to_hurt(
+        game.actors.list[target.slot()].race,
+        hero_weapon,
+        has_spirit_item,
+    ) {
         speak(game, MESSAGE_NEEDS_WEAPON);
 
         return;
     }
 
-    if RACE_UNHITTABLE.contains(&target.race) {
+    if RACE_UNHITTABLE.contains(&game.actors.list[target.slot()].race) {
         return;
     }
 
-    target.vitality = vitality_after_hit(target.vitality, wt);
+    game.actors.list[target.slot()].vitality =
+        vitality_after_hit(game.actors.list[target.slot()].vitality, wt);
 
     match hit_sound(i, j) {
-        HitSound::Arrow => play_effect(EFFECT_ARROW_HIT, PITCH_ARROW + rand64()),
-        HitSound::Rock => play_effect(EFFECT_ROCK_HIT, PITCH_ROCK + bitrand(PITCH_SPREAD)),
+        HitSound::Arrow => {
+            let pitch = PITCH_ARROW + rand64(&mut game.rng);
+            play_effect(game, EFFECT_ARROW_HIT, pitch)
+        }
+        HitSound::Rock => {
+            let pitch = PITCH_ROCK + bitrand(&mut game.rng, PITCH_SPREAD);
+            play_effect(game, EFFECT_ROCK_HIT, pitch)
+        }
         HitSound::HeroHurt => {
-            play_effect(EFFECT_HERO_HURT, PITCH_HERO_HURT + bitrand(PITCH_SPREAD))
+            let pitch = PITCH_HERO_HURT + bitrand(&mut game.rng, PITCH_SPREAD);
+            play_effect(game, EFFECT_HERO_HURT, pitch)
         }
 
-        HitSound::FoeHurt => play_effect(EFFECT_FOE_HURT, PITCH_FOE_HURT + rand256()),
+        HitSound::FoeHurt => {
+            let pitch = PITCH_FOE_HURT + rand256(&mut game.rng);
+            play_effect(game, EFFECT_FOE_HURT, pitch)
+        }
     }
 
     // push back the foe
-    if can_be_pushed(target.kind)
+    if can_be_pushed(game.actors.list[target.slot()].kind)
         && step_figure(game, j as i16, fc as i16, KNOCKBACK) != 0
         && i >= 0
     {
@@ -161,56 +176,52 @@ fn vitality_after_hit(vitality: i16, wt: i16) -> i16 {
 /// After a fight: reports how many foes were defeated or fled, or "Bravely done!" if the hero is
 /// nearly dead. Then, if turtle eggs are around, the turtle story event is checked.
 pub fn report_battle_result(game: &mut Game) {
-    unsafe {
-        let (dead, fled) = count_casualties();
-        let vitality = actor_at(HERO as i32).vitality;
+    let (dead, fled) = count_casualties(game);
+    let vitality = game.actors.list[actor_at(HERO as i32).slot()].vitality;
 
-        match battle_report(vitality, dead, fled, the_world.extent_type) {
-            BattleReport::Silent => {}
-            BattleReport::Bravely => print(game, "Bravely done!"),
-            BattleReport::Foes { dead, fled } => {
-                if dead != 0 {
-                    print(game, "");
-                    print_number(game, dead, 1);
-                    print_cont(game, "foes were defeated in battle.");
-                }
+    match battle_report(vitality, dead, fled, game.world.extent_type) {
+        BattleReport::Silent => {}
+        BattleReport::Bravely => print(game, "Bravely done!"),
+        BattleReport::Foes { dead, fled } => {
+            if dead != 0 {
+                print(game, "");
+                print_number(game, dead, 1);
+                print_cont(game, "foes were defeated in battle.");
+            }
 
-                if fled != 0 {
-                    print(game, "");
-                    print_number(game, fled, 1);
-                    print_cont(game, "foes fled in retreat.");
-                }
+            if fled != 0 {
+                print(game, "");
+                print_number(game, fled, 1);
+                print_cont(game, "foes fled in retreat.");
             }
         }
+    }
 
-        // check for presence of turtle eggs
-        if turtle_eggs != 0 {
-            summon_turtle(game);
-        }
+    // check for presence of turtle eggs
+    if game.turtle_eggs != 0 {
+        summon_turtle(game);
     }
 }
 
 /// How many of the enemies are dead and how many have fled.
-unsafe fn count_casualties() -> (i32, i32) {
-    unsafe {
-        let (mut dead, mut fled) = (0, 0);
+fn count_casualties(game: &mut Game) -> (i32, i32) {
+    let (mut dead, mut fled) = (0, 0);
 
-        for i in FIRST_MONSTER_SLOT..the_actors.active as i32 {
-            let a = actor_at(i);
+    for i in FIRST_MONSTER_SLOT..game.actors.active as i32 {
+        let a = actor_at(i);
 
-            if a.kind != ENEMY {
-                continue;
-            }
-
-            if a.state == DEAD {
-                dead += 1;
-            } else if a.goal == FLEE {
-                fled += 1;
-            }
+        if game.actors.list[a.slot()].kind != ENEMY {
+            continue;
         }
 
-        (dead, fled)
+        if game.actors.list[a.slot()].state == DEAD {
+            dead += 1;
+        } else if game.actors.list[a.slot()].goal == FLEE {
+            fled += 1;
+        }
     }
+
+    (dead, fled)
 }
 
 #[cfg(test)]

@@ -59,15 +59,13 @@ pub(in crate::game::ui) fn add_stuff(game: &mut Game, slot: usize, amount: u8) {
 }
 
 /// Handles an entry of the Items menu.
-pub unsafe fn items_option(game: &mut Game, chosen_entry: i16) {
-    unsafe {
-        match chosen_entry {
-            USE_ENTRY => go_to_menu(game, USE),
-            LIST => show_item_list(game),
-            TAKE => take_nearest(game),
-            LOOK => look_around(game),
-            GIVE_ENTRY => go_to_menu(game, GIVE),
-            _ => {}
-        }
+pub fn items_option(game: &mut Game, chosen_entry: i16) {
+    match chosen_entry {
+        USE_ENTRY => go_to_menu(game, USE),
+        LIST => show_item_list(game),
+        TAKE => take_nearest(game),
+        LOOK => look_around(game),
+        GIVE_ENTRY => go_to_menu(game, GIVE),
+        _ => {}
     }
 }

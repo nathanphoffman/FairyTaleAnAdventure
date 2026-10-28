@@ -12,6 +12,7 @@ pub use self::missile_sprites::queue_missile_sprites;
 pub use self::missiles::advance_missiles;
 
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Game;
 
 // Actor kinds and states (csrc/ftale.h).
 const OBJECTS: i8 = 1;
@@ -31,9 +32,9 @@ fn chebyshev(dx: i16, dy: i16) -> i16 {
 
 /// How far actor `target` is from the point (`x`, `y`), by `chebyshev` (the differences wrap in 16
 /// bits, as in the original).
-fn distance_to_point(target: ActorRef, x: i16, y: i16) -> i16 {
-    let xd = (target.abs_x as i32 - x as i32) as i16;
-    let yd = (target.abs_y as i32 - y as i32) as i16;
+fn distance_to_point(game: &mut Game, target: ActorRef, x: i16, y: i16) -> i16 {
+    let xd = (game.actors.list[target.slot()].abs_x as i32 - x as i32) as i16;
+    let yd = (game.actors.list[target.slot()].abs_y as i32 - y as i32) as i16;
 
     chebyshev(xd, yd)
 }

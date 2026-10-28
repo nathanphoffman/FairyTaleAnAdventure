@@ -3,7 +3,6 @@
 use super::drawing::PLANE_COUNT;
 use super::lookup::{SECTOR_BYTES, SECTOR_ROWS_IN_REGION};
 use crate::game::data::state::Game;
-use crate::game::data::state::the_world;
 
 // The overview map (magic spell): each sector is drawn as 16 x 16 pixels, 18 x 9 sectors.
 pub(super) const OVERVIEW_COLUMNS: i16 = 18;
@@ -68,25 +67,23 @@ pub(super) fn overview_origin(mx: i32, my: i32, region_x: u16, region_y: u16) ->
 /// twice as tall, 18 x 9 sectors across the screen. Each pixel's colour is the tile's overview
 /// colour (terrain table byte 3). `sector_x` / `sector_y` tell the caller which sector is at the top left.
 pub fn draw_overview_map(game: &mut Game, mx: i32, my: i32) {
-    unsafe {
-        let (x, y) = overview_origin(mx, my, the_world.origin_x, the_world.origin_y);
-        the_world.sector_x = x as i32;
-        the_world.sector_y = y as i32;
-        let mut offset = 0usize;
+    let (x, y) = overview_origin(mx, my, game.world.origin_x, game.world.origin_y);
+    game.world.sector_x = x as i32;
+    game.world.sector_y = y as i32;
+    let mut offset = 0usize;
 
-        for j in 0..OVERVIEW_ROWS {
-            for i in 0..OVERVIEW_COLUMNS {
-                let index =
-                    // Index into the region map: the sector row times 128 plus the column.
-                    the_world.origin_x as i32 + x as i32 + i as i32 + (((y + j) as i32) << MAP_ROW_SHIFT);
-                let sec = game.memory.map_byte(index as u16 as usize) as usize;
+    for j in 0..OVERVIEW_ROWS {
+        for i in 0..OVERVIEW_COLUMNS {
+            let index =
+                // Index into the region map: the sector row times 128 plus the column.
+                game.world.origin_x as i32 + x as i32 + i as i32 + (((y + j) as i32) << MAP_ROW_SHIFT);
+            let sec = game.memory.map_byte(index as u16 as usize) as usize;
 
-                draw_overview_sector(game, sec * SECTOR_BYTES, offset);
-                offset += 2;
-            }
-
-            offset += OVERVIEW_ROW_SKIP;
+            draw_overview_sector(game, sec * SECTOR_BYTES, offset);
+            offset += 2;
         }
+
+        offset += OVERVIEW_ROW_SKIP;
     }
 }
 

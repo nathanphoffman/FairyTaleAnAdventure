@@ -16,7 +16,6 @@ use self::cheats::{cheat_items, cheat_move};
 use self::menu_keys::{menu_click, menu_letter};
 use crate::game::data::state::Game;
 
-use crate::game::data::state::the_actors;
 use crate::game::ui::menus::go_to_menu;
 use crate::game::ui::options::choose_menu_entry;
 
@@ -109,40 +108,38 @@ fn press_in_key_menu(game: &mut Game, key: i8) {
 /// Codes with bit 7 set are releases. Keys that do nothing in the current state fall through
 /// to the menu shortcut letters at the end.
 pub fn handle_key(game: &mut Game, key: i32, notpause: i32) {
-    unsafe {
-        let key = key as i8;
-        let notpause = notpause as i16 != 0;
+    let key = key as i8;
+    let notpause = notpause as i16 != 0;
 
-        if game.screen.view_status != 0 && notpause {
-            // Masks with RELEASED, keeping only the bits that matter here.
-            if key & RELEASED == 0 {
-                game.screen.view_status = VIEW_REDRAW;
-            }
-        } else if the_actors.list[0].state == DEAD {
-            // ignored while dead
-        } else if (FIRST_DIRECTION_KEY..=LAST_DIRECTION_KEY).contains(&key) {
-            game.ui.held_direction = key as i16;
-
-        // Masks with CODE_MASK, keeping only the bits that matter here.
-        } else if (key & CODE_MASK) as i16 == game.ui.held_direction {
-            game.ui.held_direction = 0;
-        } else if key == FIGHT_KEY {
-            game.ui.fight_key_held = 1;
-
-        // Masks with CODE_MASK, keeping only the bits that matter here.
-        } else if key & CODE_MASK == FIGHT_KEY {
-            game.ui.fight_key_held = 0;
-        } else if cheat_items(game, key) {
-            // handled
-        } else if key & CODE_MASK >= FIRST_MENU_CLICK {
-            menu_click(game, key, notpause);
-        } else if cheat_move(game, key) {
-            // handled
-        } else if game.ui.current_menu == KEYS && key & RELEASED == 0 {
-            press_in_key_menu(game, key);
-        } else if key == b' ' as i8 || notpause {
-            menu_letter(game, key);
+    if game.screen.view_status != 0 && notpause {
+        // Masks with RELEASED, keeping only the bits that matter here.
+        if key & RELEASED == 0 {
+            game.screen.view_status = VIEW_REDRAW;
         }
+    } else if game.actors.list[0].state == DEAD {
+        // ignored while dead
+    } else if (FIRST_DIRECTION_KEY..=LAST_DIRECTION_KEY).contains(&key) {
+        game.ui.held_direction = key as i16;
+
+    // Masks with CODE_MASK, keeping only the bits that matter here.
+    } else if (key & CODE_MASK) as i16 == game.ui.held_direction {
+        game.ui.held_direction = 0;
+    } else if key == FIGHT_KEY {
+        game.ui.fight_key_held = 1;
+
+    // Masks with CODE_MASK, keeping only the bits that matter here.
+    } else if key & CODE_MASK == FIGHT_KEY {
+        game.ui.fight_key_held = 0;
+    } else if cheat_items(game, key) {
+        // handled
+    } else if key & CODE_MASK >= FIRST_MENU_CLICK {
+        menu_click(game, key, notpause);
+    } else if cheat_move(game, key) {
+        // handled
+    } else if game.ui.current_menu == KEYS && key & RELEASED == 0 {
+        press_in_key_menu(game, key);
+    } else if key == b' ' as i8 || notpause {
+        menu_letter(game, key);
     }
 }
 

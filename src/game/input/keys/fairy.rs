@@ -8,63 +8,58 @@ use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
 
 use crate::game::actors::revive::revive;
-use crate::game::data::state::the_actors;
 
 /// The hero is dead or falling: the fairy flies in, then the hero revives (or, with no luck left,
 /// the next brother takes over). Returns the hero's new state.
-pub(super) unsafe fn fairy_revival(game: &mut Game, state: i8, cycle: i16) -> i8 {
-    unsafe {
-        let (timer, action) = fairy_step(
-            game.hero.good_fairy_timer,
-            game.hero.luck,
-            the_actors.list[0].state == FALL,
-        );
+pub(super) fn fairy_revival(game: &mut Game, state: i8, cycle: i16) -> i8 {
+    let (timer, action) = fairy_step(
+        game.hero.good_fairy_timer,
+        game.hero.luck,
+        game.actors.list[0].state == FALL,
+    );
 
-        game.hero.good_fairy_timer = timer;
+    game.hero.good_fairy_timer = timer;
 
-        match action {
-            FairyAction::Revive => {
-                revive(game, 0);
+    match action {
+        FairyAction::Revive => {
+            revive(game, 0);
 
-                return STILL;
-            }
-
-            FairyAction::NextBrother => {
-                revive(game, 1);
-
-                return STILL;
-            }
-
-            FairyAction::Wait => {}
-            FairyAction::FlyIn => place_fairy(game, cycle),
+            return STILL;
         }
 
-        state
+        FairyAction::NextBrother => {
+            revive(game, 1);
+
+            return STILL;
+        }
+
+        FairyAction::Wait => {}
+        FairyAction::FlyIn => place_fairy(game, cycle),
     }
+
+    state
 }
 
 /// Puts the fairy near the hero, closer each frame, and clears the other actors away.
-unsafe fn place_fairy(game: &mut Game, cycle: i16) {
-    unsafe {
-        let mut fairy = ActorRef::new(FAIRY_SLOT);
-        the_actors.active = NO_ACTORS_LOADED;
-        fairy.abs_x = game
-            .hero
-            .x
-            .wrapping_add(game.hero.good_fairy_timer as u16 * FAIRY_SPEED)
-            .wrapping_sub(FAIRY_X_OFFSET);
-        fairy.abs_y = game.hero.y;
-        fairy.kind = OBJECTS;
+fn place_fairy(game: &mut Game, cycle: i16) {
+    let fairy = ActorRef::new(FAIRY_SLOT);
+    game.actors.active = NO_ACTORS_LOADED;
+    game.actors.list[fairy.slot()].abs_x = game
+        .hero
+        .x
+        .wrapping_add(game.hero.good_fairy_timer as u16 * FAIRY_SPEED)
+        .wrapping_sub(FAIRY_X_OFFSET);
+    game.actors.list[fairy.slot()].abs_y = game.hero.y;
+    game.actors.list[fairy.slot()].kind = OBJECTS;
 
-        // Masks with FAIRY_IMAGE, keeping only the bits that matter here.
-        fairy.index = FAIRY_IMAGE + (cycle & 1) as i8;
-        fairy.state = STILL;
-        fairy.weapon = 0;
-        fairy.environ = 0;
-        fairy.race = FAIRY_RACE;
-        the_actors.on_screen = 1;
-        the_actors.battle_flag = 0;
-    }
+    // Masks with FAIRY_IMAGE, keeping only the bits that matter here.
+    game.actors.list[fairy.slot()].index = FAIRY_IMAGE + (cycle & 1) as i8;
+    game.actors.list[fairy.slot()].state = STILL;
+    game.actors.list[fairy.slot()].weapon = 0;
+    game.actors.list[fairy.slot()].environ = 0;
+    game.actors.list[fairy.slot()].race = FAIRY_RACE;
+    game.actors.on_screen = 1;
+    game.actors.battle_flag = 0;
 }
 
 /// What the good fairy does this frame.

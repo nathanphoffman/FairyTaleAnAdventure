@@ -5,10 +5,7 @@
 //! of the game's main loop by `run_pending_command`, so they never run in the middle of a frame.
 
 use crate::game::actors::encounters::check_death;
-use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::{the_actors, the_world};
-use crate::game::data::tables::{seed1, seed2};
 use crate::game::data::types::Shape;
 use crate::game::world::places::transfer_hero;
 use std::path::Path;
@@ -59,38 +56,34 @@ pub fn queue_command(command: Command) {
 
 /// Runs the queued command, if any. Called at the top of every frame.
 pub fn run_pending_command(game: &mut Game) {
-    unsafe {
-        let Some(command) = lock_pending().take() else {
-            return;
-        };
+    let Some(command) = lock_pending().take() else {
+        return;
+    };
 
-        match command {
-            Command::Teleport { x, y } => {
-                transfer_hero(game, x as u16, y as u16, 1);
-            }
+    match command {
+        Command::Teleport { x, y } => {
+            transfer_hero(game, x as u16, y as u16, 1);
+        }
 
-            Command::Give { slot, count } => game.hero.stuff_mut()[slot as usize] = count as u8,
-            Command::SetStat { stat: 0, value } => game.hero.hunger = value as i16,
-            Command::SetStat { stat: 1, value } => game.hero.fatigue = value as i16,
-            Command::SetStat { value, .. } => game.hero.wealth = value as i16,
-            Command::SlayEnemies => slay_enemies(game),
-            Command::KillHero { luck: remaining } => {
-                game.hero.luck = remaining as i16;
-                the_actors.list[0].vitality = 0;
-                check_death(game, 0, DEATH_BY_TEST);
-            }
+        Command::Give { slot, count } => game.hero.stuff_mut()[slot as usize] = count as u8,
+        Command::SetStat { stat: 0, value } => game.hero.hunger = value as i16,
+        Command::SetStat { stat: 1, value } => game.hero.fatigue = value as i16,
+        Command::SetStat { value, .. } => game.hero.wealth = value as i16,
+        Command::SlayEnemies => slay_enemies(game),
+        Command::KillHero { luck: remaining } => {
+            game.hero.luck = remaining as i16;
+            game.actors.list[0].vitality = 0;
+            check_death(game, 0, DEATH_BY_TEST);
         }
     }
 }
 
 /// Kills every enemy that is out, as if each had been defeated.
-unsafe fn slay_enemies(game: &mut Game) {
-    unsafe {
-        for i in FIRST_ENEMY_SLOT..the_actors.active {
-            if the_actors.list[i as usize].kind == ENEMY {
-                the_actors.list[i as usize].vitality = 0;
-                check_death(game, i as i32, 0);
-            }
+fn slay_enemies(game: &mut Game) {
+    for i in FIRST_ENEMY_SLOT..game.actors.active {
+        if game.actors.list[i as usize].kind == ENEMY {
+            game.actors.list[i as usize].vitality = 0;
+            check_death(game, i as i32, 0);
         }
     }
 }
@@ -98,62 +91,60 @@ unsafe fn slay_enemies(game: &mut Game) {
 /// The state as text: the brother, place, stats, clock, random seeds, every actor, and the
 /// inventory.
 pub fn state_text(game: &mut Game) -> String {
-    unsafe {
-        let mut out = hero_world_lines(game);
-        out.push_str(&format!("seed {} {}\n", { seed1 }, { seed2 }));
+    let mut out = hero_world_lines(game);
+    out.push_str(&format!("seed {} {}\n", { game.rng.seed1 }, {
+        game.rng.seed2
+    }));
 
-        for i in 0..20 {
-            out.push_str(&actor_line(i, &(ActorRef::new(i))));
-        }
-
-        out.push_str("stuff");
-
-        for slot in 0..DUMPED_STUFF_SLOTS {
-            out.push_str(&format!(" {}", game.hero.stuff()[slot]));
-        }
-
-        out.push('\n');
-
-        out
+    for i in 0..20 {
+        out.push_str(&actor_line(i, &game.actors.list[i]));
     }
+
+    out.push_str("stuff");
+
+    for slot in 0..DUMPED_STUFF_SLOTS {
+        out.push_str(&format!(" {}", game.hero.stuff()[slot]));
+    }
+
+    out.push('\n');
+
+    out
 }
 
 /// The first lines of the dump: where the hero is, his stats, and the clock and light.
-unsafe fn hero_world_lines(game: &mut Game) -> String {
-    unsafe {
-        let mut out = String::new();
-        out.push_str(&format!(
-            "brother {} region {} hero {},{} map {},{}\n",
-            { game.hero.brother },
-            { the_world.region },
-            { game.hero.x },
-            { game.hero.y },
-            { the_world.map_x },
-            { the_world.map_y }
-        ));
+fn hero_world_lines(game: &mut Game) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "brother {} region {} hero {},{} map {},{}\n",
+        { game.hero.brother },
+        { game.world.region },
+        { game.hero.x },
+        { game.hero.y },
+        { game.world.map_x },
+        { game.world.map_y }
+    ));
 
-        out.push_str(&format!(
-            "brave {} luck {} kind {} wealth {} hunger {} fatigue {}\n",
-            { game.hero.brave },
-            { game.hero.luck },
-            { game.hero.kindness },
-            { game.hero.wealth },
-            { game.hero.hunger },
-            { game.hero.fatigue }
-        ));
+    out.push_str(&format!(
+        "brave {} luck {} kind {} wealth {} hunger {} fatigue {}\n",
+        { game.hero.brave },
+        { game.hero.luck },
+        { game.hero.kindness },
+        { game.hero.wealth },
+        { game.hero.hunger },
+        { game.hero.fatigue }
+    ));
 
-        out.push_str(&format!(
-            "daynight {} light {} riding {} flying {} anix {},{}\n",
-            { the_world.day_clock },
-            { the_world.light_level },
-            { game.hero.riding },
-            { game.hero.flying },
-            { the_actors.active },
-            { the_actors.drawn }
-        ));
+    out.push_str(&format!(
+        "daynight {} light {} riding {} flying {} anix {},{}\n",
+        { game.world.day_clock },
+        { game.world.light_level },
+        { game.hero.riding },
+        { game.hero.flying },
+        { game.actors.active },
+        { game.actors.drawn }
+    ));
 
-        out
-    }
+    out
 }
 
 /// One line describing actor `i`.
@@ -191,11 +182,13 @@ mod tests {
 
     #[test]
     fn actor_line_lists_every_field() {
-        let mut a: Shape = unsafe { std::mem::zeroed() };
-        a.abs_x = 100;
-        a.abs_y = 200;
-        a.vitality = -3;
-        a.vel_x = -1;
+        let a = Shape {
+            abs_x: 100,
+            abs_y: 200,
+            vitality: -3,
+            vel_x: -1,
+            ..Default::default()
+        };
         assert_eq!(
             actor_line(4, &a),
             "actor 4 pos 100,200 type 0 race 0 idx 0 wpn 0 env 0 goal 0 tac 0 state 0 face 0 vit -3 vel -1,0\n"

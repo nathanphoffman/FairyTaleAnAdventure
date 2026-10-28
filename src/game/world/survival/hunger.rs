@@ -83,9 +83,9 @@ mod tests {
     use super::*;
 
     fn hero_with_body(hunger: i16, fatigue: i16, vitality: i16) -> (Hero, Shape) {
-        let mut hero: Hero = unsafe { std::mem::zeroed() };
+        let mut hero: Hero = Default::default();
 
-        let mut body: Shape = unsafe { std::mem::zeroed() };
+        let mut body: Shape = Default::default();
         hero.hunger = hunger;
         hero.fatigue = fatigue;
         body.vitality = vitality;

@@ -8,18 +8,10 @@
 
 use crate::game::data::object_tables::witchpoints;
 use crate::game::data::state::Game;
-use crate::game::data::state::the_world;
 use crate::game::data::types::FPage;
 use crate::game::render::screen::PortId;
 use crate::gfx::bitmap::Rect;
 use crate::gfx::draw::COMPLEMENT;
-
-/// Which side of each beam edge the hero is on (the cross product and whether it is not negative).
-/// Read by the witch's steering in csrc/fmain.c under the names `s1` and `s2`.
-pub static mut SIDE_1: i16 = 0;
-pub static mut SIDE_2: i16 = 0;
-static mut SIDE_FLAG_1: i16 = 0;
-static mut SIDE_FLAG_2: i16 = 0;
 
 /// The beam is clipped to the 19 x 6 tiles of the play field.
 const CLIP_WIDTH: i32 = 16 * 19;
@@ -64,22 +56,20 @@ fn side(p1: (i16, i16), p2: (i16, i16), xh: i16, yh: i16) -> (i16, i16) {
 /// Draws the witch's beam on page `page` and records on which side of its edges the hero is.
 /// The drawing is clipped to the map area.
 pub fn witch_fx(game: &mut Game, page: usize) {
-    unsafe {
-        let fp = &game.screen.pages[page];
+    let fp = &game.screen.pages[page];
 
-        // Masks with TILE_X_MASK, keeping only the bits that matter here.
-        let xh = game.hero.x.wrapping_sub(the_world.map_x & TILE_X_MASK) as i16;
+    // Masks with TILE_X_MASK, keeping only the bits that matter here.
+    let xh = game.hero.x.wrapping_sub(game.world.map_x & TILE_X_MASK) as i16;
 
-        // Masks with TILE_Y_MASK, keeping only the bits that matter here.
-        let yh = game.hero.y.wrapping_sub(the_world.map_y & TILE_Y_MASK) as i16;
+    // Masks with TILE_Y_MASK, keeping only the bits that matter here.
+    let yh = game.hero.y.wrapping_sub(game.world.map_y & TILE_Y_MASK) as i16;
 
-        let (p1, p2) = edge(fp.witchdir.wrapping_add(DIRECTIONS_BEFORE as i16), fp);
-        let (p3, p4) = edge(fp.witchdir.wrapping_add(DIRECTIONS_AFTER as i16), fp);
-        (SIDE_1, SIDE_FLAG_1) = side(p1, p2, xh, yh);
-        (SIDE_2, SIDE_FLAG_2) = side(p3, p4, xh, yh);
+    let (p1, p2) = edge(fp.witchdir.wrapping_add(DIRECTIONS_BEFORE as i16), fp);
+    let (p3, p4) = edge(fp.witchdir.wrapping_add(DIRECTIONS_AFTER as i16), fp);
+    (game.side_1, game.side_flag_1) = side(p1, p2, xh, yh);
+    (game.side_2, game.side_flag_2) = side(p3, p4, xh, yh);
 
-        paint_beam(game, [p1, p2, p4, p3]);
-    }
+    paint_beam(game, [p1, p2, p4, p3]);
 }
 
 /// Fills the beam's quadrilateral with corners `p` (in drawing order) in complement mode, so

@@ -8,7 +8,6 @@ use super::{
 use crate::game::data::state::Game;
 
 use crate::game::data::random::rand256;
-use crate::game::data::state::{the_actors, the_world};
 use crate::game::files::loading::play_effect;
 use crate::game::ui::messages::print;
 
@@ -28,91 +27,88 @@ const EFFECT_ARROW_PITCH: i32 = 400;
 
 impl Ctx {
     /// Aiming and firing a bow or a fireball. No shooting under water or in peaceful places.
-    pub(super) unsafe fn shooting(&mut self, game: &mut Game) -> Pc {
-        unsafe {
-            if self.environ > ENVIRON_SINKING || the_world.extent_type > NO_SHOOT_XTYPE {
-                return Pc::Cpx;
-            }
-
-            let early_exit = if self.state == SHOOT3 {
-                self.release_shot(game)
-            } else if self.state == SHOOT1 {
-                self.start_shot(game)
-            } else {
-                None
-            };
-
-            if let Some(pc) = early_exit {
-                return pc;
-            }
-
-            self.missile.missile_type = self.actor.weapon - MISSILE_WEAPON_BASE;
-
-            Pc::DragShoot
+    pub(super) fn shooting(&mut self, game: &mut Game) -> Pc {
+        if self.environ > ENVIRON_SINKING || game.world.extent_type > NO_SHOOT_XTYPE {
+            return Pc::Cpx;
         }
+
+        let early_exit = if self.state == SHOOT3 {
+            self.release_shot(game)
+        } else if self.state == SHOOT1 {
+            self.start_shot(game)
+        } else {
+            None
+        };
+
+        if let Some(pc) = early_exit {
+            return pc;
+        }
+
+        game.actors.missiles[self.missile.slot()].missile_type =
+            game.actors.list[self.actor.slot()].weapon - MISSILE_WEAPON_BASE;
+
+        Pc::DragShoot
     }
 
     /// The shot is let go: a fireball just stays drawn, an arrow leaves the bow (and one is used up
     /// for the hero). `Some` means nothing is fired.
-    unsafe fn release_shot(&mut self, game: &mut Game) -> Option<Pc> {
-        unsafe {
-            let mut actor = self.actor;
-            let d8 = self.facing + SHOOTING_FACING_OFFSET;
+    fn release_shot(&mut self, game: &mut Game) -> Option<Pc> {
+        let actor = self.actor;
+        let d8 = self.facing + SHOOTING_FACING_OFFSET;
 
-            if actor.weapon == WEAPON_FIREBALL {
-                self.image = diroff(d8);
+        if game.actors.list[actor.slot()].weapon == WEAPON_FIREBALL {
+            self.image = diroff(d8);
 
+            return Some(Pc::Cpx);
+        }
+
+        self.image = diroff(d8) + BOW_RELEASED_FRAME;
+        game.actors.list[actor.slot()].state = STILL;
+
+        if self.slot == 0 {
+            if game.hero.stuff()[STUFF_ARROWS] == 0 {
                 return Some(Pc::Cpx);
             }
 
-            self.image = diroff(d8) + BOW_RELEASED_FRAME;
-            actor.state = STILL;
-
-            if self.slot == 0 {
-                if game.hero.stuff()[STUFF_ARROWS] == 0 {
-                    return Some(Pc::Cpx);
-                }
-
-                game.hero.stuff_mut()[STUFF_ARROWS] -= 1;
-            }
-
-            self.missile.speed = MISSILE_SPEED_ARROW;
-            the_actors.next_missile = the_actors.next_missile.wrapping_add(1);
-            play_effect(EFFECT_ARROW, EFFECT_ARROW_PITCH + rand256());
-
-            None
+            game.hero.stuff_mut()[STUFF_ARROWS] -= 1;
         }
+
+        game.actors.missiles[self.missile.slot()].speed = MISSILE_SPEED_ARROW;
+        game.actors.next_missile = game.actors.next_missile.wrapping_add(1);
+        let pitch = EFFECT_ARROW_PITCH + rand256(&mut game.rng);
+        play_effect(game, EFFECT_ARROW, pitch);
+
+        None
     }
 
     /// The actor starts to shoot: a fireball is fired at once, a bow needs arrows (for the hero).
     /// `Some` means nothing is fired.
-    unsafe fn start_shot(&mut self, game: &mut Game) -> Option<Pc> {
-        unsafe {
-            let mut actor = self.actor;
-            let d8 = self.facing + SHOOTING_FACING_OFFSET;
+    fn start_shot(&mut self, game: &mut Game) -> Option<Pc> {
+        let actor = self.actor;
+        let d8 = self.facing + SHOOTING_FACING_OFFSET;
 
-            self.image = diroff(d8)
-                + if actor.kind == ENEMY {
-                    ENEMY_BOW_DRAWN_FRAME
-                } else {
-                    HERO_BOW_DRAWN_FRAME
-                };
-
-            if actor.weapon == WEAPON_FIREBALL {
-                self.missile.speed = MISSILE_SPEED_FIREBALL;
-                the_actors.next_missile = the_actors.next_missile.wrapping_add(1);
-                actor.state = SHOOT3 as i8;
-                self.image = diroff(d8);
-                play_effect(EFFECT_FIREBALL, EFFECT_FIREBALL_PITCH + rand256());
-            } else if self.slot == 0 && game.hero.stuff()[STUFF_ARROWS] == 0 {
-                print(game, "No Arrows!");
-
-                return Some(Pc::Cpx);
+        self.image = diroff(d8)
+            + if game.actors.list[actor.slot()].kind == ENEMY {
+                ENEMY_BOW_DRAWN_FRAME
             } else {
-                self.missile.speed = 0;
-            }
+                HERO_BOW_DRAWN_FRAME
+            };
 
-            None
+        if game.actors.list[actor.slot()].weapon == WEAPON_FIREBALL {
+            game.actors.missiles[self.missile.slot()].speed = MISSILE_SPEED_FIREBALL;
+            game.actors.next_missile = game.actors.next_missile.wrapping_add(1);
+            game.actors.list[actor.slot()].state = SHOOT3 as i8;
+            self.image = diroff(d8);
+            let pitch = EFFECT_FIREBALL_PITCH + rand256(&mut game.rng);
+            play_effect(game, EFFECT_FIREBALL, pitch);
+        } else if self.slot == 0 && game.hero.stuff()[STUFF_ARROWS] == 0 {
+            print(game, "No Arrows!");
+
+            return Some(Pc::Cpx);
+        } else {
+            game.actors.missiles[self.missile.slot()].speed = 0;
         }
+
+        None
     }
 }

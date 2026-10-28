@@ -4,17 +4,15 @@ use super::water::climbs_out_of_water;
 use super::{
     BLOCK_DOOR, BLOCK_PASSABLE_WITH_KEY, Ctx, ENVIRON_BACKWARDS, ENVIRON_ICE, ENVIRON_SHALLOW,
     ENVIRON_SLOW, FACING_MASK, FRAME_FRUSTRATED, FRAME_OSCIL, FRUST, PIT_SECTOR, Pc, RACE_SNAKE,
-    RACE_WRAITH, RIDING_SWAN, RIDING_TURTLE, STUFF_GOLD_KEY_SLOT, XTEST, YTEST, diroff, pos_x,
-    pos_y, terrain,
+    RACE_WRAITH, RIDING_SWAN, RIDING_TURTLE, STUFF_GOLD_KEY_SLOT, diroff, pos_x, pos_y, terrain,
 };
 use crate::game::data::state::Game;
 
 use crate::game::actors::interaction::blocked_at;
 use crate::game::actors::steering::{STEER_OFFSET, steer_actor};
 use crate::game::data::random::rand4;
-use crate::game::data::state::the_actors;
 use crate::game::data::tables::swing_transitions;
-use crate::game::world::key_doors::{bumped_locked_door, open_door_near};
+use crate::game::world::key_doors::open_door_near;
 use crate::game::world::map::{step_x, step_y};
 
 /// Blocked for this many frames the hero oscillates; for this many more, he looks frustrated.
@@ -96,169 +94,192 @@ fn ice_velocity_toward(facing: i16, vel_x: i8, vel_y: i8) -> (i16, i16) {
 
 impl Ctx {
     /// Walking: sliding on ice, picking a step, and trying to go around what is in the way.
-    pub(super) unsafe fn walking(&mut self, game: &mut Game) -> Pc {
-        unsafe {
-            let actor = self.actor;
+    pub(super) fn walking(&mut self, game: &mut Game) -> Pc {
+        let actor = self.actor;
 
-            if self.environ == ENVIRON_ICE {
-                if let Some(next) = self.slide_on_ice(game) {
-                    return next;
-                }
-
-                self.environ = 0;
+        if self.environ == ENVIRON_ICE {
+            if let Some(next) = self.slide_on_ice(game) {
+                return next;
             }
 
-            self.step = step_length(
-                self.slot == 0 && game.hero.riding == RIDING_TURTLE,
-                self.environ,
-            );
+            self.environ = 0;
+        }
 
-            XTEST = pos_x(actor.abs_x as i32, self.facing, self.step);
-            YTEST = pos_y(actor.abs_y as i32, self.facing, self.step);
-            self.terrain = blocked_at(game, XTEST as i16, YTEST as i16, self.slot as i16) as i16;
+        self.step = step_length(
+            self.slot == 0 && game.hero.riding == RIDING_TURTLE,
+            self.environ,
+        );
 
-            if self.slot == 0 && self.hero_bumps_into_door(game) {
-                return Pc::NewLoc;
-            }
+        game.xtest = pos_x(
+            game.actors.list[actor.slot()].abs_x as i32,
+            self.facing,
+            self.step,
+        );
+        game.ytest = pos_y(
+            game.actors.list[actor.slot()].abs_y as i32,
+            self.facing,
+            self.step,
+        );
+        self.terrain =
+            blocked_at(game, game.xtest as i16, game.ytest as i16, self.slot as i16) as i16;
 
-            if self.terrain != 0 {
-                Pc::CheckDev1
-            } else {
-                Pc::NewLoc
-            }
+        if self.slot == 0 && self.hero_bumps_into_door(game) {
+            return Pc::NewLoc;
+        }
+
+        if self.terrain != 0 {
+            Pc::CheckDev1
+        } else {
+            Pc::NewLoc
         }
     }
 
     /// The hero walking into a door opens it (key doors have their own keys); walking away from one
     /// forgets that it was locked. Returns true when the gold key lets him through.
-    unsafe fn hero_bumps_into_door(&mut self, game: &mut Game) -> bool {
-        unsafe {
-            if self.terrain == BLOCK_DOOR {
-                open_door_near(game, XTEST, YTEST, 0);
-            } else {
-                bumped_locked_door = 0;
-            }
-
-            game.hero.stuff()[STUFF_GOLD_KEY_SLOT] != 0 && self.terrain == BLOCK_PASSABLE_WITH_KEY
+    fn hero_bumps_into_door(&mut self, game: &mut Game) -> bool {
+        if self.terrain == BLOCK_DOOR {
+            open_door_near(game, game.xtest, game.ytest, 0);
+        } else {
+            game.bumped_locked_door = 0;
         }
+
+        game.hero.stuff()[STUFF_GOLD_KEY_SLOT] != 0 && self.terrain == BLOCK_PASSABLE_WITH_KEY
     }
 
     /// On ice the actor keeps its momentum: pushes the velocity toward the wanted direction up to a
     /// limit and moves by it. Returns where to go next, or `None` when it hit something and should
     /// walk normally this tick.
-    unsafe fn slide_on_ice(&mut self, game: &mut Game) -> Option<Pc> {
-        unsafe {
-            let mut actor = self.actor;
-            self.step = if game.hero.riding == RIDING_SWAN {
-                ICE_TOP_SPEED_SWAN
-            } else {
-                ICE_TOP_SPEED
-            };
+    fn slide_on_ice(&mut self, game: &mut Game) -> Option<Pc> {
+        let actor = self.actor;
+        self.step = if game.hero.riding == RIDING_SWAN {
+            ICE_TOP_SPEED_SWAN
+        } else {
+            ICE_TOP_SPEED
+        };
 
-            let (nvx, nvy) = ice_velocity_toward(self.facing, actor.vel_x, actor.vel_y);
+        let (nvx, nvy) = ice_velocity_toward(
+            self.facing,
+            game.actors.list[actor.slot()].vel_x,
+            game.actors.list[actor.slot()].vel_y,
+        );
 
-            if nvx.abs() < self.step - ICE_X_MARGIN {
-                actor.vel_x = nvx as i8;
-            }
-
-            if nvy.abs() < self.step {
-                actor.vel_y = nvy as i8;
-            }
-
-            XTEST = (actor.abs_x as i32 + actor.vel_x as i32 / VELOCITY_SCALE) as u16;
-            YTEST = (actor.abs_y as i32 + actor.vel_y as i32 / VELOCITY_SCALE) as u16;
-
-            if game.hero.riding == RIDING_SWAN {
-                steer_actor(0, -(nvx as i32), -(nvy as i32), STEER_OFFSET);
-                self.facing = actor.facing as i16;
-
-                return Some(Pc::NewLoc);
-            }
-
-            if blocked_at(game, XTEST as i16, YTEST as i16, self.slot as i16) == 0 {
-                return Some(Pc::NewLoc);
-            }
-
-            None
+        if nvx.abs() < self.step - ICE_X_MARGIN {
+            game.actors.list[actor.slot()].vel_x = nvx as i8;
         }
+
+        if nvy.abs() < self.step {
+            game.actors.list[actor.slot()].vel_y = nvy as i8;
+        }
+
+        game.xtest = (game.actors.list[actor.slot()].abs_x as i32
+            + game.actors.list[actor.slot()].vel_x as i32 / VELOCITY_SCALE)
+            as u16;
+        game.ytest = (game.actors.list[actor.slot()].abs_y as i32
+            + game.actors.list[actor.slot()].vel_y as i32 / VELOCITY_SCALE)
+            as u16;
+
+        if game.hero.riding == RIDING_SWAN {
+            steer_actor(game, 0, -(nvx as i32), -(nvy as i32), STEER_OFFSET);
+            self.facing = game.actors.list[actor.slot()].facing as i16;
+
+            return Some(Pc::NewLoc);
+        }
+
+        if blocked_at(game, game.xtest as i16, game.ytest as i16, self.slot as i16) == 0 {
+            return Some(Pc::NewLoc);
+        }
+
+        None
     }
 
     /// Blocked: try one direction to the right.
-    pub(super) unsafe fn check_dev1(&mut self, game: &mut Game) -> Pc {
-        unsafe {
-            let actor = self.actor;
+    pub(super) fn check_dev1(&mut self, game: &mut Game) -> Pc {
+        let actor = self.actor;
 
-            // Masks with FACING_MASK, keeping only the bits that matter here.
-            self.facing = (self.facing + 1) & FACING_MASK;
-            XTEST = pos_x(actor.abs_x as i32, self.facing, self.step);
-            YTEST = pos_y(actor.abs_y as i32, self.facing, self.step);
+        // Masks with FACING_MASK, keeping only the bits that matter here.
+        self.facing = (self.facing + 1) & FACING_MASK;
+        game.xtest = pos_x(
+            game.actors.list[actor.slot()].abs_x as i32,
+            self.facing,
+            self.step,
+        );
+        game.ytest = pos_y(
+            game.actors.list[actor.slot()].abs_y as i32,
+            self.facing,
+            self.step,
+        );
 
-            if blocked_at(game, XTEST as i16, YTEST as i16, self.slot as i16) != 0 {
-                Pc::CheckDev2
-            } else {
-                Pc::NewLoc
-            }
+        if blocked_at(game, game.xtest as i16, game.ytest as i16, self.slot as i16) != 0 {
+            Pc::CheckDev2
+        } else {
+            Pc::NewLoc
         }
     }
 
     /// Still blocked: try one direction to the left of the original.
-    pub(super) unsafe fn check_dev2(&mut self, game: &mut Game) -> Pc {
-        unsafe {
-            let actor = self.actor;
+    pub(super) fn check_dev2(&mut self, game: &mut Game) -> Pc {
+        let actor = self.actor;
 
-            // Masks with FACING_MASK, keeping only the bits that matter here.
-            self.facing = (self.facing - 2) & FACING_MASK;
-            XTEST = pos_x(actor.abs_x as i32, self.facing, self.step);
-            YTEST = pos_y(actor.abs_y as i32, self.facing, self.step);
+        // Masks with FACING_MASK, keeping only the bits that matter here.
+        self.facing = (self.facing - 2) & FACING_MASK;
+        game.xtest = pos_x(
+            game.actors.list[actor.slot()].abs_x as i32,
+            self.facing,
+            self.step,
+        );
+        game.ytest = pos_y(
+            game.actors.list[actor.slot()].abs_y as i32,
+            self.facing,
+            self.step,
+        );
 
-            if blocked_at(game, XTEST as i16, YTEST as i16, self.slot as i16) != 0 {
-                Pc::Blocked
-            } else {
-                Pc::NewLoc
-            }
+        if blocked_at(game, game.xtest as i16, game.ytest as i16, self.slot as i16) != 0 {
+            Pc::Blocked
+        } else {
+            Pc::NewLoc
         }
     }
 
     /// A free step was found: face that way, pick the walking frame, and move (unless the terrain
     /// slows the actor to a halt).
-    pub(super) unsafe fn new_loc(&mut self, game: &mut Game) -> Pc {
-        unsafe {
-            self.pick_walking_frame(game);
+    pub(super) fn new_loc(&mut self, game: &mut Game) -> Pc {
+        self.pick_walking_frame(game);
 
-            if self.environ == ENVIRON_ICE {
-                return Pc::Cpx;
-            }
-
-            if self.environ == ENVIRON_BACKWARDS {
-                // Walking backwards: flipping the three low bits plays the walk frames in reverse order.
-                self.image ^= WALK_FRAMES_MASK as i16;
-            }
-
-            self.look_at_new_terrain(game);
-
-            if climbs_out_of_water(self.environ, self.terrain) {
-                if game.hero.sector != PIT_SECTOR {
-                    self.environ -= 1;
-                }
-
-                return Pc::Raise;
-            }
-
-            self.take_the_step();
-
-            Pc::Tail
+        if self.environ == ENVIRON_ICE {
+            return Pc::Cpx;
         }
+
+        if self.environ == ENVIRON_BACKWARDS {
+            // Walking backwards: flipping the three low bits plays the walk frames in reverse order.
+            self.image ^= WALK_FRAMES_MASK as i16;
+        }
+
+        self.look_at_new_terrain(game);
+
+        if climbs_out_of_water(self.environ, self.terrain) {
+            if game.hero.sector != PIT_SECTOR {
+                self.environ -= 1;
+            }
+
+            return Pc::Raise;
+        }
+
+        self.take_the_step(game);
+
+        Pc::Tail
     }
 
     /// Faces the actor the way it will step, and picks the walking frame for this tick (a rider and
     /// the wraiths keep their one frame).
     fn pick_walking_frame(&mut self, game: &mut Game) {
-        let mut actor = self.actor;
-        actor.facing = self.facing as i8;
+        let actor = self.actor;
+        game.actors.list[actor.slot()].facing = self.facing as i8;
         self.frame_base = diroff(self.facing);
         self.image = self.frame_base;
 
-        if !(game.hero.riding != 0 && self.slot == 0) && actor.race != RACE_WRAITH {
+        if !(game.hero.riding != 0 && self.slot == 0)
+            && game.actors.list[actor.slot()].race != RACE_WRAITH
+        {
             self.image = (self.image as i32
                 // Masks with WALK_FRAMES_MASK, keeping only the bits that matter here.
                 + ((self.cycle as i32 + self.slot) & WALK_FRAMES_MASK))
@@ -268,52 +289,56 @@ impl Ctx {
 
     /// The terrain at the new place; wraiths and snakes are immune to water, and snakes have their
     /// own pictures.
-    unsafe fn look_at_new_terrain(&mut self, game: &mut Game) {
-        unsafe {
-            let actor = self.actor;
-            self.terrain = terrain(game, XTEST, YTEST);
+    fn look_at_new_terrain(&mut self, game: &mut Game) {
+        let actor = self.actor;
+        self.terrain = terrain(game, game.xtest, game.ytest);
 
-            if actor.race == RACE_WRAITH || actor.race == RACE_SNAKE {
-                self.terrain = 0;
-            }
+        if game.actors.list[actor.slot()].race == RACE_WRAITH
+            || game.actors.list[actor.slot()].race == RACE_SNAKE
+        {
+            self.terrain = 0;
+        }
 
-            if actor.race == RACE_SNAKE {
-                // Snake pictures: two frames (bit 1 of the cycle) for each pair of facings, starting at image 0x24.
-                self.image = (self.cycle & 2) + ((self.facing & 0xfe) << 2) + SNAKE_FIRST_FRAME;
-            }
+        if game.actors.list[actor.slot()].race == RACE_SNAKE {
+            // Snake pictures: two frames (bit 1 of the cycle) for each pair of facings, starting at image 0x24.
+            self.image = (self.cycle & 2) + ((self.facing & 0xfe) << 2) + SNAKE_FIRST_FRAME;
         }
     }
 
     /// Moves to the new place, remembering the step as the velocity (for sliding on ice).
-    unsafe fn take_the_step(&mut self) {
-        unsafe {
-            let mut actor = self.actor;
-            actor.vel_x = ((XTEST.wrapping_sub(actor.abs_x) as i16 as i32) * VELOCITY_SCALE) as i8;
-            actor.vel_y = ((YTEST.wrapping_sub(actor.abs_y) as i16 as i32) * VELOCITY_SCALE) as i8;
-            actor.abs_x = XTEST;
-            actor.abs_y = YTEST;
-            the_actors.frustration = 0;
-        }
+    fn take_the_step(&mut self, game: &mut Game) {
+        let actor = self.actor;
+        game.actors.list[actor.slot()].vel_x = ((game
+            .xtest
+            .wrapping_sub(game.actors.list[actor.slot()].abs_x)
+            as i16 as i32)
+            * VELOCITY_SCALE) as i8;
+        game.actors.list[actor.slot()].vel_y = ((game
+            .ytest
+            .wrapping_sub(game.actors.list[actor.slot()].abs_y)
+            as i16 as i32)
+            * VELOCITY_SCALE) as i8;
+        game.actors.list[actor.slot()].abs_x = game.xtest;
+        game.actors.list[actor.slot()].abs_y = game.ytest;
+        game.actors.frustration = 0;
     }
 
     /// Walking found no way through. The hero shows a frustrated frame after a while; others change
     /// tactic. (The C placed this label inside the `STILL` branch.)
-    pub(super) unsafe fn blocked(&mut self) -> Pc {
-        unsafe {
-            if self.slot == 0 {
-                the_actors.frustration = the_actors.frustration.wrapping_add(1);
+    pub(super) fn blocked(&mut self, game: &mut Game) -> Pc {
+        if self.slot == 0 {
+            game.actors.frustration = game.actors.frustration.wrapping_add(1);
 
-                if let Some(frame) = frustrated_frame(the_actors.frustration, self.cycle) {
-                    self.image = frame;
-                }
-
-                return Pc::Cpx;
+            if let Some(frame) = frustrated_frame(game.actors.frustration, self.cycle) {
+                self.image = frame;
             }
 
-            self.actor.tactic = FRUST;
-
-            Pc::Still
+            return Pc::Cpx;
         }
+
+        game.actors.list[self.actor.slot()].tactic = FRUST;
+
+        Pc::Still
     }
 
     /// Standing still: the frame after the first of the facing's walking frames.
@@ -324,31 +349,33 @@ impl Ctx {
             return Pc::Cpx;
         }
 
-        self.terrain = terrain(game, self.actor.abs_x, self.actor.abs_y);
+        self.terrain = terrain(
+            game,
+            game.actors.list[self.actor.slot()].abs_x,
+            game.actors.list[self.actor.slot()].abs_y,
+        );
 
         Pc::Tail
     }
 
     /// Swinging a weapon (states 0-8): steps through the swing table.
-    pub(super) unsafe fn fighting(&mut self) -> Pc {
-        unsafe {
-            let mut actor = self.actor;
-            self.frame_base = diroff(self.facing + 8);
-            let next = swing_transitions[self.state as usize][rand4() as usize] as i16;
-            actor.state = next as i8;
-            self.state = next;
+    pub(super) fn fighting(&mut self, game: &mut Game) -> Pc {
+        let actor = self.actor;
+        self.frame_base = diroff(self.facing + 8);
+        let next = swing_transitions[self.state as usize][rand4(&mut game.rng) as usize] as i16;
+        game.actors.list[actor.slot()].state = next as i8;
+        self.state = next;
 
-            if (self.slot > FIRST_NPC_SLOT && self.state == SWING_STATE_FIRST)
-                || self.state == SWING_STATE_SECOND
-            {
-                self.state = SWING_STATE_FOLLOW_THROUGH;
-            }
-
-            self.image = self.state + self.frame_base;
-            the_actors.frustration = 0;
-
-            Pc::Cpx
+        if (self.slot > FIRST_NPC_SLOT && self.state == SWING_STATE_FIRST)
+            || self.state == SWING_STATE_SECOND
+        {
+            self.state = SWING_STATE_FOLLOW_THROUGH;
         }
+
+        self.image = self.state + self.frame_base;
+        game.actors.frustration = 0;
+
+        Pc::Cpx
     }
 }
 

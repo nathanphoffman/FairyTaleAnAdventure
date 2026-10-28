@@ -3,8 +3,6 @@
 use crate::game::actors::encounters::load_carrier;
 use crate::game::data::random::{rand8, rand64};
 use crate::game::data::state::Game;
-use crate::game::data::tables::extent_list;
-use crate::game::data::types::Extent;
 use crate::game::world::map::{step_x, step_y, terrain_at};
 
 /// Places the turtle: tries up to 25 random spots around the hero for one on water (terrain 5),
@@ -32,6 +30,7 @@ pub fn summon_turtle(game: &mut Game) {
     }
 
     center_extent_on(
+        game,
         TURTLE_EXTENT,
         game.encounter.x as i16,
         game.encounter.y as i16,
@@ -41,16 +40,14 @@ pub fn summon_turtle(game: &mut Game) {
 }
 
 /// Centres extent `e` on a point (it covers 500 by 400 pixels around it).
-pub fn center_extent_on(e: i16, x: i16, y: i16) {
+pub fn center_extent_on(game: &mut Game, e: i16, x: i16, y: i16) {
     const HALF_WIDTH: i32 = 250;
     const HALF_HEIGHT: i32 = 200;
-    unsafe {
-        let extent = &mut *(&raw mut extent_list).cast::<Extent>().add(e as usize);
-        extent.x1 = (x as i32 - HALF_WIDTH) as u16;
-        extent.y1 = (y as i32 - HALF_HEIGHT) as u16;
-        extent.x2 = (x as i32 + HALF_WIDTH) as u16;
-        extent.y2 = (y as i32 + HALF_HEIGHT) as u16;
-    }
+    let extent = &mut game.extents[e as usize];
+    extent.x1 = (x as i32 - HALF_WIDTH) as u16;
+    extent.y1 = (y as i32 - HALF_HEIGHT) as u16;
+    extent.x2 = (x as i32 + HALF_WIDTH) as u16;
+    extent.y2 = (y as i32 + HALF_HEIGHT) as u16;
 }
 
 // An encounter appears this far away: 150 plus up to 63.
@@ -59,8 +56,8 @@ const ENCOUNTER_MIN_DISTANCE: i32 = 150;
 /// Picks where a new encounter appears: a random direction and distance from the hero
 /// (150 to 213 pixels).
 pub fn pick_encounter_spot(game: &mut Game) {
-    let direction = rand8();
-    let distance = ENCOUNTER_MIN_DISTANCE + rand64();
+    let direction = rand8(&mut game.rng);
+    let distance = ENCOUNTER_MIN_DISTANCE + rand64(&mut game.rng);
     game.encounter.x = step_x(game.hero.x as i32, direction, distance) as u16;
     game.encounter.y = step_y(game.hero.y as i32, direction, distance) as u16;
 }

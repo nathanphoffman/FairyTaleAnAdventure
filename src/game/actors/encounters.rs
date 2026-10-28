@@ -5,9 +5,9 @@ use crate::game::data::object_tables::weapon_probs;
 use crate::game::data::random::{bitrand, rand2, rand4, rnd};
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::{Hero, current_extent, the_actors, the_world};
-use crate::game::data::tables::{encounter_chart, extent_list};
-use crate::game::data::types::{Extent, Shape};
+use crate::game::data::state::Hero;
+use crate::game::data::tables::encounter_chart;
+use crate::game::data::types::Shape;
 use crate::game::files::disk::motor_off;
 use crate::game::files::loading::{finish_sprite_load, load_sprite_file};
 use crate::game::ui::music::set_mood;
@@ -99,87 +99,81 @@ const FIRST_CARRIER_SLOT: usize = 3;
 /// (mixed with the one next to it when `mixflag` bit 1 is set). Returns 1 if it was placed and
 /// 0 if no free spot was found in 15 tries.
 pub fn place_encounter(game: &mut Game, i: u16, spread: u16) -> i32 {
-    unsafe {
-        let mut actor = ActorRef::new(i as usize);
-        let Some((xtest, ytest)) = find_open_spot(game, i, spread) else {
-            return 0;
-        };
+    let actor = ActorRef::new(i as usize);
+    let Some((xtest, ytest)) = find_open_spot(game, i, spread) else {
+        return 0;
+    };
 
-        actor.abs_x = xtest;
-        actor.abs_y = ytest;
-        actor.kind = ENEMY;
-        let race = encounter_race(game);
-        actor.race = race as u8;
-        arm_enemy(game, actor, race);
+    game.actors.list[actor.slot()].abs_x = xtest;
+    game.actors.list[actor.slot()].abs_y = ytest;
+    game.actors.list[actor.slot()].kind = ENEMY;
+    let race = encounter_race(game);
+    game.actors.list[actor.slot()].race = race as u8;
+    arm_enemy(game, actor, race);
 
-        actor.rel_x = actor
-            .abs_x
-            .wrapping_sub(the_world.map_x)
-            .wrapping_sub(ENEMY_ANCHOR.0);
-        actor.rel_y = actor
-            .abs_y
-            .wrapping_sub(the_world.map_y)
-            .wrapping_sub(ENEMY_ANCHOR.1);
+    game.actors.list[actor.slot()].rel_x = game.actors.list[actor.slot()]
+        .abs_x
+        .wrapping_sub(game.world.map_x)
+        .wrapping_sub(ENEMY_ANCHOR.0);
+    game.actors.list[actor.slot()].rel_y = game.actors.list[actor.slot()]
+        .abs_y
+        .wrapping_sub(game.world.map_y)
+        .wrapping_sub(ENEMY_ANCHOR.1);
 
-        1
-    }
+    1
 }
 
 /// Gives the new enemy its weapon (picked from the race's chart, at random for a mixed group),
 /// its goal (archers shoot, the rest attack, both as clever as the race is) and its hit points.
-unsafe fn arm_enemy(game: &mut Game, mut actor: ActorRef, race: i32) {
-    unsafe {
-        // Masks with MIX_RANDOM_WEAPON, keeping only the bits that matter here.
-        if game.encounter.mix_flag & MIX_RANDOM_WEAPON != 0 {
-            game.encounter.weapon_type = rand4() as i16;
-        }
-
-        let chart = &encounter_chart[race as usize];
-        let w = (chart.arms as i32 * WEAPON_CHOICES) + game.encounter.weapon_type as i32;
-        actor.weapon = weapon_probs[w as usize];
-        actor.state = STILL;
-        actor.environ = 0;
-        actor.facing = 0;
-
-        // Masks with BOW_BIT, keeping only the bits that matter here.
-        if actor.weapon & BOW_BIT != 0 {
-            actor.goal = ARCHER1 + chart.cleverness;
-        } else {
-            actor.goal = ATTACK1 + chart.cleverness;
-        }
-
-        actor.vitality = chart.hitpoints as i16;
+fn arm_enemy(game: &mut Game, actor: ActorRef, race: i32) {
+    // Masks with MIX_RANDOM_WEAPON, keeping only the bits that matter here.
+    if game.encounter.mix_flag & MIX_RANDOM_WEAPON != 0 {
+        game.encounter.weapon_type = rand4(&mut game.rng) as i16;
     }
+
+    let chart = &encounter_chart[race as usize];
+    let w = (chart.arms as i32 * WEAPON_CHOICES) + game.encounter.weapon_type as i32;
+    game.actors.list[actor.slot()].weapon = weapon_probs[w as usize];
+    game.actors.list[actor.slot()].state = STILL;
+    game.actors.list[actor.slot()].environ = 0;
+    game.actors.list[actor.slot()].facing = 0;
+
+    // Masks with BOW_BIT, keeping only the bits that matter here.
+    if game.actors.list[actor.slot()].weapon & BOW_BIT != 0 {
+        game.actors.list[actor.slot()].goal = ARCHER1 + chart.cleverness;
+    } else {
+        game.actors.list[actor.slot()].goal = ATTACK1 + chart.cleverness;
+    }
+
+    game.actors.list[actor.slot()].vitality = chart.hitpoints as i16;
 }
 
 /// Finds a place near the encounter point for actor `i`, trying up to `MAX_TRY` random spots
 /// within `spread` pixels. Some encounters always use one fixed place. Returns `None` if every
 /// spot was blocked.
-unsafe fn find_open_spot(game: &mut Game, i: u16, spread: u16) -> Option<(u16, u16)> {
-    unsafe {
-        if current_extent().v3 == FIXED_PLACE_ENCOUNTER {
-            return Some(FIXED_PLACE);
-        }
-
-        for _ in 0..MAX_TRY {
-            let xtest =
-                (game.encounter.x as i32 + bitrand(spread as i32) - (spread as i32 / 2)) as u16;
-            let ytest =
-                (game.encounter.y as i32 + bitrand(spread as i32) - (spread as i32 / 2)) as u16;
-
-            if blocked_at(game, xtest as i16, ytest as i16, i as i16) == 0 {
-                return Some((xtest, ytest));
-            }
-
-            if the_world.extent_type == SPIDER_PIT
-                && terrain_at(game, xtest as i32, ytest as i32) == TERRAIN_SWAMP
-            {
-                return Some((xtest, ytest));
-            }
-        }
-
-        None
+fn find_open_spot(game: &mut Game, i: u16, spread: u16) -> Option<(u16, u16)> {
+    if game.extents[game.world.extent].v3 == FIXED_PLACE_ENCOUNTER {
+        return Some(FIXED_PLACE);
     }
+
+    for _ in 0..MAX_TRY {
+        let xtest = (game.encounter.x as i32 + bitrand(&mut game.rng, spread as i32)
+            - (spread as i32 / 2)) as u16;
+        let ytest = (game.encounter.y as i32 + bitrand(&mut game.rng, spread as i32)
+            - (spread as i32 / 2)) as u16;
+
+        if blocked_at(game, xtest as i16, ytest as i16, i as i16) == 0 {
+            return Some((xtest, ytest));
+        }
+
+        if game.world.extent_type == SPIDER_PIT
+            && terrain_at(game, xtest as i32, ytest as i32) == TERRAIN_SWAMP
+        {
+            return Some((xtest, ytest));
+        }
+    }
+
+    None
 }
 
 /// The race of the next enemy: for mixed groups the two races of the pair are picked at random
@@ -188,7 +182,7 @@ fn encounter_race(game: &mut Game) -> i32 {
     // Masks with MIX_RACE_PAIR, keeping only the bits that matter here.
     if (game.encounter.mix_flag & MIX_RACE_PAIR) != 0 && game.encounter.kind != KIND_NO_MIX {
         // Masks with PAIR_MASK, keeping only the bits that matter here.
-        (game.encounter.kind & PAIR_MASK) as i32 + rand2()
+        (game.encounter.kind & PAIR_MASK) as i32 + rand2(&mut game.rng)
     } else {
         game.encounter.kind as i32
     }
@@ -199,9 +193,9 @@ fn encounter_race(game: &mut Game) -> i32 {
 /// 3 kindness. If it is the hero, `dtype` is the death message, luck drops by 5 and the music
 /// changes. The hero's stats are always refreshed on screen.
 pub fn check_death(game: &mut Game, i: i32, dtype: i32) {
-    let mut actor = ActorRef::new(i as usize);
+    let actor = ActorRef::new(i as usize);
 
-    if let Some(death) = start_dying(i, &mut actor, &mut game.hero) {
+    if let Some(death) = start_dying(i, &mut game.actors.list[actor.slot()], &mut game.hero) {
         if death.dark_knight {
             speak(game, SPEAK_DARK_KNIGHT_DIES);
         }
@@ -211,11 +205,11 @@ pub fn check_death(game: &mut Game, i: i32, dtype: i32) {
             set_mood(game, 1);
         }
 
-        queue_print(PRQ_VITALITY);
+        queue_print(game, PRQ_VITALITY);
     }
 
     if i == 0 {
-        queue_print(PRQ_STATS);
+        queue_print(game, PRQ_STATS);
     }
 }
 
@@ -260,57 +254,54 @@ fn start_dying(i: i32, actor: &mut Shape, hero: &mut Hero) -> Option<Death> {
 /// Puts carrier `n` (5 turtle, 10 dragon, otherwise the swan) in actor slot 3, loading its sprites
 /// if they are not the ones already loaded, in the middle of its extent.
 pub fn load_carrier(game: &mut Game, n: i16) {
-    unsafe {
-        let mut actor = ActorRef::new(FIRST_CARRIER_SLOT);
+    let actor = ActorRef::new(FIRST_CARRIER_SLOT);
 
-        actor.kind = if n == CARRIER_DRAGON { DRAGON } else { CARRIER };
-        let extent = if n == CARRIER_DRAGON {
-            2
-        } else if n == CARRIER_TURTLE {
-            1
-        } else {
-            0
-        };
+    game.actors.list[actor.slot()].kind = if n == CARRIER_DRAGON { DRAGON } else { CARRIER };
+    let extent = if n == CARRIER_DRAGON {
+        2
+    } else if n == CARRIER_TURTLE {
+        1
+    } else {
+        0
+    };
 
-        if the_actors.loaded_actor_file != n {
-            game.memory.nextshape = game.memory.seq_list[SEQ_ENEMY].location;
-            load_sprite_file(game, n as i32);
-            finish_sprite_load(game, actor.kind as i16);
-            motor_off();
-        }
-
-        let e = &*(&raw mut extent_list).cast::<Extent>().add(extent);
-        actor.abs_x = e.x1.wrapping_add(CARRIER_OFFSET.0);
-        actor.abs_y = e.y1.wrapping_add(CARRIER_OFFSET.1);
-        actor.index = 0;
-        actor.weapon = 0;
-        actor.environ = 0;
-        actor.state = STILL;
-        actor.vitality = VITALITY_CARRIER;
-        the_actors.active = ACTORS_WITH_CARRIER;
-        the_actors.active_carrier = n;
-        the_actors.loaded_actor_file = n;
-        actor.race = n as u8;
+    if game.actors.loaded_actor_file != n {
+        game.memory.nextshape = game.memory.seq_list[SEQ_ENEMY].location;
+        load_sprite_file(game, n as i32);
+        finish_sprite_load(game, game.actors.list[actor.slot()].kind as i16);
+        motor_off();
     }
+
+    let e = &game.extents[extent];
+    game.actors.list[actor.slot()].abs_x = e.x1.wrapping_add(CARRIER_OFFSET.0);
+    game.actors.list[actor.slot()].abs_y = e.y1.wrapping_add(CARRIER_OFFSET.1);
+    game.actors.list[actor.slot()].index = 0;
+    game.actors.list[actor.slot()].weapon = 0;
+    game.actors.list[actor.slot()].environ = 0;
+    game.actors.list[actor.slot()].state = STILL;
+    game.actors.list[actor.slot()].vitality = VITALITY_CARRIER;
+    game.actors.active = ACTORS_WITH_CARRIER;
+    game.actors.active_carrier = n;
+    game.actors.loaded_actor_file = n;
+    game.actors.list[actor.slot()].race = n as u8;
 }
 
 /// The actors' sprite file the monsters of this encounter need: sets how many appear and, if that
 /// file is not the one loaded, loads it (the carrier is dropped then).
 pub fn load_enemy_sprites(game: &mut Game) {
     const FIRST_ENEMY_SLOT: i16 = 3;
-    unsafe {
-        game.encounter.number =
-            (current_extent().v1 as i32 + rnd(current_extent().v2 as i32)) as u8;
-        let file = encounter_chart[game.encounter.kind as usize].file_id as i16;
+    game.encounter.number = (game.extents[game.world.extent].v1 as i32
+        + rnd(&mut game.rng, game.extents[game.world.extent].v2 as i32))
+        as u8;
+    let file = encounter_chart[game.encounter.kind as usize].file_id as i16;
 
-        if the_actors.loaded_actor_file != file {
-            the_actors.loaded_actor_file = file;
-            the_actors.active = FIRST_ENEMY_SLOT;
-            game.memory.nextshape = game.memory.seq_list[ENEMY as usize].location;
-            load_sprite_file(game, the_actors.loaded_actor_file as i32);
-            the_actors.loading = 1;
-            the_actors.active_carrier = 0;
-        }
+    if game.actors.loaded_actor_file != file {
+        game.actors.loaded_actor_file = file;
+        game.actors.active = FIRST_ENEMY_SLOT;
+        game.memory.nextshape = game.memory.seq_list[ENEMY as usize].location;
+        load_sprite_file(game, game.actors.loaded_actor_file as i32);
+        game.actors.loading = 1;
+        game.actors.active_carrier = 0;
     }
 }
 
@@ -319,20 +310,20 @@ mod tests {
     use super::*;
 
     fn actor(vitality: i16, state: i8) -> Shape {
-        let mut a: Shape = unsafe { std::mem::zeroed() };
-        a.vitality = vitality;
-        a.state = state;
-
-        a
+        Shape {
+            vitality,
+            state,
+            ..Default::default()
+        }
     }
 
     fn hero(brave: i16, luck: i16, kindness: i16) -> Hero {
-        let mut h: Hero = unsafe { std::mem::zeroed() };
-        h.brave = brave;
-        h.luck = luck;
-        h.kindness = kindness;
-
-        h
+        Hero {
+            brave,
+            luck,
+            kindness,
+            ..Default::default()
+        }
     }
 
     #[test]

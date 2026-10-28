@@ -6,7 +6,6 @@ use crate::game::actors::interaction::pick_encounter_spot;
 use crate::game::data::random::{fta_rand, rand4, rand64};
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::{the_actors, the_world};
 use crate::game::files::disk::{motor_off, read_finished};
 use crate::game::files::loading::finish_sprite_load;
 use crate::game::world::map::terrain_at;
@@ -53,117 +52,106 @@ const INDOOR_REGION: u16 = 7;
 /// Says where the hero is, finishes loading monsters, places waiting ones and now and then
 /// starts a new random encounter.
 pub fn spawn_encounters(game: &mut Game) {
-    unsafe {
-        find_place(game, 2);
+    find_place(game, 2);
 
-        if the_actors.loading == 1 && read_finished(DISK_REQUEST_ACTORS) != 0 {
-            finish_sprite_load(game, ENEMY_SLOT);
-            motor_off();
-            the_actors.loading = 0;
-            the_actors.active = FIRST_ENEMY_ACTOR;
-        }
+    if game.actors.loading == 1 && read_finished(DISK_REQUEST_ACTORS) != 0 {
+        finish_sprite_load(game, ENEMY_SLOT);
+        motor_off();
+        game.actors.loading = 0;
+        game.actors.active = FIRST_ENEMY_ACTOR;
+    }
 
-        // Masks with PLACE_PERIOD_MASK, keeping only the bits that matter here.
-        if the_world.day_clock & PLACE_PERIOD_MASK == 0
-            && game.encounter.number != 0
-            && the_actors.loading == 0
-        {
-            place_waiting_encounters(game);
-        }
+    // Masks with PLACE_PERIOD_MASK, keeping only the bits that matter here.
+    if game.world.day_clock & PLACE_PERIOD_MASK == 0
+        && game.encounter.number != 0
+        && game.actors.loading == 0
+    {
+        place_waiting_encounters(game);
+    }
 
-        if random_encounter_due() {
-            roll_random_encounter(game);
-        }
+    if random_encounter_due(game) {
+        roll_random_encounter(game);
     }
 }
 
 /// A new random encounter is rolled now and then, when nothing else is going on.
-unsafe fn random_encounter_due() -> bool {
-    unsafe {
-        // Masks with ROLL_PERIOD_MASK, keeping only the bits that matter here.
-        the_world.day_clock & ROLL_PERIOD_MASK == 0
-            && the_actors.on_screen == 0
-            && the_actors.loading == 0
-            && the_actors.active_carrier == 0
-            && the_world.extent_type < NO_RANDOM_XTYPE
-    }
+fn random_encounter_due(game: &mut Game) -> bool {
+    // Masks with ROLL_PERIOD_MASK, keeping only the bits that matter here.
+    game.world.day_clock & ROLL_PERIOD_MASK == 0
+        && game.actors.on_screen == 0
+        && game.actors.loading == 0
+        && game.actors.active_carrier == 0
+        && game.world.extent_type < NO_RANDOM_XTYPE
 }
 
 /// Rolls the danger of the area against a random number; if it is beaten, picks the kind of the
 /// encounter (a few extents decide it by rule) and starts loading the monsters' sprites.
-unsafe fn roll_random_encounter(game: &mut Game) {
-    unsafe {
-        game.encounter.danger_level = (if the_world.region > INDOOR_REGION {
-            DANGER_BASE_INDOORS + the_world.extent_type
-        } else {
-            DANGER_BASE_OUTDOORS + the_world.extent_type
-        }) as u8;
+fn roll_random_encounter(game: &mut Game) {
+    game.encounter.danger_level = (if game.world.region > INDOOR_REGION {
+        DANGER_BASE_INDOORS + game.world.extent_type
+    } else {
+        DANGER_BASE_OUTDOORS + game.world.extent_type
+    }) as u8;
 
-        if rand64() <= game.encounter.danger_level as i32 {
-            game.encounter.kind = rand4() as u16;
+    if rand64(&mut game.rng) <= game.encounter.danger_level as i32 {
+        game.encounter.kind = rand4(&mut game.rng) as u16;
 
-            if the_world.extent_type == DKNIGHT_XTYPE && game.encounter.kind == KIND_DKNIGHT_SWAP.0
-            {
-                game.encounter.kind = KIND_DKNIGHT_SWAP.1;
-            }
-
-            if the_world.extent_type == SPIDER_PIT_XTYPE {
-                game.encounter.kind = KIND_SPIDER_PIT;
-                game.encounter.mix_flag = 0;
-            }
-
-            if the_world.extent_type == FINAL_XTYPE {
-                game.encounter.kind = KIND_FINAL;
-                game.encounter.mix_flag = 0;
-            }
-
-            load_enemy_sprites(game);
+        if game.world.extent_type == DKNIGHT_XTYPE && game.encounter.kind == KIND_DKNIGHT_SWAP.0 {
+            game.encounter.kind = KIND_DKNIGHT_SWAP.1;
         }
+
+        if game.world.extent_type == SPIDER_PIT_XTYPE {
+            game.encounter.kind = KIND_SPIDER_PIT;
+            game.encounter.mix_flag = 0;
+        }
+
+        if game.world.extent_type == FINAL_XTYPE {
+            game.encounter.kind = KIND_FINAL;
+            game.encounter.mix_flag = 0;
+        }
+
+        load_enemy_sprites(game);
     }
 }
 
 /// Tries to find a clear spot near the hero and puts the waiting encounter there, into free
 /// actor slots first and then into dead ones.
-unsafe fn place_waiting_encounters(game: &mut Game) {
-    unsafe {
-        game.encounter.mix_flag = fta_rand() as i16;
+fn place_waiting_encounters(game: &mut Game) {
+    game.encounter.mix_flag = fta_rand(&mut game.rng) as i16;
 
-        if the_world.extent_type > NO_MIX_XTYPE {
-            game.encounter.mix_flag = 0;
+    if game.world.extent_type > NO_MIX_XTYPE {
+        game.encounter.mix_flag = 0;
+    }
+
+    game.encounter.weapon_type = rand4(&mut game.rng) as i16;
+
+    // Masks with NO_MIX_MASK, keeping only the bits that matter here.
+    if game.world.extent_type & NO_MIX_MASK == 0 {
+        game.encounter.mix_flag = 0;
+    }
+
+    for _ in 1..PLACE_TRIES {
+        pick_encounter_spot(game);
+
+        if terrain_at(game, game.encounter.x as i32, game.encounter.y as i32) != PLAIN_TERRAIN {
+            continue;
         }
 
-        game.encounter.weapon_type = rand4() as i16;
+        place_in_free_slots(game);
+        place_in_dead_slots(game);
 
-        // Masks with NO_MIX_MASK, keeping only the bits that matter here.
-        if the_world.extent_type & NO_MIX_MASK == 0 {
-            game.encounter.mix_flag = 0;
-        }
-
-        for _ in 1..PLACE_TRIES {
-            pick_encounter_spot(game);
-
-            if terrain_at(game, game.encounter.x as i32, game.encounter.y as i32) != PLAIN_TERRAIN {
-                continue;
-            }
-
-            place_in_free_slots(game);
-            place_in_dead_slots(game);
-
-            break;
-        }
+        break;
     }
 }
 
 /// Puts the waiting monsters into the actor slots that are still free.
-unsafe fn place_in_free_slots(game: &mut Game) {
-    unsafe {
-        while game.encounter.number != 0 && the_actors.active < LAST_ENEMY_ACTOR {
-            if place_encounter(game, the_actors.active as u16, SPREAD) != 0 {
-                the_actors.active += 1;
-            }
-
-            game.encounter.number -= 1;
+fn place_in_free_slots(game: &mut Game) {
+    while game.encounter.number != 0 && game.actors.active < LAST_ENEMY_ACTOR {
+        if place_encounter(game, game.actors.active as u16, SPREAD) != 0 {
+            game.actors.active += 1;
         }
+
+        game.encounter.number -= 1;
     }
 }
 
@@ -175,7 +163,10 @@ fn place_in_dead_slots(game: &mut Game) {
     while i < LAST_ENEMY_ACTOR as usize && game.encounter.number != 0 {
         let actor = ActorRef::new(i);
 
-        if actor.state == DEAD && (actor.visible == 0 || actor.race == WRAITH) {
+        if game.actors.list[actor.slot()].state == DEAD
+            && (game.actors.list[actor.slot()].visible == 0
+                || game.actors.list[actor.slot()].race == WRAITH)
+        {
             place_encounter(game, i as u16, SPREAD);
             game.encounter.number -= 1;
         }

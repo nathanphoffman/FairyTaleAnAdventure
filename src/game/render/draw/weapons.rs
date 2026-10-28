@@ -4,7 +4,7 @@ use super::images::{byte_of, state_entry};
 use super::{DEAD, OBJECTS, SHOOT1, Sprite};
 use crate::game::data::object_tables::{bow_x, bow_y};
 use crate::game::data::state::ActorRef;
-use crate::game::data::state::the_world;
+use crate::game::data::state::Game;
 
 const OBJ_BOW_UP: i16 = 30;
 const OBJ_BOW_MID: i16 = 0x53;
@@ -37,42 +37,40 @@ const WEAPON_SPRITE_BASE: [(i8, i16); 4] = [(2, 32), (3, 48), (1, 64), (4, 0)];
 
 /// Says whether this pass draws the weapon (`true`) or the body. An actor with a weapon is drawn in
 /// two passes, the weapon first or second depending on which way it faces.
-pub(super) unsafe fn weapon_passmode(actor: ActorRef, pass: &mut u8) -> bool {
-    unsafe {
-        let mut passmode = false;
-        let state = actor.state;
+pub(super) fn weapon_passmode(game: &mut Game, actor: ActorRef, pass: &mut u8) -> bool {
+    let mut passmode = false;
+    let state = game.actors.list[actor.slot()].state;
 
-        if actor.weapon > 0
-            && actor.weapon <= LAST_HELD_WEAPON
-            && (!(DEAD..SHOOT1).contains(&state) || the_world.extent_type > PEACEFUL_XTYPE)
-        {
-            let facing = actor.facing as i32;
+    if game.actors.list[actor.slot()].weapon > 0
+        && game.actors.list[actor.slot()].weapon <= LAST_HELD_WEAPON
+        && (!(DEAD..SHOOT1).contains(&state) || game.world.extent_type > PEACEFUL_XTYPE)
+    {
+        let facing = game.actors.list[actor.slot()].facing as i32;
 
-            // The other of the two passes (0 becomes 1, 1 becomes 0).
-            let flipped = *pass ^ 1;
+        // The other of the two passes (0 becomes 1, 1 becomes 0).
+        let flipped = *pass ^ 1;
 
-            // Masks with FACING_PICK_OFFSET, keeping only the bits that matter here.
-            let mut pick = if ((facing - FACING_PICK_OFFSET) & FACING_LEFT_BIT) != 0 {
+        // Masks with FACING_PICK_OFFSET, keeping only the bits that matter here.
+        let mut pick = if ((facing - FACING_PICK_OFFSET) & FACING_LEFT_BIT) != 0 {
+            flipped
+        } else {
+            *pass
+        };
+
+        if game.actors.list[actor.slot()].weapon == WEAPON_BOW && state < SHOOT1 {
+            // Masks with FACING_LEFT_BIT, keeping only the bits that matter here.
+            pick = if (facing & FACING_LEFT_BIT) == 0 {
                 flipped
             } else {
                 *pass
             };
-
-            if actor.weapon == WEAPON_BOW && state < SHOOT1 {
-                // Masks with FACING_LEFT_BIT, keeping only the bits that matter here.
-                pick = if (facing & FACING_LEFT_BIT) == 0 {
-                    flipped
-                } else {
-                    *pass
-                };
-            }
-
-            passmode = pick != 0;
-            *pass += 1;
         }
 
-        passmode
+        passmode = pick != 0;
+        *pass += 1;
     }
+
+    passmode
 }
 
 /// The picture of the bow for an animation frame: it is drawn up, middle or down as the frames go.
@@ -91,35 +89,33 @@ fn bow_image(frame_number: i16) -> i16 {
 }
 
 /// The weapon's sprite: where it is held for this animation frame, and which image it is.
-pub(super) unsafe fn weapon_image(actor: ActorRef, mut sprite: Sprite) -> Sprite {
-    unsafe {
-        let kind = actor.weapon as i16;
-        let frame_number = sprite.inum;
+pub(super) fn weapon_image(game: &mut Game, actor: ActorRef, mut sprite: Sprite) -> Sprite {
+    let kind = game.actors.list[actor.slot()].weapon as i16;
+    let frame_number = sprite.inum;
 
-        if kind == WEAPON_BOW as i16 && frame_number < BOW_FRAMES {
-            sprite.xstart += byte_of(&bow_x, frame_number);
-            sprite.ystart += byte_of(&bow_y, frame_number);
-            sprite.inum = bow_image(frame_number);
-        } else {
-            let entry = state_entry(frame_number);
-            sprite.xstart += entry.wpn_x as i16;
-            sprite.ystart += entry.wpn_y as i16;
+    if kind == WEAPON_BOW as i16 && frame_number < BOW_FRAMES {
+        sprite.xstart += byte_of(&bow_x, frame_number);
+        sprite.ystart += byte_of(&bow_y, frame_number);
+        sprite.inum = bow_image(frame_number);
+    } else {
+        let entry = state_entry(frame_number);
+        sprite.xstart += entry.wpn_x as i16;
+        sprite.ystart += entry.wpn_y as i16;
 
-            if kind == WEAPON_FIREBALL as i16 {
-                sprite.inum = actor.facing as i16 + OBJ_ARROW_BASE;
+        if kind == WEAPON_FIREBALL as i16 {
+            sprite.inum = game.actors.list[actor.slot()].facing as i16 + OBJ_ARROW_BASE;
 
-                if actor.facing == FIREBALL_FACING_EAST {
-                    sprite.ystart -= FIREBALL_EAST_LIFT;
-                }
-            } else {
-                sprite.inum = entry.wpn_no as i16 + hand_weapon_images(kind);
+            if game.actors.list[actor.slot()].facing == FIREBALL_FACING_EAST {
+                sprite.ystart -= FIREBALL_EAST_LIFT;
             }
+        } else {
+            sprite.inum = entry.wpn_no as i16 + hand_weapon_images(kind);
         }
-
-        sprite.atype = OBJECTS;
-
-        sprite
     }
+
+    sprite.atype = OBJECTS;
+
+    sprite
 }
 
 /// Hand weapons each have their own block of images; the first image of the block for `kind`.

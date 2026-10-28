@@ -7,12 +7,8 @@ use super::{
     PLANE_COUNT, SHIFT_MASK, TILE_LINES, TILE_MASK_BYTES, USE_A, USE_B, USE_C, USE_D,
 };
 use crate::game::data::state::Game;
+use crate::game::render::blit::SShape;
 use crate::game::render::screen::Screen;
-
-use crate::game::data::globals::{
-    current_sshape, last_word_mask, shadow_mask_offset, sprite_mask_modulo, sprite_mask_offset,
-    sprite_x_shift,
-};
 
 /// Runs `job` on the memory a blit can reach.
 fn with_mem<R>(screen: &mut Screen, shapes: &mut [u8], job: impl FnOnce(&mut BlitMem) -> R) -> R {
@@ -26,17 +22,44 @@ fn with_mem<R>(screen: &mut Screen, shapes: &mut [u8], job: impl FnOnce(&mut Bli
     })
 }
 
+/// The blitter settings of the sprite being drawn, copied out of the game so the blit can borrow the
+/// screen and the sprite memory at the same time.
+#[derive(Clone, Copy)]
+struct SpriteRegs {
+    sshape: SShape,
+    shadow_mask_offset: i16,
+    mask_offset: i16,
+    mask_modulo: i16,
+    word_mask: i16,
+    planesize: usize,
+    shapedata: usize,
+}
+
+impl SpriteRegs {
+    fn of(game: &Game) -> SpriteRegs {
+        SpriteRegs {
+            sshape: game.current_sshape,
+            shadow_mask_offset: game.shadow_mask_offset,
+            mask_offset: game.sprite_mask_offset,
+            mask_modulo: game.sprite_mask_modulo,
+            word_mask: game.last_word_mask,
+            planesize: game.screen.planesize as usize,
+            shapedata: game.memory.shapedata,
+        }
+    }
+}
+
 /// Where plane `p` of the play field starts for the current sprite.
-fn plane_at_sprite(p: i32) -> Loc {
+fn plane_at_sprite(regs: &SpriteRegs, p: i32) -> Loc {
     Loc {
         area: Area::Plane(p as u8),
-        pos: unsafe { current_sshape.coff } as isize,
+        pos: regs.sshape.coff as isize,
     }
 }
 
 /// Where the scenery mask of the current sprite starts.
-fn scenery_mask_at() -> Loc {
-    Loc::new(Area::Mask, MASK_START).add(unsafe { shadow_mask_offset } as isize)
+fn scenery_mask_at(regs: &SpriteRegs) -> Loc {
+    Loc::new(Area::Mask, MASK_START).add(regs.shadow_mask_offset as isize)
 }
 
 /// Zeroes the start of the scenery mask, a rectangle sized like a BLTSIZE value.
@@ -52,12 +75,13 @@ pub fn clear_memory(game: &mut Game, size: i32) {
 
 /// Copies the background under the sprite (all planes) to `savemem`.
 pub fn save_background(game: &mut Game, savemem: Loc) {
-    let sshape = unsafe { current_sshape };
+    let regs = SpriteRegs::of(game);
+    let sshape = { game.current_sshape };
 
     with_mem(&mut game.screen, &mut game.memory.shape, |mem| {
         for p in (0..PLANE_COUNT).rev() {
             let mut t = Blit::new(USE_B | USE_D, D_EQUALS_B, sshape.blitsize);
-            t.b = plane_at_sprite(p);
+            t.b = plane_at_sprite(&regs, p);
             t.bmod = sshape.cmod as i32;
             t.d = savemem.add(sshape.savesize as isize * p as isize);
             blit(&mut t, mem);
@@ -67,13 +91,14 @@ pub fn save_background(game: &mut Game, savemem: Loc) {
 
 /// Puts the saved background back (this erases the sprite).
 pub fn restore_background(game: &mut Game, savemem: Loc) {
-    let sshape = unsafe { current_sshape };
+    let regs = SpriteRegs::of(game);
+    let sshape = { game.current_sshape };
 
     with_mem(&mut game.screen, &mut game.memory.shape, |mem| {
         for p in (0..PLANE_COUNT).rev() {
             let mut t = Blit::new(USE_B | USE_D, D_EQUALS_B, sshape.blitsize);
             t.b = savemem.add(sshape.savesize as isize * p as isize);
-            t.d = plane_at_sprite(p);
+            t.d = plane_at_sprite(&regs, p);
             t.dmod = sshape.cmod as i32;
             blit(&mut t, mem);
         }
@@ -83,12 +108,12 @@ pub fn restore_background(game: &mut Game, savemem: Loc) {
 /// Combines the sprite's own mask with the scenery mask built by `add_scenery_mask`. The result goes in
 /// the scenery mask: the sprite is opaque here and nothing is in front of it (D = A and not C).
 pub fn combine_masks(game: &mut Game) {
-    let (sshape, mask_offset, mask_modulo, x_shift) = unsafe {
+    let (sshape, mask_offset, mask_modulo, x_shift) = {
         (
-            current_sshape,
-            sprite_mask_offset,
-            sprite_mask_modulo,
-            sprite_x_shift,
+            game.current_sshape,
+            game.sprite_mask_offset,
+            game.sprite_mask_modulo,
+            game.sprite_x_shift,
         )
     };
     let mut t = Blit::new(USE_A | USE_C | USE_D, D_EQUALS_A_AND_NOT_C, sshape.blitsize);
@@ -98,7 +123,7 @@ pub fn combine_masks(game: &mut Game) {
 
     // Masks with SHIFT_MASK, keeping only the bits that matter here.
     t.ashift = (x_shift & SHIFT_MASK) as u32;
-    t.c = scenery_mask_at();
+    t.c = scenery_mask_at(&SpriteRegs::of(game));
     t.d = t.c;
     with_mem(&mut game.screen, &mut game.memory.shape, |mem| {
         blit(&mut t, mem)
@@ -109,7 +134,7 @@ pub fn combine_masks(game: &mut Game) {
 /// The first and last word masks stop the sprite's shifted edges leaking into neighbouring pixels.
 pub fn draw_shape(game: &mut Game) {
     // Masks with SHIFT_MASK, keeping only the bits that matter here.
-    let bit_shift = (unsafe { sprite_x_shift } & SHIFT_MASK) as u32;
+    let bit_shift = ({ game.sprite_x_shift } & SHIFT_MASK) as u32;
 
     // The first word is masked so the bits left of the sprite's pixel offset stay clear.
     let first = ALL_BITS >> bit_shift;
@@ -121,12 +146,11 @@ pub fn draw_shape(game: &mut Game) {
         last = ALL_BITS;
     }
 
-    let shapedata = game.memory.shapedata;
-    let planesize = game.screen.planesize as usize;
+    let regs = SpriteRegs::of(game);
 
     with_mem(&mut game.screen, &mut game.memory.shape, |mem| {
         for p in (0..PLANE_COUNT).rev() {
-            draw_shape_plane(planesize, shapedata, mem, p, bit_shift, (first, last));
+            draw_shape_plane(&regs, mem, p, bit_shift, (first, last));
         }
     });
 }
@@ -134,21 +158,21 @@ pub fn draw_shape(game: &mut Game) {
 /// Draws one bit plane of the sprite: the mask picks, bit by bit, the sprite's pixel or the screen's.
 /// `(first, last)` are the masks for the first and last word of each row.
 fn draw_shape_plane(
-    planesize: usize,
-    shapedata: usize,
+    regs: &SpriteRegs,
     mem: &mut BlitMem,
     p: i32,
     bit_shift: u32,
     (first, last): (u32, u32),
 ) {
-    let (sshape, mask_offset, mask_modulo, word_mask) = unsafe {
-        (
-            current_sshape,
-            sprite_mask_offset,
-            sprite_mask_modulo,
-            last_word_mask,
-        )
-    };
+    let SpriteRegs {
+        sshape,
+        mask_offset,
+        mask_modulo,
+        word_mask,
+        planesize,
+        shapedata,
+        ..
+    } = *regs;
     let mut t = Blit::new(
         USE_A | USE_B | USE_C | USE_D,
         D_EQUALS_A_THEN_B_ELSE_C,
@@ -158,11 +182,11 @@ fn draw_shape_plane(
     t.bshift = bit_shift;
     t.afwm = first & word_mask as u16 as u32;
     t.alwm = last;
-    t.a = scenery_mask_at();
+    t.a = scenery_mask_at(regs);
     t.b = Loc::new(Area::Shapes, shapedata)
         .add(mask_offset as isize + planesize as isize * p as isize);
     t.bmod = mask_modulo as i32;
-    t.c = plane_at_sprite(p);
+    t.c = plane_at_sprite(regs, p);
     t.d = t.c;
     t.cmod = sshape.cmod as i32;
     t.dmod = t.cmod;

@@ -16,7 +16,7 @@ use crate::game::data::state::Game;
 
 use self::safe_spot::{put_hero_at_safe_spot, restore_hero};
 
-use crate::game::data::state::{ActorRef, the_actors, the_world};
+use crate::game::data::state::ActorRef;
 use crate::game::render::display::reset_input;
 use crate::game::render::screen_fx::fade_down;
 use crate::game::ui::music::set_mood;
@@ -39,41 +39,39 @@ const VIEW_GAME_OVER: i8 = 2;
 /// Either way the hero gets full health for the bravery, the clock is set to the morning
 /// (8000), and hunger and fatigue are cleared.
 pub fn revive(game: &mut Game, new: i16) {
-    unsafe {
-        reset_raft_setfig();
+    reset_raft_setfig(game);
 
-        let mut hero = ActorRef::new(0);
-        hero.kind = PHIL;
-        hero.goal = USER; // yes, we can usurp control from the user
+    let hero = ActorRef::new(0);
+    game.actors.list[hero.slot()].kind = PHIL;
+    game.actors.list[hero.slot()].goal = USER; // yes, we can usurp control from the user
 
-        reset_input();
-        the_actors.battle_flag = 0;
-        game.hero.good_fairy_timer = 0;
-        the_actors.next_missile = 0;
+    reset_input();
+    game.actors.battle_flag = 0;
+    game.hero.good_fairy_timer = 0;
+    game.actors.next_missile = 0;
 
-        if new != 0 {
-            stopscore();
-            leave_fallen_brother(game);
-            take_over_next_brother(game, hero);
-            show_brother_placards(game);
-            announce_brother(game);
-        } else {
-            fade_down(game);
-        }
-
-        put_hero_at_safe_spot(game, hero);
-        restore_hero(game, hero);
-
-        if game.hero.brother > LAST_BROTHER {
-            game.screen.view_status = VIEW_GAME_OVER;
-        } else {
-            game.screen.view_status = VIEW_FADE_IN;
-            set_mood(game, 1);
-        }
-
-        the_world.extent_type = 0;
-        the_actors.fiery_death = 0;
+    if new != 0 {
+        stopscore();
+        leave_fallen_brother(game);
+        take_over_next_brother(game, hero);
+        show_brother_placards(game);
+        announce_brother(game);
+    } else {
+        fade_down(game);
     }
+
+    put_hero_at_safe_spot(game, hero);
+    restore_hero(game, hero);
+
+    if game.hero.brother > LAST_BROTHER {
+        game.screen.view_status = VIEW_GAME_OVER;
+    } else {
+        game.screen.view_status = VIEW_FADE_IN;
+        set_mood(game, 1);
+    }
+
+    game.world.extent_type = 0;
+    game.actors.fiery_death = 0;
 }
 
 #[cfg(test)]
@@ -90,13 +88,9 @@ mod tests {
     use crate::game::data::state::{Hero, STUFF_SLOTS, World};
     use crate::game::data::types::Bro;
 
-    fn zeroed<T>() -> T {
-        unsafe { std::mem::zeroed() }
-    }
-
     #[test]
     fn a_new_brother_starts_clean_at_the_first_safe_spot() {
-        let (mut hero, mut world): (Hero, World) = (zeroed(), zeroed());
+        let (mut hero, mut world): (Hero, World) = (Default::default(), Default::default());
         world.secret_timer = 5;
         world.light_timer = 6;
         world.freeze_timer = 7;
@@ -116,7 +110,8 @@ mod tests {
 
     #[test]
     fn the_hero_reappears_at_the_safe_spot_with_the_camera_centred() {
-        let (mut hero, mut body, mut world): (Hero, Shape, World) = (zeroed(), zeroed(), zeroed());
+        let (mut hero, mut body, mut world): (Hero, Shape, World) =
+            (Default::default(), Default::default(), Default::default());
         hero.safe_x = 1000;
         hero.safe_y = 2000;
         hero.safe_r = 5;
@@ -136,7 +131,8 @@ mod tests {
 
     #[test]
     fn revived_hero_is_healthy_rested_and_it_is_morning() {
-        let (mut hero, mut body, mut world): (Hero, Shape, World) = (zeroed(), zeroed(), zeroed());
+        let (mut hero, mut body, mut world): (Hero, Shape, World) =
+            (Default::default(), Default::default(), Default::default());
         hero.brave = 40;
         hero.hunger = 90;
         hero.fatigue = 80;
@@ -165,11 +161,13 @@ mod tests {
             wealth: 15,
         };
 
-        let mut hero: Hero = unsafe { std::mem::zeroed() };
-        hero.brother = 1;
-        hero.philstuff = [7; STUFF_SLOTS];
+        let mut hero = Hero {
+            brother: 1,
+            philstuff: [7; STUFF_SLOTS],
+            ..Default::default()
+        };
 
-        let mut body: Shape = unsafe { std::mem::zeroed() };
+        let mut body: Shape = Default::default();
 
         start_next_brother(&mut hero, &mut body, &next);
         assert_eq!(

@@ -4,10 +4,8 @@ use super::speeches::person_speaks;
 use crate::game::actors::interaction::find_nearest_figure;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::the_actors;
 use crate::game::data::tables::setfig_table;
 use crate::game::ui::text::speak;
-use crate::game::world::objects::SetFigEntry;
 
 // Actor kinds and states (csrc/ftale.h).
 const ENEMY: i8 = 2;
@@ -40,82 +38,77 @@ const YELL: i16 = 5;
 const CARRIER_TURTLE: i16 = 5;
 
 /// Yell (louder, reaches further) or say something to the nearest person.
-pub(super) unsafe fn talk_option(game: &mut Game, chosen_entry: i16) -> bool {
-    unsafe {
-        let distance = find_nearest_figure(
-            1,
-            if chosen_entry == YELL {
-                YELL_RANGE
-            } else {
-                TALK_RANGE
-            },
-        );
+pub(super) fn talk_option(game: &mut Game, chosen_entry: i16) -> bool {
+    let distance = find_nearest_figure(
+        game,
+        1,
+        if chosen_entry == YELL {
+            YELL_RANGE
+        } else {
+            TALK_RANGE
+        },
+    );
 
-        if the_actors.nearest_object == 0 {
-            return true;
-        }
-
-        let actor = ActorRef::new(the_actors.nearest_object as usize);
-        let target = describe_target(actor);
-
-        let action = talk_action(
-            &target,
-            chosen_entry == YELL,
-            distance,
-            the_actors.active_carrier,
-            game.hero.stuff()[SHELL] != 0,
-        );
-
-        carry_out(game, action, actor);
-
-        true
+    if game.actors.nearest_object == 0 {
+        return true;
     }
+
+    let actor = ActorRef::new(game.actors.nearest_object as usize);
+    let target = describe_target(game, actor);
+
+    let action = talk_action(
+        &target,
+        chosen_entry == YELL,
+        distance,
+        game.actors.active_carrier,
+        game.hero.stuff()[SHELL] != 0,
+    );
+
+    carry_out(game, action, actor);
+
+    true
 }
 
 /// What the Talk code needs to know about the actor the hero is talking to.
-unsafe fn describe_target(actor: ActorRef) -> Target {
-    unsafe {
-        // Masks with PERSON_MASK, keeping only the bits that matter here.
-        let person = actor.race & PERSON_MASK;
-        let can_talk = (*(&raw const setfig_table)
-            .cast::<SetFigEntry>()
-            .add(person as usize))
-        .can_talk
-            != 0;
+fn describe_target(game: &mut Game, actor: ActorRef) -> Target {
+    // Masks with PERSON_MASK, keeping only the bits that matter here.
+    let person = game.actors.list[actor.slot()].race & PERSON_MASK;
+    let can_talk = (setfig_table[person as usize]).can_talk != 0;
 
-        Target {
-            kind: actor.kind,
-            state: actor.state,
-            race: actor.race,
-            can_talk,
-        }
+    Target {
+        kind: game.actors.list[actor.slot()].kind,
+        state: game.actors.list[actor.slot()].state,
+        race: game.actors.list[actor.slot()].race,
+        can_talk,
     }
 }
 
 /// Does what `talk_action` decided: speaks, and turns the person to talk or hands over the shell.
-unsafe fn carry_out(game: &mut Game, action: TalkAction, mut actor: ActorRef) {
-    unsafe {
-        match action {
-            TalkAction::Nothing => {}
-            TalkAction::TooCloseToYell => speak(game, SPEECH_TOO_CLOSE_TO_YELL),
-            TalkAction::Person { starts_talking } => {
-                if starts_talking {
-                    actor.state = TALKING;
-                    actor.tactic = TACTIC_TALK;
-                }
-
-                // Masks with PERSON_MASK, keeping only the bits that matter here.
-                person_speaks(game, actor.race & PERSON_MASK, actor);
+fn carry_out(game: &mut Game, action: TalkAction, actor: ActorRef) {
+    match action {
+        TalkAction::Nothing => {}
+        TalkAction::TooCloseToYell => speak(game, SPEECH_TOO_CLOSE_TO_YELL),
+        TalkAction::Person { starts_talking } => {
+            if starts_talking {
+                game.actors.list[actor.slot()].state = TALKING;
+                game.actors.list[actor.slot()].tactic = TACTIC_TALK;
             }
 
-            TalkAction::TurtleHasShell => speak(game, SPEECH_TURTLE_HAS_SHELL),
-            TalkAction::TurtleGivesShell => {
-                game.hero.stuff_mut()[SHELL] = 1;
-                speak(game, SPEECH_TURTLE_GIVES_SHELL);
-            }
-
-            TalkAction::EnemyShouts(race) => speak(game, race as i32),
+            // Masks with PERSON_MASK, keeping only the bits that matter here.
+            person_speaks(
+                game,
+                game.actors.list[actor.slot()].race & PERSON_MASK,
+                actor,
+            );
         }
+
+        TalkAction::TurtleHasShell => speak(game, SPEECH_TURTLE_HAS_SHELL),
+        TalkAction::TurtleGivesShell => {
+            game.hero.stuff_mut()[SHELL] = 1;
+            speak(game, SPEECH_TURTLE_GIVES_SHELL);
+        }
+
+        TalkAction::EnemyShouts(race) => speak(game, race as i32),
     }
 }
 

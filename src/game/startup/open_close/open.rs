@@ -97,7 +97,7 @@ fn load_music_waveforms() {
     copy_prefix(&mut waves, &data);
     copy_prefix(&mut volumes, data.get(2 * S_WAVBUF..).unwrap_or(&[]));
 
-    let instruments = unsafe { (*(&raw const instrument_waves)).map(|word| word as u16) };
+    let instruments = { instrument_waves.map(|word| word as u16) };
     init_music(instruments.to_vec(), waves, volumes);
 }
 

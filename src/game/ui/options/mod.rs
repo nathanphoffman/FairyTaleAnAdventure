@@ -48,28 +48,26 @@ const PRQ_VITALITY: i32 = 7;
 
 /// Does what menu entry `chosen_entry` of the current menu `current_menu` says.
 pub fn choose_menu_entry(game: &mut Game, chosen_entry: i16) {
-    unsafe {
-        let refresh = match game.ui.current_menu as i32 {
-            ITEMS => {
-                items_option(game, chosen_entry);
+    let refresh = match game.ui.current_menu as i32 {
+        ITEMS => {
+            items_option(game, chosen_entry);
 
-                true
-            }
-
-            MAGIC => magic_option(game, chosen_entry),
-            TALK => talk_option(game, chosen_entry),
-            BUY => buy_option(game, chosen_entry),
-            GAME => game_option(game, chosen_entry),
-            USE => use_option(game, chosen_entry),
-            SAVEX => save_exit_option(game, chosen_entry),
-            FILE => file_option(game, chosen_entry),
-            KEYS => keys_option(game, chosen_entry),
-            GIVE => give_option(game, chosen_entry),
-            _ => true,
-        };
-
-        if refresh {
-            update_menu_availability(game);
+            true
         }
+
+        MAGIC => magic_option(game, chosen_entry),
+        TALK => talk_option(game, chosen_entry),
+        BUY => buy_option(game, chosen_entry),
+        GAME => game_option(game, chosen_entry),
+        USE => use_option(game, chosen_entry),
+        SAVEX => save_exit_option(game, chosen_entry),
+        FILE => file_option(game, chosen_entry),
+        KEYS => keys_option(game, chosen_entry),
+        GIVE => give_option(game, chosen_entry),
+        _ => true,
+    };
+
+    if refresh {
+        update_menu_availability(game);
     }
 }

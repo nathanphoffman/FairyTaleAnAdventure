@@ -5,7 +5,6 @@ use crate::game::actors::interaction::hit_actor;
 use crate::game::data::random::{bitrand, rand4, rand8, rand256};
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::{the_actors, the_world};
 use crate::game::files::loading::play_effect;
 use crate::game::world::map::{step_x, step_y};
 
@@ -34,22 +33,20 @@ pub(super) const WHOOSH_MARGIN: i16 = 2;
 /// Everything not walking swings its weapon (or bites) at whatever is within reach of the tip:
 /// `hit_actor` if it lands, a whoosh if it nearly does. Only the hero acts while time is frozen.
 pub fn resolve_melee(game: &mut Game) {
-    unsafe {
-        let mut i = 0;
+    let mut i = 0;
 
-        while i < the_actors.active as usize {
-            if i > 0 && the_world.freeze_timer != 0 {
-                break;
-            }
-
-            let attacker = ActorRef::new(i);
-
-            if i != RAFT && attacker.state < WALKING {
-                swing(game, i);
-            }
-
-            i += 1;
+    while i < game.actors.active as usize {
+        if i > 0 && game.world.freeze_timer != 0 {
+            break;
         }
+
+        let attacker = ActorRef::new(i);
+
+        if i != RAFT && game.actors.list[attacker.slot()].state < WALKING {
+            swing(game, i);
+        }
+
+        i += 1;
     }
 }
 
@@ -95,84 +92,95 @@ struct Swing {
 }
 
 /// One actor's swing.
-pub(super) unsafe fn swing(game: &mut Game, i: usize) {
-    unsafe {
-        let attacker = ActorRef::new(i);
-        let Some(base) = melee_weapon(attacker.weapon as i16) else {
-            return;
-        };
+pub(super) fn swing(game: &mut Game, i: usize) {
+    let attacker = ActorRef::new(i);
+    let Some(base) = melee_weapon(game.actors.list[attacker.slot()].weapon as i16) else {
+        return;
+    };
 
-        let strength = base + bitrand(2) as i16;
-        let facing = attacker.facing as i32;
-        let swing = Swing {
-            attacker: i,
-            facing,
-            strength,
-            tip: weapon_tip(attacker, facing, strength),
-            reach: if i == 0 {
-                hero_reach(game.hero.brave)
-            } else {
-                enemy_reach(rand4() as i16)
-            },
-        };
+    let strength = base + bitrand(&mut game.rng, 2) as i16;
+    let facing = game.actors.list[attacker.slot()].facing as i32;
+    let swing = Swing {
+        attacker: i,
+        facing,
+        strength,
+        tip: weapon_tip(game, attacker, facing, strength),
+        reach: if i == 0 {
+            hero_reach(game.hero.brave)
+        } else {
+            enemy_reach(rand4(&mut game.rng) as i16)
+        },
+    };
 
-        for j in 0..the_actors.active as usize {
-            if swing_at(game, &swing, j) {
-                break;
-            }
+    for j in 0..game.actors.active as usize {
+        if swing_at(game, &swing, j) {
+            break;
         }
     }
 }
 
 /// Swings at actor `j` if it is a target (not the raft, the attacker, the dead, or by a carrier).
 /// Returns true when the swing hit, which ends it.
-unsafe fn swing_at(game: &mut Game, swing: &Swing, j: usize) -> bool {
-    unsafe {
-        let attacker = ActorRef::new(swing.attacker);
-        let target = ActorRef::new(j);
+fn swing_at(game: &mut Game, swing: &Swing, j: usize) -> bool {
+    let attacker = ActorRef::new(swing.attacker);
+    let target = ActorRef::new(j);
 
-        if j == RAFT || j == swing.attacker || target.state == DEAD || attacker.kind == CARRIER {
-            return false;
+    if j == RAFT
+        || j == swing.attacker
+        || game.actors.list[target.slot()].state == DEAD
+        || game.actors.list[attacker.slot()].kind == CARRIER
+    {
+        return false;
+    }
+
+    match swing_result(
+        swing.attacker == 0,
+        distance_to_point(game, target, swing.tip.0, swing.tip.1),
+        swing.reach,
+        game.world.freeze_timer != 0,
+        swing.strength,
+        game.hero.brave,
+        || rand256(&mut game.rng),
+    ) {
+        SwingResult::Hit => {
+            hit_actor(
+                game,
+                swing.attacker as i32,
+                j as i32,
+                swing.facing,
+                swing.strength,
+            );
+
+            true
         }
 
-        match swing_result(
-            swing.attacker == 0,
-            distance_to_point(target, swing.tip.0, swing.tip.1),
-            swing.reach,
-            the_world.freeze_timer != 0,
-            swing.strength,
-            game.hero.brave,
-            rand256,
-        ) {
-            SwingResult::Hit => {
-                hit_actor(
-                    game,
-                    swing.attacker as i32,
-                    j as i32,
-                    swing.facing,
-                    swing.strength,
-                );
+        SwingResult::Whoosh => {
+            let pitch = SWING_SOUND_PITCH + rand256(&mut game.rng);
+            play_effect(game, SWING_SOUND, pitch);
 
-                true
-            }
-
-            SwingResult::Whoosh => {
-                play_effect(SWING_SOUND, SWING_SOUND_PITCH + rand256());
-
-                false
-            }
-
-            SwingResult::Miss => false,
+            false
         }
+
+        SwingResult::Miss => false,
     }
 }
 
 /// Where the tip of the weapon is: twice the weapon's strength in front of the attacker, with a
 /// little random wobble.
-fn weapon_tip(attacker: ActorRef, facing: i32, strength: i16) -> (i16, i16) {
+fn weapon_tip(game: &mut Game, attacker: ActorRef, facing: i32, strength: i16) -> (i16, i16) {
     let reach = (strength + strength) as i32;
-    let xs = (step_x(attacker.abs_x as i32, facing, reach) + rand8() - TIP_NOISE) as i16;
-    let ys = (step_y(attacker.abs_y as i32, facing, reach) + rand8() - TIP_NOISE) as i16;
+    let xs = (step_x(
+        game.actors.list[attacker.slot()].abs_x as i32,
+        facing,
+        reach,
+    ) + rand8(&mut game.rng)
+        - TIP_NOISE) as i16;
+    let ys = (step_y(
+        game.actors.list[attacker.slot()].abs_y as i32,
+        facing,
+        reach,
+    ) + rand8(&mut game.rng)
+        - TIP_NOISE) as i16;
 
     (xs, ys)
 }

@@ -10,19 +10,14 @@ use crate::gfx::bitmap::Rect;
 
 const ALL_PLANES: u32 = 0x1f;
 
-/// Set once the player has pressed Space to skip the intro.
-pub static mut intro_skip_requested: i8 = 0;
-
 /// Whether the intro is being skipped. Once Space has been seen the skip sticks (the original
 /// reset it on every poll without a key).
-pub fn intro_skipped() -> i32 {
-    unsafe {
-        if next_key() == b' ' as i32 {
-            intro_skip_requested = 1;
-        }
-
-        intro_skip_requested as i32
+pub fn intro_skipped(game: &mut Game) -> i32 {
+    if next_key() == b' ' as i32 {
+        game.intro_skip_requested = 1;
     }
+
+    game.intro_skip_requested as i32
 }
 
 const SCREEN_WIDTH: i32 = 320;
@@ -38,10 +33,8 @@ const PAGE_DELAY: i32 = 350;
 /// Shows two pictures on the story page, then turns it over.
 /// The new pictures are drawn onto `pageb` while `pagea` keeps the old page for the turn.
 pub fn show_story_page(game: &mut Game, br1: &str, br2: &str, x: i16, y: i16) {
-    unsafe {
-        if intro_skip_requested != 0 {
-            return;
-        }
+    if game.intro_skip_requested != 0 {
+        return;
     }
 
     delay(game, PAGE_DELAY);
@@ -60,12 +53,12 @@ pub fn show_story_page(game: &mut Game, br1: &str, br2: &str, x: i16, y: i16) {
     load_picture(br1, new_page, PICTURE_X, PICTURE_Y);
     load_picture(br2, new_page, x as usize, y as usize);
 
-    if intro_skipped() != 0 {
+    if intro_skipped(game) != 0 {
         return;
     }
 
     turn_page(game);
-    intro_skipped();
+    intro_skipped(game);
 }
 
 // The page-turn animation, 22 frames: strip step, strip width and delay for each.

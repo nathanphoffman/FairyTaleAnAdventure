@@ -1,11 +1,9 @@
 //! The day and night clock (from the main loop in csrc/fmain.c): sleeping, the time of day, the
 //! light level, the messages when a new part of the day starts, and slow healing.
 
-use crate::game::data::object_tables::ob_listg;
 use crate::game::data::random::rand64;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::{the_actors, the_world};
 use crate::game::render::screen_fx::day_fade;
 use crate::game::ui::text::{queue_print, show_event};
 
@@ -96,38 +94,36 @@ fn heal_due(clock: u16, vitality: i16, bravery: i16, state: i8) -> bool {
 
 /// Sleeping, the day clock, the light level, the messages for the time of day and slow healing.
 pub fn day_night_tick(game: &mut Game) {
-    unsafe {
-        let mut hero = ActorRef::new(0);
+    let hero = ActorRef::new(0);
 
-        if hero.state == SLEEP {
-            sleep_tick(game, hero);
-        }
+    if game.actors.list[hero.slot()].state == SLEEP {
+        sleep_tick(game, hero);
+    }
 
-        let tick = day_step(
-            the_world.day_clock,
-            the_world.freeze_timer != 0,
-            the_world.day_period,
-            hero.vitality,
-            game.hero.brave,
-            hero.state,
-        );
+    let tick = day_step(
+        game.world.day_clock,
+        game.world.freeze_timer != 0,
+        game.world.day_period,
+        game.actors.list[hero.slot()].vitality,
+        game.hero.brave,
+        game.actors.list[hero.slot()].state,
+    );
 
-        the_world.day_clock = tick.clock;
-        the_world.light_level = tick.light;
+    game.world.day_clock = tick.clock;
+    game.world.light_level = tick.light;
 
-        ob_listg[LAMP_SLOT].ob_stat = if tick.lamp_on { LAMP_ON } else { LAMP_OFF };
-        the_world.day_period = tick.period;
+    game.objects.global[LAMP_SLOT].ob_stat = if tick.lamp_on { LAMP_ON } else { LAMP_OFF };
+    game.world.day_period = tick.period;
 
-        if let Some(e) = tick.period_event {
-            show_event(game, e);
-        }
+    if let Some(e) = tick.period_event {
+        show_event(game, e);
+    }
 
-        day_fade(game);
+    day_fade(game);
 
-        if tick.heal {
-            hero.vitality += 1;
-            queue_print(PRQ_STATS);
-        }
+    if tick.heal {
+        game.actors.list[hero.slot()].vitality += 1;
+        queue_print(game, PRQ_STATS);
     }
 }
 
@@ -191,23 +187,21 @@ fn sleep_step(
 }
 
 /// While asleep time runs fast; the hero wakes when rested, at dawn, or when a fight starts.
-unsafe fn sleep_tick(game: &mut Game, mut hero: ActorRef) {
-    unsafe {
-        let (clock, tired, wake) = sleep_step(
-            the_world.day_clock,
-            game.hero.fatigue,
-            the_actors.battle_flag != 0,
-            || rand64() == 0,
-        );
+fn sleep_tick(game: &mut Game, hero: ActorRef) {
+    let (clock, tired, wake) = sleep_step(
+        game.world.day_clock,
+        game.hero.fatigue,
+        game.actors.battle_flag != 0,
+        || rand64(&mut game.rng) == 0,
+    );
 
-        the_world.day_clock = clock;
-        game.hero.fatigue = tired;
+    game.world.day_clock = clock;
+    game.hero.fatigue = tired;
 
-        if wake {
-            hero.state = STILL;
-            hero.abs_y &= WAKE_Y_MASK;
-            game.hero.y = hero.abs_y;
-        }
+    if wake {
+        game.actors.list[hero.slot()].state = STILL;
+        game.actors.list[hero.slot()].abs_y &= WAKE_Y_MASK;
+        game.hero.y = game.actors.list[hero.slot()].abs_y;
     }
 }
 

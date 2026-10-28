@@ -4,13 +4,9 @@
 //! when loading, so the order of the calls in `transfer_all` is the file format. Numbers are
 //! stored big-endian (as the Amiga's 68000 kept them).
 
-use crate::game::data::globals::{
-    princesses_rescued, save_padding_1, save_padding_2, save_padding_3,
-};
-use crate::game::data::object_tables::{dstobs, glbobs, mapobs, ob_listg, region_objects};
+use crate::game::data::object_tables::glbobs;
 use crate::game::data::state::Game;
-use crate::game::data::state::{SAVED_STUFF_SLOTS, the_actors, the_world};
-use crate::game::data::tables::extent_list;
+use crate::game::data::state::SAVED_STUFF_SLOTS;
 use crate::game::data::types::{Extent, Missile, Shape, WorldObject};
 
 /// Entries of `extent_list` that are saved, and entries in the per-region object tables.
@@ -131,48 +127,46 @@ impl Transfer {
 /// positions, the stats (bravery, luck, kindness, wealth, hunger, fatigue), which brother is
 /// playing, the day/night clock, the magic timers and so on. The order is the file format.
 fn transfer_variables(game: &mut Game, t: &mut Transfer) {
-    unsafe {
-        t.u16(&mut *(&raw mut the_world.map_x));
-        t.u16(&mut *(&raw mut the_world.map_y));
-        t.u16(&mut *(&raw mut game.hero.x));
-        t.u16(&mut *(&raw mut game.hero.y));
-        t.u16(&mut *(&raw mut game.hero.safe_x));
-        t.u16(&mut *(&raw mut game.hero.safe_y));
-        t.u16(&mut *(&raw mut game.hero.safe_r));
-        t.u16(&mut *(&raw mut the_world.tile_x));
-        t.u16(&mut *(&raw mut the_world.tile_y));
-        t.u16(&mut *(&raw mut game.ui.cheat_enabled));
-        t.u16(&mut *(&raw mut game.hero.riding));
-        t.u16(&mut *(&raw mut game.hero.flying));
-        t.u16(&mut *(&raw mut the_actors.carrier_slot));
-        t.u16(&mut *(&raw mut the_actors.turtle_nearness));
-        t.u16(&mut *(&raw mut the_actors.raft_nearness));
-        t.u16(&mut *(&raw mut game.hero.brave));
-        t.u16(&mut *(&raw mut game.hero.luck));
-        t.u16(&mut *(&raw mut game.hero.kindness));
-        t.u16(&mut *(&raw mut game.hero.wealth));
-        t.u16(&mut *(&raw mut game.hero.hunger));
-        t.u16(&mut *(&raw mut game.hero.fatigue));
-        t.u16(&mut *(&raw mut game.hero.brother));
-        t.u16(&mut *(&raw mut princesses_rescued));
-        t.u16(&mut *(&raw mut game.hero.sector));
-        t.u16(&mut *(&raw mut game.hero.place));
-        t.u16(&mut *(&raw mut the_world.day_clock));
-        t.u16(&mut *(&raw mut the_world.light_level));
-        t.u16(&mut *(&raw mut the_actors.loaded_actor_file));
-        t.u16(&mut *(&raw mut the_actors.loaded_setfig_file));
-        t.u16(&mut *(&raw mut the_actors.active_carrier));
-        t.u16(&mut *(&raw mut the_world.extent_type));
-        t.u16(&mut *(&raw mut the_actors.leader));
-        t.u16(&mut *(&raw mut the_world.secret_timer));
-        t.u16(&mut *(&raw mut the_world.light_timer));
-        t.u16(&mut *(&raw mut the_world.freeze_timer));
-        t.u16(&mut *(&raw mut game.ui.current_menu));
-        t.u16(&mut *(&raw mut game.encounter.kind));
-        t.u16(&mut *(&raw mut save_padding_1));
-        t.u16(&mut *(&raw mut save_padding_2));
-        t.u16(&mut *(&raw mut save_padding_3));
-    }
+    t.u16(&mut game.world.map_x);
+    t.u16(&mut game.world.map_y);
+    t.u16(&mut game.hero.x);
+    t.u16(&mut game.hero.y);
+    t.u16(&mut game.hero.safe_x);
+    t.u16(&mut game.hero.safe_y);
+    t.u16(&mut game.hero.safe_r);
+    t.u16(&mut game.world.tile_x);
+    t.u16(&mut game.world.tile_y);
+    t.u16(&mut game.ui.cheat_enabled);
+    t.u16(&mut game.hero.riding);
+    t.u16(&mut game.hero.flying);
+    t.u16(&mut game.actors.carrier_slot);
+    t.u16(&mut game.actors.turtle_nearness);
+    t.u16(&mut game.actors.raft_nearness);
+    t.u16(&mut game.hero.brave);
+    t.u16(&mut game.hero.luck);
+    t.u16(&mut game.hero.kindness);
+    t.u16(&mut game.hero.wealth);
+    t.u16(&mut game.hero.hunger);
+    t.u16(&mut game.hero.fatigue);
+    t.u16(&mut game.hero.brother);
+    t.u16(&mut game.princesses_rescued);
+    t.u16(&mut game.hero.sector);
+    t.u16(&mut game.hero.place);
+    t.u16(&mut game.world.day_clock);
+    t.u16(&mut game.world.light_level);
+    t.u16(&mut game.actors.loaded_actor_file);
+    t.u16(&mut game.actors.loaded_setfig_file);
+    t.u16(&mut game.actors.active_carrier);
+    t.u16(&mut game.world.extent_type);
+    t.u16(&mut game.actors.leader);
+    t.u16(&mut game.world.secret_timer);
+    t.u16(&mut game.world.light_timer);
+    t.u16(&mut game.world.freeze_timer);
+    t.u16(&mut game.ui.current_menu);
+    t.u16(&mut game.encounter.kind);
+    t.u16(&mut game.save_padding_1);
+    t.u16(&mut game.save_padding_2);
+    t.u16(&mut game.save_padding_3);
 }
 
 /// Saves or loads one actor.
@@ -230,58 +224,50 @@ fn transfer_missile(t: &mut Transfer, m: &mut Missile) {
 /// Saves or loads the three brothers' item lists and the missiles (the count `next_missile` is saved
 /// elsewhere).
 fn transfer_party(game: &mut Game, t: &mut Transfer) {
-    unsafe {
-        t.bytes(&mut game.hero.julstuff[..SAVED_STUFF_SLOTS]);
-        t.bytes(&mut game.hero.philstuff[..SAVED_STUFF_SLOTS]);
-        t.bytes(&mut game.hero.kevstuff[..SAVED_STUFF_SLOTS]);
+    t.bytes(&mut game.hero.julstuff[..SAVED_STUFF_SLOTS]);
+    t.bytes(&mut game.hero.philstuff[..SAVED_STUFF_SLOTS]);
+    t.bytes(&mut game.hero.kevstuff[..SAVED_STUFF_SLOTS]);
 
-        for missile in (*(&raw mut the_actors.missiles)).iter_mut() {
-            transfer_missile(t, missile);
-        }
+    for missile in game.actors.missiles.iter_mut() {
+        transfer_missile(t, missile);
     }
 }
 
 /// Writes (`Transfer::saving`) or reads the whole game state: the misc variables, the region, the
 /// actors, the inventories and missiles, the extents and the object lists.
 pub fn transfer_all(game: &mut Game, t: &mut Transfer) {
-    unsafe {
-        transfer_variables(game, t);
-        t.u16(&mut *(&raw mut the_world.region));
+    transfer_variables(game, t);
+    t.u16(&mut game.world.region);
 
-        t.u16(&mut *(&raw mut the_actors.active));
-        t.u16(&mut *(&raw mut the_actors.drawn));
-        t.u16(&mut *(&raw mut the_actors.next_missile));
+    t.u16(&mut game.actors.active);
+    t.u16(&mut game.actors.drawn);
+    t.u16(&mut game.actors.next_missile);
 
-        for i in 0..the_actors.active as usize {
-            transfer_actor(t, &mut *(&raw mut the_actors.list[i]));
-        }
+    for i in 0..game.actors.active as usize {
+        transfer_actor(t, &mut game.actors.list[i]);
+    }
 
-        transfer_party(game, t);
+    transfer_party(game, t);
 
-        for extent in (*(&raw mut extent_list)).iter_mut().take(SAVED_EXTENTS) {
-            transfer_extent(t, extent);
-        }
+    for extent in game.extents.iter_mut().take(SAVED_EXTENTS) {
+        transfer_extent(t, extent);
+    }
 
-        for object in (*(&raw mut ob_listg)).iter_mut().take(glbobs as usize) {
+    for object in game.objects.global.iter_mut().take(glbobs as usize) {
+        transfer_object(t, object);
+    }
+
+    for count in game.mapobs.iter_mut().take(OBJECT_REGIONS) {
+        t.u16(count);
+    }
+
+    for count in game.dstobs.iter_mut().take(OBJECT_REGIONS) {
+        t.u16(count);
+    }
+
+    for (i, &count) in game.mapobs.iter().enumerate().take(OBJECT_REGIONS) {
+        for object in game.objects.region(i).iter_mut().take(count as usize) {
             transfer_object(t, object);
-        }
-
-        for count in (*(&raw mut mapobs)).iter_mut().take(OBJECT_REGIONS) {
-            t.u16(count);
-        }
-
-        for count in (*(&raw mut dstobs)).iter_mut().take(OBJECT_REGIONS) {
-            t.u16(count);
-        }
-
-        for (i, &count) in (*(&raw const mapobs))
-            .iter()
-            .enumerate()
-            .take(OBJECT_REGIONS)
-        {
-            for object in region_objects(i).iter_mut().take(count as usize) {
-                transfer_object(t, object);
-            }
         }
     }
 }
