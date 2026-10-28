@@ -120,6 +120,55 @@ pub struct Actors {
 
 pub static mut the_actors: Actors = unsafe { std::mem::zeroed() };
 
+/// A way to reach one actor of `the_actors.list` by its number, so that code can hold on to "that
+/// actor" while it calls others that change the list. Each use looks the actor up again.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct ActorRef(usize);
+
+impl ActorRef {
+    pub fn new(index: usize) -> ActorRef {
+        ActorRef(index)
+    }
+}
+
+impl std::ops::Deref for ActorRef {
+    type Target = Shape;
+
+    fn deref(&self) -> &Shape {
+        unsafe { &(*(&raw const the_actors.list))[self.0] }
+    }
+}
+
+impl std::ops::DerefMut for ActorRef {
+    fn deref_mut(&mut self) -> &mut Shape {
+        unsafe { &mut (*(&raw mut the_actors.list))[self.0] }
+    }
+}
+
+/// The same for the missiles in flight.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct MissileRef(usize);
+
+impl MissileRef {
+    pub fn new(index: usize) -> MissileRef {
+        MissileRef(index)
+    }
+}
+
+impl std::ops::Deref for MissileRef {
+    type Target = Missile;
+
+    fn deref(&self) -> &Missile {
+        unsafe { &(*(&raw const the_actors.missiles))[self.0] }
+    }
+}
+
+impl std::ops::DerefMut for MissileRef {
+    fn deref_mut(&mut self) -> &mut Missile {
+        unsafe { &mut (*(&raw mut the_actors.missiles))[self.0] }
+    }
+}
+
 /// The screen: bitmaps, display pages, pens and view ports, and what is shown.
 pub static mut the_screen: Screen = Screen::new();
 

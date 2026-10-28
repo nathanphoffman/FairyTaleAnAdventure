@@ -3,8 +3,8 @@
 use super::{CARRIER, DEAD, RAFT, WALKING, distance_to_point};
 use crate::game::actors::interaction::hit_actor;
 use crate::game::data::random::{bitrand, rand4, rand8, rand256};
+use crate::game::data::state::ActorRef;
 use crate::game::data::state::{the_actors, the_hero, the_world};
-use crate::game::data::types::Shape;
 use crate::game::files::loading::play_effect;
 use crate::game::world::map::{step_x, step_y};
 
@@ -41,9 +41,9 @@ pub fn resolve_melee() {
                 break;
             }
 
-            let attacker = &raw const the_actors.list[i];
+            let attacker = ActorRef::new(i);
 
-            if i != RAFT && (*attacker).state < WALKING {
+            if i != RAFT && attacker.state < WALKING {
                 swing(i);
             }
 
@@ -96,13 +96,13 @@ struct Swing {
 /// One actor's swing.
 pub(super) unsafe fn swing(i: usize) {
     unsafe {
-        let attacker = &raw const the_actors.list[i];
-        let Some(base) = melee_weapon((*attacker).weapon as i16) else {
+        let attacker = ActorRef::new(i);
+        let Some(base) = melee_weapon(attacker.weapon as i16) else {
             return;
         };
 
         let strength = base + bitrand(2) as i16;
-        let facing = (*attacker).facing as i32;
+        let facing = attacker.facing as i32;
         let swing = Swing {
             attacker: i,
             facing,
@@ -127,14 +127,10 @@ pub(super) unsafe fn swing(i: usize) {
 /// Returns true when the swing hit, which ends it.
 unsafe fn swing_at(swing: &Swing, j: usize) -> bool {
     unsafe {
-        let attacker = &raw const the_actors.list[swing.attacker];
-        let target = &raw const the_actors.list[j];
+        let attacker = ActorRef::new(swing.attacker);
+        let target = ActorRef::new(j);
 
-        if j == RAFT
-            || j == swing.attacker
-            || (*target).state == DEAD
-            || (*attacker).kind == CARRIER
-        {
+        if j == RAFT || j == swing.attacker || target.state == DEAD || attacker.kind == CARRIER {
             return false;
         }
 
@@ -171,14 +167,12 @@ unsafe fn swing_at(swing: &Swing, j: usize) -> bool {
 
 /// Where the tip of the weapon is: twice the weapon's strength in front of the attacker, with a
 /// little random wobble.
-unsafe fn weapon_tip(attacker: *const Shape, facing: i32, strength: i16) -> (i16, i16) {
-    unsafe {
-        let reach = (strength + strength) as i32;
-        let xs = (step_x((*attacker).abs_x as i32, facing, reach) + rand8() - TIP_NOISE) as i16;
-        let ys = (step_y((*attacker).abs_y as i32, facing, reach) + rand8() - TIP_NOISE) as i16;
+fn weapon_tip(attacker: ActorRef, facing: i32, strength: i16) -> (i16, i16) {
+    let reach = (strength + strength) as i32;
+    let xs = (step_x(attacker.abs_x as i32, facing, reach) + rand8() - TIP_NOISE) as i16;
+    let ys = (step_y(attacker.abs_y as i32, facing, reach) + rand8() - TIP_NOISE) as i16;
 
-        (xs, ys)
-    }
+    (xs, ys)
 }
 
 /// How a swing at one target turned out.

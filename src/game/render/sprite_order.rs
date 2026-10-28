@@ -2,6 +2,7 @@
 //! is the nearest person.
 
 use crate::game::actors::interaction::actor_distance;
+use crate::game::data::state::ActorRef;
 use crate::game::data::state::{the_actors, the_hero};
 
 // Actor kinds and states (csrc/ftale.h).
@@ -29,13 +30,9 @@ pub fn sort_actors() {
         }
 
         for i in 0..the_actors.drawn as usize {
-            let actor = &raw const the_actors.list[i];
+            let actor = ActorRef::new(i);
 
-            if i != 0
-                && (*actor).kind != OBJECTS
-                && (*actor).state != DEAD
-                && the_hero.riding != BIRD
-            {
+            if i != 0 && actor.kind != OBJECTS && actor.state != DEAD && the_hero.riding != BIRD {
                 let dist = actor_distance(i as i32, 0) as i16;
 
                 if dist < the_actors.nearest_person_distance {
@@ -56,24 +53,24 @@ unsafe fn bubble_step(j: usize) {
     unsafe {
         let k1 = the_actors.draw_order[j - 1];
         let k2 = the_actors.draw_order[j];
-        let a = &raw const the_actors.list[k1 as usize];
-        let b = &raw const the_actors.list[k2 as usize];
-        let mut y1 = (*a).abs_y as i16;
-        let mut y2 = (*b).abs_y as i16;
+        let a = ActorRef::new(k1 as usize);
+        let b = ActorRef::new(k2 as usize);
+        let mut y1 = a.abs_y as i16;
+        let mut y2 = b.abs_y as i16;
 
-        if (*a).state == DEAD || (k2 == 0 && the_hero.riding != 0) || k1 == RAFT_ACTOR {
+        if a.state == DEAD || (k2 == 0 && the_hero.riding != 0) || k1 == RAFT_ACTOR {
             y1 = y1.wrapping_sub(DRAW_LOWER);
         }
 
-        if (*b).state == DEAD || (k1 == 0 && the_hero.riding != 0) || k2 == RAFT_ACTOR {
+        if b.state == DEAD || (k1 == 0 && the_hero.riding != 0) || k2 == RAFT_ACTOR {
             y2 = y2.wrapping_sub(DRAW_LOWER);
         }
 
-        if (*a).environ > WADING {
+        if a.environ > WADING {
             y1 = y1.wrapping_add(DRAW_LOWER);
         }
 
-        if (*b).environ > WADING {
+        if b.environ > WADING {
             y2 = y2.wrapping_add(DRAW_LOWER);
         }
 

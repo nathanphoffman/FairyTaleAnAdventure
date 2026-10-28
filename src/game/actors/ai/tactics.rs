@@ -4,8 +4,8 @@ use super::{BACKUP, BOW_BIT, STILL};
 use crate::game::actors::interaction::{run_tactic, turtle_eggs};
 use crate::game::actors::steering::steer_actor;
 use crate::game::data::random::rand2;
+use crate::game::data::state::ActorRef;
 use crate::game::data::state::the_hero;
-use crate::game::data::types::Shape;
 
 const FIGHTING: i8 = 0;
 const WALKING: i8 = 12;
@@ -32,12 +32,12 @@ const WEAK: i16 = 6;
 const DKNIGHT_FACING: i8 = 5;
 
 /// A hostile enemy picks a new tactic. May also change its mode to wandering if it has no weapon.
-pub(super) unsafe fn choose_tactic(actor: *mut Shape, mode: i16, xd: i16, yd: i16) -> (i16, i16) {
+pub(super) unsafe fn choose_tactic(actor: ActorRef, mode: i16, xd: i16, yd: i16) -> (i16, i16) {
     unsafe {
         let facts = TacticFacts {
-            race: (*actor).race,
-            weapon: (*actor).weapon,
-            vitality: (*actor).vitality,
+            race: actor.race,
+            weapon: actor.weapon,
+            vitality: actor.vitality,
             eggs_to_guard: turtle_eggs != 0,
         };
 
@@ -91,32 +91,25 @@ fn pick_tactic(
 /// A hostile enemy strikes if close enough, otherwise acts on its tactic.
 pub(super) unsafe fn hostile_action(
     i: usize,
-    actor: *mut Shape,
+    mut actor: ActorRef,
     mode: i16,
     tactic: i16,
     xd: i16,
     yd: i16,
 ) {
     unsafe {
-        match hostile_choice(
-            (*actor).race,
-            (*actor).weapon,
-            (*actor).vitality,
-            mode,
-            xd,
-            yd,
-        ) {
+        match hostile_choice(actor.race, actor.weapon, actor.vitality, mode, xd, yd) {
             Hostile::Strike => {
                 steer_actor(i as i32, the_hero.x as i32, the_hero.y as i32, 0);
 
-                if (*actor).state >= WALKING {
-                    (*actor).state = FIGHTING;
+                if actor.state >= WALKING {
+                    actor.state = FIGHTING;
                 }
             }
 
             Hostile::KnightGuard => {
-                (*actor).state = STILL;
-                (*actor).facing = DKNIGHT_FACING;
+                actor.state = STILL;
+                actor.facing = DKNIGHT_FACING;
             }
 
             Hostile::Tactic => run_tactic(i as i32, tactic as i32),

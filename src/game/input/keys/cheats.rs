@@ -5,6 +5,7 @@ use super::{
     CHEAT_RESCUE, CHEAT_SOUTH, CHEAT_STEP_X, CHEAT_STEP_Y, CHEAT_STUFF, CHEAT_TIME,
     CHEAT_TIME_STEP, CHEAT_WEST, GOLDBASE, RAFT_STONE_SLOT, VIAL_SLOT,
 };
+use crate::game::data::state::ActorRef;
 
 use crate::game::actors::encounters::load_carrier;
 use crate::game::actors::interaction::{center_extent_on, rescue_princess};
@@ -59,7 +60,7 @@ pub(super) unsafe fn cheat_move(key: i8) -> bool {
             return false;
         }
 
-        let hero = &raw mut the_actors.list[0];
+        let mut hero = ActorRef::new(0);
 
         match key {
             CHEAT_RESCUE => rescue_princess(),
@@ -67,22 +68,22 @@ pub(super) unsafe fn cheat_move(key: i8) -> bool {
             CHEAT_PRQ_3 => queue_print(PRQ_DEBUG_SECTOR),
             CHEAT_TIME => the_world.day_clock = the_world.day_clock.wrapping_add(CHEAT_TIME_STEP),
             CHEAT_NORTH => {
-                (*hero).abs_y = (*hero).abs_y.wrapping_sub(CHEAT_STEP_Y);
+                hero.abs_y = hero.abs_y.wrapping_sub(CHEAT_STEP_Y);
                 the_world.map_y = the_world.map_y.wrapping_sub(CHEAT_STEP_Y);
             }
 
             CHEAT_SOUTH => {
-                (*hero).abs_y = (*hero).abs_y.wrapping_add(CHEAT_STEP_Y);
+                hero.abs_y = hero.abs_y.wrapping_add(CHEAT_STEP_Y);
                 the_world.map_y = the_world.map_y.wrapping_add(CHEAT_STEP_Y);
             }
 
             CHEAT_EAST => {
-                (*hero).abs_x = (*hero).abs_x.wrapping_add(CHEAT_STEP_X);
+                hero.abs_x = hero.abs_x.wrapping_add(CHEAT_STEP_X);
                 the_world.map_x = the_world.map_x.wrapping_add(CHEAT_STEP_X);
             }
 
             CHEAT_WEST => {
-                (*hero).abs_x = (*hero).abs_x.wrapping_sub(CHEAT_STEP_X);
+                hero.abs_x = hero.abs_x.wrapping_sub(CHEAT_STEP_X);
                 the_world.map_x = the_world.map_x.wrapping_sub(CHEAT_STEP_X);
             }
 

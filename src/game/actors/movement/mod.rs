@@ -20,9 +20,9 @@ mod walking;
 
 mod water;
 
+use crate::game::data::state::{ActorRef, MissileRef};
 use crate::game::data::state::{the_actors, the_world};
 use crate::game::data::tables::facing_frame_offsets;
-use crate::game::data::types::{Missile, Shape};
 use crate::game::world::map::{step_x, step_y, terrain_at};
 
 // Actor kinds and states (csrc/ftale.h).
@@ -238,8 +238,8 @@ static mut YTEST: u16 = 0;
 
 /// The working variables of one `move_actor` call (the C locals).
 struct Ctx {
-    pub(super) actor: *mut Shape,
-    pub(super) missile: *mut Missile,
+    pub(super) actor: ActorRef,
+    pub(super) missile: MissileRef,
     pub(super) slot: i32,
     pub(super) cycle: i16,
     /// The actor's environ (terrain state).
@@ -309,10 +309,10 @@ impl Ctx {
     /// actor left in the main loop's `j`.
     unsafe fn start(i: i32, cycle: i16, terrain: i16) -> (Ctx, Pc) {
         unsafe {
-            let actor = &raw mut the_actors.list[i as usize];
+            let actor = ActorRef::new(i as usize);
             let mut c = Ctx {
                 actor,
-                missile: (&raw mut the_actors.missiles as *mut Missile).offset(0),
+                missile: MissileRef::new(0),
                 slot: i,
                 cycle,
                 environ: 0,
@@ -328,13 +328,12 @@ impl Ctx {
                 return (c, Pc::Statc);
             }
 
-            c.environ = (*actor).environ;
-            c.facing = (*actor).facing as i16;
-            c.state = (*actor).state as i16;
-            c.image = (*actor).index as i16;
+            c.environ = actor.environ;
+            c.facing = actor.facing as i16;
+            c.state = actor.state as i16;
+            c.image = actor.index as i16;
             c.frame_base = diroff(c.facing);
-            c.missile = (&raw mut the_actors.missiles as *mut Missile)
-                .offset(the_actors.next_missile as isize);
+            c.missile = MissileRef::new(the_actors.next_missile as usize);
 
             (c, Pc::Dispatch)
         }
@@ -346,7 +345,7 @@ impl Ctx {
     unsafe fn dispatch(&mut self) -> Pc {
         unsafe {
             let actor = self.actor;
-            let kind = (*actor).kind;
+            let kind = actor.kind;
 
             if kind == OBJECTS {
                 self.terrain = 0;
@@ -361,7 +360,7 @@ impl Ctx {
             } else if kind == RAFT {
                 self.raft()
             } else if self.state == SINK {
-                if (*actor).vitality > 0 {
+                if actor.vitality > 0 {
                     self.image = FRAME_SINK;
                 }
 

@@ -15,8 +15,7 @@ use self::brothers::{
 
 use self::safe_spot::{put_hero_at_safe_spot, restore_hero};
 
-use crate::game::data::state::{the_actors, the_hero, the_screen, the_world};
-use crate::game::data::types::Shape;
+use crate::game::data::state::{ActorRef, the_actors, the_hero, the_screen, the_world};
 use crate::game::render::display::reset_input;
 use crate::game::render::screen_fx::fade_down;
 use crate::game::ui::music::set_mood;
@@ -40,12 +39,11 @@ const VIEW_GAME_OVER: i8 = 2;
 /// (8000), and hunger and fatigue are cleared.
 pub fn revive(new: i16) {
     unsafe {
-        let list = (&raw mut the_actors.list).cast::<Shape>();
-        reset_raft_setfig(list);
+        reset_raft_setfig();
 
-        let hero = list;
-        (*hero).kind = PHIL;
-        (*hero).goal = USER; // yes, we can usurp control from the user
+        let mut hero = ActorRef::new(0);
+        hero.kind = PHIL;
+        hero.goal = USER; // yes, we can usurp control from the user
 
         reset_input();
         the_actors.battle_flag = 0;
@@ -82,12 +80,12 @@ mod tests {
     use super::brothers::{
         FIRST_REGION, FIRST_SAFE_SPOT, GOLDBASE, reset_for_next_brother, start_next_brother,
     };
+    use crate::game::data::types::Shape;
 
     use super::safe_spot::{
         CAMERA_OFFSET, START_DAYNIGHT, START_LIGHT, STILL, move_to_safe_spot, restore_stats,
     };
 
-    use super::*;
     use crate::game::data::state::{Hero, World};
     use crate::game::data::types::Bro;
 

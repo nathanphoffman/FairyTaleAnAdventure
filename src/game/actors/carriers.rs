@@ -1,6 +1,7 @@
 //! How near the hero is to the raft, turtle or swan that can carry them (from the main loop in
 //! csrc/fmain.c).
 
+use crate::game::data::state::ActorRef;
 use crate::game::data::state::{the_actors, the_hero};
 
 // Actor kinds and states (csrc/ftale.h).
@@ -42,14 +43,14 @@ pub fn raft_proximity() {
             RAFT_SLOT
         };
 
-        let carrier = &raw const the_actors.list[the_actors.carrier_slot as usize];
-        let hero = &raw mut the_actors.list[0];
-        let dx = ((*hero).abs_x as i32 - (*carrier).abs_x as i32 - CARRIER_OFFSET) as i16;
-        let dy = ((*hero).abs_y as i32 - (*carrier).abs_y as i32 - CARRIER_OFFSET) as i16;
+        let carrier = ActorRef::new(the_actors.carrier_slot as usize);
+        let mut hero = ActorRef::new(0);
+        let dx = (hero.abs_x as i32 - carrier.abs_x as i32 - CARRIER_OFFSET) as i16;
+        let dy = (hero.abs_y as i32 - carrier.abs_y as i32 - CARRIER_OFFSET) as i16;
         the_actors.raft_nearness = nearness(dx, dy);
 
         if the_hero.riding == BIRD {
-            (*hero).environ = TURTLE_ENVIRON;
+            hero.environ = TURTLE_ENVIRON;
         }
     }
 }

@@ -25,7 +25,7 @@ pub fn blocked_at(x: i16, y: i16, i: i16) -> i32 {
     unsafe {
         let me = actor_at(i as i32);
 
-        if (*me).kind != ENEMY || (*me).race != RACE_WRAITH {
+        if me.kind != ENEMY || me.race != RACE_WRAITH {
             let mut terrain = probe_collision(x as i32, y as i32);
 
             if i == 0 && SOFT_TERRAIN.contains(&terrain) {
@@ -47,42 +47,34 @@ pub fn blocked_at(x: i16, y: i16, i: i16) -> i32 {
 
 /// Whether actor `j` stands in the way of actor `i` at (`x`, `y`). Dead actors and rafts can be
 /// walked over.
-unsafe fn blocked_by_actor(x: i16, y: i16, i: i16, j: i32) -> bool {
-    unsafe {
-        let other = actor_at(j);
+fn blocked_by_actor(x: i16, y: i16, i: i16, j: i32) -> bool {
+    let other = actor_at(j);
 
-        if i as i32 == j
-            || j == RAFT_SLOT as i32
-            || (*other).kind == RAFT_TYPE
-            || (*other).state == DEAD
-        {
-            return false;
-        }
-
-        let dx = x as i32 - (*other).abs_x as i32;
-        let dy = y as i32 - (*other).abs_y as i32;
-
-        dx < BLOCK_HALF_WIDTH
-            && dx > -BLOCK_HALF_WIDTH
-            && dy < BLOCK_HALF_HEIGHT
-            && dy > -BLOCK_HALF_HEIGHT
+    if i as i32 == j || j == RAFT_SLOT as i32 || other.kind == RAFT_TYPE || other.state == DEAD {
+        return false;
     }
+
+    let dx = x as i32 - other.abs_x as i32;
+    let dy = y as i32 - other.abs_y as i32;
+
+    dx < BLOCK_HALF_WIDTH
+        && dx > -BLOCK_HALF_WIDTH
+        && dy < BLOCK_HALF_HEIGHT
+        && dy > -BLOCK_HALF_HEIGHT
 }
 
 /// Moves an actor `dist` in direction `dir` if nothing blocks it. Returns TRUE if it moved.
 pub fn step_figure(fig: i16, dir: i16, dist: i16) -> i32 {
-    unsafe {
-        let a = actor_at(fig as i32);
-        let xtest = step_x((*a).abs_x as i32, dir as i32, dist as i32) as u16;
-        let ytest = step_y((*a).abs_y as i32, dir as i32, dist as i32) as u16;
+    let mut a = actor_at(fig as i32);
+    let xtest = step_x(a.abs_x as i32, dir as i32, dist as i32) as u16;
+    let ytest = step_y(a.abs_y as i32, dir as i32, dist as i32) as u16;
 
-        if blocked_at(xtest as i16, ytest as i16, fig) != 0 {
-            return 0;
-        }
-
-        (*a).abs_x = xtest;
-        (*a).abs_y = ytest;
-
-        1
+    if blocked_at(xtest as i16, ytest as i16, fig) != 0 {
+        return 0;
     }
+
+    a.abs_x = xtest;
+    a.abs_y = ytest;
+
+    1
 }

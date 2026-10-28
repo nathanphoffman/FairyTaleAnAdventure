@@ -2,8 +2,8 @@
 
 use super::{CARRIER, FALL, OBJECTS, RAFT_SLOT};
 use crate::game::data::object_tables::minimap;
+use crate::game::data::state::ActorRef;
 use crate::game::data::state::{memory, the_hero, the_world};
-use crate::game::data::types::Shape;
 use crate::game::render::blit::{add_scenery_mask, clear_memory};
 
 /// The mask buffer (the mask region) is cleared before each sprite: 96 lines of 64 words, plus 5.
@@ -61,7 +61,7 @@ pub(super) fn clear_scenery_mask() {
 
 /// True for sprites drawn in front of everything: carriers, the hero when riding the swan or in
 /// certain places, arrows and some special races.
-pub(super) unsafe fn drawn_in_front(actor: *const Shape, i: i32, atype: i16, inum: i16) -> bool {
+pub(super) unsafe fn drawn_in_front(actor: ActorRef, i: i32, atype: i16, inum: i16) -> bool {
     unsafe {
         if atype == CARRIER
             || (i == 0
@@ -79,7 +79,7 @@ pub(super) unsafe fn drawn_in_front(actor: *const Shape, i: i32, atype: i16, inu
             return true;
         }
 
-        (*actor).race == RACE_NO_MASK_A || (*actor).race == RACE_NO_MASK_B
+        actor.race == RACE_NO_MASK_A || actor.race == RACE_NO_MASK_B
     }
 }
 
@@ -121,7 +121,7 @@ pub(super) fn scenery_rule(k: i16, xm: i32, ym: i32, ystop: i16, on_bridge: bool
 /// The sprite whose tiles are being masked: which actor, where its feet are and which minimap
 /// tiles it covers.
 struct SpriteTiles {
-    actor: *const Shape,
+    actor: ActorRef,
     i: i32,
     ground: i16,
     xbw: i8,
@@ -132,7 +132,7 @@ struct SpriteTiles {
 /// time, by marking them in the mask buffer.
 #[allow(clippy::too_many_arguments)] // the tile loop of the original, kept as one call
 pub(super) unsafe fn mask_against_scenery(
-    actor: *const Shape,
+    actor: ActorRef,
     i: i32,
     ground: i16,
     xbw: i8,
@@ -178,7 +178,7 @@ impl SpriteTiles {
                 // Masks with TERRAIN_TYPE_MASK, keeping only the bits that matter here.
                 (memory().terrain_byte(cm as usize + 1) & TERRAIN_TYPE_MASK) as i16;
 
-            if (*self.actor).state == FALL {
+            if self.actor.state == FALL {
                 if cm <= FALL_TILE_LIMIT {
                     return None;
                 }

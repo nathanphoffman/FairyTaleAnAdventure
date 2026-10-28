@@ -5,6 +5,7 @@ use super::{
     SWAN_FILE, TERRAIN_DEEP_WATER, TERRAIN_WADE, TURTLE_STEP, TURTLE_WATER, WALKING, XTEST, YTEST,
     pos_x, pos_y, terrain,
 };
+use crate::game::data::state::ActorRef;
 
 use crate::game::actors::interaction::center_extent_on;
 use crate::game::data::state::{the_actors, the_hero};
@@ -67,23 +68,23 @@ impl Ctx {
     /// The swan goes where the hero goes if he is near and has the lasso, otherwise it stays.
     unsafe fn swan_moves(&mut self) {
         unsafe {
-            let actor = self.actor;
-            let hero = &raw const the_actors.list[0];
+            let mut actor = self.actor;
+            let hero = ActorRef::new(0);
 
             if swan_carries(
                 the_actors.raft_nearness,
                 the_actors.carrier_slot,
                 *the_hero.stuff.add(STUFF_SWAN_ITEM) != 0,
             ) {
-                self.facing = (*hero).facing as i16;
-                (*actor).abs_x = (*hero).abs_x;
-                XTEST = (*hero).abs_x;
-                (*actor).abs_y = (*hero).abs_y;
-                YTEST = (*hero).abs_y;
+                self.facing = hero.facing as i16;
+                actor.abs_x = hero.abs_x;
+                XTEST = hero.abs_x;
+                actor.abs_y = hero.abs_y;
+                YTEST = hero.abs_y;
                 the_hero.riding = RIDING_SWAN;
             } else {
-                XTEST = (*actor).abs_x;
-                YTEST = (*actor).abs_y;
+                XTEST = actor.abs_x;
+                YTEST = actor.abs_y;
             }
 
             self.image = self.facing;
@@ -94,17 +95,17 @@ impl Ctx {
     /// The turtle carries the hero when he is near, otherwise it swims on its own.
     unsafe fn turtle_moves(&mut self) {
         unsafe {
-            let actor = self.actor;
-            let hero = &raw const the_actors.list[0];
+            let mut actor = self.actor;
+            let hero = ActorRef::new(0);
 
             if turtle_carries(the_actors.raft_nearness, the_actors.carrier_slot) {
-                self.facing = (*hero).facing as i16;
-                XTEST = (*hero).abs_x;
-                YTEST = (*hero).abs_y;
+                self.facing = hero.facing as i16;
+                XTEST = hero.abs_x;
+                YTEST = hero.abs_y;
                 the_hero.riding = RIDING_TURTLE;
                 self.image = self.facing + self.facing;
 
-                if (*hero).state as i16 == WALKING {
+                if hero.state as i16 == WALKING {
                     // Masks off the low bits (a cheap remainder or a flag test).
                     self.image += self.cycle & 1;
                 }
@@ -115,8 +116,8 @@ impl Ctx {
             self.terrain = terrain(XTEST, YTEST);
 
             if self.terrain == TURTLE_WATER {
-                (*actor).abs_x = XTEST;
-                (*actor).abs_y = YTEST;
+                actor.abs_x = XTEST;
+                actor.abs_y = YTEST;
             }
 
             self.step = 1;
@@ -128,7 +129,7 @@ impl Ctx {
     unsafe fn turtle_swims(&mut self) {
         unsafe {
             let actor = self.actor;
-            let (ax, ay) = ((*actor).abs_x as i32, (*actor).abs_y as i32);
+            let (ax, ay) = (actor.abs_x as i32, actor.abs_y as i32);
             self.facing = turtle_heading(self.facing, |dir| {
                 terrain(pos_x(ax, dir, TURTLE_STEP), pos_y(ay, dir, TURTLE_STEP)) == TURTLE_WATER
             });
@@ -145,7 +146,7 @@ impl Ctx {
     /// The raft: follows the hero when the hero is very near and the terrain is water.
     pub(super) unsafe fn raft(&mut self) -> Pc {
         unsafe {
-            let actor = self.actor;
+            let mut actor = self.actor;
             the_hero.riding = 0;
 
             if the_actors.carrier_slot != RIDING_RAFT || the_actors.raft_nearness != 2 {
@@ -160,8 +161,8 @@ impl Ctx {
                 return Pc::Statc;
             }
 
-            (*actor).abs_x = XTEST;
-            (*actor).abs_y = YTEST;
+            actor.abs_x = XTEST;
+            actor.abs_y = YTEST;
             the_hero.riding = RIDING_RAFT;
 
             Pc::Statc

@@ -16,7 +16,7 @@ pub fn find_nearest_figure(constraint: c_char, mut dist: i16) -> i32 {
         for i in 1..the_actors.drawn as i32 {
             let a = actor_at(i);
 
-            if (*a).kind == OBJECTS && (constraint != 0 || (*a).index == ALWAYS_COUNTED_OBJECT) {
+            if a.kind == OBJECTS && (constraint != 0 || a.index == ALWAYS_COUNTED_OBJECT) {
                 continue;
             }
 
@@ -39,7 +39,7 @@ const DIAGONAL_DENOMINATOR: i32 = 7;
 /// Distance between two actors. The game avoids a square root: if one axis is more than twice
 /// the other it is used alone, otherwise (x + y) * 5 / 7 approximates the diagonal.
 pub fn actor_distance(a: i32, b: i32) -> i32 {
-    let (a, b) = unsafe { (&*actor_at(a), &*actor_at(b)) };
+    let (a, b) = (&*actor_at(a), &*actor_at(b));
     let x = (a.abs_x as i32 - b.abs_x as i32).abs();
     let y = (a.abs_y as i32 - b.abs_y as i32).abs();
 

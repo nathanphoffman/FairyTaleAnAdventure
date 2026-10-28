@@ -2,9 +2,10 @@
 
 use super::weapons::weapon_image;
 use super::{CARRIER, DEAD, DYING, ENEMY, FALL, OBJECTS, PHIL, RAFT, Sprite};
+use crate::game::data::state::ActorRef;
 use crate::game::data::state::{memory, the_actors, the_hero};
 use crate::game::data::tables::animation_frames;
-use crate::game::data::types::{SeqInfo, Shape, StateEntry};
+use crate::game::data::types::{SeqInfo, StateEntry};
 
 /// Enemy race 8 (the spectre) and 4 (snakes) look different.
 const RACE_SPECTRE: u8 = 8;
@@ -67,11 +68,11 @@ pub(super) fn sprite_sheet(atype: i16) -> &'static SeqInfo {
 
 /// Picks the image for this pass: the weapon's (`passmode`) or the actor's own, and where its top
 /// left corner is on the screen. `None` means nothing is drawn.
-pub(super) unsafe fn choose_image(actor: *const Shape, i: i32, passmode: bool) -> Option<Sprite> {
+pub(super) unsafe fn choose_image(actor: ActorRef, i: i32, passmode: bool) -> Option<Sprite> {
     unsafe {
-        let inum = (*actor).index as i16;
-        let xstart = (*actor).rel_x as i16;
-        let ystart = (*actor).rel_y as i16;
+        let inum = actor.index as i16;
+        let xstart = actor.rel_x as i16;
+        let ystart = actor.rel_y as i16;
         let ground = ystart.wrapping_add(SPRITE_GROUND_OFFSET);
         let blank = Sprite {
             atype: OBJECTS,
@@ -99,20 +100,20 @@ pub(super) unsafe fn choose_image(actor: *const Shape, i: i32, passmode: bool) -
 
 /// The actor's own sprite sheet and image for this animation frame. `None` means nothing is drawn
 /// (a burnt body, or an object with no image).
-unsafe fn body_image(actor: *const Shape, i: i32, mut inum: i16) -> Option<(i16, i16)> {
+unsafe fn body_image(actor: ActorRef, i: i32, mut inum: i16) -> Option<(i16, i16)> {
     unsafe {
-        let mut atype = (*actor).kind as i16;
+        let mut atype = actor.kind as i16;
 
-        if (atype == ENEMY && (*actor).race != RACE_SPECTRE) || atype == PHIL {
-            if the_actors.fiery_death != 0 && (*actor).environ > 0 {
-                if (*actor).state == DEAD {
+        if (atype == ENEMY && actor.race != RACE_SPECTRE) || atype == PHIL {
+            if the_actors.fiery_death != 0 && actor.environ > 0 {
+                if actor.state == DEAD {
                     return None;
-                } else if (*actor).state == DYING {
+                } else if actor.state == DYING {
                     // a body burning in the lava: nothing more to work out
                     return Some((OBJECTS, OBJ_BURNING));
                 }
-            } else if (*actor).state == FALL {
-                atype = if (*actor).tactic < FALL_AS_ENEMY_STEPS {
+            } else if actor.state == FALL {
+                atype = if actor.tactic < FALL_AS_ENEMY_STEPS {
                     ENEMY
                 } else {
                     OBJECTS
@@ -124,7 +125,7 @@ unsafe fn body_image(actor: *const Shape, i: i32, mut inum: i16) -> Option<(i16,
             inum = pick_of_pair(actor, i, inum);
         }
 
-        if atype == OBJECTS && (*actor).race == 0 {
+        if atype == OBJECTS && actor.race == 0 {
             return None;
         }
 
@@ -139,23 +140,21 @@ unsafe fn body_image(actor: *const Shape, i: i32, mut inum: i16) -> Option<(i16,
 
 /// Snakes use their own pictures; other enemies have two pictures per figure, picked by the race
 /// (the hero, actor 0, has just the one).
-unsafe fn pick_of_pair(actor: *const Shape, i: i32, inum: i16) -> i16 {
-    unsafe {
-        if (*actor).race == RACE_SNAKE {
-            if (*actor).state < DYING {
-                return inum + SNAKE_FIRST_IMAGE;
-            }
-        } else if i > 0 {
-            // Masks off the low bits (a cheap remainder or a flag test).
-            if (*actor).race & 1 != 0 {
-                return inum | IMAGE_PAIR_BIT;
-            }
-
-            return inum & !IMAGE_PAIR_BIT;
+fn pick_of_pair(actor: ActorRef, i: i32, inum: i16) -> i16 {
+    if actor.race == RACE_SNAKE {
+        if actor.state < DYING {
+            return inum + SNAKE_FIRST_IMAGE;
+        }
+    } else if i > 0 {
+        // Masks off the low bits (a cheap remainder or a flag test).
+        if actor.race & 1 != 0 {
+            return inum | IMAGE_PAIR_BIT;
         }
 
-        inum
+        return inum & !IMAGE_PAIR_BIT;
     }
+
+    inum
 }
 
 /// The height of an image in lines: the sheet's, except for some small objects.
@@ -177,14 +176,14 @@ pub(super) fn image_height(atype: i16, inum: i16, sheet_height: i8) -> i8 {
 /// Sinks the sprite into water, shortens it when the hero rides the swan, and so on. Returns false
 /// if nothing is left to draw.
 pub(super) unsafe fn adjust_for_depth(
-    actor: *const Shape,
+    actor: ActorRef,
     i: i32,
     cycle: i16,
     passmode: bool,
     sprite: &mut Sprite,
 ) -> bool {
     unsafe {
-        let depth = (*actor).environ as i16;
+        let depth = actor.environ as i16;
 
         if !passmode && sprite.atype != OBJECTS {
             sink_body(actor, i, cycle, depth, sprite)
@@ -196,20 +195,14 @@ pub(super) unsafe fn adjust_for_depth(
 
 /// A body standing in water: the raft and the swan lift it, shallow water hides the legs, and deep
 /// water shows only bubbles. Returns false if there is nothing to draw (a dead body under water).
-unsafe fn sink_body(
-    actor: *const Shape,
-    i: i32,
-    cycle: i16,
-    depth: i16,
-    sprite: &mut Sprite,
-) -> bool {
+unsafe fn sink_body(actor: ActorRef, i: i32, cycle: i16, depth: i16, sprite: &mut Sprite) -> bool {
     unsafe {
         if i == 0 && the_hero.riding == RIDING_SWAN {
             sprite.ystop -= SWAN_LIFT;
         } else if depth == SHALLOW_DEPTH {
             sprite.ystop -= SHALLOW_HIDDEN_LINES;
         } else if depth > UNDER_SURFACE_DEPTH {
-            if (*actor).state == DEAD {
+            if actor.state == DEAD {
                 return false;
             }
 

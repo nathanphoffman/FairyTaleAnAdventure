@@ -2,6 +2,7 @@
 
 use super::hunger::{eats_fruit, hunger_due, hunger_effects};
 use super::{MOOD_PERIOD_MASK, STARVING_AT, safe_check_due};
+use crate::game::data::state::ActorRef;
 use crate::game::data::state::{Hero, the_actors, the_hero, the_witch, the_world};
 use crate::game::data::types::Shape;
 use crate::game::ui::music::set_mood;
@@ -36,11 +37,7 @@ pub fn survival_tick() {
             battle: the_actors.battle_flag != 0,
         };
 
-        let steps = survival_step(
-            &facts,
-            &mut *(&raw mut the_hero),
-            &mut *(&raw mut the_actors.list[0]),
-        );
+        let steps = survival_step(&facts, &mut *(&raw mut the_hero), &mut (ActorRef::new(0)));
 
         for step in steps {
             match step {

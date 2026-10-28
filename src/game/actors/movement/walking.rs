@@ -112,8 +112,8 @@ impl Ctx {
                 self.environ,
             );
 
-            XTEST = pos_x((*actor).abs_x as i32, self.facing, self.step);
-            YTEST = pos_y((*actor).abs_y as i32, self.facing, self.step);
+            XTEST = pos_x(actor.abs_x as i32, self.facing, self.step);
+            YTEST = pos_y(actor.abs_y as i32, self.facing, self.step);
             self.terrain = blocked_at(XTEST as i16, YTEST as i16, self.slot as i16) as i16;
 
             if self.slot == 0 && self.hero_bumps_into_door() {
@@ -147,29 +147,29 @@ impl Ctx {
     /// walk normally this tick.
     unsafe fn slide_on_ice(&mut self) -> Option<Pc> {
         unsafe {
-            let actor = self.actor;
+            let mut actor = self.actor;
             self.step = if the_hero.riding == RIDING_SWAN {
                 ICE_TOP_SPEED_SWAN
             } else {
                 ICE_TOP_SPEED
             };
 
-            let (nvx, nvy) = ice_velocity_toward(self.facing, (*actor).vel_x, (*actor).vel_y);
+            let (nvx, nvy) = ice_velocity_toward(self.facing, actor.vel_x, actor.vel_y);
 
             if nvx.abs() < self.step - ICE_X_MARGIN {
-                (*actor).vel_x = nvx as i8;
+                actor.vel_x = nvx as i8;
             }
 
             if nvy.abs() < self.step {
-                (*actor).vel_y = nvy as i8;
+                actor.vel_y = nvy as i8;
             }
 
-            XTEST = ((*actor).abs_x as i32 + (*actor).vel_x as i32 / VELOCITY_SCALE) as u16;
-            YTEST = ((*actor).abs_y as i32 + (*actor).vel_y as i32 / VELOCITY_SCALE) as u16;
+            XTEST = (actor.abs_x as i32 + actor.vel_x as i32 / VELOCITY_SCALE) as u16;
+            YTEST = (actor.abs_y as i32 + actor.vel_y as i32 / VELOCITY_SCALE) as u16;
 
             if the_hero.riding == RIDING_SWAN {
                 steer_actor(0, -(nvx as i32), -(nvy as i32), STEER_OFFSET);
-                self.facing = (*actor).facing as i16;
+                self.facing = actor.facing as i16;
 
                 return Some(Pc::NewLoc);
             }
@@ -189,8 +189,8 @@ impl Ctx {
 
             // Masks with FACING_MASK, keeping only the bits that matter here.
             self.facing = (self.facing + 1) & FACING_MASK;
-            XTEST = pos_x((*actor).abs_x as i32, self.facing, self.step);
-            YTEST = pos_y((*actor).abs_y as i32, self.facing, self.step);
+            XTEST = pos_x(actor.abs_x as i32, self.facing, self.step);
+            YTEST = pos_y(actor.abs_y as i32, self.facing, self.step);
 
             if blocked_at(XTEST as i16, YTEST as i16, self.slot as i16) != 0 {
                 Pc::CheckDev2
@@ -207,8 +207,8 @@ impl Ctx {
 
             // Masks with FACING_MASK, keeping only the bits that matter here.
             self.facing = (self.facing - 2) & FACING_MASK;
-            XTEST = pos_x((*actor).abs_x as i32, self.facing, self.step);
-            YTEST = pos_y((*actor).abs_y as i32, self.facing, self.step);
+            XTEST = pos_x(actor.abs_x as i32, self.facing, self.step);
+            YTEST = pos_y(actor.abs_y as i32, self.facing, self.step);
 
             if blocked_at(XTEST as i16, YTEST as i16, self.slot as i16) != 0 {
                 Pc::Blocked
@@ -253,12 +253,12 @@ impl Ctx {
     /// the wraiths keep their one frame).
     unsafe fn pick_walking_frame(&mut self) {
         unsafe {
-            let actor = self.actor;
-            (*actor).facing = self.facing as i8;
+            let mut actor = self.actor;
+            actor.facing = self.facing as i8;
             self.frame_base = diroff(self.facing);
             self.image = self.frame_base;
 
-            if !(the_hero.riding != 0 && self.slot == 0) && (*actor).race != RACE_WRAITH {
+            if !(the_hero.riding != 0 && self.slot == 0) && actor.race != RACE_WRAITH {
                 self.image = (self.image as i32
                     // Masks with WALK_FRAMES_MASK, keeping only the bits that matter here.
                     + ((self.cycle as i32 + self.slot) & WALK_FRAMES_MASK))
@@ -274,11 +274,11 @@ impl Ctx {
             let actor = self.actor;
             self.terrain = terrain(XTEST, YTEST);
 
-            if (*actor).race == RACE_WRAITH || (*actor).race == RACE_SNAKE {
+            if actor.race == RACE_WRAITH || actor.race == RACE_SNAKE {
                 self.terrain = 0;
             }
 
-            if (*actor).race == RACE_SNAKE {
+            if actor.race == RACE_SNAKE {
                 // Snake pictures: two frames (bit 1 of the cycle) for each pair of facings, starting at image 0x24.
                 self.image = (self.cycle & 2) + ((self.facing & 0xfe) << 2) + SNAKE_FIRST_FRAME;
             }
@@ -288,13 +288,11 @@ impl Ctx {
     /// Moves to the new place, remembering the step as the velocity (for sliding on ice).
     unsafe fn take_the_step(&mut self) {
         unsafe {
-            let actor = self.actor;
-            (*actor).vel_x =
-                ((XTEST.wrapping_sub((*actor).abs_x) as i16 as i32) * VELOCITY_SCALE) as i8;
-            (*actor).vel_y =
-                ((YTEST.wrapping_sub((*actor).abs_y) as i16 as i32) * VELOCITY_SCALE) as i8;
-            (*actor).abs_x = XTEST;
-            (*actor).abs_y = YTEST;
+            let mut actor = self.actor;
+            actor.vel_x = ((XTEST.wrapping_sub(actor.abs_x) as i16 as i32) * VELOCITY_SCALE) as i8;
+            actor.vel_y = ((YTEST.wrapping_sub(actor.abs_y) as i16 as i32) * VELOCITY_SCALE) as i8;
+            actor.abs_x = XTEST;
+            actor.abs_y = YTEST;
             the_actors.frustration = 0;
         }
     }
@@ -313,34 +311,32 @@ impl Ctx {
                 return Pc::Cpx;
             }
 
-            (*self.actor).tactic = FRUST;
+            self.actor.tactic = FRUST;
 
             Pc::Still
         }
     }
 
     /// Standing still: the frame after the first of the facing's walking frames.
-    pub(super) unsafe fn still(&mut self) -> Pc {
-        unsafe {
-            self.image = self.frame_base + 1;
+    pub(super) fn still(&mut self) -> Pc {
+        self.image = self.frame_base + 1;
 
-            if self.environ == ENVIRON_ICE {
-                return Pc::Cpx;
-            }
-
-            self.terrain = terrain((*self.actor).abs_x, (*self.actor).abs_y);
-
-            Pc::Tail
+        if self.environ == ENVIRON_ICE {
+            return Pc::Cpx;
         }
+
+        self.terrain = terrain(self.actor.abs_x, self.actor.abs_y);
+
+        Pc::Tail
     }
 
     /// Swinging a weapon (states 0-8): steps through the swing table.
     pub(super) unsafe fn fighting(&mut self) -> Pc {
         unsafe {
-            let actor = self.actor;
+            let mut actor = self.actor;
             self.frame_base = diroff(self.facing + 8);
             let next = swing_transitions[self.state as usize][rand4() as usize] as i16;
-            (*actor).state = next as i8;
+            actor.state = next as i8;
             self.state = next;
 
             if (self.slot > FIRST_NPC_SLOT && self.state == SWING_STATE_FIRST)

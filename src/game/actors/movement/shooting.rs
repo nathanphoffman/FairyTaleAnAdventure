@@ -45,7 +45,7 @@ impl Ctx {
                 return pc;
             }
 
-            (*self.missile).missile_type = (*self.actor).weapon - MISSILE_WEAPON_BASE;
+            self.missile.missile_type = self.actor.weapon - MISSILE_WEAPON_BASE;
 
             Pc::DragShoot
         }
@@ -55,17 +55,17 @@ impl Ctx {
     /// for the hero). `Some` means nothing is fired.
     unsafe fn release_shot(&mut self) -> Option<Pc> {
         unsafe {
-            let actor = self.actor;
+            let mut actor = self.actor;
             let d8 = self.facing + SHOOTING_FACING_OFFSET;
 
-            if (*actor).weapon == WEAPON_FIREBALL {
+            if actor.weapon == WEAPON_FIREBALL {
                 self.image = diroff(d8);
 
                 return Some(Pc::Cpx);
             }
 
             self.image = diroff(d8) + BOW_RELEASED_FRAME;
-            (*actor).state = STILL;
+            actor.state = STILL;
 
             if self.slot == 0 {
                 if *the_hero.stuff.add(STUFF_ARROWS) == 0 {
@@ -75,7 +75,7 @@ impl Ctx {
                 *the_hero.stuff.add(STUFF_ARROWS) -= 1;
             }
 
-            (*self.missile).speed = MISSILE_SPEED_ARROW;
+            self.missile.speed = MISSILE_SPEED_ARROW;
             the_actors.next_missile = the_actors.next_missile.wrapping_add(1);
             play_effect(EFFECT_ARROW, EFFECT_ARROW_PITCH + rand256());
 
@@ -87,20 +87,20 @@ impl Ctx {
     /// `Some` means nothing is fired.
     unsafe fn start_shot(&mut self) -> Option<Pc> {
         unsafe {
-            let actor = self.actor;
+            let mut actor = self.actor;
             let d8 = self.facing + SHOOTING_FACING_OFFSET;
 
             self.image = diroff(d8)
-                + if (*actor).kind == ENEMY {
+                + if actor.kind == ENEMY {
                     ENEMY_BOW_DRAWN_FRAME
                 } else {
                     HERO_BOW_DRAWN_FRAME
                 };
 
-            if (*actor).weapon == WEAPON_FIREBALL {
-                (*self.missile).speed = MISSILE_SPEED_FIREBALL;
+            if actor.weapon == WEAPON_FIREBALL {
+                self.missile.speed = MISSILE_SPEED_FIREBALL;
                 the_actors.next_missile = the_actors.next_missile.wrapping_add(1);
-                (*actor).state = SHOOT3 as i8;
+                actor.state = SHOOT3 as i8;
                 self.image = diroff(d8);
                 play_effect(EFFECT_FIREBALL, EFFECT_FIREBALL_PITCH + rand256());
             } else if self.slot == 0 && *the_hero.stuff.add(STUFF_ARROWS) == 0 {
@@ -108,7 +108,7 @@ impl Ctx {
 
                 return Some(Pc::Cpx);
             } else {
-                (*self.missile).speed = 0;
+                self.missile.speed = 0;
             }
 
             None

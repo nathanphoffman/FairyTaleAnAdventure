@@ -8,6 +8,7 @@ use super::{
     ARROWBASE, ARROWS, CHEST, FRUIT_SLOT, GOLDBASE, OBJECTS, PRQ_VITALITY, SACKS, TALISMAN, URN,
     add_stuff, item_name,
 };
+use crate::game::data::state::ActorRef;
 use crate::game::render::screen::{FontKind, screen};
 
 use crate::game::actors::interaction::{eat_food, find_nearest_figure};
@@ -64,15 +65,15 @@ pub(super) unsafe fn take_nearest() {
             return;
         }
 
-        let actor = &raw mut the_actors.list[the_actors.nearest_object as usize];
+        let actor = ActorRef::new(the_actors.nearest_object as usize);
 
-        if (*actor).kind == OBJECTS {
+        if actor.kind == OBJECTS {
             if take_object() {
                 finish_pickup();
             }
-        } else if (*actor).weapon < 0 {
+        } else if actor.weapon < 0 {
             // already searched
-        } else if (*actor).vitality == 0 || the_world.freeze_timer != 0 {
+        } else if actor.vitality == 0 || the_world.freeze_timer != 0 {
             search_body();
         } else {
             show_event(EVENT_ALIVE);
@@ -104,11 +105,11 @@ unsafe fn finish_pickup() {
 /// Handles taking the object `nearest_object`. Returns true if it was taken (so it must be removed).
 unsafe fn take_object() -> bool {
     unsafe {
-        let actor = &raw mut the_actors.list[the_actors.nearest_object as usize];
-        let id = (*actor).index as u8 as u32;
+        let actor = ActorRef::new(the_actors.nearest_object as usize);
+        let id = actor.index as u8 as u32;
 
         // Masks with OWNER_MASK, keeping only the bits that matter here.
-        let owner = (*actor).vitality as u32 & OWNER_MASK;
+        let owner = actor.vitality as u32 & OWNER_MASK;
 
         match classify_take(id, the_hero.hunger, the_world.region) {
             Take::Gold => {

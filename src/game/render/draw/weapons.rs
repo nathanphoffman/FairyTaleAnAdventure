@@ -3,8 +3,8 @@
 use super::images::{byte_of, state_entry};
 use super::{DEAD, OBJECTS, SHOOT1, Sprite};
 use crate::game::data::object_tables::{bow_x, bow_y};
+use crate::game::data::state::ActorRef;
 use crate::game::data::state::the_world;
-use crate::game::data::types::Shape;
 
 const OBJ_BOW_UP: i16 = 30;
 const OBJ_BOW_MID: i16 = 0x53;
@@ -37,16 +37,16 @@ const WEAPON_SPRITE_BASE: [(i8, i16); 4] = [(2, 32), (3, 48), (1, 64), (4, 0)];
 
 /// Says whether this pass draws the weapon (`true`) or the body. An actor with a weapon is drawn in
 /// two passes, the weapon first or second depending on which way it faces.
-pub(super) unsafe fn weapon_passmode(actor: *const Shape, pass: &mut u8) -> bool {
+pub(super) unsafe fn weapon_passmode(actor: ActorRef, pass: &mut u8) -> bool {
     unsafe {
         let mut passmode = false;
-        let state = (*actor).state;
+        let state = actor.state;
 
-        if (*actor).weapon > 0
-            && (*actor).weapon <= LAST_HELD_WEAPON
+        if actor.weapon > 0
+            && actor.weapon <= LAST_HELD_WEAPON
             && (!(DEAD..SHOOT1).contains(&state) || the_world.extent_type > PEACEFUL_XTYPE)
         {
-            let facing = (*actor).facing as i32;
+            let facing = actor.facing as i32;
 
             // The other of the two passes (0 becomes 1, 1 becomes 0).
             let flipped = *pass ^ 1;
@@ -58,7 +58,7 @@ pub(super) unsafe fn weapon_passmode(actor: *const Shape, pass: &mut u8) -> bool
                 *pass
             };
 
-            if (*actor).weapon == WEAPON_BOW && state < SHOOT1 {
+            if actor.weapon == WEAPON_BOW && state < SHOOT1 {
                 // Masks with FACING_LEFT_BIT, keeping only the bits that matter here.
                 pick = if (facing & FACING_LEFT_BIT) == 0 {
                     flipped
@@ -91,9 +91,9 @@ fn bow_image(frame_number: i16) -> i16 {
 }
 
 /// The weapon's sprite: where it is held for this animation frame, and which image it is.
-pub(super) unsafe fn weapon_image(actor: *const Shape, mut sprite: Sprite) -> Sprite {
+pub(super) unsafe fn weapon_image(actor: ActorRef, mut sprite: Sprite) -> Sprite {
     unsafe {
-        let kind = (*actor).weapon as i16;
+        let kind = actor.weapon as i16;
         let frame_number = sprite.inum;
 
         if kind == WEAPON_BOW as i16 && frame_number < BOW_FRAMES {
@@ -106,9 +106,9 @@ pub(super) unsafe fn weapon_image(actor: *const Shape, mut sprite: Sprite) -> Sp
             sprite.ystart += entry.wpn_y as i16;
 
             if kind == WEAPON_FIREBALL as i16 {
-                sprite.inum = (*actor).facing as i16 + OBJ_ARROW_BASE;
+                sprite.inum = actor.facing as i16 + OBJ_ARROW_BASE;
 
-                if (*actor).facing == FIREBALL_FACING_EAST {
+                if actor.facing == FIREBALL_FACING_EAST {
                     sprite.ystart -= FIREBALL_EAST_LIFT;
                 }
             } else {

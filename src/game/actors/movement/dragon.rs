@@ -15,7 +15,7 @@ impl Ctx {
     /// them), and now and then breathes a fireball.
     pub(super) unsafe fn dragon(&mut self) -> Pc {
         unsafe {
-            let actor = self.actor;
+            let mut actor = self.actor;
             self.image = 0;
 
             if self.state == DYING {
@@ -23,12 +23,12 @@ impl Ctx {
             } else if self.state == DEAD {
                 self.image = DRAGON_DEAD_FRAME;
             } else if rand4() == 0 {
-                (*self.missile).speed = MISSILE_SPEED_FIREBALL;
+                self.missile.speed = MISSILE_SPEED_FIREBALL;
                 the_actors.next_missile = the_actors.next_missile.wrapping_add(1);
                 self.image = (rand2() + 1) as i16;
                 play_effect(EFFECT_FIREBALL, EFFECT_FIREBALL_PITCH + rand256());
-                (*actor).facing = DRAGON_BREATH_FACING;
-                (*self.missile).missile_type = MISSILE_ROCK_TYPE;
+                actor.facing = DRAGON_BREATH_FACING;
+                self.missile.missile_type = MISSILE_ROCK_TYPE;
 
                 return Pc::DragShoot;
             }
@@ -44,21 +44,21 @@ impl Ctx {
     pub(super) unsafe fn drag_shoot(&mut self) -> Pc {
         unsafe {
             let actor = self.actor;
-            let ms = self.missile;
+            let mut ms = self.missile;
             let d = self.facing as usize;
             let dx = bowshotx.get(d).copied().unwrap_or(0) as i32;
-            (*ms).abs_x = ((*actor).abs_x as i32 + dx) as u16;
-            (*ms).abs_y = (*actor).abs_y;
-            let dy = if (*actor).weapon == WEAPON_BOW {
+            ms.abs_x = (actor.abs_x as i32 + dx) as u16;
+            ms.abs_y = actor.abs_y;
+            let dy = if actor.weapon == WEAPON_BOW {
                 bowshoty.get(d).copied().unwrap_or(0)
             } else {
                 gunshoty.get(d).copied().unwrap_or(0)
             };
 
-            (*ms).abs_y = ((*ms).abs_y as i32 + dy as i32) as u16;
-            (*ms).time_of_flight = 0;
-            (*ms).direction = (*actor).facing;
-            (*ms).archer = self.slot as i8;
+            ms.abs_y = (ms.abs_y as i32 + dy as i32) as u16;
+            ms.time_of_flight = 0;
+            ms.direction = actor.facing;
+            ms.archer = self.slot as i8;
 
             if the_actors.next_missile > MAX_MISSILE {
                 the_actors.next_missile = 0;

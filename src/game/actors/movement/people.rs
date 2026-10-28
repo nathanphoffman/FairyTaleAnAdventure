@@ -20,10 +20,10 @@ impl Ctx {
     /// People standing about: images from the setfig table, talking, and the witch watching the hero.
     pub(super) unsafe fn setfig(&mut self) -> Pc {
         unsafe {
-            let actor = self.actor;
+            let mut actor = self.actor;
 
             // Masks with PERSON_MASK, keeping only the bits that matter here.
-            self.terrain = ((*actor).race & PERSON_MASK) as i16;
+            self.terrain = (actor.race & PERSON_MASK) as i16;
             let entry = &*(&raw const setfig_table)
                 .cast::<SetFigEntry>()
                 .add(self.terrain as usize);
@@ -36,14 +36,14 @@ impl Ctx {
                 self.image += PERSON_DEAD_OFFSET + witch_extra(witch);
             } else if witch {
                 steer_actor(self.slot, the_hero.x as i32, the_hero.y as i32, 0);
-                self.image = ((*actor).facing / 2) as i16;
+                self.image = (actor.facing / 2) as i16;
                 the_witch.on_screen = 1;
             } else if self.state == TALKING {
                 self.image += rand2() as i16;
-                (*actor).tactic = (*actor).tactic.wrapping_sub(1);
+                actor.tactic = actor.tactic.wrapping_sub(1);
 
-                if (*actor).tactic == 0 {
-                    (*actor).state = STILL;
+                if actor.tactic == 0 {
+                    actor.state = STILL;
                 }
             } else {
                 return Pc::Statc;

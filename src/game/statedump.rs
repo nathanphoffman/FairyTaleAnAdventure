@@ -5,6 +5,7 @@
 //! of the game's main loop by `run_pending_command`, so they never run in the middle of a frame.
 
 use crate::game::actors::encounters::check_death;
+use crate::game::data::state::ActorRef;
 use crate::game::data::state::{the_actors, the_hero, the_world};
 use crate::game::data::tables::{seed1, seed2};
 use crate::game::data::types::Shape;
@@ -101,7 +102,7 @@ pub fn state_text() -> String {
         out.push_str(&format!("seed {} {}\n", { seed1 }, { seed2 }));
 
         for i in 0..20 {
-            out.push_str(&actor_line(i, &*(&raw const the_actors.list[i])));
+            out.push_str(&actor_line(i, &(ActorRef::new(i))));
         }
 
         out.push_str("stuff");

@@ -3,8 +3,8 @@
 
 use crate::game::data::object_tables::ob_listg;
 use crate::game::data::random::rand64;
+use crate::game::data::state::ActorRef;
 use crate::game::data::state::{the_actors, the_hero, the_world};
-use crate::game::data::types::Shape;
 use crate::game::render::screen_fx::day_fade;
 use crate::game::ui::text::{queue_print, show_event};
 
@@ -96,9 +96,9 @@ fn heal_due(clock: u16, vitality: i16, bravery: i16, state: i8) -> bool {
 /// Sleeping, the day clock, the light level, the messages for the time of day and slow healing.
 pub fn day_night_tick() {
     unsafe {
-        let hero = &raw mut the_actors.list[0];
+        let mut hero = ActorRef::new(0);
 
-        if (*hero).state == SLEEP {
+        if hero.state == SLEEP {
             sleep_tick(hero);
         }
 
@@ -106,9 +106,9 @@ pub fn day_night_tick() {
             the_world.day_clock,
             the_world.freeze_timer != 0,
             the_world.day_period,
-            (*hero).vitality,
+            hero.vitality,
             the_hero.brave,
-            (*hero).state,
+            hero.state,
         );
 
         the_world.day_clock = tick.clock;
@@ -124,7 +124,7 @@ pub fn day_night_tick() {
         day_fade();
 
         if tick.heal {
-            (*hero).vitality += 1;
+            hero.vitality += 1;
             queue_print(PRQ_STATS);
         }
     }
@@ -190,7 +190,7 @@ fn sleep_step(
 }
 
 /// While asleep time runs fast; the hero wakes when rested, at dawn, or when a fight starts.
-unsafe fn sleep_tick(hero: *mut Shape) {
+unsafe fn sleep_tick(mut hero: ActorRef) {
     unsafe {
         let (clock, tired, wake) = sleep_step(
             the_world.day_clock,
@@ -203,9 +203,9 @@ unsafe fn sleep_tick(hero: *mut Shape) {
         the_hero.fatigue = tired;
 
         if wake {
-            (*hero).state = STILL;
-            (*hero).abs_y &= WAKE_Y_MASK;
-            the_hero.y = (*hero).abs_y;
+            hero.state = STILL;
+            hero.abs_y &= WAKE_Y_MASK;
+            the_hero.y = hero.abs_y;
         }
     }
 }

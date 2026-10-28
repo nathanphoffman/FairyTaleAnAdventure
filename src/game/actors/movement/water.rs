@@ -71,7 +71,7 @@ impl Ctx {
     /// actor sinks, or at the pit sector falls through to the dungeon.
     pub(super) unsafe fn wade(&mut self, j: i16) {
         unsafe {
-            let actor = self.actor;
+            let mut actor = self.actor;
             let (depth, outcome) =
                 wade_step(self.environ, j, self.state == DYING || self.state == DEAD);
             self.environ = depth;
@@ -86,14 +86,14 @@ impl Ctx {
                             transfer_hero(DUNGEON_ARRIVAL.0, DUNGEON_ARRIVAL.1, 0);
                             find_place(1);
                         } else {
-                            (*actor).vitality = 0;
+                            actor.vitality = 0;
                         }
                     }
 
-                    (*actor).state = STILL;
+                    actor.state = STILL;
                 }
 
-                Wading::Sinking => (*actor).state = SINK as i8,
+                Wading::Sinking => actor.state = SINK as i8,
             }
         }
     }

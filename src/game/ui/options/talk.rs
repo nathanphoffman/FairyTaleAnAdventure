@@ -2,9 +2,9 @@
 
 use super::speeches::person_speaks;
 use crate::game::actors::interaction::find_nearest_figure;
+use crate::game::data::state::ActorRef;
 use crate::game::data::state::{the_actors, the_hero};
 use crate::game::data::tables::setfig_table;
-use crate::game::data::types::Shape;
 use crate::game::ui::text::speak;
 use crate::game::world::objects::SetFigEntry;
 
@@ -54,7 +54,7 @@ pub(super) unsafe fn talk_option(chosen_entry: i16) -> bool {
             return true;
         }
 
-        let actor = &raw mut the_actors.list[the_actors.nearest_object as usize];
+        let actor = ActorRef::new(the_actors.nearest_object as usize);
         let target = describe_target(actor);
 
         let action = talk_action(
@@ -72,10 +72,10 @@ pub(super) unsafe fn talk_option(chosen_entry: i16) -> bool {
 }
 
 /// What the Talk code needs to know about the actor the hero is talking to.
-unsafe fn describe_target(actor: *const Shape) -> Target {
+unsafe fn describe_target(actor: ActorRef) -> Target {
     unsafe {
         // Masks with PERSON_MASK, keeping only the bits that matter here.
-        let person = (*actor).race & PERSON_MASK;
+        let person = actor.race & PERSON_MASK;
         let can_talk = (*(&raw const setfig_table)
             .cast::<SetFigEntry>()
             .add(person as usize))
@@ -83,28 +83,28 @@ unsafe fn describe_target(actor: *const Shape) -> Target {
             != 0;
 
         Target {
-            kind: (*actor).kind,
-            state: (*actor).state,
-            race: (*actor).race,
+            kind: actor.kind,
+            state: actor.state,
+            race: actor.race,
             can_talk,
         }
     }
 }
 
 /// Does what `talk_action` decided: speaks, and turns the person to talk or hands over the shell.
-unsafe fn carry_out(action: TalkAction, actor: *mut Shape) {
+unsafe fn carry_out(action: TalkAction, mut actor: ActorRef) {
     unsafe {
         match action {
             TalkAction::Nothing => {}
             TalkAction::TooCloseToYell => speak(SPEECH_TOO_CLOSE_TO_YELL),
             TalkAction::Person { starts_talking } => {
                 if starts_talking {
-                    (*actor).state = TALKING;
-                    (*actor).tactic = TACTIC_TALK;
+                    actor.state = TALKING;
+                    actor.tactic = TACTIC_TALK;
                 }
 
                 // Masks with PERSON_MASK, keeping only the bits that matter here.
-                person_speaks((*actor).race & PERSON_MASK, actor);
+                person_speaks(actor.race & PERSON_MASK, actor);
             }
 
             TalkAction::TurtleHasShell => speak(SPEECH_TURTLE_HAS_SHELL),

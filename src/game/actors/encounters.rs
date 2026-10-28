@@ -3,6 +3,7 @@
 use crate::game::actors::interaction::blocked_at;
 use crate::game::data::object_tables::weapon_probs;
 use crate::game::data::random::{bitrand, rand2, rand4, rnd};
+use crate::game::data::state::ActorRef;
 use crate::game::data::state::{
     Hero, memory, the_actors, the_encounter, the_hero, the_memory, the_world,
 };
@@ -100,23 +101,23 @@ const FIRST_CARRIER_SLOT: usize = 3;
 /// 0 if no free spot was found in 15 tries.
 pub fn place_encounter(i: u16, spread: u16) -> i32 {
     unsafe {
-        let actor = (&raw mut the_actors.list).cast::<Shape>().add(i as usize);
+        let mut actor = ActorRef::new(i as usize);
         let Some((xtest, ytest)) = find_open_spot(i, spread) else {
             return 0;
         };
 
-        (*actor).abs_x = xtest;
-        (*actor).abs_y = ytest;
-        (*actor).kind = ENEMY;
+        actor.abs_x = xtest;
+        actor.abs_y = ytest;
+        actor.kind = ENEMY;
         let race = encounter_race();
-        (*actor).race = race as u8;
+        actor.race = race as u8;
         arm_enemy(actor, race);
 
-        (*actor).rel_x = (*actor)
+        actor.rel_x = actor
             .abs_x
             .wrapping_sub(the_world.map_x)
             .wrapping_sub(ENEMY_ANCHOR.0);
-        (*actor).rel_y = (*actor)
+        actor.rel_y = actor
             .abs_y
             .wrapping_sub(the_world.map_y)
             .wrapping_sub(ENEMY_ANCHOR.1);
@@ -127,7 +128,7 @@ pub fn place_encounter(i: u16, spread: u16) -> i32 {
 
 /// Gives the new enemy its weapon (picked from the race's chart, at random for a mixed group),
 /// its goal (archers shoot, the rest attack, both as clever as the race is) and its hit points.
-unsafe fn arm_enemy(actor: *mut Shape, race: i32) {
+unsafe fn arm_enemy(mut actor: ActorRef, race: i32) {
     unsafe {
         // Masks with MIX_RANDOM_WEAPON, keeping only the bits that matter here.
         if the_encounter.mix_flag & MIX_RANDOM_WEAPON != 0 {
@@ -136,19 +137,19 @@ unsafe fn arm_enemy(actor: *mut Shape, race: i32) {
 
         let chart = &encounter_chart[race as usize];
         let w = (chart.arms as i32 * WEAPON_CHOICES) + the_encounter.weapon_type as i32;
-        (*actor).weapon = weapon_probs[w as usize];
-        (*actor).state = STILL;
-        (*actor).environ = 0;
-        (*actor).facing = 0;
+        actor.weapon = weapon_probs[w as usize];
+        actor.state = STILL;
+        actor.environ = 0;
+        actor.facing = 0;
 
         // Masks with BOW_BIT, keeping only the bits that matter here.
-        if (*actor).weapon & BOW_BIT != 0 {
-            (*actor).goal = ARCHER1 + chart.cleverness;
+        if actor.weapon & BOW_BIT != 0 {
+            actor.goal = ARCHER1 + chart.cleverness;
         } else {
-            (*actor).goal = ATTACK1 + chart.cleverness;
+            actor.goal = ATTACK1 + chart.cleverness;
         }
 
-        (*actor).vitality = chart.hitpoints as i16;
+        actor.vitality = chart.hitpoints as i16;
     }
 }
 
@@ -202,9 +203,9 @@ unsafe fn encounter_race() -> i32 {
 /// changes. The hero's stats are always refreshed on screen.
 pub fn check_death(i: i32, dtype: i32) {
     unsafe {
-        let actor = (&raw mut the_actors.list).cast::<Shape>().add(i as usize);
+        let mut actor = ActorRef::new(i as usize);
 
-        if let Some(death) = start_dying(i, &mut *actor, &mut *(&raw mut the_hero)) {
+        if let Some(death) = start_dying(i, &mut actor, &mut *(&raw mut the_hero)) {
             if death.dark_knight {
                 speak(SPEAK_DARK_KNIGHT_DIES);
             }
@@ -265,11 +266,9 @@ fn start_dying(i: i32, actor: &mut Shape, hero: &mut Hero) -> Option<Death> {
 /// if they are not the ones already loaded, in the middle of its extent.
 pub fn load_carrier(n: i16) {
     unsafe {
-        let actor = (&raw mut the_actors.list)
-            .cast::<Shape>()
-            .add(FIRST_CARRIER_SLOT);
+        let mut actor = ActorRef::new(FIRST_CARRIER_SLOT);
 
-        (*actor).kind = if n == CARRIER_DRAGON { DRAGON } else { CARRIER };
+        actor.kind = if n == CARRIER_DRAGON { DRAGON } else { CARRIER };
         let extent = if n == CARRIER_DRAGON {
             2
         } else if n == CARRIER_TURTLE {
@@ -281,22 +280,22 @@ pub fn load_carrier(n: i16) {
         if the_actors.loaded_actor_file != n {
             the_memory.nextshape = memory().seq_list[SEQ_ENEMY].location;
             load_sprite_file(n as i32);
-            finish_sprite_load((*actor).kind as i16);
+            finish_sprite_load(actor.kind as i16);
             motor_off();
         }
 
         let e = &*(&raw mut extent_list).cast::<Extent>().add(extent);
-        (*actor).abs_x = e.x1.wrapping_add(CARRIER_OFFSET.0);
-        (*actor).abs_y = e.y1.wrapping_add(CARRIER_OFFSET.1);
-        (*actor).index = 0;
-        (*actor).weapon = 0;
-        (*actor).environ = 0;
-        (*actor).state = STILL;
-        (*actor).vitality = VITALITY_CARRIER;
+        actor.abs_x = e.x1.wrapping_add(CARRIER_OFFSET.0);
+        actor.abs_y = e.y1.wrapping_add(CARRIER_OFFSET.1);
+        actor.index = 0;
+        actor.weapon = 0;
+        actor.environ = 0;
+        actor.state = STILL;
+        actor.vitality = VITALITY_CARRIER;
         the_actors.active = ACTORS_WITH_CARRIER;
         the_actors.active_carrier = n;
         the_actors.loaded_actor_file = n;
-        (*actor).race = n as u8;
+        actor.race = n as u8;
     }
 }
 

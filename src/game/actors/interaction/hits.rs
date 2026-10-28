@@ -5,8 +5,7 @@ use super::extents::summon_turtle;
 use super::{DEAD, DRAGON, ENEMY, FLEE, HERO, SETFIG, turtle_eggs};
 use crate::game::actors::encounters::check_death;
 use crate::game::data::random::{bitrand, rand64, rand256};
-use crate::game::data::state::{the_actors, the_hero, the_world};
-use crate::game::data::types::Shape;
+use crate::game::data::state::{ActorRef, the_actors, the_hero, the_world};
 use crate::game::files::loading::play_effect;
 use crate::game::ui::messages::{print, print_cont};
 use crate::game::ui::text::{print_number, speak};
@@ -46,13 +45,9 @@ const EFFECT_FOE_HURT: i16 = 3;
 const PEACEFUL_EXTENT: u16 = 50;
 const BRAVE_LOW_VITALITY: i16 = 5;
 
-/// Actor `i`. A raw pointer, because the functions called while it is in use change actors too.
-pub(super) fn actor_at(i: i32) -> *mut Shape {
-    unsafe {
-        (&raw mut the_actors.list)
-            .cast::<Shape>()
-            .wrapping_add(i as usize)
-    }
+/// Actor `i`.
+pub(super) fn actor_at(i: i32) -> ActorRef {
+    ActorRef::new(i as usize)
 }
 
 /// A hit from actor `i` on actor `j`: `wt` damage, then the target is pushed back in direction `fc`.
@@ -64,21 +59,21 @@ pub(super) fn actor_at(i: i32) -> *mut Shape {
 /// ghost brothers) are never hurt. Dragons and people are not pushed back.
 pub fn hit_actor(i: i32, j: i32, fc: i32, wt: i16) {
     unsafe {
-        let target = actor_at(j);
-        let hero_weapon = (*actor_at(HERO as i32)).weapon;
+        let mut target = actor_at(j);
+        let hero_weapon = actor_at(HERO as i32).weapon;
         let has_spirit_item = *the_hero.stuff.add(SPIRIT_HURT_ITEM) != 0;
 
-        if too_weak_to_hurt((*target).race, hero_weapon, has_spirit_item) {
+        if too_weak_to_hurt(target.race, hero_weapon, has_spirit_item) {
             speak(MESSAGE_NEEDS_WEAPON);
 
             return;
         }
 
-        if RACE_UNHITTABLE.contains(&(*target).race) {
+        if RACE_UNHITTABLE.contains(&target.race) {
             return;
         }
 
-        (*target).vitality = vitality_after_hit((*target).vitality, wt);
+        target.vitality = vitality_after_hit(target.vitality, wt);
 
         match hit_sound(i, j) {
             HitSound::Arrow => play_effect(EFFECT_ARROW_HIT, PITCH_ARROW + rand64()),
@@ -91,9 +86,7 @@ pub fn hit_actor(i: i32, j: i32, fc: i32, wt: i16) {
         }
 
         // push back the foe
-        if can_be_pushed((*target).kind)
-            && step_figure(j as i16, fc as i16, KNOCKBACK) != 0
-            && i >= 0
+        if can_be_pushed(target.kind) && step_figure(j as i16, fc as i16, KNOCKBACK) != 0 && i >= 0
         {
             step_figure(i as i16, fc as i16, KNOCKBACK);
         }
@@ -169,7 +162,7 @@ fn vitality_after_hit(vitality: i16, wt: i16) -> i16 {
 pub fn report_battle_result() {
     unsafe {
         let (dead, fled) = count_casualties();
-        let vitality = (*actor_at(HERO as i32)).vitality;
+        let vitality = actor_at(HERO as i32).vitality;
 
         match battle_report(vitality, dead, fled, the_world.extent_type) {
             BattleReport::Silent => {}
@@ -204,13 +197,13 @@ unsafe fn count_casualties() -> (i32, i32) {
         for i in FIRST_MONSTER_SLOT..the_actors.active as i32 {
             let a = actor_at(i);
 
-            if (*a).kind != ENEMY {
+            if a.kind != ENEMY {
                 continue;
             }
 
-            if (*a).state == DEAD {
+            if a.state == DEAD {
                 dead += 1;
-            } else if (*a).goal == FLEE {
+            } else if a.goal == FLEE {
                 fled += 1;
             }
         }

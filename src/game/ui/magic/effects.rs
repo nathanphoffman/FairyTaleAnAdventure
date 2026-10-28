@@ -2,6 +2,7 @@
 
 use crate::game::actors::encounters::check_death;
 use crate::game::data::random::rand8;
+use crate::game::data::state::ActorRef;
 use crate::game::data::state::{the_actors, the_hero, the_world};
 use crate::game::data::tables::stone_ring_sectors;
 use crate::game::data::types::Shape;
@@ -162,9 +163,9 @@ fn stone_target(sector: i16, px: u16, py: u16, facing: i8, list: &[u8]) -> Stone
 /// Heals the hero a little, up to a limit set by bravery.
 pub(super) unsafe fn heal() {
     unsafe {
-        let hero = &raw mut the_actors.list[0];
-        let (vitality, capped) = healed_vitality((*hero).vitality, the_hero.brave, rand8());
-        (*hero).vitality = vitality;
+        let mut hero = ActorRef::new(0);
+        let (vitality, capped) = healed_vitality(hero.vitality, the_hero.brave, rand8());
+        hero.vitality = vitality;
 
         if !capped {
             print("That feels a lot better!");
@@ -198,10 +199,10 @@ pub(super) unsafe fn scare_enemies() {
         let mut i = 1;
 
         while i < the_actors.active as usize {
-            let actor = &raw mut the_actors.list[i];
+            let mut actor = ActorRef::new(i);
 
-            if is_scared_by_fear_spell(&*actor) {
-                (*actor).vitality = 0;
+            if is_scared_by_fear_spell(&actor) {
+                actor.vitality = 0;
                 check_death(i as i32, 0);
                 the_hero.brave -= 1;
             }

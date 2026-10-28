@@ -4,26 +4,26 @@ use super::{ARROWS, GOLDBASE, add_stuff, item, item_name};
 use crate::game::actors::encounters::Encounter;
 use crate::game::data::object_tables::treasure_probs;
 use crate::game::data::random::rand8;
+use crate::game::data::state::ActorRef;
 use crate::game::data::state::{the_actors, the_hero};
 use crate::game::data::tables::encounter_chart;
-use crate::game::data::types::Shape;
 use crate::game::ui::messages::{print, print_cont, print_wrapped};
 use crate::game::ui::text::print_number;
 
 /// Searches the dead body `nearest_object`: takes its weapon and any treasure.
 pub(super) unsafe fn search_body() {
     unsafe {
-        let actor = &raw mut the_actors.list[the_actors.nearest_object as usize];
+        let mut actor = ActorRef::new(the_actors.nearest_object as usize);
         print_wrapped("% searched the body and found");
         print("");
         let loot = body_loot(
-            (*actor).weapon,
+            actor.weapon,
             the_actors.list[0].weapon,
             || rand8() + EXTRA_ARROWS_MIN,
             || roll_body_treasure(actor),
         );
 
-        (*actor).weapon = -1;
+        actor.weapon = -1;
 
         take_found_weapon(&loot);
 
@@ -150,18 +150,18 @@ fn better_weapon(current: i8, found: u32) -> i8 {
 
 /// Picks what a dead enemy carries besides its weapon, from the treasure table for its race.
 /// Returns an item number (0 for nothing); characters like shopkeepers (a set figure) carry none.
-unsafe fn roll_body_treasure(actor: *mut Shape) -> u32 {
+unsafe fn roll_body_treasure(actor: ActorRef) -> u32 {
     const SETFIG_RACE_BIT: u8 = 0x80;
     const TREASURE_CLASS_SIZE: i32 = 8;
     unsafe {
         // Masks with SETFIG_RACE_BIT, keeping only the bits that matter here.
-        if (*actor).race & SETFIG_RACE_BIT != 0 {
+        if actor.race & SETFIG_RACE_BIT != 0 {
             return 0;
         }
 
         let class = (*(&raw const encounter_chart)
             .cast::<Encounter>()
-            .add((*actor).race as usize))
+            .add(actor.race as usize))
         .treasure;
 
         treasure_probs[(class as i32 * TREASURE_CLASS_SIZE + rand8()) as usize] as i32 as u32

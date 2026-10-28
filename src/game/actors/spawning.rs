@@ -4,6 +4,7 @@ use crate::game::actors::encounters::load_enemy_sprites;
 use crate::game::actors::encounters::place_encounter;
 use crate::game::actors::interaction::pick_encounter_spot;
 use crate::game::data::random::{fta_rand, rand4, rand64};
+use crate::game::data::state::ActorRef;
 use crate::game::data::state::{the_actors, the_encounter, the_world};
 use crate::game::files::disk::{motor_off, read_finished};
 use crate::game::files::loading::finish_sprite_load;
@@ -171,9 +172,9 @@ unsafe fn place_in_dead_slots() {
         let mut i = FIRST_ENEMY_ACTOR as usize;
 
         while i < LAST_ENEMY_ACTOR as usize && the_encounter.number != 0 {
-            let actor = &raw const the_actors.list[i];
+            let actor = ActorRef::new(i);
 
-            if (*actor).state == DEAD && ((*actor).visible == 0 || (*actor).race == WRAITH) {
+            if actor.state == DEAD && (actor.visible == 0 || actor.race == WRAITH) {
                 place_encounter(i as u16, SPREAD);
                 the_encounter.number -= 1;
             }

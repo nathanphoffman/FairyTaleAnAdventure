@@ -1,7 +1,8 @@
 //! Sleeping in a bed: standing on a bed tile indoors for a while puts a tired hero to sleep (from
 //! the main loop in csrc/fmain.c).
 
-use crate::game::data::state::{memory, the_actors, the_hero, the_world};
+use crate::game::data::state::ActorRef;
+use crate::game::data::state::{memory, the_hero, the_world};
 use crate::game::ui::text::show_event;
 use crate::game::world::map::tile_index;
 
@@ -27,14 +28,14 @@ const BED_Y_MASK: u16 = 0x1f;
 /// Copies the hero's position, and puts the hero to bed after standing on a bed for 30 ticks.
 pub fn check_bed() {
     unsafe {
-        let hero = &raw mut the_actors.list[0];
+        let mut hero = ActorRef::new(0);
 
-        if (*hero).state != STILL {
+        if hero.state != STILL {
             the_world.bed_wait = 0;
         }
 
-        the_hero.x = (*hero).abs_x;
-        the_hero.y = (*hero).abs_y;
+        the_hero.x = hero.abs_x;
+        the_hero.y = hero.abs_y;
 
         if the_world.region == INSIDE_REGION {
             let tile = memory().sector_byte(tile_index(
@@ -57,9 +58,9 @@ pub fn check_bed() {
                 BedAction::NotTired => show_event(EVENT_NOT_TIRED),
                 BedAction::FallAsleep => {
                     show_event(EVENT_SLEEPING);
-                    (*hero).abs_y |= BED_Y_MASK;
-                    the_hero.y = (*hero).abs_y;
-                    (*hero).state = SLEEP;
+                    hero.abs_y |= BED_Y_MASK;
+                    the_hero.y = hero.abs_y;
+                    hero.state = SLEEP;
                 }
             }
         }

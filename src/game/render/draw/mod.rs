@@ -15,6 +15,7 @@ mod weapons;
 
 use self::blit_setup::set_up_blit;
 use self::scenery::mask_against_scenery;
+use crate::game::data::state::ActorRef;
 
 pub use self::map_edge::repair_edges;
 
@@ -29,7 +30,6 @@ use crate::game::data::globals::current_sshape;
 use crate::game::render::blit::{Loc, SShape};
 
 use crate::game::data::state::{the_actors, the_world};
-use crate::game::data::types::Shape;
 use crate::game::render::blit::{combine_masks, draw_shape, save_background};
 use crate::game::render::screen::screen;
 
@@ -75,8 +75,8 @@ pub fn draw_sprites(cycle: i16) {
 
         for j in 0..the_actors.drawn {
             let i = the_actors.draw_order[j as usize] as i32;
-            let actor = &raw mut the_actors.list[i as usize];
-            (*actor).visible = 0;
+            let mut actor = ActorRef::new(i as usize);
+            actor.visible = 0;
             let mut pass: u8 = 0;
 
             loop {
@@ -111,7 +111,7 @@ struct Sprite {
 /// Draws one actor (or its weapon) for the current pass.
 unsafe fn draw_one(
     frame: &mut Frame,
-    actor: *mut Shape,
+    actor: ActorRef,
     i: i32,
     cycle: i16,
     passmode: bool,
@@ -203,7 +203,7 @@ fn blit_extent(clip: &Clip) -> (i8, i8, i8) {
 /// Saves the background under the sprite and draws it through its masks into the page.
 unsafe fn blit_sprite(
     frame: &mut Frame,
-    actor: *mut Shape,
+    mut actor: ActorRef,
     i: i32,
     sprite: &Sprite,
     clip: &Clip,
@@ -231,7 +231,7 @@ unsafe fn blit_sprite(
 
         combine_masks();
         draw_shape();
-        (*actor).visible = 1;
+        actor.visible = 1;
         queue_shape(current_sshape);
 
         Drawn::Done

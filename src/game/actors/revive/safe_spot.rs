@@ -1,5 +1,6 @@
 //! Putting the hero back at the last safe spot with full health.
 
+use crate::game::data::state::ActorRef;
 use crate::game::data::state::{Hero, World, the_actors, the_hero, the_world};
 use crate::game::data::types::Shape;
 use crate::game::ui::menus::update_menu_availability;
@@ -30,11 +31,11 @@ const PRQ_STATS: i32 = 4;
 const PRQ_VITALITY: i32 = 7;
 
 /// The hero (re)appears at the last safe spot, and the region there is loaded.
-pub(super) unsafe fn put_hero_at_safe_spot(hero: *mut Shape) {
+pub(super) unsafe fn put_hero_at_safe_spot(mut hero: ActorRef) {
     unsafe {
         move_to_safe_spot(
             &mut *(&raw mut the_hero),
-            &mut *hero,
+            &mut hero,
             &mut *(&raw mut the_world),
         );
 
@@ -55,11 +56,11 @@ pub(super) fn move_to_safe_spot(hero: &mut Hero, body: &mut Shape, world: &mut W
 }
 
 /// Fresh health, a new day, and no hunger or tiredness.
-pub(super) unsafe fn restore_hero(hero: *mut Shape) {
+pub(super) unsafe fn restore_hero(mut hero: ActorRef) {
     unsafe {
         restore_stats(
             &mut *(&raw mut the_hero),
-            &mut *hero,
+            &mut hero,
             &mut *(&raw mut the_world),
         );
 

@@ -1,6 +1,7 @@
 //! Handing over from a fallen brother to the next: his body, the placards and the new stats.
 
 use crate::game::data::object_tables::{ob_list8, ob_listg};
+use crate::game::data::state::ActorRef;
 use crate::game::data::state::{Hero, World, the_actors, the_hero, the_ui, the_world};
 use crate::game::data::tables::brother_stats;
 use crate::game::data::types::{Bro, Shape};
@@ -74,23 +75,21 @@ const HERO_SPRITE_FILE: i16 = 6;
 const HERO_SET_FILE: i16 = 13;
 
 /// Puts the raft and the first person back where they start.
-pub(super) unsafe fn reset_raft_setfig(list: *mut Shape) {
-    unsafe {
-        let raft = list.add(1);
-        (*raft).kind = RAFT;
-        (*raft).abs_x = RAFT_START.0;
-        (*raft).abs_y = RAFT_START.1;
-        (*raft).index = 0;
-        (*raft).weapon = 0;
-        (*raft).environ = 0;
+pub(super) fn reset_raft_setfig() {
+    let mut raft = ActorRef::new(1);
+    raft.kind = RAFT;
+    raft.abs_x = RAFT_START.0;
+    raft.abs_y = RAFT_START.1;
+    raft.index = 0;
+    raft.weapon = 0;
+    raft.environ = 0;
 
-        let setfig = list.add(2);
-        (*setfig).kind = SETFIG;
-        (*setfig).abs_x = SETFIG_START.0;
-        (*setfig).abs_y = SETFIG_START.1;
-        (*setfig).index = 0;
-        (*setfig).weapon = 0;
-    }
+    let mut setfig = ActorRef::new(2);
+    setfig.kind = SETFIG;
+    setfig.abs_x = SETFIG_START.0;
+    setfig.abs_y = SETFIG_START.1;
+    setfig.index = 0;
+    setfig.weapon = 0;
 }
 
 /// The fallen brother's body is left where he died, and his ghost appears.
@@ -109,11 +108,11 @@ pub(super) unsafe fn leave_fallen_brother() {
 
 /// The next brother takes over: his stats and item list, nothing in the timers, and the first
 /// safe spot.
-pub(super) unsafe fn take_over_next_brother(hero: *mut Shape) {
+pub(super) unsafe fn take_over_next_brother(mut hero: ActorRef) {
     unsafe {
         start_next_brother(
             &mut *(&raw mut the_hero),
-            &mut *hero,
+            &mut hero,
             &brother_stats[the_hero.brother as usize],
         );
 

@@ -2,6 +2,7 @@
 
 use super::{BONE, ITEMS, PRQ_STATS, PRQ_VITALITY};
 use crate::game::data::random::rand64;
+use crate::game::data::state::ActorRef;
 use crate::game::data::state::{the_actors, the_hero};
 use crate::game::ui::menus::go_to_menu;
 use crate::game::ui::text::{queue_print, speak};
@@ -26,8 +27,8 @@ pub(super) unsafe fn give_option(chosen_entry: i16) -> bool {
             return true;
         }
 
-        let person = &raw mut the_actors.list[the_actors.nearest_person as usize];
-        let race = (*person).race;
+        let person = ActorRef::new(the_actors.nearest_person as usize);
+        let race = person.race;
 
         if chosen_entry == GIVE_GOLD && the_hero.wealth > GOLD_GIVEN {
             the_hero.wealth -= GOLD_GIVEN;
@@ -40,7 +41,7 @@ pub(super) unsafe fn give_option(chosen_entry: i16) -> bool {
             queue_print(PRQ_VITALITY);
 
             if race == BEGGAR_RACE {
-                speak(BEGGAR_SPEECH + (*person).goal as i32);
+                speak(BEGGAR_SPEECH + person.goal as i32);
             } else {
                 speak(BEGGAR_THANKS);
             }

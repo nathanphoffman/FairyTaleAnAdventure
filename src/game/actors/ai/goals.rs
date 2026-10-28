@@ -5,8 +5,8 @@ use super::{BACKUP, BOW_BIT, STILL};
 use crate::game::actors::interaction::{report_battle_result, run_tactic};
 use crate::game::actors::steering::steer_actor;
 use crate::game::data::random::{bitrand, rand2, rand4};
+use crate::game::data::state::ActorRef;
 use crate::game::data::state::{the_actors, the_hero, the_world};
-use crate::game::data::types::Shape;
 use crate::game::ui::music::set_mood;
 use crate::game::ui::text::queue_print;
 
@@ -88,13 +88,13 @@ pub fn update_enemy_goals() {
 /// anyone out of hit points who is on screen.
 unsafe fn think(i: usize, battle2: i8) {
     unsafe {
-        let actor = &raw mut the_actors.list[i];
+        let mut actor = ActorRef::new(i);
 
-        if (*actor).kind == CARRIER {
+        if actor.kind == CARRIER {
             aim_carrier(i);
 
             return;
-        } else if (*actor).kind == SETFIG {
+        } else if actor.kind == SETFIG {
             return;
         }
 
@@ -104,12 +104,12 @@ unsafe fn think(i: usize, battle2: i8) {
             return;
         }
 
-        let tactic = (*actor).tactic as i16;
+        let tactic = actor.tactic as i16;
         let new_tactic_roll = bitrand(NEW_TACTIC_ODDS - 1) == 0;
-        let mode = adjust_mode_for_situation(actor, (*actor).goal as i16);
+        let mode = adjust_mode_for_situation(actor, actor.goal as i16);
         let mode = act_on_goal(i, actor, mode, tactic, (xd, yd), new_tactic_roll);
 
-        (*actor).goal = mode as i8;
+        actor.goal = mode as i8;
 
         if the_actors.leader == 0 {
             the_actors.leader = i as i16;
@@ -133,10 +133,10 @@ unsafe fn aim_carrier(i: usize) {
 }
 
 /// How far the actor is from the hero along each axis, never negative.
-unsafe fn distance_from_hero(actor: *const Shape) -> (i16, i16) {
+unsafe fn distance_from_hero(actor: ActorRef) -> (i16, i16) {
     unsafe {
-        let xd = ((*actor).abs_x as i32 - the_hero.x as i32) as i16;
-        let yd = ((*actor).abs_y as i32 - the_hero.y as i32) as i16;
+        let xd = (actor.abs_x as i32 - the_hero.x as i32) as i16;
+        let yd = (actor.abs_y as i32 - the_hero.y as i32) as i16;
 
         (xd.wrapping_abs(), yd.wrapping_abs())
     }
@@ -144,16 +144,16 @@ unsafe fn distance_from_hero(actor: *const Shape) -> (i16, i16) {
 
 /// Notes that an actor is on screen, and that a battle is on if it is awake and in view. Returns
 /// false for an actor that is on screen but out of hit points (it does nothing more).
-unsafe fn notice_actor(actor: *const Shape, xd: i16, yd: i16, battle2: i8) -> bool {
+unsafe fn notice_actor(actor: ActorRef, xd: i16, yd: i16, battle2: i8) -> bool {
     unsafe {
         if on_screen(xd, yd) {
             the_actors.on_screen = 1;
 
-            if (*actor).vitality < 1 {
+            if actor.vitality < 1 {
                 return false;
             }
 
-            if (*actor).visible != 0 || battle2 != 0 {
+            if actor.visible != 0 || battle2 != 0 {
                 the_actors.battle_flag = 1;
             }
         }
@@ -163,14 +163,12 @@ unsafe fn notice_actor(actor: *const Shape, xd: i16, yd: i16, battle2: i8) -> bo
 }
 
 /// A stuck actor picks a new tactic: archers one of the ranged ones, the others a melee one.
-unsafe fn try_something_else(i: usize, actor: *mut Shape) {
-    unsafe {
-        // Masks with BOW_BIT, keeping only the bits that matter here.
-        if (*actor).weapon & BOW_BIT != 0 {
-            run_tactic(i as i32, rand4() + ARCHER_FRUSTRATION_TACTIC);
-        } else {
-            run_tactic(i as i32, rand2() + MELEE_FRUSTRATION_TACTIC);
-        }
+fn try_something_else(i: usize, actor: ActorRef) {
+    // Masks with BOW_BIT, keeping only the bits that matter here.
+    if actor.weapon & BOW_BIT != 0 {
+        run_tactic(i as i32, rand4() + ARCHER_FRUSTRATION_TACTIC);
+    } else {
+        run_tactic(i as i32, rand2() + MELEE_FRUSTRATION_TACTIC);
     }
 }
 
@@ -179,7 +177,7 @@ unsafe fn try_something_else(i: usize, actor: *mut Shape) {
 /// goal for next frame, which a hostile actor may change.
 unsafe fn act_on_goal(
     i: usize,
-    actor: *mut Shape,
+    mut actor: ActorRef,
     mut mode: i16,
     mut tactic: i16,
     (xd, yd): (i16, i16),
@@ -188,8 +186,8 @@ unsafe fn act_on_goal(
     unsafe {
         if tactic == FRUST || tactic == SHOOTFRUST {
             try_something_else(i, actor);
-        } else if (*actor).state == SHOOT1 {
-            (*actor).state = SHOOT3;
+        } else if actor.state == SHOOT1 {
+            actor.state = SHOOT3;
         } else if mode <= ARCHER2 {
             // Masks off the low bits (a cheap remainder or a flag test).
             if mode & 2 == 0 {
@@ -207,9 +205,9 @@ unsafe fn act_on_goal(
             run_tactic(i as i32, FOLLOW);
         } else if mode == STAND {
             steer_actor(i as i32, the_hero.x as i32, the_hero.y as i32, 0);
-            (*actor).state = STILL;
+            actor.state = STILL;
         } else if mode == WAIT {
-            (*actor).state = STILL;
+            actor.state = STILL;
         }
 
         mode
@@ -218,15 +216,15 @@ unsafe fn act_on_goal(
 
 /// Overrides an actor's mode when the situation demands: flee or follow when the hero is down,
 /// flee when nearly dead.
-unsafe fn adjust_mode_for_situation(actor: *mut Shape, mode: i16) -> i16 {
+unsafe fn adjust_mode_for_situation(actor: ActorRef, mode: i16) -> i16 {
     unsafe {
         adjusted_mode(
             mode,
             the_actors.list[0].state,
             the_actors.leader,
-            (*actor).vitality,
+            actor.vitality,
             the_world.extent_type,
-            (*actor).race,
+            actor.race,
             (*the_world.extent).v3,
         )
     }

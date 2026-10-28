@@ -4,8 +4,8 @@
 use super::{PRQ_STATS, PRQ_VITALITY};
 use crate::game::data::object_tables::{ob_list8, ob_listg};
 use crate::game::data::random::rand64;
+use crate::game::data::state::ActorRef;
 use crate::game::data::state::{the_actors, the_hero, the_world};
-use crate::game::data::types::Shape;
 use crate::game::ui::text::{queue_print, speak};
 
 const WRIT: usize = 28;
@@ -67,7 +67,7 @@ const RANGER_SWAMP_REGION: u16 = 2;
 
 /// What each kind of person says. Some of them also change the world (the priest heals, the
 /// sorceress gives luck).
-pub(super) unsafe fn person_speaks(person: u8, actor: *mut Shape) {
+pub(super) unsafe fn person_speaks(person: u8, actor: ActorRef) {
     unsafe {
         match person {
             PRIEST => priest_speaks(),
@@ -78,7 +78,7 @@ pub(super) unsafe fn person_speaks(person: u8, actor: *mut Shape) {
                     fatigue: the_hero.fatigue,
                     day_period: the_world.day_period,
                     region: the_world.region,
-                    goal: (*actor).goal as i32,
+                    goal: actor.goal as i32,
                     princess_freed: ob_list8[PRINCESS_FREED_SLOT].ob_stat != 0,
                 };
 
