@@ -175,7 +175,6 @@ impl Sound {
         loop {
             let (cmd, value) = self.next_event(v);
 
-            // Masks with CMD_NOTE_FLAG, keeping only the bits that matter here.
             if cmd & CMD_NOTE_FLAG == 0 || cmd == CMD_REST {
                 self.start_note(v, cmd, value);
 
@@ -205,7 +204,6 @@ impl Sound {
     fn run_command(&mut self, v: usize, cmd: u8, value: u8) -> bool {
         match cmd {
             CMD_INSTRUMENT => {
-                // Masks with INSTRUMENT_MASK, keeping only the bits that matter here.
                 let word = self
                     .ins
                     .get((value & INSTRUMENT_MASK) as usize)
@@ -244,7 +242,6 @@ impl Sound {
     }
 
     fn start_note(&mut self, v: usize, cmd: u8, value: u8) {
-        // Masks with NOTE_LENGTHS, keeping only the bits that matter here.
         let len = NOTE_LENGTHS[(value & NOTE_LENGTH_MASK) as usize];
         let mut stop = len - GAP;
 

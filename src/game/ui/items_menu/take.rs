@@ -104,7 +104,6 @@ fn take_object(game: &mut Game) -> bool {
     let actor = ActorRef::new(game.actors.nearest_object as usize);
     let id = game.actor(actor).index as u8 as u32;
 
-    // Masks with OWNER_MASK, keeping only the bits that matter here.
     let owner = game.actor(actor).vitality as u32 & OWNER_MASK;
 
     match classify_take(id, game.hero.hunger, game.world.region) {

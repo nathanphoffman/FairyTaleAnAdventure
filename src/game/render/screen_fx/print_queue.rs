@@ -43,7 +43,6 @@ pub fn handle_print_request(game: &mut Game) {
 
     let request = game.ui.print_queue.items[game.ui.print_queue.read as usize] as i32;
 
-    // Masks with QUEUE_MASK, keeping only the bits that matter here.
     game.ui.print_queue.read = (game.ui.print_queue.read + 1) & QUEUE_MASK;
 
     match request {

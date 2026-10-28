@@ -132,7 +132,6 @@ pub fn speak(game: &mut Game, n: i32) {
 /// Adds a request to the print queue (ignored if the queue is full). `handle_print_request` handles them one
 /// per tick, which spreads the redrawing work over several frames.
 pub fn queue_print(game: &mut Game, x: i32) {
-    // Masks with PRINT_QUEUE_MASK, keeping only the bits that matter here.
     let next = (game.ui.print_queue.write + 1) & PRINT_QUEUE_MASK;
 
     if next == game.ui.print_queue.read {

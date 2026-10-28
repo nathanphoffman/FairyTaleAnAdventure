@@ -148,7 +148,6 @@ fn hostile_choice(race: u8, weapon: i8, vitality: i16, mode: i16, xd: i16, yd: i
         thresh = DKNIGHT_STRIKE;
     }
 
-    // Masks with BOW_BIT, keeping only the bits that matter here.
     if weapon & BOW_BIT == 0 && xd < thresh && yd < thresh {
         Hostile::Strike
     } else if race == DKNIGHT && vitality != 0 {

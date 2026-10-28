@@ -71,7 +71,6 @@ pub(super) fn talk_option(game: &mut Game, chosen_entry: i16) -> bool {
 
 /// What the Talk code needs to know about the actor the hero is talking to.
 fn describe_target(game: &mut Game, actor: ActorRef) -> Target {
-    // Masks with PERSON_MASK, keeping only the bits that matter here.
     let person = game.actor(actor).race & PERSON_MASK;
     let can_talk = (setfig_table[person as usize]).can_talk != 0;
 
@@ -94,7 +93,6 @@ fn carry_out(game: &mut Game, action: TalkAction, actor: ActorRef) {
                 game.actor_mut(actor).tactic = TACTIC_TALK;
             }
 
-            // Masks with PERSON_MASK, keeping only the bits that matter here.
             person_speaks(game, game.actor(actor).race & PERSON_MASK, actor);
         }
 

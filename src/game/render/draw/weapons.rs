@@ -50,7 +50,6 @@ pub(super) fn weapon_passmode(game: &mut Game, actor: ActorRef, pass: &mut u8) -
         // The other of the two passes (0 becomes 1, 1 becomes 0).
         let flipped = *pass ^ 1;
 
-        // Masks with FACING_PICK_OFFSET, keeping only the bits that matter here.
         let mut pick = if ((facing - FACING_PICK_OFFSET) & FACING_LEFT_BIT) != 0 {
             flipped
         } else {
@@ -58,7 +57,6 @@ pub(super) fn weapon_passmode(game: &mut Game, actor: ActorRef, pass: &mut u8) -
         };
 
         if game.actor(actor).weapon == WEAPON_BOW && state < SHOOT1 {
-            // Masks with FACING_LEFT_BIT, keeping only the bits that matter here.
             pick = if (facing & FACING_LEFT_BIT) == 0 {
                 flipped
             } else {
@@ -77,10 +75,8 @@ pub(super) fn weapon_passmode(game: &mut Game, actor: ActorRef, pass: &mut u8) -
 fn bow_image(frame_number: i16) -> i16 {
     let bow_phase = frame_number / BOW_PHASE_FRAMES;
 
-    // Masks off the low bits (a cheap remainder or a flag test).
     if bow_phase & 1 != 0 {
         OBJ_BOW_UP
-    // Masks off the low bits (a cheap remainder or a flag test).
     } else if bow_phase & 2 != 0 {
         OBJ_BOW_MID
     } else {

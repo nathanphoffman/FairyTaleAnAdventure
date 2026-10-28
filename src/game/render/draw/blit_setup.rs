@@ -66,7 +66,6 @@ pub(super) fn clip_to_screen(sprite: &mut Sprite) -> Clip {
         yoff: (ystart - sprite.ystart) as i8,
     };
 
-    // Masks with OBJECTS, keeping only the bits that matter here.
     if sprite.atype == OBJECTS && (sprite.inum & FROM_MIDDLE_BIT) != 0 {
         sprite.inum &= IMAGE_NUMBER_MASK;
         clip.yoff = clip.yoff.wrapping_add(MIDDLE_START);
@@ -118,7 +117,6 @@ pub(super) fn set_up_blit(
 
     // Blitter size word: height in the high bits, width in words in the low 6 bits.
     game.blitter.sshape.blitsize =
-        // Shifts by BLIT_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
         (((blithigh as i32) << BLIT_HEIGHT_SHIFT) + blitwide as i32) as i16;
 
     locate_sprite_data(game, &seq, sprite.inum);
@@ -150,7 +148,6 @@ fn set_blitter_registers(
     blitwide: i8,
 ) {
     game.blitter.shadow_mask_offset =
-        // Masks with SHADOW_LINES_MASK, keeping only the bits that matter here.
         ((clip.ystart & SHADOW_LINES_MASK) as i32 * blitwide as i32 * WORD_BYTES) as i16;
 
     // Where the visible part starts in the mask: whole words (2 bytes per 16 pixels) in, and whole rows down.
@@ -159,10 +156,8 @@ fn set_blitter_registers(
     game.blitter.sshape.coff =
         (xbw as i32 * WORD_BYTES + clip.ystart as i32 * PAGE_ROW_BYTES) as i16;
 
-    // Masks with WORD_PIXELS_MASK, keeping only the bits that matter here.
     game.blitter.sprite_x_shift = sprite.xstart & WORD_PIXELS_MASK;
 
-    // Masks with WORD_PIXELS_MASK, keeping only the bits that matter here.
     if clip.xoff & WORD_PIXELS_MASK as i8 != 0 {
         game.blitter.sshape.coff -= WORD_BYTES as i16;
         game.blitter.last_word_mask = 0;

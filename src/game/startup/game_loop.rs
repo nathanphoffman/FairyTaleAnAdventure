@@ -79,10 +79,8 @@ const STATUS_COLOR: usize = 31;
 
 /// How the map moved since the last frame, in sectors (x wraps at 10 bits).
 fn scroll_step(game: &mut Game) -> (i16, i16) {
-    // Shifts by TILE_WIDTH_SHIFT, converting between pixels, tiles, sectors or bytes.
     game.world.tile_x = game.world.map_x >> TILE_WIDTH_SHIFT;
 
-    // Shifts by TILE_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
     game.world.tile_y = game.world.map_y >> TILE_HEIGHT_SHIFT;
     let page = game.screen.drawing_page();
     let dif_x = (game.world.tile_x as i32 - page.isv_x) as i16;
@@ -93,11 +91,9 @@ fn scroll_step(game: &mut Game) -> (i16, i16) {
 
 /// The map's horizontal step as a 10 bit signed number (the map wraps round at the edges).
 fn wrap_scroll_difference(difference: i16) -> i16 {
-    // Masks with DIF_SIGN_BIT, keeping only the bits that matter here.
     if difference as i32 & DIF_SIGN_BIT != 0 {
         (difference as i32 | DIF_SIGN_EXTEND) as i16
     } else {
-        // Masks with DIF_MASK, keeping only the bits that matter here.
         (difference as i32 & DIF_MASK) as i16
     }
 }
@@ -140,7 +136,6 @@ fn run_frame(game: &mut Game, state: &mut FrameState) {
 
     read_walk_direction(game);
 
-    // Masks with GAME_MENU, keeping only the bits that matter here.
     if game.menus[GAME_MENU].enabled[PAUSE_ENTRY] & 1 != 0 {
         delay(game, 1);
 
@@ -169,7 +164,6 @@ fn run_frame(game: &mut Game, state: &mut FrameState) {
 fn read_keyboard(game: &mut Game) {
     let key = next_key() as i8;
 
-    // Masks with GAME_MENU, keeping only the bits that matter here.
     let notpause = game.menus[GAME_MENU].enabled[PAUSE_ENTRY] & 1 == 0;
 
     if key != 0 {
@@ -184,7 +178,6 @@ fn handle_view_status(game: &mut Game) -> bool {
         delay(game, PAUSE_WAIT);
         game.screen.view_status = VIEW_REDRAW;
     } else if game.screen.view_status == VIEW_BIG || game.screen.view_status == VIEW_BIG_STILL {
-        // Masks with FLASH_BIT, keeping only the bits that matter here.
         if game.screen.flasher & FLASH_BIT != 0 && game.screen.view_status == VIEW_BIG {
             game.screen.set_color(
                 ViewPortId::Page,
@@ -331,9 +324,7 @@ fn draw_frame(game: &mut Game, state: &mut FrameState, scroll_x: i16, scroll_y: 
     // The drawing loop used to leave `j` here; the next frame's actor loop reads it.
     state.last_terrain = game.actors.drawn;
     let ras = game.screen.drawing_page().ras;
-    // Masks with TILE_X_MASK, keeping only the bits that matter here.
     game.screen.ras[ras].x = (game.world.map_x as i32 & TILE_X_MASK) as i16;
-    // Masks with TILE_Y_MASK, keeping only the bits that matter here.
     game.screen.ras[ras].y = (game.world.map_y as i32 & TILE_Y_MASK) as i16;
     flip_pages(game);
 

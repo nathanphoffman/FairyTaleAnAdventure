@@ -115,7 +115,6 @@ fn think(game: &mut Game, i: usize, battle2: i8) {
 
 /// A carrier (raft, turtle, swan) keeps steering toward the hero every few frames.
 fn aim_carrier(game: &mut Game, i: usize) {
-    // Masks with CARRIER_AIM_MASK, keeping only the bits that matter here.
     if game.world.day_clock & CARRIER_AIM_MASK == 0 {
         steer_actor(
             game,
@@ -155,7 +154,6 @@ fn notice_actor(game: &mut Game, actor: ActorRef, xd: i16, yd: i16, battle2: i8)
 
 /// A stuck actor picks a new tactic: archers one of the ranged ones, the others a melee one.
 fn try_something_else(game: &mut Game, i: usize, actor: ActorRef) {
-    // Masks with BOW_BIT, keeping only the bits that matter here.
     if game.actor(actor).weapon & BOW_BIT != 0 {
         let tactic = rand4(&mut game.rng) + ARCHER_FRUSTRATION_TACTIC;
         run_tactic(game, i as i32, tactic);
@@ -183,7 +181,6 @@ fn act_on_goal(
     } else if game.actor(actor).state == SHOOT1 {
         game.actor_mut(actor).state = SHOOT3;
     } else if mode <= ARCHER2 {
-        // Masks off the low bits (a cheap remainder or a flag test).
         if mode & 2 == 0 {
             new_tactic_roll = rand4(&mut game.rng) == 0;
         }

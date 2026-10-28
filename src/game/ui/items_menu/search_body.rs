@@ -148,7 +148,6 @@ fn better_weapon(current: i8, found: u32) -> i8 {
 fn roll_body_treasure(game: &mut Game, actor: ActorRef) -> u32 {
     const SETFIG_RACE_BIT: u8 = 0x80;
     const TREASURE_CLASS_SIZE: i32 = 8;
-    // Masks with SETFIG_RACE_BIT, keeping only the bits that matter here.
     if game.actor(actor).race & SETFIG_RACE_BIT != 0 {
         return 0;
     }

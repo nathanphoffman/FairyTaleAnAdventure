@@ -113,7 +113,6 @@ const DIRECTION_MASK: usize = 7;
 /// Shifts the map one tile in one of 8 directions (the blitter did this on the Amiga).
 /// Moving down copies from the bottom up, so lines are not overwritten before they are read.
 pub fn scroll_map(game: &mut Game, dir: i32) {
-    // Masks with SCROLL_MODES, keeping only the bits that matter here.
     let m = &SCROLL_MODES[dir as usize & DIRECTION_MASK];
     let bitmap = game.screen.draw_bitmap_mut();
 

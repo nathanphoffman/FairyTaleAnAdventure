@@ -96,10 +96,8 @@ pub fn refresh_minimap(game: &mut Game) {
 /// region at the middle of the screen and starts loading it if it is not the current one.
 fn follow_outdoor_region(game: &mut Game) {
     if game.world.new_region < NO_REGION {
-        // Masks with MAP_X_WRAP, keeping only the bits that matter here.
         let xs = game.world.map_x as u32 & MAP_X_WRAP;
 
-        // Masks with MAP_Y_WRAP, keeping only the bits that matter here.
         let ys = game.world.map_y as u32 & MAP_Y_WRAP;
 
         if (ys > MAP_Y_MIN_FOR_LOAD && ys < MAP_Y_MAX_FOR_LOAD) && !DEAD_STRIP_X.contains(&xs) {
@@ -129,14 +127,11 @@ fn update_region_origin(game: &mut Game) {
     let xr = if game.world.target_region >= FIRST_INDOOR_REGION {
         0
     } else {
-        // Masks off the low bits (a cheap remainder or a flag test).
         game.world.target_region & 1
     };
 
-    // Shifts by REGION_WIDTH_SHIFT, converting between pixels, tiles, sectors or bytes.
     game.world.origin_x = xr << REGION_WIDTH_SHIFT;
 
-    // Shifts by REGION_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
     game.world.origin_y = yr << REGION_HEIGHT_SHIFT;
 }
 
@@ -144,9 +139,7 @@ fn update_region_origin(game: &mut Game) {
 /// left corner, so the middle is 151 pixels across and 64 down from it, and a sector is 256 pixels.
 pub fn center_sector(game: &mut Game) -> (u32, u32) {
     (
-        // Shifts by SECTOR_PIXELS_SHIFT, converting between pixels, tiles, sectors or bytes.
         (game.world.map_x as u32 + CENTER_OFFSET_X) >> SECTOR_PIXELS_SHIFT,
-        // Shifts by SECTOR_PIXELS_SHIFT, converting between pixels, tiles, sectors or bytes.
         (game.world.map_y as u32 + CENTER_OFFSET_Y) >> SECTOR_PIXELS_SHIFT,
     )
 }

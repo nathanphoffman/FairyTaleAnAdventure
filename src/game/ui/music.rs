@@ -63,7 +63,6 @@ pub fn export_tunes(dir: &std::path::Path) {
 pub fn set_mood(game: &mut Game, now: i8) {
     let tune = pick_tune(game);
 
-    // Masks with GAME_MENU, keeping only the bits that matter here.
     if { game.menus[GAME_MENU].enabled[MUSIC_ENTRY] } & 1 != 0 {
         if now != 0 {
             playscore(tune_tracks(tune));

@@ -39,9 +39,7 @@ pub fn check_bed(game: &mut Game) {
     if game.world.region == INSIDE_REGION {
         let tile = game.memory.sector_byte(tile_index(
             game,
-            // Shifts by TILE_WIDTH_SHIFT, converting between pixels, tiles, sectors or bytes.
             (game.hero.x >> TILE_WIDTH_SHIFT) as i32,
-            // Shifts by TILE_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
             (game.hero.y >> TILE_HEIGHT_SHIFT) as i32,
         ));
 

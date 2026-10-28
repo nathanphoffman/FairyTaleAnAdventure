@@ -233,44 +233,37 @@ impl Screen {
 
     /// Makes the bitmaps, pens and view ports, and the memory the sprite blitter works in.
     pub fn set_up(&mut self, compass: [&[u8]; 2]) {
-        self.set_bitmap(
-            BitmapId::Page1,
-            Bitmap::new(PAGE_WIDTH, PAGE_ROWS, PAGE_DEPTH),
-        );
-        self.set_bitmap(
-            BitmapId::Page2,
-            Bitmap::new(PAGE_WIDTH, PAGE_ROWS, PAGE_DEPTH),
-        );
+        self.make_bitmaps(compass);
+        self.make_rasters_and_ports();
+        self.make_view_ports();
+
+        self.queue_region = vec![0; BLITTER_REGION];
+        self.mask_region = vec![0; BLITTER_REGION];
+    }
+
+    /// The pages, the text panel and the compass pictures.
+    fn make_bitmaps(&mut self, compass: [&[u8]; 2]) {
+        let page = || Bitmap::new(PAGE_WIDTH, PAGE_ROWS, PAGE_DEPTH);
+
+        self.set_bitmap(BitmapId::Page1, page());
+        self.set_bitmap(BitmapId::Page2, page());
         self.set_bitmap(
             BitmapId::Text,
             Bitmap::new(TEXT_WIDTH, TEXT_ROWS, TEXT_DEPTH),
         );
-        self.set_bitmap(
-            BitmapId::PageA,
-            Bitmap::new(PAGE_WIDTH, PAGE_ROWS, PAGE_DEPTH),
-        );
-        self.set_bitmap(
-            BitmapId::PageB,
-            Bitmap::new(PAGE_WIDTH, PAGE_ROWS, PAGE_DEPTH),
-        );
+        self.set_bitmap(BitmapId::PageA, page());
+        self.set_bitmap(BitmapId::PageB, page());
         self.compass = compass.map(|data| Bitmap::from_plane(COMPASS_WIDTH, COMPASS_ROWS, data));
+    }
+
+    /// Which bitmap each raster shows, which page is drawn and shown, and where each port draws.
+    fn make_rasters_and_ports(&mut self) {
+        let at_origin = |bitmap| RasInfo { bitmap, x: 0, y: 0 };
 
         self.ras = [
-            RasInfo {
-                bitmap: BitmapId::Page1,
-                x: 0,
-                y: 0,
-            },
-            RasInfo {
-                bitmap: BitmapId::Page2,
-                x: 0,
-                y: 0,
-            },
-            RasInfo {
-                bitmap: BitmapId::Text,
-                x: 0,
-                y: 0,
-            },
+            at_origin(BitmapId::Page1),
+            at_origin(BitmapId::Page2),
+            at_origin(BitmapId::Text),
         ];
 
         // Both pages start on the first bitmap; the intro gives the second page its own.
@@ -283,7 +276,10 @@ impl Screen {
         self.ports[PortId::Text.index()].target = Some(BitmapId::Text);
         self.ports[PortId::Text2.index()].target = Some(BitmapId::Text);
         self.current_port = PortId::Text;
+    }
 
+    /// The play field on top and the text panel below it.
+    fn make_view_ports(&mut self) {
         self.vp_page = ViewPortState {
             ras: None,
             width: LOWRES_WIDTH,
@@ -303,9 +299,6 @@ impl Screen {
             modes: HIRES | SPRITES | VP_HIDE,
             colors: vec![0; TEXT_COLORS],
         };
-
-        self.queue_region = vec![0; BLITTER_REGION];
-        self.mask_region = vec![0; BLITTER_REGION];
     }
 
     // ---- bitmaps ----

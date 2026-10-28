@@ -56,10 +56,8 @@ fn side(p1: (i16, i16), p2: (i16, i16), xh: i16, yh: i16) -> i16 {
 pub fn witch_fx(game: &mut Game, page: usize) {
     let fp = &game.screen.pages[page];
 
-    // Masks with TILE_X_MASK, keeping only the bits that matter here.
     let xh = game.hero.x.wrapping_sub(game.world.map_x & TILE_X_MASK) as i16;
 
-    // Masks with TILE_Y_MASK, keeping only the bits that matter here.
     let yh = game.hero.y.wrapping_sub(game.world.map_y & TILE_Y_MASK) as i16;
 
     let (p1, p2) = edge(fp.witchdir.wrapping_add(DIRECTIONS_BEFORE as i16), fp);

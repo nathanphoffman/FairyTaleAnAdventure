@@ -16,6 +16,5 @@ const STARVING_AT: i16 = 90;
 const MOOD_PERIOD_MASK: u16 = 7;
 
 fn safe_check_due(clock: u16) -> bool {
-    // Masks with SAFE_CHECK_MASK, keeping only the bits that matter here.
     clock & SAFE_CHECK_MASK == 0
 }

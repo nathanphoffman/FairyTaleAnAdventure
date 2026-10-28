@@ -162,7 +162,6 @@ pub fn mouse_buttons_changed(left: bool, right: bool) {
 
     // Xor with the old state leaves only the bits that changed: the left button was pressed or released.
     if (new_qualifier ^ handler.qualifier) & LEFT_BUTTON != 0 {
-        // Masks with LEFT_BUTTON, keeping only the bits that matter here.
         let key = if new_qualifier & LEFT_BUTTON != 0 {
             menu_key_at(handler.pointer.0 as i32, handler.pointer.1 as i32)
         } else if handler.last_menu != 0 {

@@ -103,10 +103,8 @@ pub fn transfer_hero(game: &mut Game, xtest: u16, ytest: u16, flag: u16) -> i32 
     if flag != 0 {
         let (sector_x, sector_y) = center_sector(game);
 
-        // Shifts by REGION_WIDTH_SHIFT, converting between pixels, tiles, sectors or bytes.
         let column = (sector_x >> REGION_WIDTH_SHIFT) & 1;
 
-        // Shifts by REGION_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
         let row = (sector_y >> REGION_HEIGHT_SHIFT) & TRANSFER_ROW_MASK;
         game.world.new_region = (column + row + row) as u16;
     }
@@ -207,7 +205,6 @@ fn find_table_message(table: &[u8], sector: u8) -> u8 {
 fn mountain_name(game: &mut Game, message: u8) -> u8 {
     if message != MOUNTAINS_MESSAGE || game.world.region >= FIRST_INDOOR_REGION {
         message
-    // Masks off the low bits (a cheap remainder or a flag test).
     } else if game.world.region & 1 != 0 {
         NORTHERN_MOUNTAINS_MESSAGE
     } else if game.world.region > LAST_NORTHERN_REGION {
@@ -222,13 +219,10 @@ fn hero_on_loaded_edge(game: &mut Game) -> bool {
     // The hero's sector column and row: 256 pixels to a sector.
     let hero_column = (game.hero.x >> SECTOR_SHIFT).wrapping_sub(game.world.origin_x);
 
-    // Shifts by SECTOR_SHIFT, converting between pixels, tiles, sectors or bytes.
     let hero_row = (game.hero.y >> SECTOR_SHIFT).wrapping_sub(game.world.origin_y);
 
     game.world.new_region < NO_REGION
-        // Masks with OUTSIDE_COLUMN_BIT, keeping only the bits that matter here.
         || hero_column & OUTSIDE_COLUMN_BIT != 0
-        // Masks with OUTSIDE_ROW_BIT, keeping only the bits that matter here.
         || hero_row & OUTSIDE_ROW_BIT != 0
 }
 

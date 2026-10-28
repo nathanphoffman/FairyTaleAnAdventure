@@ -39,7 +39,6 @@ fn step(seed: i32) -> (i32, i32) {
     // ror.l #6
     let rotated = (next as u32).rotate_right(ROTATE_BITS);
 
-    // Masks with RESULT_MASK, keeping only the bits that matter here.
     (next, (rotated & RESULT_MASK) as i32)
 }
 
@@ -48,7 +47,6 @@ fn step(seed: i32) -> (i32, i32) {
 /// `divu` divides a 32-bit number by a 16-bit one and keeps the remainder. Only the low 16 bits of
 /// the value and of `n` are used.
 fn bounded(value: i32, n: i32) -> i32 {
-    // Masks with LOW_WORD_MASK, keeping only the bits that matter here.
     (value as u16 as u32 % (n & LOW_WORD_MASK) as u32) as i32
 }
 
@@ -69,31 +67,26 @@ pub fn bitrand(rng: &mut Rng, mask: i32) -> i32 {
 
 /// Random 0 or 1.
 pub fn rand2(rng: &mut Rng) -> i32 {
-    // Masks off the low bits (a cheap remainder or a flag test).
     fta_rand(rng) & 1
 }
 
 /// Random 0 to 3.
 pub fn rand4(rng: &mut Rng) -> i32 {
-    // Masks off the low bits (a cheap remainder or a flag test).
     fta_rand(rng) & 3
 }
 
 /// Random 0 to 7 (also used as a random compass direction).
 pub fn rand8(rng: &mut Rng) -> i32 {
-    // Masks off the low bits (a cheap remainder or a flag test).
     fta_rand(rng) & 7
 }
 
 /// Random 0 to 63.
 pub fn rand64(rng: &mut Rng) -> i32 {
-    // Masks off the low bits (a cheap remainder or a flag test).
     fta_rand(rng) & 63
 }
 
 /// Random 0 to 255.
 pub fn rand256(rng: &mut Rng) -> i32 {
-    // Masks off the low bits (a cheap remainder or a flag test).
     fta_rand(rng) & 255
 }
 

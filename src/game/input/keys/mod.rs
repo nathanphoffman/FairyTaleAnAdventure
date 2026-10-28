@@ -112,7 +112,6 @@ pub fn handle_key(game: &mut Game, key: i32, notpause: i32) {
     let notpause = notpause as i16 != 0;
 
     if game.screen.view_status != 0 && notpause {
-        // Masks with RELEASED, keeping only the bits that matter here.
         if key & RELEASED == 0 {
             game.screen.view_status = VIEW_REDRAW;
         }
@@ -120,14 +119,10 @@ pub fn handle_key(game: &mut Game, key: i32, notpause: i32) {
         // ignored while dead
     } else if (FIRST_DIRECTION_KEY..=LAST_DIRECTION_KEY).contains(&key) {
         game.ui.held_direction = key as i16;
-
-    // Masks with CODE_MASK, keeping only the bits that matter here.
     } else if (key & CODE_MASK) as i16 == game.ui.held_direction {
         game.ui.held_direction = 0;
     } else if key == FIGHT_KEY {
         game.ui.fight_key_held = 1;
-
-    // Masks with CODE_MASK, keeping only the bits that matter here.
     } else if key & CODE_MASK == FIGHT_KEY {
         game.ui.fight_key_held = 0;
     } else if cheat_items(game, key) {

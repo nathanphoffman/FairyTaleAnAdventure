@@ -15,14 +15,12 @@ use crate::game::ui::text::queue_print;
 /// A click on a menu slot (the mouse sends 'a' + slot for the button going down, and the same
 /// with bit 7 set for it coming up).
 pub(super) fn menu_click(game: &mut Game, key: i8, notpause: bool) {
-    // Masks with CODE_MASK, keeping only the bits that matter here.
     let slot = ((key & CODE_MASK) - FIRST_MENU_CLICK) as i16;
     game.ui.chosen_entry = game.ui.slot_entries[slot as usize];
     let chosen_entry = game.ui.chosen_entry as i16;
     let menu = game.ui.current_menu as usize;
     let valid = chosen_entry >= 0 && chosen_entry < game.menus[menu].num as i16;
 
-    // Masks with RELEASED, keeping only the bits that matter here.
     if key & RELEASED != 0 {
         if valid {
             print_menu_entry(game, slot, 0);
@@ -45,7 +43,6 @@ pub(super) fn menu_click(game: &mut Game, key: i8, notpause: bool) {
 fn press_entry(game: &mut Game, slot: i16, chosen_entry: i16, notpause: bool) {
     let menu = game.ui.current_menu as usize;
     let entry = chosen_entry as usize;
-    // Masks with TYPE_MASK, keeping only the bits that matter here.
     let kind = game.menus[menu].enabled[entry] as i32 & TYPE_MASK;
 
     if kind != TYPE_IMMEDIATE {
@@ -53,9 +50,7 @@ fn press_entry(game: &mut Game, slot: i16, chosen_entry: i16, notpause: bool) {
     }
 
     if kind == TYPE_TOGGLE {
-        // Xor flips the selected bit: a toggle entry goes from on to off or back.
         game.menus[menu].enabled[entry] ^= SELECTED;
-        // Masks with SELECTED, keeping only the bits that matter here.
         print_menu_entry(
             game,
             slot,
@@ -75,7 +70,6 @@ fn press_entry(game: &mut Game, slot: i16, chosen_entry: i16, notpause: bool) {
         game.ui.current_menu = chosen_entry;
         queue_print(game, PRQ_OPTIONS);
     } else {
-        // Masks with SELECTED, keeping only the bits that matter here.
         print_menu_entry(
             game,
             slot,
@@ -100,12 +94,9 @@ pub(super) fn menu_letter(game: &mut Game, key: i8) {
         let entry =
             &mut game.menus[game.ui.current_menu as usize].enabled[game.ui.chosen_entry as usize];
 
-        // Masks with DISPLAYED, keeping only the bits that matter here.
         game.ui.menu_hit_enabled = *entry & DISPLAYED;
 
-        // Masks with TYPE_MASK, keeping only the bits that matter here.
         if *entry as i32 & TYPE_MASK == TYPE_TOGGLE {
-            // Xor flips the selected bit: a toggle entry goes from on to off or back.
             *entry ^= SELECTED;
         }
 

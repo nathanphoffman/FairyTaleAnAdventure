@@ -128,7 +128,6 @@ pub fn place_encounter(game: &mut Game, i: u16, spread: u16) -> i32 {
 /// Gives the new enemy its weapon (picked from the race's chart, at random for a mixed group),
 /// its goal (archers shoot, the rest attack, both as clever as the race is) and its hit points.
 fn arm_enemy(game: &mut Game, actor: ActorRef, race: i32) {
-    // Masks with MIX_RANDOM_WEAPON, keeping only the bits that matter here.
     if game.encounter.mix_flag & MIX_RANDOM_WEAPON != 0 {
         game.encounter.weapon_type = rand4(&mut game.rng) as i16;
     }
@@ -140,7 +139,6 @@ fn arm_enemy(game: &mut Game, actor: ActorRef, race: i32) {
     game.actor_mut(actor).environ = 0;
     game.actor_mut(actor).facing = 0;
 
-    // Masks with BOW_BIT, keeping only the bits that matter here.
     if game.actor(actor).weapon & BOW_BIT != 0 {
         game.actor_mut(actor).goal = ARCHER1 + chart.cleverness;
     } else {
@@ -181,9 +179,7 @@ fn find_open_spot(game: &mut Game, i: u16, spread: u16) -> Option<(u16, u16)> {
 /// The race of the next enemy: for mixed groups the two races of the pair are picked at random
 /// (except encounter type 4).
 fn encounter_race(game: &mut Game) -> i32 {
-    // Masks with MIX_RACE_PAIR, keeping only the bits that matter here.
     if (game.encounter.mix_flag & MIX_RACE_PAIR) != 0 && game.encounter.kind != KIND_NO_MIX {
-        // Masks with PAIR_MASK, keeping only the bits that matter here.
         (game.encounter.kind & PAIR_MASK) as i32 + rand2(&mut game.rng)
     } else {
         game.encounter.kind as i32

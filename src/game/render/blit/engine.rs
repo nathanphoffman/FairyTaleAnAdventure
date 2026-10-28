@@ -122,7 +122,6 @@ pub(super) fn blit_height(size: i16) -> i32 {
 
 /// ... and the width in words in the low 6 bits (0 means 64).
 pub(super) fn blit_width(size: i16) -> i32 {
-    // Masks with WIDTH_MASK, keeping only the bits that matter here.
     match size as i32 & WIDTH_MASK {
         0 => MAX_WIDTH,
         width => width,
@@ -141,16 +140,12 @@ pub(super) fn minterm_word(minterm: u32, a: u32, b: u32, c: u32) -> u32 {
     for index in 0..MINTERM_BITS {
         // Bit `index` of the minterm is the result for that combination of the A, B and C bits.
         if minterm >> index & 1 != 0 {
-            // Masks with MINTERM_A, keeping only the bits that matter here.
             result |= pick(a, index & MINTERM_A != 0)
-                // Masks with MINTERM_B, keeping only the bits that matter here.
                 & pick(b, index & MINTERM_B != 0)
-                // Masks with MINTERM_C, keeping only the bits that matter here.
                 & pick(c, index & MINTERM_C != 0);
         }
     }
 
-    // Masks with ALL_BITS, keeping only the bits that matter here.
     result & ALL_BITS
 }
 
@@ -169,7 +164,6 @@ pub(super) fn blit(t: &mut Blit, mem: &mut BlitMem) {
 /// The A source word for column `x` of a row (all ones when A is not in use): the first and last
 /// words of the row are masked.
 fn next_a_word(t: &mut Blit, mem: &BlitMem, x: i32) -> u32 {
-    // Masks with USE_A, keeping only the bits that matter here.
     if t.uses & USE_A == 0 {
         return ALL_BITS;
     }
@@ -197,13 +191,11 @@ pub(super) fn blit_row(t: &mut Blit, mem: &mut BlitMem) {
         let (mut bw, mut cw) = (0, 0);
         let aw = next_a_word(t, mem, x);
 
-        // Masks with USE_B, keeping only the bits that matter here.
         if t.uses & USE_B != 0 {
             bw = mem.read_word(t.b);
             t.b = t.b.add(2);
         }
 
-        // Masks with USE_C, keeping only the bits that matter here.
         if t.uses & USE_C != 0 {
             cw = mem.read_word(t.c);
         }
@@ -218,13 +210,11 @@ pub(super) fn blit_row(t: &mut Blit, mem: &mut BlitMem) {
 
         let dw = minterm_word(t.minterm, shifted_a, shifted_b, cw);
 
-        // Masks with USE_D, keeping only the bits that matter here.
         if t.uses & USE_D != 0 {
             mem.write_word(t.d, dw);
             t.d = t.d.add(2);
         }
 
-        // Masks with USE_C, keeping only the bits that matter here.
         if t.uses & USE_C != 0 {
             t.c = t.c.add(2);
         }
@@ -233,22 +223,18 @@ pub(super) fn blit_row(t: &mut Blit, mem: &mut BlitMem) {
 
 /// After a row, moves each place in use on by its modulo (bytes to skip to reach the next row).
 pub(super) fn skip_row_modulos(t: &mut Blit) {
-    // Masks with USE_A, keeping only the bits that matter here.
     if t.uses & USE_A != 0 {
         t.a = t.a.add(t.amod as isize);
     }
 
-    // Masks with USE_B, keeping only the bits that matter here.
     if t.uses & USE_B != 0 {
         t.b = t.b.add(t.bmod as isize);
     }
 
-    // Masks with USE_C, keeping only the bits that matter here.
     if t.uses & USE_C != 0 {
         t.c = t.c.add(t.cmod as isize);
     }
 
-    // Masks with USE_D, keeping only the bits that matter here.
     if t.uses & USE_D != 0 {
         t.d = t.d.add(t.dmod as isize);
     }

@@ -21,7 +21,6 @@ const EVENT_TIRED: i32 = 3;
 const EVENT_STARVING: i32 = 4;
 
 fn mood_due(clock: u16, battle: bool) -> bool {
-    // Masks with MOOD_PERIOD_MASK, keeping only the bits that matter here.
     clock & MOOD_PERIOD_MASK == 0 && !battle
 }
 

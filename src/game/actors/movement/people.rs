@@ -20,7 +20,6 @@ impl Ctx {
     pub(super) fn setfig(&mut self, game: &mut Game) -> Pc {
         let actor = self.actor;
 
-        // Masks with PERSON_MASK, keeping only the bits that matter here.
         self.terrain = (game.actor(actor).race & PERSON_MASK) as i16;
         let entry = &setfig_table[self.terrain as usize];
         self.image = entry.image_base as i16;

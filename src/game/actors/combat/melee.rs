@@ -53,7 +53,6 @@ pub fn resolve_melee(game: &mut Game) {
 /// The weapon an actor swings in melee, or `None` for a bow (archers shoot instead). Anything
 /// past the hand weapons (8 and up: bites, claws) counts as a touch.
 pub(super) fn melee_weapon(weapon: i16) -> Option<i16> {
-    // Masks with BOW_BIT, keeping only the bits that matter here.
     if weapon & BOW_BIT != 0 {
         None
     } else if weapon >= FIRST_TOUCH_WEAPON {

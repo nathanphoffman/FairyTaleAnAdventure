@@ -137,10 +137,8 @@ pub fn leave_item(game: &mut Game, i: i16, object: i16) {
 pub fn change_object(game: &mut Game, id: i32, flag: i32) {
     let vitality = game.actors.list[id as usize].vitality;
 
-    // Masks with OBJECT_INDEX_MASK, keeping only the bits that matter here.
     let index = (vitality & OBJECT_INDEX_MASK) as usize;
 
-    // Masks with GLOBAL_LIST_BIT, keeping only the bits that matter here.
     let object = if vitality & GLOBAL_LIST_BIT != 0 {
         &mut game.objects.global[index]
     } else {
@@ -163,11 +161,9 @@ fn distribute_treasure(game: &mut Game) {
         let (mut x, mut y);
 
         loop {
-            // Masks with REGION_WIDTH, keeping only the bits that matter here.
             x = (bitrand(&mut game.rng, REGION_WIDTH - 1)
                 + ((game.world.region & 1) as i32 * REGION_WIDTH)) as i16;
 
-            // Masks with REGION_HEIGHT, keeping only the bits that matter here.
             y = (bitrand(&mut game.rng, REGION_HEIGHT - 1)
                 + ((game.world.region & 6) as i32 * REGION_ROW_STEP)) as i16;
 

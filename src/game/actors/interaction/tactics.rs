@@ -88,7 +88,6 @@ fn engage_target(game: &mut Game, i: i32, actor: ActorRef, hx: i32, hy: i32) {
         || (xd as i32 > yd as i32 - SHOOT_DIAGONAL_BELOW as i32
             && (xd as i32) < yd as i32 + SHOOT_DIAGONAL_ABOVE as i32);
 
-    // Masks off the low bits (a cheap remainder or a flag test).
     if fta_rand(&mut game.rng) & 1 != 0 && lined_up {
         steer_actor(game, i, hx, hy, COURSE_TURN_ONLY);
 
@@ -103,7 +102,6 @@ fn engage_target(game: &mut Game, i: i32, actor: ActorRef, hx: i32, hy: i32) {
 /// Wander: now and then turn a random way, and keep walking.
 fn wander(game: &mut Game, actor: ActorRef, acts_now: bool) {
     if acts_now {
-        // Masks with FACING_MASK, keeping only the bits that matter here.
         game.actor_mut(actor).facing = (fta_rand(&mut game.rng) & FACING_MASK) as i8;
     }
 

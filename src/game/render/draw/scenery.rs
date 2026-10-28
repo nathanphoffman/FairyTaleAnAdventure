@@ -144,10 +144,8 @@ pub(super) fn mask_against_scenery(
     ystop1: i16,
     blitwide: i8,
 ) {
-    // Shifts by TILE_ROW_SHIFT, converting between pixels, tiles, sectors or bytes.
     let ym1 = (ystart1 >> TILE_ROW_SHIFT) as u8;
 
-    // Shifts by TILE_ROW_SHIFT, converting between pixels, tiles, sectors or bytes.
     let ym2 = ((ystop1 >> TILE_ROW_SHIFT) as u8).wrapping_sub(ym1);
     let tiles = SpriteTiles {
         actor,
@@ -174,9 +172,7 @@ impl SpriteTiles {
         let ystop = self.ground - (((ym + self.ym1 as i32) << TILE_ROW_SHIFT) as i16);
         let mut cm = ((xm + self.xbw as i32) * MINIMAP_COLUMN_TILES + ym + self.ym1 as i32) as i16;
         cm = (game.memory.minimap[cm as usize] as i32 * TERRAIN_ENTRY_BYTES) as i16;
-        let mut k =
-            // Masks with TERRAIN_TYPE_MASK, keeping only the bits that matter here.
-            (game.memory.terrain_byte(cm as usize + 1) & TERRAIN_TYPE_MASK) as i16;
+        let mut k = (game.memory.terrain_byte(cm as usize + 1) & TERRAIN_TYPE_MASK) as i16;
 
         if game.actor(self.actor).state == FALL {
             if cm <= FALL_TILE_LIMIT {

@@ -43,11 +43,9 @@ pub fn repair_edges(game: &mut Game, dif_x: i16, dif_y: i16) {
     let witch = ActorRef::new(WITCH_SLOT);
     let page = game.screen.drawing_page_mut();
 
-    // Masks with TILE_X_MASK, keeping only the bits that matter here.
     page.witchx = (game.actors.list[witch.slot()].abs_x as i32
         - (game.world.map_x & TILE_X_MASK) as i32) as i16;
     page.witchy = ((game.actors.list[witch.slot()].abs_y as i32 - WITCH_ANCHOR_Y)
-        // Masks with TILE_Y_MASK, keeping only the bits that matter here.
         - (game.world.map_y & TILE_Y_MASK) as i32) as i16;
 
     if rand4(&mut game.rng) == 0 {

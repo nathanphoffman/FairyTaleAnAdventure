@@ -196,7 +196,6 @@ impl Ctx {
     pub(super) fn check_dev1(&mut self, game: &mut Game) -> Pc {
         let actor = self.actor;
 
-        // Masks with FACING_MASK, keeping only the bits that matter here.
         self.facing = (self.facing + 1) & FACING_MASK;
         game.actors.test_x = pos_x(game.actor(actor).abs_x as i32, self.facing, self.step);
         game.actors.test_y = pos_y(game.actor(actor).abs_y as i32, self.facing, self.step);
@@ -218,7 +217,6 @@ impl Ctx {
     pub(super) fn check_dev2(&mut self, game: &mut Game) -> Pc {
         let actor = self.actor;
 
-        // Masks with FACING_MASK, keeping only the bits that matter here.
         self.facing = (self.facing - 2) & FACING_MASK;
         game.actors.test_x = pos_x(game.actor(actor).abs_x as i32, self.facing, self.step);
         game.actors.test_y = pos_y(game.actor(actor).abs_y as i32, self.facing, self.step);
@@ -274,10 +272,8 @@ impl Ctx {
         self.image = self.frame_base;
 
         if !(game.hero.riding != 0 && self.slot == 0) && game.actor(actor).race != RACE_WRAITH {
-            self.image = (self.image as i32
-                // Masks with WALK_FRAMES_MASK, keeping only the bits that matter here.
-                + ((self.cycle as i32 + self.slot) & WALK_FRAMES_MASK))
-                as i16;
+            self.image =
+                (self.image as i32 + ((self.cycle as i32 + self.slot) & WALK_FRAMES_MASK)) as i16;
         }
     }
 

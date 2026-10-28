@@ -18,8 +18,6 @@ fn outside_spot(d: &Door) -> (u16, u16) {
             d.xc1.wrapping_sub(CAVE_OUT.0),
             d.yc1.wrapping_add(CAVE_OUT.1),
         )
-
-    // Masks off the low bits (a cheap remainder or a flag test).
     } else if d.kind & 1 != 0 {
         (
             d.xc1.wrapping_add(HORIZONTAL_OUT.0),
@@ -36,7 +34,6 @@ fn outside_spot(d: &Door) -> (u16, u16) {
 /// Whether a door's inside entrance is where the hero stands (`xtest`, `ytest`: the hero's position
 /// rounded to a tile). Horizontal doors are also found one tile to the right.
 fn is_exit_here(d: &Door, xtest: u16, ytest: u16) -> bool {
-    // Masks off the low bits (a cheap remainder or a flag test).
     let horizontal = d.kind & 1 != 0;
 
     d.yc2 == ytest && (d.xc2 == xtest || (d.xc2 as i32 == xtest as i32 - TILE_WIDTH && horizontal))
@@ -44,12 +41,9 @@ fn is_exit_here(d: &Door, xtest: u16, ytest: u16) -> bool {
 
 /// The hero can go out when lined up with the door the other way round to `may_enter`.
 fn may_leave(d: &Door, hero_x: u16, hero_y: u16) -> bool {
-    // Masks off the low bits (a cheap remainder or a flag test).
     if d.kind & 1 != 0 {
-        // Masks with LOWER_HALF_BIT, keeping only the bits that matter here.
         hero_y & LOWER_HALF_BIT != 0
     } else {
-        // Masks with TILE_COLUMN_MASK, keeping only the bits that matter here.
         hero_x & TILE_COLUMN_MASK >= OUT_COLUMN_LIMIT
     }
 }

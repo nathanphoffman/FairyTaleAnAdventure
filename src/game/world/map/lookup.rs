@@ -66,9 +66,7 @@ const SECTOR_POSITION_SHIFT: u32 = 8;
 
 /// Sector column from an image column: values outside 0-63 wrap, as in the assembly.
 pub(super) fn wrap_secx(mut v: u16) -> u16 {
-    // Masks with COLUMN_OFF_MAP, keeping only the bits that matter here.
     if v & COLUMN_OFF_MAP != 0 {
-        // Masks with COLUMN_OFF_LOW_SIDE, keeping only the bits that matter here.
         v = if v & COLUMN_OFF_LOW_SIDE != 0 {
             0
         } else {
@@ -118,19 +116,16 @@ pub fn terrain_at(game: &Game, x: i32, y: i32) -> i32 {
 fn subarea_bit(ux: u16, uy: u16) -> u8 {
     let mut bit = FIRST_SUBAREA_BIT;
 
-    // Masks with RIGHT_HALF_PIXEL, keeping only the bits that matter here.
     if ux & RIGHT_HALF_PIXEL != 0 {
         // The right half of the tile: the second column of sub-areas.
         bit >>= RIGHT_HALF_SHIFT;
     }
 
-    // Masks with LOWER_ROW_PIXEL, keeping only the bits that matter here.
     if uy & LOWER_ROW_PIXEL != 0 {
         // The lower half of a 16 pixel row of sub-areas.
         bit >>= 1;
     }
 
-    // Masks with LOWER_PAIR_PIXEL, keeping only the bits that matter here.
     if uy & LOWER_PAIR_PIXEL != 0 {
         // The lower two of the four rows of sub-areas.
         bit >>= 2;
@@ -167,9 +162,7 @@ pub fn tile_index(game: &Game, imx: i32, imy: i32) -> usize {
     // Pixel row to sector row: 8 tiles to a sector, so 8 times 32 divided by 32.
     let mut row = (uy >> SECTOR_HEIGHT_SHIFT).wrapping_sub(game.world.origin_y);
 
-    // Masks with ROW_OFF_MAP, keeping only the bits that matter here.
     if row & ROW_OFF_MAP != 0 {
-        // Masks with ROW_OFF_LOW_SIDE, keeping only the bits that matter here.
         row = if row & ROW_OFF_LOW_SIDE != 0 {
             0
         } else {
@@ -180,9 +173,7 @@ pub fn tile_index(game: &Game, imx: i32, imy: i32) -> usize {
     let sec = sector_at(game, col, row) as usize;
 
     (sec * SECTOR_BYTES
-        // Masks with TILE_ROW_MASK, keeping only the bits that matter here.
         + (uy as usize & TILE_ROW_MASK) * SECTOR_ROW_TILES
-        // Masks with TILE_COLUMN_MASK, keeping only the bits that matter here.
         + (ux as usize & TILE_COLUMN_MASK)) as u16 as usize
 }
 
@@ -196,7 +187,6 @@ pub fn fill_minimap(game: &mut Game, tile_x: i32, tile_y: i32) {
         x &= TILE_COLUMN_WRAP;
 
         for j in 0..SCREEN_ROWS as i32 {
-            // Masks with TILE_ROW_WRAP, keeping only the bits that matter here.
             game.memory.minimap[next] =
                 tile_number(game, x, (tile_y + j) as u16 & TILE_ROW_WRAP) as i16;
             next += 1;
@@ -224,9 +214,7 @@ fn tile_number(game: &Game, x: u16, y: u16) -> u8 {
 
     game.memory.sector_byte(
         (sec * SECTOR_BYTES
-            // Masks with TILE_ROW_MASK, keeping only the bits that matter here.
             + (y as usize & TILE_ROW_MASK) * SECTOR_ROW_TILES
-            // Masks with TILE_COLUMN_MASK, keeping only the bits that matter here.
             + (x as usize & TILE_COLUMN_MASK)) as u16 as usize,
     )
 }
@@ -238,14 +226,12 @@ fn hero_sector(game: &mut Game) -> i16 {
 
     // The hero's sector row: 256 pixels to a sector.
     let hy =
-        // Shifts by SECTOR_POSITION_SHIFT, converting between pixels, tiles, sectors or bytes.
         ((game.hero.y >> SECTOR_POSITION_SHIFT).wrapping_sub(game.world.origin_y)) as i16 as i32;
     // The region map has 128 sectors in each row.
     let mut sec =
         game.memory
             .map_byte(((hy << MAP_ROW_SHIFT).wrapping_add(hx)) as u16 as usize) as i32;
 
-    // Masks with REGION_BYTE_MASK, keeping only the bits that matter here.
     if game.world.region & REGION_BYTE_MASK > LAST_FIRST_HALF_REGION {
         sec += SECOND_HALF_OFFSET;
     }

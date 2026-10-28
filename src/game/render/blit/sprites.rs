@@ -121,7 +121,6 @@ pub fn combine_masks(game: &mut Game) {
     t.a = Loc::new(Area::Shapes, game.memory.mask_buffer).add(mask_offset as isize);
     t.amod = mask_modulo as i32;
 
-    // Masks with SHIFT_MASK, keeping only the bits that matter here.
     t.ashift = (x_shift & SHIFT_MASK) as u32;
     t.c = scenery_mask_at(&SpriteRegs::of(game));
     t.d = t.c;
@@ -133,13 +132,11 @@ pub fn combine_masks(game: &mut Game) {
 /// Draws the sprite into the planes through the mask: D = mask ? shape : screen.
 /// The first and last word masks stop the sprite's shifted edges leaking into neighbouring pixels.
 pub fn draw_shape(game: &mut Game) {
-    // Masks with SHIFT_MASK, keeping only the bits that matter here.
     let bit_shift = ({ game.blitter.sprite_x_shift } & SHIFT_MASK) as u32;
 
     // The first word is masked so the bits left of the sprite's pixel offset stay clear.
     let first = ALL_BITS >> bit_shift;
 
-    // Masks with ALL_BITS, keeping only the bits that matter here.
     let mut last = !first & ALL_BITS;
 
     if last == 0 {

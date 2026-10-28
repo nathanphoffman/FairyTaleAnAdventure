@@ -33,7 +33,6 @@ impl Ctx {
         } else if s == DEAD || s == FROZEN {
             self.image = FRAME_FLAT;
         } else if s == OSCIL {
-            // Masks with FRAME_OSCIL, keeping only the bits that matter here.
             self.image = FRAME_OSCIL + (self.cycle & 1);
         } else if s == OSCIL + 1 {
             self.image = FRAME_OSCIL;
@@ -244,9 +243,8 @@ impl Ctx {
         let race = game.actor(actor).race as i8;
 
         if game.actor(actor).environ == ENVIRON_DROWNED
-                // Masks with DROWN_PERIOD_MASK, keeping only the bits that matter here.
-                && (cycle & DROWN_PERIOD_MASK) == 0
-                && !DROWN_IMMUNE_RACES.contains(&race)
+            && (cycle & DROWN_PERIOD_MASK) == 0
+            && !DROWN_IMMUNE_RACES.contains(&race)
         {
             game.actor_mut(actor).vitality = game.actor(actor).vitality.wrapping_sub(1);
             check_death(game, i, DEATH_DROWN);
@@ -260,10 +258,8 @@ impl Ctx {
         let state = game.actor(actor).state as i16;
 
         if race == RACE_SNAKE as i8 && state < WALKING {
-            // Masks off the low bits (a cheap remainder or a flag test).
             self.image = ((cycle & 1) + diroff(self.facing) as i32) as i16;
         } else if race == RACE_SNAKE as i8 && state < DYING {
-            // Masks off the low bits (a cheap remainder or a flag test).
             self.image = (((cycle / 2) & 1) + diroff(self.facing) as i32) as i16;
         } else if race == RACE_SPECTRE {
             if state == DEAD {
@@ -271,7 +267,6 @@ impl Ctx {
             } else if state == DYING {
                 self.image = SPECTRE_DEAD_FRAME;
             } else {
-                // Masks with SPECTRE_CYCLE_MASK, keeping only the bits that matter here.
                 self.image = ((cycle & SPECTRE_CYCLE_MASK) * 2) as i16;
 
                 if self.image > SPECTRE_SKIP_FRAME {

@@ -52,7 +52,6 @@ fn place_fairy(game: &mut Game, cycle: i16) {
     game.actor_mut(fairy).abs_y = game.hero.y;
     game.actor_mut(fairy).kind = OBJECTS;
 
-    // Masks with FAIRY_IMAGE, keeping only the bits that matter here.
     game.actor_mut(fairy).index = FAIRY_IMAGE + (cycle & 1) as i8;
     game.actor_mut(fairy).state = STILL;
     game.actor_mut(fairy).weapon = 0;
