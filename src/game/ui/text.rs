@@ -133,14 +133,14 @@ pub fn speak(game: &mut Game, n: i32) {
 /// per tick, which spreads the redrawing work over several frames.
 pub fn queue_print(game: &mut Game, x: i32) {
     // Masks with PRINT_QUEUE_MASK, keeping only the bits that matter here.
-    let next = (game.prec + 1) & PRINT_QUEUE_MASK;
+    let next = (game.ui.print_queue.write + 1) & PRINT_QUEUE_MASK;
 
-    if next == game.pplay {
+    if next == game.ui.print_queue.read {
         return;
     }
 
-    game.print_que[game.prec as usize] = x as i8;
-    game.prec = next;
+    game.ui.print_queue.items[game.ui.print_queue.write as usize] = x as i8;
+    game.ui.print_queue.write = next;
 }
 
 // The decorative border drawn on story pages.

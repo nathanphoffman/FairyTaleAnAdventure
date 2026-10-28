@@ -58,7 +58,12 @@ impl Ctx {
             self.turtle_moves(game);
         }
 
-        center_extent_on(game, self.step, game.xtest as i16, game.ytest as i16);
+        center_extent_on(
+            game,
+            self.step,
+            game.actors.test_x as i16,
+            game.actors.test_y as i16,
+        );
 
         Pc::Raise
     }
@@ -75,13 +80,13 @@ impl Ctx {
         ) {
             self.facing = game.actors.list[hero.slot()].facing as i16;
             game.actors.list[actor.slot()].abs_x = game.actors.list[hero.slot()].abs_x;
-            game.xtest = game.actors.list[hero.slot()].abs_x;
+            game.actors.test_x = game.actors.list[hero.slot()].abs_x;
             game.actors.list[actor.slot()].abs_y = game.actors.list[hero.slot()].abs_y;
-            game.ytest = game.actors.list[hero.slot()].abs_y;
+            game.actors.test_y = game.actors.list[hero.slot()].abs_y;
             game.hero.riding = RIDING_SWAN;
         } else {
-            game.xtest = game.actors.list[actor.slot()].abs_x;
-            game.ytest = game.actors.list[actor.slot()].abs_y;
+            game.actors.test_x = game.actors.list[actor.slot()].abs_x;
+            game.actors.test_y = game.actors.list[actor.slot()].abs_y;
         }
 
         self.image = self.facing;
@@ -95,8 +100,8 @@ impl Ctx {
 
         if turtle_carries(game.actors.raft_nearness, game.actors.carrier_slot) {
             self.facing = game.actors.list[hero.slot()].facing as i16;
-            game.xtest = game.actors.list[hero.slot()].abs_x;
-            game.ytest = game.actors.list[hero.slot()].abs_y;
+            game.actors.test_x = game.actors.list[hero.slot()].abs_x;
+            game.actors.test_y = game.actors.list[hero.slot()].abs_y;
             game.hero.riding = RIDING_TURTLE;
             self.image = self.facing + self.facing;
 
@@ -108,11 +113,11 @@ impl Ctx {
             self.turtle_swims(game);
         }
 
-        self.terrain = terrain(game, game.xtest, game.ytest);
+        self.terrain = terrain(game, game.actors.test_x, game.actors.test_y);
 
         if self.terrain == TURTLE_WATER {
-            game.actors.list[actor.slot()].abs_x = game.xtest;
-            game.actors.list[actor.slot()].abs_y = game.ytest;
+            game.actors.list[actor.slot()].abs_x = game.actors.test_x;
+            game.actors.list[actor.slot()].abs_y = game.actors.test_y;
         }
 
         self.step = 1;
@@ -134,8 +139,8 @@ impl Ctx {
             ) == TURTLE_WATER
         });
 
-        game.xtest = pos_x(ax, self.facing, TURTLE_STEP);
-        game.ytest = pos_y(ay, self.facing, TURTLE_STEP);
+        game.actors.test_x = pos_x(ax, self.facing, TURTLE_STEP);
+        game.actors.test_y = pos_y(ay, self.facing, TURTLE_STEP);
         game.hero.riding = 0;
 
         // Masks off the low bits (a cheap remainder or a flag test).
@@ -151,16 +156,16 @@ impl Ctx {
             return Pc::Statc;
         }
 
-        game.xtest = game.actors.list[0].abs_x;
-        game.ytest = game.actors.list[0].abs_y;
-        self.terrain = terrain(game, game.xtest, game.ytest);
+        game.actors.test_x = game.actors.list[0].abs_x;
+        game.actors.test_y = game.actors.list[0].abs_y;
+        self.terrain = terrain(game, game.actors.test_x, game.actors.test_y);
 
         if !(TERRAIN_WADE..=TERRAIN_DEEP_WATER).contains(&self.terrain) {
             return Pc::Statc;
         }
 
-        game.actors.list[actor.slot()].abs_x = game.xtest;
-        game.actors.list[actor.slot()].abs_y = game.ytest;
+        game.actors.list[actor.slot()].abs_x = game.actors.test_x;
+        game.actors.list[actor.slot()].abs_y = game.actors.test_y;
         game.hero.riding = RIDING_RAFT;
 
         Pc::Statc

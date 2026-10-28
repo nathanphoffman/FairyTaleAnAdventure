@@ -211,7 +211,7 @@ fn blit_sprite(
     ) {
         return Drawn::OutOfRoom; // no more blits if no room
     }
-    save_background(game, game.current_sshape.backsave);
+    save_background(game, game.blitter.sshape.backsave);
 
     if !drawn_in_front(game, actor, i, sprite.atype, sprite.inum) {
         mask_against_scenery(
@@ -229,7 +229,7 @@ fn blit_sprite(
     combine_masks(game);
     draw_shape(game);
     game.actors.list[actor.slot()].visible = 1;
-    queue_shape(game, game.current_sshape);
+    queue_shape(game, game.blitter.sshape);
 
     Drawn::Done
 }

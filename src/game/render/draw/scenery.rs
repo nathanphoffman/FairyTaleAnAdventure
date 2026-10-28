@@ -174,7 +174,7 @@ impl SpriteTiles {
         // Back from tile rows to pixels.
         let ystop = self.ground - (((ym + self.ym1 as i32) << TILE_ROW_SHIFT) as i16);
         let mut cm = ((xm + self.xbw as i32) * MINIMAP_COLUMN_TILES + ym + self.ym1 as i32) as i16;
-        cm = (game.minimap[cm as usize] as i32 * TERRAIN_ENTRY_BYTES) as i16;
+        cm = (game.memory.minimap[cm as usize] as i32 * TERRAIN_ENTRY_BYTES) as i16;
         let mut k =
             // Masks with TERRAIN_TYPE_MASK, keeping only the bits that matter here.
             (game.memory.terrain_byte(cm as usize + 1) & TERRAIN_TYPE_MASK) as i16;

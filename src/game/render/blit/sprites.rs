@@ -38,11 +38,11 @@ struct SpriteRegs {
 impl SpriteRegs {
     fn of(game: &Game) -> SpriteRegs {
         SpriteRegs {
-            sshape: game.current_sshape,
-            shadow_mask_offset: game.shadow_mask_offset,
-            mask_offset: game.sprite_mask_offset,
-            mask_modulo: game.sprite_mask_modulo,
-            word_mask: game.last_word_mask,
+            sshape: game.blitter.sshape,
+            shadow_mask_offset: game.blitter.shadow_mask_offset,
+            mask_offset: game.blitter.sprite_mask_offset,
+            mask_modulo: game.blitter.sprite_mask_modulo,
+            word_mask: game.blitter.last_word_mask,
             planesize: game.screen.planesize as usize,
             shapedata: game.memory.shapedata,
         }
@@ -76,7 +76,7 @@ pub fn clear_memory(game: &mut Game, size: i32) {
 /// Copies the background under the sprite (all planes) to `savemem`.
 pub fn save_background(game: &mut Game, savemem: Loc) {
     let regs = SpriteRegs::of(game);
-    let sshape = { game.current_sshape };
+    let sshape = { game.blitter.sshape };
 
     with_mem(&mut game.screen, &mut game.memory.shape, |mem| {
         for p in (0..PLANE_COUNT).rev() {
@@ -92,7 +92,7 @@ pub fn save_background(game: &mut Game, savemem: Loc) {
 /// Puts the saved background back (this erases the sprite).
 pub fn restore_background(game: &mut Game, savemem: Loc) {
     let regs = SpriteRegs::of(game);
-    let sshape = { game.current_sshape };
+    let sshape = { game.blitter.sshape };
 
     with_mem(&mut game.screen, &mut game.memory.shape, |mem| {
         for p in (0..PLANE_COUNT).rev() {
@@ -110,10 +110,10 @@ pub fn restore_background(game: &mut Game, savemem: Loc) {
 pub fn combine_masks(game: &mut Game) {
     let (sshape, mask_offset, mask_modulo, x_shift) = {
         (
-            game.current_sshape,
-            game.sprite_mask_offset,
-            game.sprite_mask_modulo,
-            game.sprite_x_shift,
+            game.blitter.sshape,
+            game.blitter.sprite_mask_offset,
+            game.blitter.sprite_mask_modulo,
+            game.blitter.sprite_x_shift,
         )
     };
     let mut t = Blit::new(USE_A | USE_C | USE_D, D_EQUALS_A_AND_NOT_C, sshape.blitsize);
@@ -134,7 +134,7 @@ pub fn combine_masks(game: &mut Game) {
 /// The first and last word masks stop the sprite's shifted edges leaking into neighbouring pixels.
 pub fn draw_shape(game: &mut Game) {
     // Masks with SHIFT_MASK, keeping only the bits that matter here.
-    let bit_shift = ({ game.sprite_x_shift } & SHIFT_MASK) as u32;
+    let bit_shift = ({ game.blitter.sprite_x_shift } & SHIFT_MASK) as u32;
 
     // The first word is masked so the bits left of the sprite's pixel offset stay clear.
     let first = ALL_BITS >> bit_shift;

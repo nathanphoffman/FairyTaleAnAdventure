@@ -1,7 +1,7 @@
 //! Loading sprite files, songs and the intro pictures (from csrc/fmain2.c).
 //!
 //! Sprites: every kind of character (the three brothers, monsters, people, the raft, the turtle ...)
-//! is stored on the disk image as a block of frames. `sprite_files` lists them. `load_sprite_file` copies one
+//! is stored on the disk image as a block of frames. `SPRITE_FILES` lists them. `load_sprite_file` copies one
 //! into `shape_mem`, a big scratch area, and `finish_sprite_load` builds a transparency mask for it so the
 //! blitter knows which pixels to leave alone. Each loaded sprite sequence takes its frames (5
 //! bitplanes) plus one mask plane, in memory order.
@@ -17,7 +17,7 @@ mod story_pages;
 
 pub use self::sound_data::{play_effect, read_sample, read_score, track, tune_tracks};
 pub use self::sprites::{
-    finish_sprite_load, load_pending_region, load_sprite_file, load_start_sprites, sprite_files,
+    SPRITE_FILES, finish_sprite_load, load_pending_region, load_sprite_file, load_start_sprites,
 };
 
 pub use self::story_pages::{intro_skipped, show_story_page};

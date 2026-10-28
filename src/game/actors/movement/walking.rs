@@ -110,18 +110,22 @@ impl Ctx {
             self.environ,
         );
 
-        game.xtest = pos_x(
+        game.actors.test_x = pos_x(
             game.actors.list[actor.slot()].abs_x as i32,
             self.facing,
             self.step,
         );
-        game.ytest = pos_y(
+        game.actors.test_y = pos_y(
             game.actors.list[actor.slot()].abs_y as i32,
             self.facing,
             self.step,
         );
-        self.terrain =
-            blocked_at(game, game.xtest as i16, game.ytest as i16, self.slot as i16) as i16;
+        self.terrain = blocked_at(
+            game,
+            game.actors.test_x as i16,
+            game.actors.test_y as i16,
+            self.slot as i16,
+        ) as i16;
 
         if self.slot == 0 && self.hero_bumps_into_door(game) {
             return Pc::NewLoc;
@@ -138,9 +142,9 @@ impl Ctx {
     /// forgets that it was locked. Returns true when the gold key lets him through.
     fn hero_bumps_into_door(&mut self, game: &mut Game) -> bool {
         if self.terrain == BLOCK_DOOR {
-            open_door_near(game, game.xtest, game.ytest, 0);
+            open_door_near(game, game.actors.test_x, game.actors.test_y, 0);
         } else {
-            game.bumped_locked_door = 0;
+            game.world.bumped_locked_door = 0;
         }
 
         game.hero.stuff()[STUFF_GOLD_KEY_SLOT] != 0 && self.terrain == BLOCK_PASSABLE_WITH_KEY
@@ -171,10 +175,10 @@ impl Ctx {
             game.actors.list[actor.slot()].vel_y = nvy as i8;
         }
 
-        game.xtest = (game.actors.list[actor.slot()].abs_x as i32
+        game.actors.test_x = (game.actors.list[actor.slot()].abs_x as i32
             + game.actors.list[actor.slot()].vel_x as i32 / VELOCITY_SCALE)
             as u16;
-        game.ytest = (game.actors.list[actor.slot()].abs_y as i32
+        game.actors.test_y = (game.actors.list[actor.slot()].abs_y as i32
             + game.actors.list[actor.slot()].vel_y as i32 / VELOCITY_SCALE)
             as u16;
 
@@ -185,7 +189,13 @@ impl Ctx {
             return Some(Pc::NewLoc);
         }
 
-        if blocked_at(game, game.xtest as i16, game.ytest as i16, self.slot as i16) == 0 {
+        if blocked_at(
+            game,
+            game.actors.test_x as i16,
+            game.actors.test_y as i16,
+            self.slot as i16,
+        ) == 0
+        {
             return Some(Pc::NewLoc);
         }
 
@@ -198,18 +208,24 @@ impl Ctx {
 
         // Masks with FACING_MASK, keeping only the bits that matter here.
         self.facing = (self.facing + 1) & FACING_MASK;
-        game.xtest = pos_x(
+        game.actors.test_x = pos_x(
             game.actors.list[actor.slot()].abs_x as i32,
             self.facing,
             self.step,
         );
-        game.ytest = pos_y(
+        game.actors.test_y = pos_y(
             game.actors.list[actor.slot()].abs_y as i32,
             self.facing,
             self.step,
         );
 
-        if blocked_at(game, game.xtest as i16, game.ytest as i16, self.slot as i16) != 0 {
+        if blocked_at(
+            game,
+            game.actors.test_x as i16,
+            game.actors.test_y as i16,
+            self.slot as i16,
+        ) != 0
+        {
             Pc::CheckDev2
         } else {
             Pc::NewLoc
@@ -222,18 +238,24 @@ impl Ctx {
 
         // Masks with FACING_MASK, keeping only the bits that matter here.
         self.facing = (self.facing - 2) & FACING_MASK;
-        game.xtest = pos_x(
+        game.actors.test_x = pos_x(
             game.actors.list[actor.slot()].abs_x as i32,
             self.facing,
             self.step,
         );
-        game.ytest = pos_y(
+        game.actors.test_y = pos_y(
             game.actors.list[actor.slot()].abs_y as i32,
             self.facing,
             self.step,
         );
 
-        if blocked_at(game, game.xtest as i16, game.ytest as i16, self.slot as i16) != 0 {
+        if blocked_at(
+            game,
+            game.actors.test_x as i16,
+            game.actors.test_y as i16,
+            self.slot as i16,
+        ) != 0
+        {
             Pc::Blocked
         } else {
             Pc::NewLoc
@@ -291,7 +313,7 @@ impl Ctx {
     /// own pictures.
     fn look_at_new_terrain(&mut self, game: &mut Game) {
         let actor = self.actor;
-        self.terrain = terrain(game, game.xtest, game.ytest);
+        self.terrain = terrain(game, game.actors.test_x, game.actors.test_y);
 
         if game.actors.list[actor.slot()].race == RACE_WRAITH
             || game.actors.list[actor.slot()].race == RACE_SNAKE
@@ -309,17 +331,19 @@ impl Ctx {
     fn take_the_step(&mut self, game: &mut Game) {
         let actor = self.actor;
         game.actors.list[actor.slot()].vel_x = ((game
-            .xtest
+            .actors
+            .test_x
             .wrapping_sub(game.actors.list[actor.slot()].abs_x)
             as i16 as i32)
             * VELOCITY_SCALE) as i8;
         game.actors.list[actor.slot()].vel_y = ((game
-            .ytest
+            .actors
+            .test_y
             .wrapping_sub(game.actors.list[actor.slot()].abs_y)
             as i16 as i32)
             * VELOCITY_SCALE) as i8;
-        game.actors.list[actor.slot()].abs_x = game.xtest;
-        game.actors.list[actor.slot()].abs_y = game.ytest;
+        game.actors.list[actor.slot()].abs_x = game.actors.test_x;
+        game.actors.list[actor.slot()].abs_y = game.actors.test_y;
         game.actors.frustration = 0;
     }
 

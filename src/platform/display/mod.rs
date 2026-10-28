@@ -150,20 +150,22 @@ pub fn init() -> Result<(), String> {
 /// Converts the scene to RGB and shows it.
 fn draw(d: &mut Display, scene: &Scene) {
     compose(scene, &mut d.frame);
-    let bytes: &[u8] = unsafe {
-        std::slice::from_raw_parts(
-            d.frame.as_ptr() as *const u8,
-            d.frame.len() * BYTES_PER_PIXEL,
-        )
-    };
-
     let texture = d
         .creator
         .create_texture_streaming(PixelFormatEnum::ARGB8888, WIDTH, HEIGHT);
 
     match texture {
         Ok(mut texture) => {
-            if let Err(e) = texture.update(None, bytes, WIDTH as usize * BYTES_PER_PIXEL) {
+            let frame = &d.frame;
+            let copied = texture.with_lock(None, |bytes, pitch| {
+                for (row, pixels) in bytes.chunks_mut(pitch).zip(frame.chunks(WIDTH as usize)) {
+                    for (out, pixel) in row.chunks_mut(BYTES_PER_PIXEL).zip(pixels) {
+                        out.copy_from_slice(&pixel.to_ne_bytes());
+                    }
+                }
+            });
+
+            if let Err(e) = copied {
                 eprintln!("Could not update the screen texture: {e}");
             }
 

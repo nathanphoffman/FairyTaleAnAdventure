@@ -190,7 +190,7 @@ fn load_changed_tables(game: &mut Game, need: &Need) {
 
 /// Loads the sector table and the region map if they changed.
 fn load_changed_map_tables(game: &mut Game, need: &Need) {
-    if need.sector != game.loaded_blocks.sector {
+    if need.sector != game.memory.loaded_blocks.sector {
         load_track_range(
             need.sector as i16,
             SECTOR_BLOCKS,
@@ -198,10 +198,10 @@ fn load_changed_map_tables(game: &mut Game, need: &Need) {
             REQ_SECTOR,
         );
 
-        game.loaded_blocks.sector = need.sector;
+        game.memory.loaded_blocks.sector = need.sector;
     }
 
-    if need.region != game.loaded_blocks.region {
+    if need.region != game.memory.loaded_blocks.region {
         load_track_range(
             need.region as i16,
             REGION_MAP_BLOCKS,
@@ -209,13 +209,13 @@ fn load_changed_map_tables(game: &mut Game, need: &Need) {
             REQ_MAP,
         );
 
-        game.loaded_blocks.region = need.region;
+        game.memory.loaded_blocks.region = need.region;
     }
 }
 
 /// Loads the two terrain tables if they changed.
 fn load_changed_terrain(game: &mut Game, need: &Need) {
-    if need.terra1 != game.loaded_blocks.terra1 {
+    if need.terra1 != game.memory.loaded_blocks.terra1 {
         load_track_range(
             TERRA_BLOCK + need.terra1 as i16,
             1,
@@ -223,13 +223,13 @@ fn load_changed_terrain(game: &mut Game, need: &Need) {
             REQ_TERRA1,
         );
 
-        game.loaded_blocks.terra1 = need.terra1;
+        game.memory.loaded_blocks.terra1 = need.terra1;
     }
 
-    if need.terra2 != game.loaded_blocks.terra2 {
+    if need.terra2 != game.memory.loaded_blocks.terra2 {
         let dest = &mut game.memory.terrain[TERRA_TABLE_SIZE..];
         load_track_range(TERRA_BLOCK + need.terra2 as i16, 1, dest, REQ_TERRA2);
-        game.loaded_blocks.terra2 = need.terra2;
+        game.memory.loaded_blocks.terra2 = need.terra2;
     }
 }
 
@@ -239,7 +239,7 @@ fn load_next_image_bank(game: &mut Game, need: &Need) -> bool {
     let mut bank_mem = 0;
 
     for bank in 0..4 {
-        if need.image[bank] != game.loaded_blocks.image[bank] {
+        if need.image[bank] != game.memory.loaded_blocks.image[bank] {
             let first = need.image[bank] as i16;
 
             for plane in 0..5 {
@@ -254,7 +254,7 @@ fn load_next_image_bank(game: &mut Game, need: &Need) -> bool {
                 );
             }
 
-            game.loaded_blocks.image[bank] = need.image[bank];
+            game.memory.loaded_blocks.image[bank] = need.image[bank];
 
             return true;
         }

@@ -237,8 +237,8 @@ pub fn read_walk_direction(game: &mut Game) {
         }
     };
 
-    if dir != game.compass_lit_direction {
-        game.compass_lit_direction = dir;
+    if dir != game.ui.compass_lit_direction {
+        game.ui.compass_lit_direction = dir;
         draw_compass(game, dir);
     }
 }

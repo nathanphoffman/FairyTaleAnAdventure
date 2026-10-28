@@ -44,13 +44,11 @@ fn edge(dir: i16, fp: &FPage) -> ((i16, i16), (i16, i16)) {
 }
 
 /// Which side of the line (p1, p2) the point (xh, yh) is on: the cross product, as the 16 bit
-/// value the original kept, and 1 if it is not negative.
-fn side(p1: (i16, i16), p2: (i16, i16), xh: i16, yh: i16) -> (i16, i16) {
+/// value the original kept.
+fn side(p1: (i16, i16), p2: (i16, i16), xh: i16, yh: i16) -> i16 {
     let (dx, dy) = (p2.0.wrapping_sub(p1.0), p2.1.wrapping_sub(p1.1));
     let (dx1, dy1) = (xh.wrapping_sub(p1.0), yh.wrapping_sub(p1.1));
-    let cross = (dx as i32 * dy1 as i32 - dy as i32 * dx1 as i32) as i16;
-
-    (cross, (cross >= 0) as i16)
+    (dx as i32 * dy1 as i32 - dy as i32 * dx1 as i32) as i16
 }
 
 /// Draws the witch's beam on page `page` and records on which side of its edges the hero is.
@@ -66,8 +64,8 @@ pub fn witch_fx(game: &mut Game, page: usize) {
 
     let (p1, p2) = edge(fp.witchdir.wrapping_add(DIRECTIONS_BEFORE as i16), fp);
     let (p3, p4) = edge(fp.witchdir.wrapping_add(DIRECTIONS_AFTER as i16), fp);
-    (game.side_1, game.side_flag_1) = side(p1, p2, xh, yh);
-    (game.side_2, game.side_flag_2) = side(p3, p4, xh, yh);
+    game.witch.side_1 = side(p1, p2, xh, yh);
+    game.witch.side_2 = side(p3, p4, xh, yh);
 
     paint_beam(game, [p1, p2, p4, p3]);
 }
@@ -94,7 +92,7 @@ mod tests {
     #[test]
     fn side_tells_which_way_the_hero_is() {
         // line along x; a point below it (positive y) has a positive cross product
-        assert_eq!(side((0, 0), (10, 0), 5, 5), (50, 1));
-        assert_eq!(side((0, 0), (10, 0), 5, -5), (-50, 0));
+        assert_eq!(side((0, 0), (10, 0), 5, 5), 50);
+        assert_eq!(side((0, 0), (10, 0), 5, -5), -50);
     }
 }

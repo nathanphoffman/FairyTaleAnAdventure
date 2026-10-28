@@ -18,7 +18,7 @@ use crate::game::data::random::bitrand;
 use crate::game::data::tables::setfig_table;
 use crate::game::data::types::WorldObject;
 use crate::game::files::disk::motor_off;
-use crate::game::files::loading::sprite_files;
+use crate::game::files::loading::SPRITE_FILES;
 use crate::game::files::loading::{finish_sprite_load, load_sprite_file};
 use crate::game::world::map::terrain_at;
 
@@ -90,13 +90,18 @@ fn inside(value: i16, (low, high): (i16, i16)) -> bool {
 /// Turns the global and current region's object lists into actors.
 /// Called when the screen changes (new region, scrolling far, after loading a game).
 pub fn spawn_object_actors(game: &mut Game) {
-    game.j1 = FIRST_OBJECT_ACTOR;
+    game.actors.free_slot = FIRST_OBJECT_ACTOR;
     add_objects_near(game, ObjectList::Global, glbobs, GLOBAL_LIST_BIT as i32);
     let region = game.world.region as usize;
-    add_objects_near(game, ObjectList::Region(region), game.mapobs[region], 0);
+    add_objects_near(
+        game,
+        ObjectList::Region(region),
+        game.objects.used[region],
+        0,
+    );
 
-    if game.j1 > FIRST_MONSTER_SLOT {
-        game.actors.active = game.j1;
+    if game.actors.free_slot > FIRST_MONSTER_SLOT {
+        game.actors.active = game.actors.free_slot;
     }
 }
 
@@ -171,8 +176,8 @@ fn distribute_treasure(game: &mut Game) {
             }
         }
 
-        let k = game.mapobs[region] as usize;
-        game.mapobs[region] += 1;
+        let k = game.objects.used[region] as usize;
+        game.objects.used[region] += 1;
         let kind = rand_treasure[bitrand(&mut game.rng, TREASURE_KINDS - 1) as usize] as i8;
         let object = &mut game.objects.region(region)[k];
         object.xc = x as u16;
@@ -181,7 +186,7 @@ fn distribute_treasure(game: &mut Game) {
         object.ob_stat = STAT_SHOWN;
     }
 
-    game.dstobs[region] = 1; // mark this region as distributed
+    game.objects.distributed[region] = 1; // mark this region as distributed
 }
 
 /// Makes sure the sprite file for the kind of person `id` is loaded. Several kinds share one
@@ -189,8 +194,8 @@ fn distribute_treasure(game: &mut Game) {
 fn load_set_figure(game: &mut Game, id: i8) {
     let entry = (setfig_table[id as usize]).cfile_entry;
 
-    if sprite_files[entry as usize].file_id
-        != sprite_files[game.actors.loaded_setfig_file as usize].file_id
+    if SPRITE_FILES[entry as usize].file_id
+        != SPRITE_FILES[game.actors.loaded_setfig_file as usize].file_id
     {
         game.actors.loaded_setfig_file = entry as i16;
         game.memory.nextshape = game.memory.seq_list[SETFIG as usize].location;
@@ -208,10 +213,12 @@ fn load_set_figure(game: &mut Game, id: i8) {
 /// screen; items that are hidden or taken are skipped. A person already in the actor list at the
 /// same place is not added twice (and is marked dead if its actor died).
 pub fn add_objects_near(game: &mut Game, which: ObjectList, mut length: i16, f: i32) {
-    game.turtle_eggs = 0;
+    game.actors.turtle_eggs = 0;
     game.witch.on_screen = 0;
 
-    if game.dstobs[game.world.region as usize] == 0 && game.world.new_region >= NO_REGION {
+    if game.objects.distributed[game.world.region as usize] == 0
+        && game.world.new_region >= NO_REGION
+    {
         distribute_treasure(game);
     }
 
@@ -293,9 +300,9 @@ fn add_person_actor(
     ystart: i16,
 ) -> Option<(ActorRef, i16)> {
     let id = object.ob_id;
-    let slot = game.j1 as usize;
+    let slot = game.actors.free_slot as usize;
     let actor = &mut game.actors.list[slot];
-    game.j1 += 1;
+    game.actors.free_slot += 1;
 
     if actor.abs_x == object.xc && actor.abs_y == object.yc {
         if actor.state == DEAD {
@@ -320,8 +327,8 @@ fn add_person_actor(
     // A person's race is 0x80 plus their kind, so they can be told from monsters.
     actor.race = (id as i32 + PERSON_RACE_BASE) as u8;
 
-    if game.j1 > game.actors.drawn {
-        game.actors.drawn = game.j1;
+    if game.actors.free_slot > game.actors.drawn {
+        game.actors.drawn = game.actors.free_slot;
     }
 
     Some((ActorRef::new(slot), ystart - PERSON_RAISE))
@@ -330,7 +337,7 @@ fn add_person_actor(
 /// Makes an item lying about (or the turtle's eggs, a raft...) out of a world object.
 fn add_item_actor(game: &mut Game, object: &WorldObject, index: i16, f: i32) -> ActorRef {
     if object.ob_id == TURTLE as i8 {
-        game.turtle_eggs = game.actors.drawn as i8;
+        game.actors.turtle_eggs = game.actors.drawn as i8;
     }
 
     let slot = game.actors.drawn as usize;

@@ -36,7 +36,7 @@ pub(super) fn draw_tile(game: &mut Game, tile: i32, dst: usize) {
 pub(super) fn draw_minimap_tile(game: &mut Game, col: usize, row: usize) {
     draw_tile(
         game,
-        game.minimap[col * SCREEN_ROWS + row] as i32,
+        game.memory.minimap[col * SCREEN_ROWS + row] as i32,
         row * TILE_LINES * ROW_BYTES + col * 2,
     )
 }

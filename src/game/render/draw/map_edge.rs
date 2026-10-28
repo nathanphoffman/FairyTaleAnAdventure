@@ -51,7 +51,7 @@ pub fn repair_edges(game: &mut Game, dif_x: i16, dif_y: i16) {
         - (game.world.map_y & TILE_Y_MASK) as i32) as i16;
 
     if rand4(&mut game.rng) == 0 {
-        game.witch.direction = if game.side_1 > 0 { 1 } else { -1 };
+        game.witch.direction = if game.witch.side_1 > 0 { 1 } else { -1 };
     }
 
     game.witch.angle = game.witch.angle.wrapping_add(game.witch.direction as u8);
@@ -61,8 +61,8 @@ pub fn repair_edges(game: &mut Game, dif_x: i16, dif_y: i16) {
     if game.witch.on_screen != 0 {
         witch_fx(game, game.screen.drawing);
 
-        if game.side_1 > 0
-            && game.side_2 < 0
+        if game.witch.side_1 > 0
+            && game.witch.side_2 < 0
             && actor_distance(game, WITCH_SLOT as i32, 0) < WITCH_REACH
         {
             let facing = game.actors.list[witch.slot()].facing as i32;

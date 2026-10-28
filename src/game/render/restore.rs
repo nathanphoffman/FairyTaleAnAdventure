@@ -11,8 +11,8 @@ pub fn undo_sprites(game: &mut Game) {
     game.screen.draw_target = game.screen.drawing_bitmap_id();
 
     for i in (1..=game.screen.drawing_page().obcount as usize).rev() {
-        game.current_sshape = game.screen.drawing_page().shape_queue[i - 1];
-        restore_background(game, game.current_sshape.backsave);
+        game.blitter.sshape = game.screen.drawing_page().shape_queue[i - 1];
+        restore_background(game, game.blitter.sshape.backsave);
     }
 
     game.screen.port_mut(PortId::Map).target = Some(game.screen.drawing_bitmap_id());

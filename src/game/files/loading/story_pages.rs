@@ -14,10 +14,10 @@ const ALL_PLANES: u32 = 0x1f;
 /// reset it on every poll without a key).
 pub fn intro_skipped(game: &mut Game) -> i32 {
     if next_key() == b' ' as i32 {
-        game.intro_skip_requested = 1;
+        game.ui.intro_skip_requested = 1;
     }
 
-    game.intro_skip_requested as i32
+    game.ui.intro_skip_requested as i32
 }
 
 const SCREEN_WIDTH: i32 = 320;
@@ -33,7 +33,7 @@ const PAGE_DELAY: i32 = 350;
 /// Shows two pictures on the story page, then turns it over.
 /// The new pictures are drawn onto `pageb` while `pagea` keeps the old page for the turn.
 pub fn show_story_page(game: &mut Game, br1: &str, br2: &str, x: i16, y: i16) {
-    if game.intro_skip_requested != 0 {
+    if game.ui.intro_skip_requested != 0 {
         return;
     }
 

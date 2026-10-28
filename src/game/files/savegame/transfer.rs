@@ -149,7 +149,7 @@ fn transfer_variables(game: &mut Game, t: &mut Transfer) {
     t.u16(&mut game.hero.hunger);
     t.u16(&mut game.hero.fatigue);
     t.u16(&mut game.hero.brother);
-    t.u16(&mut game.princesses_rescued);
+    t.u16(&mut game.hero.princesses_rescued);
     t.u16(&mut game.hero.sector);
     t.u16(&mut game.hero.place);
     t.u16(&mut game.world.day_clock);
@@ -164,9 +164,9 @@ fn transfer_variables(game: &mut Game, t: &mut Transfer) {
     t.u16(&mut game.world.freeze_timer);
     t.u16(&mut game.ui.current_menu);
     t.u16(&mut game.encounter.kind);
-    t.u16(&mut game.save_padding_1);
-    t.u16(&mut game.save_padding_2);
-    t.u16(&mut game.save_padding_3);
+    t.u16(&mut game.save_padding[0]);
+    t.u16(&mut game.save_padding[1]);
+    t.u16(&mut game.save_padding[2]);
 }
 
 /// Saves or loads one actor.
@@ -257,15 +257,17 @@ pub fn transfer_all(game: &mut Game, t: &mut Transfer) {
         transfer_object(t, object);
     }
 
-    for count in game.mapobs.iter_mut().take(OBJECT_REGIONS) {
+    for count in game.objects.used.iter_mut().take(OBJECT_REGIONS) {
         t.u16(count);
     }
 
-    for count in game.dstobs.iter_mut().take(OBJECT_REGIONS) {
+    for count in game.objects.distributed.iter_mut().take(OBJECT_REGIONS) {
         t.u16(count);
     }
 
-    for (i, &count) in game.mapobs.iter().enumerate().take(OBJECT_REGIONS) {
+    for i in 0..OBJECT_REGIONS {
+        let count = game.objects.used[i];
+
         for object in game.objects.region(i).iter_mut().take(count as usize) {
             transfer_object(t, object);
         }

@@ -1,7 +1,7 @@
 //! The game's main state, gathered into a few structs instead of loose variables.
 //!
-//! Each struct has one `static mut` instance (`the_hero`, `the_world`, ...).
-//! They start out zero apart from the few values listed below.
+//! `Game` holds all of them (`game.hero`, `game.world`, ...). They start out zero apart from the few
+//! values set in `Game::new`.
 use crate::game::data::object_tables::{ObjectLists, initial_page_colors};
 use crate::game::data::random::Rng;
 use crate::game::data::tables::{initial_extents, initial_menus};
@@ -52,6 +52,7 @@ pub struct Hero {
     pub safe_x: u16,
     pub safe_y: u16,
     pub good_fairy_timer: u8,
+    pub princesses_rescued: i16,
 }
 
 impl Default for Hero {
@@ -78,6 +79,7 @@ impl Default for Hero {
             safe_x: 0,
             safe_y: 0,
             good_fairy_timer: 0,
+            princesses_rescued: 0,
         }
     }
 }
@@ -127,6 +129,8 @@ pub struct World {
     pub sector_y: i32,
     /// How many frames the hero has stood on a bed.
     pub bed_wait: i16,
+    /// Set when the hero walks into a locked door.
+    pub bumped_locked_door: i8,
 }
 
 /// The monster encounter being set up and how dangerous the place is.
@@ -166,6 +170,13 @@ pub struct Actors {
     pub battle_flag: i8,
     pub frustration: i8,
     pub fiery_death: i8,
+    /// Where the actor being moved would be after this step.
+    pub test_x: u16,
+    pub test_y: u16,
+    /// The first free actor slot while the object lists are being turned into actors.
+    pub free_slot: i16,
+    /// The slot of the turtle's eggs on the actor list (0 if there are none).
+    pub turtle_eggs: i8,
 }
 
 /// A way to name one actor of `Game::actors.list` by its number, so that code can hold on to "that
@@ -216,6 +227,10 @@ pub struct Memory {
     /// Where the next sprite sheet loads in `shape`.
     pub nextshape: usize,
     pub seq_list: [SeqInfo; SPRITE_SHEETS],
+    /// Which disk blocks are loaded now (image banks, terrain, sectors, region, characters).
+    pub loaded_blocks: Need,
+    /// The overview map of the world sectors (see `world::regions`).
+    pub minimap: [i16; 120],
 }
 
 /// Where the region map starts in `Memory::sector`.
@@ -233,6 +248,15 @@ impl Memory {
             mask_buffer: 0,
             nextshape: 0,
             seq_list: [const { SeqInfo::EMPTY }; SPRITE_SHEETS],
+            loaded_blocks: Need {
+                image: [0, 0, 0, 0],
+                terra1: 1,
+                terra2: 2,
+                sector: 0,
+                region: 0,
+                setchar: 0,
+            },
+            minimap: [0; 120],
         }
     }
 
@@ -279,6 +303,42 @@ pub struct Ui {
     /// The file menu is for saving (else for loading).
     pub saving: bool,
     pub slot_entries: [i8; MENU_SLOTS],
+    pub print_queue: PrintQueue,
+    pub intro_skip_requested: i8,
+    /// The direction lit on the compass (9 when none).
+    pub compass_lit_direction: i16,
+}
+
+/// The sprite blitter's work values for the sprite being drawn.
+pub struct Blitter {
+    pub sshape: SShape,
+    pub shadow_mask_offset: i16,
+    pub sprite_mask_offset: i16,
+    pub sprite_mask_modulo: i16,
+    pub sprite_x_shift: i16,
+    pub last_word_mask: i16,
+}
+
+impl Blitter {
+    pub fn new() -> Blitter {
+        Blitter {
+            sshape: SShape::new(),
+            shadow_mask_offset: 0,
+            sprite_mask_offset: 0,
+            sprite_mask_modulo: 0,
+            sprite_x_shift: 0,
+            last_word_mask: 0,
+        }
+    }
+}
+
+/// The text printing queue: requests wait here until the screen code takes them.
+#[derive(Default)]
+pub struct PrintQueue {
+    pub items: [i8; 32],
+    /// Where the next request is added, and where the next one is taken from.
+    pub write: i16,
+    pub read: i16,
 }
 
 /// The witch and her spinning beam.
@@ -286,50 +346,25 @@ pub struct Witch {
     pub direction: i8,
     pub on_screen: i8,
     pub angle: u8,
+    /// Which side of the beam's two edges the hero is on (see `render::witch::side`).
+    pub side_1: i16,
+    pub side_2: i16,
 }
 
 /// Everything that changes while the game runs, in one value that is passed down from `run_game`.
-/// The pieces move in from the `static mut` variables one at a time; what is still a static is
-/// listed in modern_engine_plan.md.
 pub struct Game {
     pub witch: Witch,
     pub ui: Ui,
     pub encounter: Encounters,
     pub memory: Memory,
     pub screen: Screen,
-    pub compass_lit_direction: i16,
+    pub blitter: Blitter,
+    pub save_padding: [u16; 3],
     pub rng: Rng,
     pub extents: [Extent; 23],
     pub menus: [Menu; 10],
     pub page_colors: [u16; 32],
     pub objects: ObjectLists,
-    pub loaded_blocks: Need,
-    pub dstobs: [i16; 10],
-    pub mapobs: [i16; 10],
-    pub minimap: [i16; 120],
-    pub pplay: i16,
-    pub prec: i16,
-    pub print_que: [i8; 32],
-    pub j1: i16,
-    pub intro_skip_requested: i8,
-    pub bumped_locked_door: i8,
-    pub ytest: u16,
-    pub xtest: u16,
-    pub side_flag_2: i16,
-    pub side_flag_1: i16,
-    pub side_2: i16,
-    pub side_1: i16,
-    pub turtle_eggs: i8,
-    pub last_word_mask: i16,
-    pub current_sshape: SShape,
-    pub sprite_x_shift: i16,
-    pub princesses_rescued: i16,
-    pub save_padding_3: u16,
-    pub save_padding_2: u16,
-    pub save_padding_1: u16,
-    pub sprite_mask_offset: i16,
-    pub sprite_mask_modulo: i16,
-    pub shadow_mask_offset: i16,
     pub actors: Actors,
     pub world: World,
     pub hero: Hero,
@@ -342,50 +377,22 @@ impl Game {
                 direction: 0,
                 on_screen: 0,
                 angle: 0,
+                side_1: 0,
+                side_2: 0,
             },
-            ui: Default::default(),
+            ui: Ui {
+                compass_lit_direction: 9,
+                ..Default::default()
+            },
             encounter: Default::default(),
             screen: Screen::new(),
-            compass_lit_direction: 9,
+            blitter: Blitter::new(),
+            save_padding: [0; 3],
             rng: Rng::new(),
             extents: initial_extents,
             menus: initial_menus,
             page_colors: initial_page_colors,
             objects: ObjectLists::new(),
-            loaded_blocks: Need {
-                image: [0, 0, 0, 0],
-                terra1: 1,
-                terra2: 2,
-                sector: 0,
-                region: 0,
-                setchar: 0,
-            },
-            dstobs: [0, 0, 0, 0, 0, 0, 0, 0, 1, 1],
-            mapobs: [3, 1, 5, 12, 3, 5, 1, 1, 61 + 16, 9],
-            minimap: [0; 120],
-            pplay: 0,
-            prec: 0,
-            print_que: [0; 32],
-            j1: 0,
-            intro_skip_requested: 0,
-            bumped_locked_door: 0,
-            ytest: 0,
-            xtest: 0,
-            side_flag_2: 0,
-            side_flag_1: 0,
-            side_2: 0,
-            side_1: 0,
-            turtle_eggs: 0,
-            last_word_mask: Default::default(),
-            current_sshape: SShape::new(),
-            sprite_x_shift: Default::default(),
-            princesses_rescued: Default::default(),
-            save_padding_3: Default::default(),
-            save_padding_2: Default::default(),
-            save_padding_1: Default::default(),
-            sprite_mask_offset: Default::default(),
-            sprite_mask_modulo: Default::default(),
-            shadow_mask_offset: Default::default(),
             actors: Default::default(),
             world: World {
                 region: 3,

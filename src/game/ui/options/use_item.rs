@@ -72,7 +72,7 @@ pub(super) fn use_option(game: &mut Game, chosen_entry: i16) -> bool {
 /// Tries a key on every door and chest around the hero.
 pub(super) fn keys_option(game: &mut Game, chosen_entry: i16) -> bool {
     let key = (chosen_entry - FIRST_MENU_ENTRY) as usize;
-    game.bumped_locked_door = 0;
+    game.world.bumped_locked_door = 0;
 
     if game.hero.stuff()[key + KEYBASE] != 0 {
         let mut direction = 0;

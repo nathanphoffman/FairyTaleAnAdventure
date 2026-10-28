@@ -43,7 +43,7 @@ pub(super) fn choose_tactic(
         race: game.actors.list[actor.slot()].race,
         weapon: game.actors.list[actor.slot()].weapon,
         vitality: game.actors.list[actor.slot()].vitality,
-        eggs_to_guard: game.turtle_eggs != 0,
+        eggs_to_guard: game.actors.turtle_eggs != 0,
     };
 
     pick_tactic(&facts, mode, xd, yd, || rand2(&mut game.rng) != 0)

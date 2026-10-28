@@ -37,7 +37,7 @@ const SPRITE_REQUEST: i16 = 8;
 ///
 /// Entry 12 (snake and salamander) uses the same block as entry 0, which looks like a leftover
 /// placeholder in the original; it is copied as it was.
-pub static sprite_files: [CFileInfo; 18] = [
+pub static SPRITE_FILES: [CFileInfo; 18] = [
     cfile(1, 32, 67, 42, PHIL, 1376),     // julian
     cfile(1, 32, 67, 42, PHIL, 1418),     // phillip
     cfile(1, 32, 67, 42, PHIL, 1460),     // kevin
@@ -58,7 +58,7 @@ pub static sprite_files: [CFileInfo; 18] = [
     cfile(1, 32, 8, 5, SETFIG, 951),      // ranger/begger
 ];
 
-// Indexes into `sprite_files` that are always loaded together at the start.
+// Indexes into `SPRITE_FILES` that are always loaded together at the start.
 const OBJECTS_FILE: i32 = 3;
 const RAFT_FILE: i32 = 4;
 
@@ -76,7 +76,7 @@ pub fn load_start_sprites(game: &mut Game) {
     load_sprite_file(game, game.actors.loaded_actor_file as i32);
     finish_sprite_load(
         game,
-        sprite_files[game.actors.loaded_actor_file as usize].seq_num as i16,
+        SPRITE_FILES[game.actors.loaded_actor_file as usize].seq_num as i16,
     );
     load_sprite_file(game, game.actors.loaded_setfig_file as i32);
     finish_sprite_load(game, SETFIG as i16);
@@ -95,7 +95,7 @@ pub(super) fn sequence(game: &mut Game, slot: u8) -> &mut SeqInfo {
 /// Each sequence is stored as 5 planes of `size` bytes followed by a one-plane mask (`size` bytes).
 /// The check makes sure that all of it, with room to spare, fits in the scratch area.
 pub fn load_sprite_file(game: &mut Game, num: i32) {
-    let file = &sprite_files[num as usize];
+    let file = &SPRITE_FILES[num as usize];
     let next = game.memory.nextshape;
     let slot = sequence(game, file.seq_num);
     slot.bytes = file.height as i16 * file.width as i16 * 2;
@@ -154,7 +154,7 @@ mod tests {
     #[test]
     fn sprite_table_matches_the_c_struct() {
         assert_eq!(size_of::<CFileInfo>(), 8);
-        assert_eq!(sprite_files.len(), 18);
-        assert_eq!(sprite_files[16].file_id, 946); // witch
+        assert_eq!(SPRITE_FILES.len(), 18);
+        assert_eq!(SPRITE_FILES[16].file_id, 946); // witch
     }
 }

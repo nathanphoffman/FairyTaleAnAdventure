@@ -47,7 +47,7 @@ pub fn rescue_princess(game: &mut Game) {
     map_message(game);
     let current = game.screen.current_port;
     game.screen.set_font_kind(current, FontKind::Story);
-    let line = game.princesses_rescued as i32 * RESCUE_PLACARDS_EACH;
+    let line = game.hero.princesses_rescued as i32 * RESCUE_PLACARDS_EACH;
     placard_text(game, RESCUE_PLACARD_BASE + line);
     name(game);
     placard_text(game, RESCUE_PLACARD_BASE + 1 + line);
@@ -66,7 +66,7 @@ pub fn rescue_princess(game: &mut Game) {
     delay(game, RESCUE_PAUSE);
     message_off(game);
 
-    game.princesses_rescued += 1;
+    game.hero.princesses_rescued += 1;
     transfer_hero(game, PRINCESS_HOME.0, PRINCESS_HOME.1, 0); // do princess transfer
     center_extent_on(game, 0, PRINCESS_EXTENT.0, PRINCESS_EXTENT.1);
     game.objects.region(INSIDE_OBJECTS)[PRINCESS_OBJECT].ob_id = PRINCESS_OBJECT_ID;

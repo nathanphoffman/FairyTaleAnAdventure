@@ -1,14 +1,9 @@
 //! The tables for what lies where and how things are drawn (from the end of csrc/fmain2.c): item
 //! ids, the objects in each region, colours, the witch's beam points, bow offsets and loot
-//! probabilities. (The tables describing kinds of things are in `tables`.) Names and element types match the C originals, because the C
-//! that is left reads many of them.
-//!
-//! The names stay as in the C source for now (the C that is left refers to them); they are
-//! renamed in the cleanup pass after the port.
+//! probabilities. (The tables describing kinds of things are in `tables`.) The names stay as in the
+//! C source so the two can be compared.
 
-// The names stay as in the C source for now (the C that is left refers to them); they are
-// renamed in the cleanup pass after the port.
-#![allow(non_upper_case_globals, dead_code)]
+#![allow(non_upper_case_globals)]
 
 use crate::game::data::types::WorldObject;
 
@@ -32,7 +27,6 @@ pub const FOOTSTOOL: u8 = 31;
 pub const TURTLE: u8 = 102;
 pub const BLUE_KEY: u8 = 114;
 pub const M_WAND: u8 = 145;
-pub const MEAL: u8 = 146;
 pub const ROSE: u8 = 147;
 pub const FRUIT: u8 = 148;
 pub const STATUE: u8 = 149;
@@ -436,6 +430,9 @@ pub static initial_ob_list9: [WorldObject; 9] = [
 pub struct ObjectLists {
     pub region: [Vec<WorldObject>; 10],
     pub global: Vec<WorldObject>,
+    /// How many objects each region's list uses, and whether random treasure has been scattered there.
+    pub used: [i16; 10],
+    pub distributed: [i16; 10],
 }
 
 /// One of the object lists: the global one or the list of a region.
@@ -470,6 +467,8 @@ impl ObjectLists {
                 initial_ob_list9.to_vec(),
             ],
             global: initial_ob_listg.to_vec(),
+            used: [3, 1, 5, 12, 3, 5, 1, 1, 61 + 16, 9],
+            distributed: [0, 0, 0, 0, 0, 0, 0, 0, 1, 1],
         }
     }
 
@@ -497,7 +496,7 @@ mod tests {
         let game = &mut Game::new();
         let capacity = [13, 11, 15, 22, 13, 15, 11, 11, 78, 9];
         for (region, room) in capacity.iter().enumerate() {
-            assert!(game.mapobs[region] <= *room, "region {region}");
+            assert!(game.objects.used[region] <= *room, "region {region}");
         }
     }
 
@@ -507,7 +506,7 @@ mod tests {
         // regions not yet distributed (dstobs 0) get 10 new objects when first visited
         let capacity = [13, 11, 15, 22, 13, 15, 11, 11];
         for (region, room) in capacity.iter().enumerate() {
-            assert!(game.mapobs[region] + 10 <= *room, "region {region}");
+            assert!(game.objects.used[region] + 10 <= *room, "region {region}");
         }
     }
 

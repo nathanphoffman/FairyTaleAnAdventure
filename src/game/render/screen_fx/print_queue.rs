@@ -35,16 +35,16 @@ const WEALTH_X: i32 = 321;
 /// Requests: 2 and 3 debug information, 4 the vitality figure, 5 the menu, 7 the stats line
 /// (bravery, luck, kindness, wealth), 10 "Take What?".
 pub fn handle_print_request(game: &mut Game) {
-    if game.prec == game.pplay {
+    if game.ui.print_queue.write == game.ui.print_queue.read {
         delay(game, 1);
 
         return;
     }
 
-    let request = game.print_que[game.pplay as usize] as i32;
+    let request = game.ui.print_queue.items[game.ui.print_queue.read as usize] as i32;
 
     // Masks with QUEUE_MASK, keeping only the bits that matter here.
-    game.pplay = (game.pplay + 1) & QUEUE_MASK;
+    game.ui.print_queue.read = (game.ui.print_queue.read + 1) & QUEUE_MASK;
 
     match request {
         REQUEST_DEBUG_COORDS => show_debug_coords(game),

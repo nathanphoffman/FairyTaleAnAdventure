@@ -198,7 +198,7 @@ pub fn report_battle_result(game: &mut Game) {
     }
 
     // check for presence of turtle eggs
-    if game.turtle_eggs != 0 {
+    if game.actors.turtle_eggs != 0 {
         summon_turtle(game);
     }
 }

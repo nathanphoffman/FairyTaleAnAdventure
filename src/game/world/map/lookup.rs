@@ -197,7 +197,8 @@ pub fn fill_minimap(game: &mut Game, tile_x: i32, tile_y: i32) {
 
         for j in 0..SCREEN_ROWS as i32 {
             // Masks with TILE_ROW_WRAP, keeping only the bits that matter here.
-            game.minimap[next] = tile_number(game, x, (tile_y + j) as u16 & TILE_ROW_WRAP) as i16;
+            game.memory.minimap[next] =
+                tile_number(game, x, (tile_y + j) as u16 & TILE_ROW_WRAP) as i16;
             next += 1;
         }
 

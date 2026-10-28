@@ -109,7 +109,7 @@ pub fn open_door_near(game: &mut Game, x: u16, y: u16, keytype: u32) -> i32 {
     let sector_id = tile(game, x, y);
 
     // Shifts by MAP_SET_SHIFT, converting between pixels, tiles, sectors or bytes.
-    let map_id = game.loaded_blocks.image[(sector_id >> MAP_SET_SHIFT) as usize];
+    let map_id = game.memory.loaded_blocks.image[(sector_id >> MAP_SET_SHIFT) as usize];
 
     if let Some(open) = find_open(sector_id, map_id, keytype) {
         swap_in_open_door_tiles(game, open, x, y);
@@ -120,11 +120,11 @@ pub fn open_door_near(game: &mut Game, x: u16, y: u16, keytype: u32) -> i32 {
         return 1;
     }
 
-    if game.bumped_locked_door == 0 && keytype == 0 {
+    if game.world.bumped_locked_door == 0 && keytype == 0 {
         print(game, "It's locked.");
     }
 
-    game.bumped_locked_door = 1;
+    game.world.bumped_locked_door = 1;
 
     0
 }

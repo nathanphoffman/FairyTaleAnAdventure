@@ -68,8 +68,8 @@ pub(super) fn fighting_state(game: &mut Game, state: i8) -> i8 {
         return state;
     }
 
-    if game.compass_lit_direction < NOT_WALKING {
-        game.actors.list[hero.slot()].facing = game.compass_lit_direction as i8;
+    if game.ui.compass_lit_direction < NOT_WALKING {
+        game.actors.list[hero.slot()].facing = game.ui.compass_lit_direction as i8;
     }
 
     if state >= WALKING {
@@ -144,20 +144,20 @@ pub(super) fn fighting_state_for(state: i8, weapon: i8) -> i8 {
 
 /// No fight button: walk the way the controls point (stumbling when starving), or stand still.
 pub(super) fn walking_state(game: &mut Game, state: i8) -> i8 {
-    if game.compass_lit_direction >= NOT_WALKING {
+    if game.ui.compass_lit_direction >= NOT_WALKING {
         return STILL;
     }
 
     let rng = std::cell::RefCell::new(&mut game.rng);
-    game.compass_lit_direction = stumble(
-        game.compass_lit_direction,
+    game.ui.compass_lit_direction = stumble(
+        game.ui.compass_lit_direction,
         game.hero.hunger,
         || rand4(&mut rng.borrow_mut()) == 0,
         // Masks off the low bits (a cheap remainder or a flag test).
         || fta_rand(&mut rng.borrow_mut()) & 1 != 0,
     );
 
-    game.actors.list[0].facing = game.compass_lit_direction as i8;
+    game.actors.list[0].facing = game.ui.compass_lit_direction as i8;
 
     // Masks with LEFT_BUTTON, keeping only the bits that matter here.
     if mouse_buttons() & LEFT_BUTTON != 0 || game.ui.held_direction != 0 {

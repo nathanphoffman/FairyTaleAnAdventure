@@ -1,8 +1,8 @@
 //! The tables that describe the game's kinds of things (from the top of csrc/fmain.c): the people,
 //! monsters, doors, animation frames, items, menus and map regions. (What lies where in each region,
-//! the colours and the loot odds are in `object_tables`.) They are `static mut` because some of them are
-//! changed while the game runs (`extent_list`, the menu `enabled` flags, ...). Each keeps the C name
-//! and layout, since the rest of the game finds them by that name.
+//! the colours and the loot odds are in `object_tables`.) These are the tables as the game starts; the
+//! ones that change while it runs (`initial_extents`, `initial_menus`) are copied into `Game`. Each
+//! keeps the C name so the two can be compared.
 #![allow(non_upper_case_globals)]
 
 use crate::game::actors::encounters::Encounter;

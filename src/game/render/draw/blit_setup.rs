@@ -80,15 +80,15 @@ pub(super) fn clip_to_screen(sprite: &mut Sprite) -> Clip {
 pub(super) fn assign_background_save(game: &mut Game, frame: &mut Frame) -> bool {
     let page = game.screen.drawing_page_mut();
 
-    if game.current_sshape.savesize < SMALL_SAVE && frame.crack < SPARE_SAVES {
-        game.current_sshape.backsave = Loc::new(Area::Plane(frame.crack), SPARE_PLANE_OFFSET);
+    if game.blitter.sshape.savesize < SMALL_SAVE && frame.crack < SPARE_SAVES {
+        game.blitter.sshape.backsave = Loc::new(Area::Plane(frame.crack), SPARE_PLANE_OFFSET);
         frame.crack += 1;
 
         return true;
     }
 
-    game.current_sshape.backsave = frame.backalloc;
-    let bytes = PLANES * game.current_sshape.savesize as i32;
+    game.blitter.sshape.backsave = frame.backalloc;
+    let bytes = PLANES * game.blitter.sshape.savesize as i32;
     frame.backalloc = frame.backalloc.add(bytes as isize);
     page.saveused += bytes;
 
@@ -112,12 +112,12 @@ pub(super) fn set_up_blit(
     // The sheet is looked up again: a sunk actor is drawn from the objects sheet, but is as wide
     // and high as its own.
     let seq = *sprite_sheet(game, sprite.atype);
-    game.current_sshape = SShape::new();
+    game.blitter.sshape = SShape::new();
     game.screen.planesize = seq.bytes;
-    game.current_sshape.savesize = (blitwide as i32 * blithigh as i32 * WORD_BYTES) as i16;
+    game.blitter.sshape.savesize = (blitwide as i32 * blithigh as i32 * WORD_BYTES) as i16;
 
     // Blitter size word: height in the high bits, width in words in the low 6 bits.
-    game.current_sshape.blitsize =
+    game.blitter.sshape.blitsize =
         // Shifts by BLIT_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
         (((blithigh as i32) << BLIT_HEIGHT_SHIFT) + blitwide as i32) as i16;
 
@@ -149,29 +149,29 @@ fn set_blitter_registers(
     xbw: i8,
     blitwide: i8,
 ) {
-    game.shadow_mask_offset =
+    game.blitter.shadow_mask_offset =
         // Masks with SHADOW_LINES_MASK, keeping only the bits that matter here.
         ((clip.ystart & SHADOW_LINES_MASK) as i32 * blitwide as i32 * WORD_BYTES) as i16;
 
     // Where the visible part starts in the mask: whole words (2 bytes per 16 pixels) in, and whole rows down.
-    game.sprite_mask_offset = ((clip.xoff >> WORD_PIXELS_SHIFT) as i32 * WORD_BYTES
+    game.blitter.sprite_mask_offset = ((clip.xoff >> WORD_PIXELS_SHIFT) as i32 * WORD_BYTES
         + cwide as i32 * clip.yoff as i32) as i16;
-    game.current_sshape.coff =
+    game.blitter.sshape.coff =
         (xbw as i32 * WORD_BYTES + clip.ystart as i32 * PAGE_ROW_BYTES) as i16;
 
     // Masks with WORD_PIXELS_MASK, keeping only the bits that matter here.
-    game.sprite_x_shift = sprite.xstart & WORD_PIXELS_MASK;
+    game.blitter.sprite_x_shift = sprite.xstart & WORD_PIXELS_MASK;
 
     // Masks with WORD_PIXELS_MASK, keeping only the bits that matter here.
     if clip.xoff & WORD_PIXELS_MASK as i8 != 0 {
-        game.current_sshape.coff -= WORD_BYTES as i16;
-        game.last_word_mask = 0;
+        game.blitter.sshape.coff -= WORD_BYTES as i16;
+        game.blitter.last_word_mask = 0;
     } else {
-        game.last_word_mask = -1;
+        game.blitter.last_word_mask = -1;
     }
 
-    game.sprite_mask_modulo = (cwide as i32 - blitwide as i32 * WORD_BYTES) as i16;
-    game.current_sshape.cmod = (PAGE_ROW_BYTES - blitwide as i32 * WORD_BYTES) as i16;
+    game.blitter.sprite_mask_modulo = (cwide as i32 - blitwide as i32 * WORD_BYTES) as i16;
+    game.blitter.sshape.cmod = (PAGE_ROW_BYTES - blitwide as i32 * WORD_BYTES) as i16;
 }
 
 #[cfg(test)]

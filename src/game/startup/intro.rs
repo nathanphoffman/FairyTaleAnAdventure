@@ -240,7 +240,7 @@ fn play_intro(game: &mut Game) {
             show_story_page(game, first, second, first_wait, second_wait);
         }
 
-        if { game.intro_skip_requested } == 0 {
+        if { game.ui.intro_skip_requested } == 0 {
             delay(game, INTRO_PAGES_WAIT);
         }
     }
