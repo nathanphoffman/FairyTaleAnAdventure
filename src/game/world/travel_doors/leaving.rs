@@ -2,6 +2,7 @@
 
 use super::entering::door_at;
 use super::{CAVE, DOORCOUNT, LOWER_HALF_BIT, TILE_COLUMN_MASK, TILE_WIDTH};
+use crate::game::data::state::Game;
 use crate::game::data::state::the_hero;
 use crate::game::data::types::Door;
 use crate::game::world::places::{find_place, transfer_hero};
@@ -56,7 +57,7 @@ fn may_leave(d: &Door, hero_x: u16, hero_y: u16) -> bool {
 
 /// Indoors: if the hero stands at the inside entrance of a door and is lined up with it, he is moved
 /// to the outside.
-pub(super) unsafe fn leave_door(xtest: u16, ytest: u16) {
+pub(super) unsafe fn leave_door(game: &mut Game, xtest: u16, ytest: u16) {
     unsafe {
         for j in 0..DOORCOUNT {
             let d = door_at(j);
@@ -64,8 +65,8 @@ pub(super) unsafe fn leave_door(xtest: u16, ytest: u16) {
             if is_exit_here(d, xtest, ytest) {
                 if may_leave(d, the_hero.x, the_hero.y) {
                     let (x, y) = outside_spot(d);
-                    transfer_hero(x, y, 1);
-                    find_place(0);
+                    transfer_hero(game, x, y, 1);
+                    find_place(game, 0);
                 }
 
                 break;

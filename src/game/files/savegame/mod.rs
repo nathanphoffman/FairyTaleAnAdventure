@@ -6,6 +6,7 @@
 mod transfer;
 
 use self::transfer::{Transfer, transfer_all};
+use crate::game::data::state::Game;
 use crate::game::data::state::{the_actors, the_encounter, the_screen};
 use crate::game::files::loading::load_start_sprites;
 use crate::game::render::screen::{FontKind, screen};
@@ -25,7 +26,7 @@ const PRINT_VITALITY: i32 = 4;
 const PRINT_STATS: i32 = 7;
 
 /// Saves the game into slot `slot` (0 = A ...) when `saving`, or loads it from there.
-pub fn savegame(slot: i16, saving: bool) {
+pub fn savegame(game: &mut Game, slot: i16, saving: bool) {
     set_current_font(FontKind::Panel);
 
     let name = format!(
@@ -34,11 +35,11 @@ pub fn savegame(slot: i16, saving: bool) {
     );
 
     if saving {
-        if write_game(&name).is_err() {
+        if write_game(game, &name).is_err() {
             print("ERROR: Couldn't save game.");
         }
     } else {
-        if read_game(&name).is_err() {
+        if read_game(game, &name).is_err() {
             print("ERROR: Couldn't load game.");
         }
 
@@ -49,9 +50,9 @@ pub fn savegame(slot: i16, saving: bool) {
 }
 
 /// Writes the game to the save file `name`.
-fn write_game(name: &str) -> std::io::Result<()> {
+fn write_game(game: &mut Game, name: &str) -> std::io::Result<()> {
     let mut transfer = Transfer::saving();
-    transfer_all(&mut transfer);
+    transfer_all(game, &mut transfer);
 
     let path = resolve(name, true).ok_or(std::io::ErrorKind::NotFound)?;
 
@@ -59,10 +60,10 @@ fn write_game(name: &str) -> std::io::Result<()> {
 }
 
 /// Reads the game from the save file `name`.
-fn read_game(name: &str) -> std::io::Result<()> {
+fn read_game(game: &mut Game, name: &str) -> std::io::Result<()> {
     let path = resolve(name, false).ok_or(std::io::ErrorKind::NotFound)?;
     let mut transfer = Transfer::loading(std::fs::read(path)?);
-    transfer_all(&mut transfer);
+    transfer_all(game, &mut transfer);
 
     Ok(())
 }

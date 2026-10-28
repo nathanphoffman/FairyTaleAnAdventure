@@ -299,8 +299,6 @@ pub struct Ui {
     pub slot_entries: [i8; MENU_SLOTS],
 }
 
-pub static mut the_ui: Ui = unsafe { std::mem::zeroed() };
-
 /// The witch and her spinning beam.
 pub struct Witch {
     pub direction: i8,
@@ -313,10 +311,18 @@ pub struct Witch {
 /// listed in modern_engine_plan.md.
 pub struct Game {
     pub witch: Witch,
+    pub ui: Ui,
 }
 
 impl Game {
     pub fn new() -> Game {
-        Game { witch: Witch { direction: 0, on_screen: 0, angle: 0 } }
+        Game {
+            witch: Witch {
+                direction: 0,
+                on_screen: 0,
+                angle: 0,
+            },
+            ui: unsafe { std::mem::zeroed() },
+        }
     }
 }

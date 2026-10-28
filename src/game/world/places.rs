@@ -9,10 +9,9 @@ use crate::game::actors::encounters::load_enemy_sprites;
 use crate::game::actors::encounters::{load_carrier, place_encounter};
 use crate::game::actors::interaction::{blocked_at, rescue_princess};
 use crate::game::data::object_tables::ob_list8;
+use crate::game::data::state::Game;
 use crate::game::data::state::current_extent;
-use crate::game::data::state::{
-    the_actors, the_encounter, the_hero, the_screen, the_ui, the_world,
-};
+use crate::game::data::state::{the_actors, the_encounter, the_hero, the_screen, the_world};
 
 use crate::game::data::story_text::{INSIDE_MSG, INSIDE_TBL, PLACE_MSG, PLACE_TBL};
 use crate::game::files::disk::motor_off;
@@ -88,7 +87,7 @@ const SPIDER_ENCOUNTER: u16 = 8;
 /// Moves the hero to the world position (x, y) and reloads what is needed there. With `flag`
 /// set the region is worked out from the position (like walking through a door); otherwise
 /// `new_region` must already be set. If the spot is blocked the hero is moved down until it is free.
-pub fn transfer_hero(xtest: u16, ytest: u16, flag: u16) -> i32 {
+pub fn transfer_hero(game: &mut Game, xtest: u16, ytest: u16, flag: u16) -> i32 {
     unsafe {
         the_world.map_x = the_world.map_x.wrapping_add(xtest.wrapping_sub(the_hero.x));
         the_world.map_y = the_world.map_y.wrapping_add(ytest.wrapping_sub(the_hero.y));
@@ -110,7 +109,7 @@ pub fn transfer_hero(xtest: u16, ytest: u16, flag: u16) -> i32 {
             the_world.new_region = (column + row + row) as u16;
         }
 
-        the_ui.held_direction = 0;
+        game.ui.held_direction = 0;
         load_region_now();
         refresh_minimap(); // to set region_origin_x and region_origin_y
         the_screen.view_status = VIEW_REBUILD_ALL;
@@ -152,7 +151,7 @@ unsafe fn start_forced_encounter() {
 /// extent the hero stands in, and whatever that extent starts.
 ///
 /// `flag` 0 is silent, 1 also starts monster zones, 2 only says the place name.
-pub fn find_place(flag: i16) -> i32 {
+pub fn find_place(game: &mut Game, flag: i16) -> i32 {
     unsafe {
         let mut flag = flag;
 
@@ -160,7 +159,7 @@ pub fn find_place(flag: i16) -> i32 {
             announce_place(flag);
             locate_extent();
 
-            if !enter_extent(flag) {
+            if !enter_extent(game, flag) {
                 // the princess was rescued: look again from the top, without the messages
                 flag = 0;
 
@@ -279,7 +278,7 @@ unsafe fn locate_extent() {
 /// What happens when the hero walks into a different kind of extent: the princess is rescued, a
 /// boss or the turtle eggs call up their monsters, the spider pit loads the spiders, and monster
 /// zones may send a fight. Returns false if the princess was rescued (the caller starts over).
-unsafe fn enter_extent(flag: i16) -> bool {
+unsafe fn enter_extent(game: &mut Game, flag: i16) -> bool {
     unsafe {
         if the_world.extent_type == current_extent().etype as u16 {
             return true;
@@ -289,7 +288,7 @@ unsafe fn enter_extent(flag: i16) -> bool {
         let mut force = false;
 
         if the_world.extent_type == XT_PRINCESS && ob_list8[PRINCESS_OBJECT].ob_stat != 0 {
-            rescue_princess();
+            rescue_princess(game);
 
             return false;
         } else if the_world.extent_type >= XT_SPECIAL_MIN {

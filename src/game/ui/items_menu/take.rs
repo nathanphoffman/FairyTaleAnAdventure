@@ -9,12 +9,13 @@ use super::{
     add_stuff, item_name,
 };
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Game;
 use crate::game::data::state::player;
 use crate::game::render::screen::{FontKind, screen};
 
 use crate::game::actors::interaction::{eat_food, find_nearest_figure};
 use crate::game::data::object_tables::{itrans, ob_listg};
-use crate::game::data::state::{the_actors, the_hero, the_ui, the_world};
+use crate::game::data::state::{the_actors, the_hero, the_world};
 use crate::game::render::screen_fx::{map_message, win_colors};
 use crate::game::ui::messages::{announce_container, announce_treasure, print_cont};
 use crate::game::ui::text::{queue_print, show_event};
@@ -54,7 +55,7 @@ const EVENT_FRUIT_KEPT: i32 = 36;
 const FIRST_INDOOR_REGION: u16 = 7;
 
 /// Takes the nearest object, or searches the nearest dead body.
-pub(super) unsafe fn take_nearest() {
+pub(super) unsafe fn take_nearest(game: &mut Game) {
     unsafe {
         queue_print(PRQ_VITALITY);
         find_nearest_figure(0, TAKE_RANGE);
@@ -70,7 +71,7 @@ pub(super) unsafe fn take_nearest() {
 
         if actor.kind == OBJECTS {
             if take_object() {
-                finish_pickup();
+                finish_pickup(game);
             }
         } else if actor.weapon < 0 {
             // already searched
@@ -84,7 +85,7 @@ pub(super) unsafe fn take_nearest() {
 
 /// Removes the picked-up object from the world, turns any arrows picked up into the arrow
 /// count, and ends the game if the talisman was found.
-unsafe fn finish_pickup() {
+unsafe fn finish_pickup(game: &mut Game) {
     unsafe {
         change_object(the_actors.nearest_object as i32, 2);
         add_stuff(
@@ -93,7 +94,7 @@ unsafe fn finish_pickup() {
         );
 
         if player().stuff()[TALISMAN] != 0 {
-            the_ui.quit_requested = 1;
+            game.ui.quit_requested = 1;
             screen().view_status = VIEW_GAME_OVER;
             map_message();
             let current = screen().current_port;

@@ -3,6 +3,7 @@
 use crate::game::actors::encounters::check_death;
 use crate::game::data::random::rand8;
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Game;
 use crate::game::data::state::{the_actors, the_hero, the_world};
 use crate::game::data::tables::stone_ring_sectors;
 use crate::game::data::types::Shape;
@@ -83,7 +84,7 @@ pub(super) unsafe fn show_map() {
 
 /// The stone ring spell: only works standing in the middle of a stone circle. Takes the hero to
 /// the next circle in the direction faced. Returns false if the spell did not work.
-pub(super) unsafe fn stone_jump() -> bool {
+pub(super) unsafe fn stone_jump(game: &mut Game) -> bool {
     unsafe {
         let ring_list = stone_ring_sectors;
 
@@ -98,7 +99,7 @@ pub(super) unsafe fn stone_jump() -> bool {
             StoneJump::NoRing => true,
             StoneJump::To(x, y) => {
                 flicker_colors();
-                transfer_hero(x, y, 1);
+                transfer_hero(game, x, y, 1);
 
                 if the_hero.riding != 0 {
                     the_actors.list[the_actors.carrier_slot as usize].abs_x =

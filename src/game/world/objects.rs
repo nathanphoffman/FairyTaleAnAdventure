@@ -11,11 +11,11 @@
 //! The actor's `vitality` field is borrowed to remember which list entry it came from (the entry
 //! number, plus 0x80 for the global list), so `change_object` can find the entry again later.
 
-use crate::game::data::state::Game;
 use crate::game::actors::interaction::turtle_eggs;
 use crate::game::data::object_tables::{
     CHEST, TURTLE, dstobs, glbobs, global_objects, mapobs, rand_treasure, region_objects,
 };
+use crate::game::data::state::Game;
 
 use crate::game::data::random::bitrand;
 use crate::game::data::state::{memory, the_actors, the_memory, the_world};
@@ -297,7 +297,12 @@ unsafe fn add_object(game: &mut Game, object: &mut WorldObject, index: i16, f: i
 
 /// A person close enough to the screen gets their pictures loaded (the witch also marks herself as
 /// on screen). Returns false if the person is too far away.
-unsafe fn load_person_if_near(game: &mut Game, object: &WorldObject, xstart: i16, ystart: i16) -> bool {
+unsafe fn load_person_if_near(
+    game: &mut Game,
+    object: &WorldObject,
+    xstart: i16,
+    ystart: i16,
+) -> bool {
     unsafe {
         if !(inside(xstart, PERSON_LOAD_X) && inside(ystart, PERSON_LOAD_Y)) {
             return false;

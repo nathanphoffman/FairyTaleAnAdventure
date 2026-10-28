@@ -32,7 +32,7 @@ pub fn run_game() {
             return;
         }
 
-        if start_up() {
+        if start_up(&mut game) {
             main_loop(&mut game);
             stopscore();
         }

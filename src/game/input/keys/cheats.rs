@@ -6,19 +6,20 @@ use super::{
     CHEAT_TIME_STEP, CHEAT_WEST, GOLDBASE, RAFT_STONE_SLOT, VIAL_SLOT,
 };
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Game;
 use crate::game::data::state::player;
 
 use crate::game::actors::encounters::load_carrier;
 use crate::game::actors::interaction::{center_extent_on, rescue_princess};
 use crate::game::data::random::rnd;
-use crate::game::data::state::{the_actors, the_hero, the_ui, the_world};
+use crate::game::data::state::{the_actors, the_hero, the_world};
 use crate::game::ui::menus::update_menu_availability;
 use crate::game::ui::text::queue_print;
 
 /// Debug keys that give the hero a carrier or items. Returns true if the key was one.
-pub(super) unsafe fn cheat_items(key: i8) -> bool {
+pub(super) unsafe fn cheat_items(game: &mut Game, key: i8) -> bool {
     unsafe {
-        if the_ui.cheat_enabled == 0 {
+        if game.ui.cheat_enabled == 0 {
             return false;
         }
 
@@ -55,16 +56,16 @@ const PRQ_DEBUG_COORDS: i32 = 2;
 const PRQ_DEBUG_SECTOR: i32 = 3;
 
 /// Debug keys that rescue, redraw or move the hero about. Returns true if the key was one.
-pub(super) unsafe fn cheat_move(key: i8) -> bool {
+pub(super) unsafe fn cheat_move(game: &mut Game, key: i8) -> bool {
     unsafe {
-        if the_ui.cheat_enabled == 0 {
+        if game.ui.cheat_enabled == 0 {
             return false;
         }
 
         let mut hero = ActorRef::new(0);
 
         match key {
-            CHEAT_RESCUE => rescue_princess(),
+            CHEAT_RESCUE => rescue_princess(game),
             CHEAT_PRQ_2 => queue_print(PRQ_DEBUG_COORDS),
             CHEAT_PRQ_3 => queue_print(PRQ_DEBUG_SECTOR),
             CHEAT_TIME => the_world.day_clock = the_world.day_clock.wrapping_add(CHEAT_TIME_STEP),

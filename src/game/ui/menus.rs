@@ -4,8 +4,8 @@
 //! how it is drawn: 8 is greyed out, 10 is available, and other values come from whether the hero
 //! has the matching item (`item_menu_state`).
 
+use crate::game::data::state::Game;
 use crate::game::data::state::the_hero;
-use crate::game::data::state::the_ui;
 use crate::game::data::tables::{key_colors, label1, menus};
 use crate::game::input::handler::forget_last_menu;
 use crate::game::render::screen::{PortId, screen};
@@ -97,9 +97,9 @@ const SHOWN: i8 = 2;
 
 /// Draws the current menu (`current_menu`): the entries that are switched on, in the order they are shown,
 /// and blanks over the slots that are left. `slot_entries` remembers which entry each slot is.
-pub fn print_options() {
+pub fn print_options(game: &mut Game) {
     unsafe {
-        let menu = &menus[the_ui.current_menu as usize];
+        let menu = &menus[game.ui.current_menu as usize];
         let mut slot = 0usize;
 
         for entry in 0..menu.num as usize {
@@ -110,10 +110,10 @@ pub fn print_options() {
                 continue;
             }
 
-            the_ui.slot_entries[slot] = entry as i8;
+            game.ui.slot_entries[slot] = entry as i8;
 
             // Masks off the low bits (a cheap remainder or a flag test).
-            print_menu_entry(slot as i16, (enabled & 1) as i16);
+            print_menu_entry(game, slot as i16, (enabled & 1) as i16);
             slot += 1;
 
             if slot > SLOTS - 1 {
@@ -121,43 +121,41 @@ pub fn print_options() {
             }
         }
 
-        blank_slots_from(slot);
+        blank_slots_from(game, slot);
     }
 }
 
 /// Blanks the slots from `first` to the last one: nothing is shown there.
-unsafe fn blank_slots_from(first: usize) {
-    unsafe {
-        screen().set_b_pen(PortId::Text2, 0);
+fn blank_slots_from(game: &mut Game, first: usize) {
+    screen().set_b_pen(PortId::Text2, 0);
 
-        for slot in first..SLOTS {
-            // Masks off the low bits (a cheap remainder or a flag test).
-            let x = if slot & 1 != 0 {
-                RIGHT_COLUMN_X
-            } else {
-                LEFT_COLUMN_X
-            };
+    for slot in first..SLOTS {
+        // Masks off the low bits (a cheap remainder or a flag test).
+        let x = if slot & 1 != 0 {
+            RIGHT_COLUMN_X
+        } else {
+            LEFT_COLUMN_X
+        };
 
-            let y = (slot / 2) as i32 * ROW_HEIGHT + FIRST_ROW_Y;
-            screen().move_to(PortId::Text2, x, y);
-            screen().text(PortId::Text2, &BOX[..ENTRY_WIDTH as usize]);
+        let y = (slot / 2) as i32 * ROW_HEIGHT + FIRST_ROW_Y;
+        screen().move_to(PortId::Text2, x, y);
+        screen().text(PortId::Text2, &BOX[..ENTRY_WIDTH as usize]);
 
-            the_ui.slot_entries[slot] = -1;
-        }
+        game.ui.slot_entries[slot] = -1;
     }
 }
 
 /// Switches to menu `mode` and redraws it, unless the game is paused.
-pub fn go_to_menu(mode: i16) {
+pub fn go_to_menu(game: &mut Game, mode: i16) {
     unsafe {
         // Masks with GAME, keeping only the bits that matter here.
         if menus[GAME].enabled[PAUSE_ENTRY] & 1 != 0 {
             return;
         }
 
-        the_ui.current_menu = mode;
+        game.ui.current_menu = mode;
         forget_last_menu();
-        print_options();
+        print_options(game);
     }
 }
 
@@ -182,11 +180,11 @@ const MAIN_PEN: u32 = 4;
 
 /// Draws entry slot `j` (0-11) of the current menu in the panel. `pena` is the text colour:
 /// 1 for a selected entry, 0 for a plain one. The box colour depends on the menu.
-pub fn print_menu_entry(j: i16, pena: i16) {
+pub fn print_menu_entry(game: &mut Game, j: i16, pena: i16) {
     unsafe {
-        let entry = the_ui.slot_entries[j as usize] as i32;
+        let entry = game.ui.slot_entries[j as usize] as i32;
         screen().set_a_pen(PortId::Text2, pena as u8);
-        screen().set_b_pen(PortId::Text2, entry_box_pen(entry) as u8);
+        screen().set_b_pen(PortId::Text2, entry_box_pen(game, entry) as u8);
 
         let offset = entry * LABEL_LEN;
 
@@ -198,7 +196,7 @@ pub fn print_menu_entry(j: i16, pena: i16) {
         };
 
         let y = (j as i32 / 2) * ROW_HEIGHT + FIRST_ROW_Y;
-        let label = entry_label(offset);
+        let label = entry_label(game, offset);
         let screen = screen();
         screen.move_to(PortId::Text2, x, y);
         screen.text(PortId::Text2, BOX);
@@ -209,9 +207,9 @@ pub fn print_menu_entry(j: i16, pena: i16) {
 
 /// The colour of the box behind an entry of the current menu: fixed for the use and file menus and
 /// the main names, from a table for keys and the save slots, else the menu's own.
-unsafe fn entry_box_pen(entry: i32) -> u32 {
+unsafe fn entry_box_pen(game: &mut Game, entry: i32) -> u32 {
     unsafe {
-        let menu = the_ui.current_menu as usize;
+        let menu = game.ui.current_menu as usize;
 
         if menu == USE {
             USE_PEN
@@ -231,8 +229,8 @@ unsafe fn entry_box_pen(entry: i32) -> u32 {
 
 /// The label text `offset` bytes into the current menu's labels. The main names come from `label1`;
 /// the other menus have their own list, which for the first 5 slots is skipped over.
-fn entry_label(offset: i32) -> &'static [u8] {
-    let current = unsafe { the_ui.current_menu } as usize;
+fn entry_label(game: &mut Game, offset: i32) -> &'static [u8] {
+    let current = game.ui.current_menu as usize;
     let labels = unsafe { menus[current].label_list };
 
     let (list, from) = if current >= USE {

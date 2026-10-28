@@ -1,12 +1,11 @@
 //! Keys and clicks on the menu entries: choosing an entry with the mouse or with its letter.
 
-use crate::game::data::state::Game;
 use super::{
     CODE_MASK, DISPLAYED, FIRST_ACTION_MENU, FIRST_MENU_CLICK, LETTER_COUNT, PRQ_OPTIONS, RELEASED,
     SAVEX, SELECTED, TYPE_IMMEDIATE, TYPE_MASK, TYPE_RADIO, TYPE_TOGGLE,
 };
+use crate::game::data::state::Game;
 
-use crate::game::data::state::the_ui;
 use crate::game::data::tables::{menu_entry, menu_shortcuts, menus};
 use crate::game::data::types::Letter;
 use crate::game::input::handler::forget_last_menu;
@@ -20,21 +19,21 @@ pub(super) unsafe fn menu_click(game: &mut Game, key: i8, notpause: bool) {
     unsafe {
         // Masks with CODE_MASK, keeping only the bits that matter here.
         let slot = ((key & CODE_MASK) - FIRST_MENU_CLICK) as i16;
-        the_ui.chosen_entry = the_ui.slot_entries[slot as usize];
-        let chosen_entry = the_ui.chosen_entry as i16;
-        let menu = the_ui.current_menu as usize;
+        game.ui.chosen_entry = game.ui.slot_entries[slot as usize];
+        let chosen_entry = game.ui.chosen_entry as i16;
+        let menu = game.ui.current_menu as usize;
         let valid = chosen_entry >= 0 && chosen_entry < menus[menu].num as i16;
 
         // Masks with RELEASED, keeping only the bits that matter here.
         if key & RELEASED != 0 {
             if valid {
-                print_menu_entry(slot, 0);
+                print_menu_entry(game, slot, 0);
             }
 
             return;
         }
 
-        the_ui.menu_hit_enabled = 1;
+        game.ui.menu_hit_enabled = 1;
 
         if !valid {
             return;
@@ -52,37 +51,35 @@ pub(super) unsafe fn menu_click(game: &mut Game, key: i8, notpause: bool) {
 
 /// Presses a valid menu entry according to its type: toggles, immediate actions and radio buttons
 /// work even when paused; the rest (menu names) only when not.
-unsafe fn press_entry(game: &mut Game, slot: i16, chosen_entry: i16, entry: &mut i8, notpause: bool) {
-    unsafe {
-        // Masks with TYPE_MASK, keeping only the bits that matter here.
-        let kind = *entry as i32 & TYPE_MASK;
+fn press_entry(game: &mut Game, slot: i16, chosen_entry: i16, entry: &mut i8, notpause: bool) {
+    // Masks with TYPE_MASK, keeping only the bits that matter here.
+    let kind = *entry as i32 & TYPE_MASK;
 
-        if kind != TYPE_IMMEDIATE {
-            forget_last_menu();
-        }
+    if kind != TYPE_IMMEDIATE {
+        forget_last_menu();
+    }
 
-        if kind == TYPE_TOGGLE {
-            // Xor flips the selected bit: a toggle entry goes from on to off or back.
-            *entry ^= SELECTED;
-            // Masks with SELECTED, keeping only the bits that matter here.
-            print_menu_entry(slot, (*entry & SELECTED) as i16);
-            choose_menu_entry(game, chosen_entry);
-        } else if kind == TYPE_IMMEDIATE {
-            print_menu_entry(slot, 1);
-            choose_menu_entry(game, chosen_entry);
-        } else if kind == TYPE_RADIO {
-            *entry |= SELECTED;
-            print_menu_entry(slot, 1);
-            choose_menu_entry(game, chosen_entry);
-        } else if !notpause {
-            // paused: only the menu types above work
-        } else if kind == 0 && chosen_entry < FIRST_ACTION_MENU {
-            the_ui.current_menu = chosen_entry;
-            queue_print(PRQ_OPTIONS);
-        } else {
-            // Masks with SELECTED, keeping only the bits that matter here.
-            print_menu_entry(slot, (*entry & SELECTED) as i16);
-        }
+    if kind == TYPE_TOGGLE {
+        // Xor flips the selected bit: a toggle entry goes from on to off or back.
+        *entry ^= SELECTED;
+        // Masks with SELECTED, keeping only the bits that matter here.
+        print_menu_entry(game, slot, (*entry & SELECTED) as i16);
+        choose_menu_entry(game, chosen_entry);
+    } else if kind == TYPE_IMMEDIATE {
+        print_menu_entry(game, slot, 1);
+        choose_menu_entry(game, chosen_entry);
+    } else if kind == TYPE_RADIO {
+        *entry |= SELECTED;
+        print_menu_entry(game, slot, 1);
+        choose_menu_entry(game, chosen_entry);
+    } else if !notpause {
+        // paused: only the menu types above work
+    } else if kind == 0 && chosen_entry < FIRST_ACTION_MENU {
+        game.ui.current_menu = chosen_entry;
+        queue_print(PRQ_OPTIONS);
+    } else {
+        // Masks with SELECTED, keeping only the bits that matter here.
+        print_menu_entry(game, slot, (*entry & SELECTED) as i16);
     }
 }
 
@@ -96,17 +93,17 @@ pub(super) unsafe fn menu_letter(game: &mut Game, key: i8) {
                 continue;
             }
 
-            if shortcut.menu as i16 == SAVEX && the_ui.current_menu != SAVEX {
+            if shortcut.menu as i16 == SAVEX && game.ui.current_menu != SAVEX {
                 break;
             }
 
-            the_ui.current_menu = shortcut.menu as i16;
-            the_ui.chosen_entry = shortcut.choice;
-            let entry =
-                &raw mut menus[the_ui.current_menu as usize].enabled[the_ui.chosen_entry as usize];
+            game.ui.current_menu = shortcut.menu as i16;
+            game.ui.chosen_entry = shortcut.choice;
+            let entry = &raw mut menus[game.ui.current_menu as usize].enabled
+                [game.ui.chosen_entry as usize];
 
             // Masks with DISPLAYED, keeping only the bits that matter here.
-            the_ui.menu_hit_enabled = *entry & DISPLAYED;
+            game.ui.menu_hit_enabled = *entry & DISPLAYED;
 
             // Masks with TYPE_MASK, keeping only the bits that matter here.
             if *entry as i32 & TYPE_MASK == TYPE_TOGGLE {
@@ -114,8 +111,8 @@ pub(super) unsafe fn menu_letter(game: &mut Game, key: i8) {
                 *entry ^= SELECTED;
             }
 
-            choose_menu_entry(game, the_ui.chosen_entry as i16);
-            print_options();
+            choose_menu_entry(game, game.ui.chosen_entry as i16);
+            print_options(game);
 
             break;
         }

@@ -7,6 +7,7 @@ mod leaving;
 
 use self::entering::enter_door;
 use self::leaving::leave_door;
+use crate::game::data::state::Game;
 
 use crate::game::data::state::{the_hero, the_world};
 
@@ -27,7 +28,7 @@ const TILE_WIDTH: i32 = 16;
 /// Is the hero standing at a door? Outdoors the doors are in sorted order and found by binary
 /// search; indoors they are searched in turn. If so, the hero is moved to the other side.
 /// Riding disables doors.
-pub fn check_door() {
+pub fn check_door(game: &mut Game) {
     unsafe {
         if the_hero.riding != 0 {
             return;
@@ -40,9 +41,9 @@ pub fn check_door() {
         let ytest = the_hero.y & TILE_Y_MASK;
 
         if the_world.region < FIRST_INSIDE_REGION {
-            enter_door(xtest, ytest);
+            enter_door(game, xtest, ytest);
         } else {
-            leave_door(xtest, ytest);
+            leave_door(game, xtest, ytest);
         }
     }
 }

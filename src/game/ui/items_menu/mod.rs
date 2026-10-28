@@ -14,6 +14,7 @@ mod take;
 use self::item_list::show_item_list;
 use self::look::look_around;
 use self::take::take_nearest;
+use crate::game::data::state::Game;
 use crate::game::data::state::player;
 
 use crate::game::data::tables::item_list;
@@ -59,14 +60,14 @@ pub(in crate::game::ui) fn add_stuff(slot: usize, amount: u8) {
 }
 
 /// Handles an entry of the Items menu.
-pub unsafe fn items_option(chosen_entry: i16) {
+pub unsafe fn items_option(game: &mut Game, chosen_entry: i16) {
     unsafe {
         match chosen_entry {
-            USE_ENTRY => go_to_menu(USE),
+            USE_ENTRY => go_to_menu(game, USE),
             LIST => show_item_list(),
-            TAKE => take_nearest(),
+            TAKE => take_nearest(game),
             LOOK => look_around(),
-            GIVE_ENTRY => go_to_menu(GIVE),
+            GIVE_ENTRY => go_to_menu(game, GIVE),
             _ => {}
         }
     }

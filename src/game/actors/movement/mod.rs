@@ -293,7 +293,7 @@ pub fn move_actor(game: &mut Game, i: i32, cycle: i16, jp: &mut i16) {
                 Pc::Still => c.still(),
                 Pc::DragShoot => c.drag_shoot(),
                 Pc::Cpx => c.cpx(),
-                Pc::Tail => c.tail(),
+                Pc::Tail => c.tail(game),
                 Pc::Raise => c.raise(),
                 Pc::Statc => break,
             };
@@ -369,7 +369,7 @@ impl Ctx {
 
                 Pc::Cpx
             } else if self.state == WALKING {
-                self.walking()
+                self.walking(game)
             } else if self.state == STILL as i16 {
                 Pc::Still
             } else if self.state >= SHOOT1 {

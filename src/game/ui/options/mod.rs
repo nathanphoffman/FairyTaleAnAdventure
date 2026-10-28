@@ -14,14 +14,13 @@ mod talk;
 
 mod use_item;
 
-use crate::game::data::state::Game;
 use self::game_menu::{file_option, game_option, save_exit_option};
 use self::give::give_option;
 use self::shop::buy_option;
 use self::talk::talk_option;
 use self::use_item::{keys_option, use_option};
+use crate::game::data::state::Game;
 
-use crate::game::data::state::the_ui;
 use crate::game::ui::items_menu::items_option;
 use crate::game::ui::magic::magic_option;
 use crate::game::ui::menus::update_menu_availability;
@@ -50,22 +49,22 @@ const PRQ_VITALITY: i32 = 7;
 /// Does what menu entry `chosen_entry` of the current menu `current_menu` says.
 pub fn choose_menu_entry(game: &mut Game, chosen_entry: i16) {
     unsafe {
-        let refresh = match the_ui.current_menu as i32 {
+        let refresh = match game.ui.current_menu as i32 {
             ITEMS => {
-                items_option(chosen_entry);
+                items_option(game, chosen_entry);
 
                 true
             }
 
-            MAGIC => magic_option(chosen_entry),
+            MAGIC => magic_option(game, chosen_entry),
             TALK => talk_option(chosen_entry),
             BUY => buy_option(chosen_entry),
-            GAME => game_option(chosen_entry),
+            GAME => game_option(game, chosen_entry),
             USE => use_option(game, chosen_entry),
-            SAVEX => save_exit_option(chosen_entry),
-            FILE => file_option(chosen_entry),
-            KEYS => keys_option(chosen_entry),
-            GIVE => give_option(chosen_entry),
+            SAVEX => save_exit_option(game, chosen_entry),
+            FILE => file_option(game, chosen_entry),
+            KEYS => keys_option(game, chosen_entry),
+            GIVE => give_option(game, chosen_entry),
             _ => true,
         };
 

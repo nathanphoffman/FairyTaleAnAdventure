@@ -3,6 +3,7 @@
 use super::{BONE, ITEMS, PRQ_STATS, PRQ_VITALITY};
 use crate::game::data::random::rand64;
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Game;
 use crate::game::data::state::player;
 use crate::game::data::state::{the_actors, the_hero};
 use crate::game::ui::menus::go_to_menu;
@@ -22,7 +23,7 @@ const SPECTRE_THANKS: i32 = 48;
 const SPECTRE_BONE_DROP: i16 = 140;
 
 /// Gives gold to a beggar, or the bone to the spectre.
-pub(super) unsafe fn give_option(chosen_entry: i16) -> bool {
+pub(super) unsafe fn give_option(game: &mut Game, chosen_entry: i16) -> bool {
     unsafe {
         if the_actors.nearest_person == 0 {
             return true;
@@ -56,7 +57,7 @@ pub(super) unsafe fn give_option(chosen_entry: i16) -> bool {
             }
         }
 
-        go_to_menu(ITEMS as i16);
+        go_to_menu(game, ITEMS as i16);
 
         true
     }

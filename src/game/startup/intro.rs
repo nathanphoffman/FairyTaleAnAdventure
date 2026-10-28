@@ -2,7 +2,8 @@
 //! first frame of the game.
 
 use crate::game::actors::revive::revive;
-use crate::game::data::state::{memory, the_ui};
+use crate::game::data::state::Game;
+use crate::game::data::state::memory;
 use crate::game::data::story_text::TITLE_TEXT;
 use crate::game::data::tables::{black_colors, text_colors};
 use crate::game::files::disk::load_track_range;
@@ -76,7 +77,7 @@ const PLACARD_COPYRIGHT: i32 = 19;
 const SHADOW_BLOCK: (i16, i16) = (896, 24);
 
 /// Returns false if the player failed the copy protection.
-pub(super) fn start_up() -> bool {
+pub(super) fn start_up(game: &mut Game) -> bool {
     stopscore();
     show_title_screen();
     prepare_intro();
@@ -99,7 +100,7 @@ pub(super) fn start_up() -> bool {
     }
 
     delay(PLACARD_WAIT);
-    start_first_brother();
+    start_first_brother(game);
 
     true
 }
@@ -193,7 +194,7 @@ fn show_play_screen_background() {
 }
 
 /// Starts the first brother and sets up the text page and the colours for play.
-fn start_first_brother() {
+fn start_first_brother(game: &mut Game) {
     let screen = screen();
 
     for ras in &mut screen.ras[..2] {
@@ -202,7 +203,7 @@ fn start_first_brother() {
     }
 
     stopscore();
-    revive(1);
+    revive(game, 1);
 
     let screen = crate::game::render::screen::screen();
     screen.port_mut(PortId::Map).target = Some(screen.drawing_bitmap_id());
@@ -222,8 +223,8 @@ fn start_first_brother() {
 
     screen.view_status = VIEW_REDRAW;
 
-    unsafe { the_ui.current_menu = 0 };
-    print_options();
+    game.ui.current_menu = 0;
+    print_options(game);
 }
 
 /// The story pictures with the zoom in and out (skipped if the player presses Space).

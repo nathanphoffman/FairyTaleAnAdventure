@@ -4,7 +4,8 @@
 //! needed) swaps those tiles for the "open" ones. `open_list` says, per door and per map set,
 //! which tiles to swap in and which key is needed.
 
-use crate::game::data::state::{memory, the_screen, the_ui};
+use crate::game::data::state::Game;
+use crate::game::data::state::{memory, the_screen};
 use crate::game::data::tables::loaded_blocks;
 use crate::game::ui::messages::print;
 use crate::game::world::map::{terrain_at, tile_index};
@@ -104,7 +105,7 @@ fn set_tile(x: i32, y: i32, value: u8) {
 /// without a key). Looks 4 pixels either side for the door terrain, then walks left and down to
 /// the door's top-left tile. Returns 1 if a door opened, 0 if not ("It's locked." is said the
 /// first time).
-pub fn open_door_near(x: u16, y: u16, keytype: u32) -> i32 {
+pub fn open_door_near(game: &mut Game, x: u16, y: u16, keytype: u32) -> i32 {
     unsafe {
         let Some((x, y)) = find_door_corner(x, y) else {
             return 0;
@@ -119,7 +120,7 @@ pub fn open_door_near(x: u16, y: u16, keytype: u32) -> i32 {
         if let Some(open) = find_open(sector_id, map_id, keytype) {
             swap_in_open_door_tiles(open, x, y);
             the_screen.view_status = REDRAW_MAP;
-            the_ui.held_direction = 0;
+            game.ui.held_direction = 0;
             print("It opened.");
 
             return 1;

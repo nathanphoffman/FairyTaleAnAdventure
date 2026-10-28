@@ -7,17 +7,18 @@ use super::{
     NOT_WALKING, RIGHT_BUTTON, SHOOT1, SHOOT3, SHOOTING_ZONE, SINK, SLEEP, STILL, STUMBLE_HUNGER,
     WALKING, WEAPON_BOW, WEAPON_WAND, ZONE_ARROW_FAST, ZONE_ARROW_SLOW,
 };
+use crate::game::data::state::Game;
 
 use crate::game::actors::interaction::blocked_at;
 use crate::game::data::random::{fta_rand, rand4};
-use crate::game::data::state::{ActorRef, the_actors, the_hero, the_ui, the_world};
+use crate::game::data::state::{ActorRef, the_actors, the_hero, the_world};
 use crate::game::data::tables::compass_lit_direction;
 use crate::game::input::handler::{joystick_fire, mouse_buttons};
 use crate::game::ui::text::show_event;
 
 /// Counts the timers down and sets the hero's state from the controls: the good fairy when dead
 /// or falling, shooting, riding, fighting or walking. `cycle` is the main loop's frame counter.
-pub fn update_hero(cycle: i16) {
+pub fn update_hero(game: &mut Game, cycle: i16) {
     unsafe {
         the_world.light_timer = timer_step(the_world.light_timer);
         the_world.secret_timer = timer_step(the_world.secret_timer);
@@ -31,12 +32,12 @@ pub fn update_hero(cycle: i16) {
         let mut state = the_actors.list[0].state;
 
         if state == DEAD || state == FALL {
-            state = fairy_revival(state, cycle);
+            state = fairy_revival(game, state, cycle);
         } else if state == DYING || state == SINK || state == SLEEP {
             // nothing to do
         } else if mouse_buttons() & RIGHT_BUTTON != 0
 
-            || the_ui.fight_key_held != 0
+            || game.ui.fight_key_held != 0
             // Masks with keeping only the bits that matter here.
             || joystick_fire()
         {
@@ -44,7 +45,7 @@ pub fn update_hero(cycle: i16) {
         } else if state == SHOOT1 {
             state = SHOOT3; // release the arrow
         } else {
-            state = walking_state(state);
+            state = walking_state(game, state);
         }
 
         the_actors.list[0].state = state;
@@ -140,7 +141,7 @@ pub(super) fn fighting_state_for(state: i8, weapon: i8) -> i8 {
 }
 
 /// No fight button: walk the way the controls point (stumbling when starving), or stand still.
-pub(super) unsafe fn walking_state(state: i8) -> i8 {
+pub(super) unsafe fn walking_state(game: &mut Game, state: i8) -> i8 {
     unsafe {
         if compass_lit_direction >= NOT_WALKING {
             return STILL;
@@ -157,7 +158,7 @@ pub(super) unsafe fn walking_state(state: i8) -> i8 {
         the_actors.list[0].facing = compass_lit_direction as i8;
 
         // Masks with LEFT_BUTTON, keeping only the bits that matter here.
-        if mouse_buttons() & LEFT_BUTTON != 0 || the_ui.held_direction != 0 {
+        if mouse_buttons() & LEFT_BUTTON != 0 || game.ui.held_direction != 0 {
             return WALKING;
         }
 

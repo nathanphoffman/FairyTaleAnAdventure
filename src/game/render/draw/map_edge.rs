@@ -1,10 +1,10 @@
 //! Finishing the scrolled map edge each frame, and the witch's beam and her damage.
 
-use crate::game::data::state::Game;
 use crate::game::actors::interaction::{actor_distance, hit_actor};
 use crate::game::data::random::{rand2, rand4};
 use crate::game::data::state::ActorRef;
-use crate::game::data::state::{the_world};
+use crate::game::data::state::Game;
+use crate::game::data::state::the_world;
 use crate::game::render::screen::screen;
 use crate::game::render::witch::{SIDE_1 as s1, SIDE_2 as s2, witch_fx};
 use crate::game::world::map::{draw_map_column, draw_map_row};

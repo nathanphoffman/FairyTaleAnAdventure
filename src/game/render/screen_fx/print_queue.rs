@@ -1,6 +1,7 @@
 //! The print queue: requests for the text panel (stats, vitality, menu, debug information).
 
 use crate::game::data::object_tables::{pplay, prec, print_que};
+use crate::game::data::state::Game;
 use crate::game::data::state::{the_actors, the_hero, the_world};
 use crate::game::render::display::delay;
 use crate::game::ui::menus::print_options;
@@ -35,7 +36,7 @@ const WEALTH_X: i32 = 321;
 /// Handles one request from the print queue (or waits a tick if there is none).
 /// Requests: 2 and 3 debug information, 4 the vitality figure, 5 the menu, 7 the stats line
 /// (bravery, luck, kindness, wealth), 10 "Take What?".
-pub fn handle_print_request() {
+pub fn handle_print_request(game: &mut Game) {
     unsafe {
         if prec == pplay {
             delay(1);
@@ -52,7 +53,7 @@ pub fn handle_print_request() {
             REQUEST_DEBUG_COORDS => show_debug_coords(),
             REQUEST_DEBUG_SECTOR => show_debug_sector(),
             REQUEST_VITALITY => draw_vitality(),
-            REQUEST_OPTIONS => print_options(),
+            REQUEST_OPTIONS => print_options(game),
             REQUEST_STATS => draw_stats(),
             REQUEST_TAKE_WHAT => print("Take What?"),
             _ => {}

@@ -4,6 +4,7 @@ use super::{
     Ctx, DEAD, DYING, ENVIRON_DROWNED, ENVIRON_SINKING, PIT_SECTOR, SINK, STILL, TERRAIN_SLOW_SINK,
     TERRAIN_WADE,
 };
+use crate::game::data::state::Game;
 
 use crate::game::data::state::{the_hero, the_world};
 use crate::game::world::places::{find_place, transfer_hero};
@@ -69,7 +70,7 @@ fn wade_step(depth: i8, j: i16, dead_or_dying: bool) -> (i8, Wading) {
 impl Ctx {
     /// In water (terrain 4 is shallow, 5 deep): the depth moves one step towards its limit, and the
     /// actor sinks, or at the pit sector falls through to the dungeon.
-    pub(super) unsafe fn wade(&mut self, j: i16) {
+    pub(super) unsafe fn wade(&mut self, game: &mut Game, j: i16) {
         unsafe {
             let mut actor = self.actor;
             let (depth, outcome) =
@@ -83,8 +84,8 @@ impl Ctx {
                         if self.slot == 0 {
                             self.environ = 0;
                             the_world.new_region = DUNGEON_REGION;
-                            transfer_hero(DUNGEON_ARRIVAL.0, DUNGEON_ARRIVAL.1, 0);
-                            find_place(1);
+                            transfer_hero(game, DUNGEON_ARRIVAL.0, DUNGEON_ARRIVAL.1, 0);
+                            find_place(game, 1);
                         } else {
                             actor.vitality = 0;
                         }

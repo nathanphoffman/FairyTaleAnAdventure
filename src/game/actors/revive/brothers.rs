@@ -2,7 +2,8 @@
 
 use crate::game::data::object_tables::{ob_list8, ob_listg};
 use crate::game::data::state::ActorRef;
-use crate::game::data::state::{Hero, World, the_actors, the_hero, the_ui, the_world};
+use crate::game::data::state::Game;
+use crate::game::data::state::{Hero, World, the_actors, the_hero, the_world};
 use crate::game::data::tables::brother_stats;
 use crate::game::data::types::{Bro, Shape};
 use crate::game::files::loading::load_start_sprites;
@@ -153,7 +154,7 @@ pub(super) fn start_next_brother(hero: &mut Hero, body: &mut Shape, next: &Bro) 
 }
 
 /// The story pages between brothers (and the game over page after the last).
-pub(super) unsafe fn show_brother_placards() {
+pub(super) unsafe fn show_brother_placards(game: &mut Game) {
     unsafe {
         map_message();
         let current = screen().current_port;
@@ -177,7 +178,7 @@ pub(super) unsafe fn show_brother_placards() {
         delay(SHOW_PLACARD);
 
         if the_hero.brother > LAST_BROTHER {
-            the_ui.quit_requested = 1;
+            game.ui.quit_requested = 1;
             delay(GAME_OVER_PAUSE);
         } else if the_hero.brother > JULIAN {
             show_follow_up_placard();

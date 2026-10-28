@@ -6,6 +6,7 @@
 
 use crate::game::actors::encounters::check_death;
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Game;
 use crate::game::data::state::player;
 use crate::game::data::state::{the_actors, the_hero, the_world};
 use crate::game::data::tables::{seed1, seed2};
@@ -58,7 +59,7 @@ pub fn queue_command(command: Command) {
 }
 
 /// Runs the queued command, if any. Called at the top of every frame.
-pub fn run_pending_command() {
+pub fn run_pending_command(game: &mut Game) {
     unsafe {
         let Some(command) = lock_pending().take() else {
             return;
@@ -66,7 +67,7 @@ pub fn run_pending_command() {
 
         match command {
             Command::Teleport { x, y } => {
-                transfer_hero(x as u16, y as u16, 1);
+                transfer_hero(game, x as u16, y as u16, 1);
             }
 
             Command::Give { slot, count } => player().stuff_mut()[slot as usize] = count as u8,

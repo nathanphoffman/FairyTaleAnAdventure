@@ -10,7 +10,7 @@ use crate::game::actors::combat::{advance_missiles, queue_missile_sprites, resol
 use crate::game::actors::movement::move_actor;
 use crate::game::actors::nearby_speech::speak_nearby;
 use crate::game::actors::spawning::spawn_encounters;
-use crate::game::data::state::{the_actors, the_hero, the_screen, the_ui, the_world};
+use crate::game::data::state::{the_actors, the_hero, the_screen, the_world};
 use crate::game::data::tables::menus;
 use crate::game::files::loading::load_pending_region;
 use crate::game::input::handler::{next_key, read_walk_direction};
@@ -123,10 +123,10 @@ pub(super) unsafe fn main_loop(game: &mut Game) {
             last_terrain: 0,
         };
 
-        the_ui.cheat_enabled = 0;
-        the_ui.quit_requested = 0;
+        game.ui.cheat_enabled = 0;
+        game.ui.quit_requested = 0;
 
-        while the_ui.quit_requested == 0 {
+        while game.ui.quit_requested == 0 {
             run_frame(game, &mut state);
         }
     }
@@ -137,15 +137,15 @@ unsafe fn run_frame(game: &mut Game, state: &mut FrameState) {
     unsafe {
         state.cycle = state.cycle.wrapping_add(1);
         the_screen.flasher = the_screen.flasher.wrapping_add(1);
-        crate::game::statedump::run_pending_command(); // test commands, does nothing normally
+        crate::game::statedump::run_pending_command(game); // test commands, does nothing normally
 
         read_keyboard(game);
 
-        if handle_view_status() {
+        if handle_view_status(game) {
             return;
         }
 
-        read_walk_direction();
+        read_walk_direction(game);
 
         // Masks with GAME_MENU, keeping only the bits that matter here.
         if menus[GAME_MENU].enabled[PAUSE_ENTRY] & 1 != 0 {
@@ -154,16 +154,16 @@ unsafe fn run_frame(game: &mut Game, state: &mut FrameState) {
             return;
         }
 
-        update_hero(state.cycle);
+        update_hero(game, state.cycle);
         move_everything(game, state);
         check_bed();
-        check_door();
+        check_door(game);
 
         the_hero.x = the_actors.list[0].abs_x;
         the_hero.y = the_actors.list[0].abs_y;
 
         undo_sprites();
-        let (scroll_x, scroll_y, world_update) = update_map_view();
+        let (scroll_x, scroll_y, world_update) = update_map_view(game);
 
         if world_update {
             run_world_update(game);
@@ -189,7 +189,7 @@ unsafe fn read_keyboard(game: &mut Game) {
 
 /// The screen modes that stop a normal frame. Returns true if this frame ends here (the item list
 /// and the like only flash the pointer and handle the print queue).
-unsafe fn handle_view_status() -> bool {
+unsafe fn handle_view_status(game: &mut Game) -> bool {
     unsafe {
         if the_screen.view_status == VIEW_PAUSED {
             delay(PAUSE_WAIT);
@@ -206,7 +206,7 @@ unsafe fn handle_view_status() -> bool {
                 screen().set_color(ViewPortId::Page, STATUS_COLOR, (0, 0, 0));
             }
 
-            handle_print_request();
+            handle_print_request(game);
 
             return true;
         }
@@ -271,7 +271,7 @@ unsafe fn redraw_whole_map() -> bool {
 /// Brings the map in line with the camera: loads a waiting region, then redraws the whole map or
 /// scrolls it by one tile. Returns the scroll step used and whether the world gets its turn this
 /// frame (it does when the map is redrawn from scratch, or did not move at all).
-unsafe fn update_map_view() -> (i16, i16, bool) {
+unsafe fn update_map_view(game: &mut Game) -> (i16, i16, bool) {
     unsafe {
         let (mut scroll_x, mut scroll_y) = scroll_step();
 
@@ -295,7 +295,7 @@ unsafe fn update_map_view() -> (i16, i16, bool) {
 
         if scroll_x == 0 && scroll_y == 0 {
             // no motion: the world gets its turn here
-            handle_print_request();
+            handle_print_request(game);
 
             return (scroll_x, scroll_y, true);
         }
@@ -316,7 +316,7 @@ unsafe fn run_world_update(game: &mut Game) {
         day_night_tick();
 
         if the_world.freeze_timer == 0 {
-            spawn_encounters();
+            spawn_encounters(game);
             speak_nearby();
             update_enemy_goals();
             survival_tick(game);

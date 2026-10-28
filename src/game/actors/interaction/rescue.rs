@@ -1,6 +1,7 @@
 //! Rescuing the princess: the story page, the reward and the keys.
 
 use super::extents::center_extent_on;
+use crate::game::data::state::Game;
 use crate::game::data::state::player;
 use crate::game::render::display::delay;
 use crate::game::render::screen::{FontKind, screen};
@@ -46,7 +47,7 @@ const REWARD_GOLD: i16 = 100;
 /// Shows the story pages, moves the hero to the princess's home, repositions the extent for the
 /// next princess, changes the princess object, gives 100 gold and three of each key, and bumps
 /// the `princess` count (each rescue shows different story pages).
-pub fn rescue_princess() {
+pub fn rescue_princess(game: &mut Game) {
     unsafe {
         map_message();
         let current = screen().current_port;
@@ -71,7 +72,7 @@ pub fn rescue_princess() {
         message_off();
 
         princesses_rescued += 1;
-        transfer_hero(PRINCESS_HOME.0, PRINCESS_HOME.1, 0); // do princess transfer
+        transfer_hero(game, PRINCESS_HOME.0, PRINCESS_HOME.1, 0); // do princess transfer
         center_extent_on(0, PRINCESS_EXTENT.0, PRINCESS_EXTENT.1);
         let objects = region_objects(INSIDE_OBJECTS);
         objects[PRINCESS_OBJECT].ob_id = PRINCESS_OBJECT_ID;

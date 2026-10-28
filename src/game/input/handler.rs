@@ -14,7 +14,7 @@
 //! Directions are numbered 0-7 clockwise starting at north-west: 0 NW, 1 N, 2 NE, 3 E, 4 SE, 5 S,
 //! 6 SW, 7 W. The value 9 means "not walking".
 
-use crate::game::data::state::the_ui;
+use crate::game::data::state::Game;
 use crate::game::data::tables::compass_lit_direction;
 use crate::game::render::screen_fx::draw_compass;
 use std::collections::VecDeque;
@@ -217,7 +217,7 @@ fn compass_direction(x: i32, y: i32) -> i16 {
 ///
 /// While a mouse button is down the pointer position decides; otherwise the direction key
 /// (numbered from 20, the keypad digits) does. Anything outside 20-29 means no direction.
-pub fn read_walk_direction() {
+pub fn read_walk_direction(game: &mut Game) {
     let (qualifier, pointer) = {
         let handler = handler();
 
@@ -228,12 +228,12 @@ pub fn read_walk_direction() {
         let dir = if qualifier & (LEFT_BUTTON | RIGHT_BUTTON) != 0 {
             compass_direction(pointer.0 as i32, pointer.1 as i32)
         } else {
-            let dir = the_ui.held_direction.wrapping_sub(KEYDIR_BASE);
+            let dir = game.ui.held_direction.wrapping_sub(KEYDIR_BASE);
 
             if (0..DIRECTION_COUNT).contains(&dir) {
                 dir
             } else {
-                the_ui.held_direction = 0;
+                game.ui.held_direction = 0;
 
                 DIR_NONE
             }

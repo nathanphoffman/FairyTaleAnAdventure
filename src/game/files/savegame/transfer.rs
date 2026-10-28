@@ -8,8 +8,9 @@ use crate::game::data::globals::{
     princesses_rescued, save_padding_1, save_padding_2, save_padding_3,
 };
 use crate::game::data::object_tables::{dstobs, glbobs, mapobs, ob_listg, region_objects};
+use crate::game::data::state::Game;
 use crate::game::data::state::{
-    SAVED_STUFF_SLOTS, player, the_actors, the_encounter, the_hero, the_ui, the_world,
+    SAVED_STUFF_SLOTS, player, the_actors, the_encounter, the_hero, the_world,
 };
 use crate::game::data::tables::extent_list;
 use crate::game::data::types::{Extent, Missile, Shape, WorldObject};
@@ -131,7 +132,7 @@ impl Transfer {
 /// The 40 variables the original saved as one 80 byte block, in that order: the map and hero
 /// positions, the stats (bravery, luck, kindness, wealth, hunger, fatigue), which brother is
 /// playing, the day/night clock, the magic timers and so on. The order is the file format.
-fn transfer_variables(t: &mut Transfer) {
+fn transfer_variables(game: &mut Game, t: &mut Transfer) {
     unsafe {
         t.u16(&mut *(&raw mut the_world.map_x));
         t.u16(&mut *(&raw mut the_world.map_y));
@@ -142,7 +143,7 @@ fn transfer_variables(t: &mut Transfer) {
         t.u16(&mut *(&raw mut the_hero.safe_r));
         t.u16(&mut *(&raw mut the_world.tile_x));
         t.u16(&mut *(&raw mut the_world.tile_y));
-        t.u16(&mut *(&raw mut the_ui.cheat_enabled));
+        t.u16(&mut *(&raw mut game.ui.cheat_enabled));
         t.u16(&mut *(&raw mut the_hero.riding));
         t.u16(&mut *(&raw mut the_hero.flying));
         t.u16(&mut *(&raw mut the_actors.carrier_slot));
@@ -168,7 +169,7 @@ fn transfer_variables(t: &mut Transfer) {
         t.u16(&mut *(&raw mut the_world.secret_timer));
         t.u16(&mut *(&raw mut the_world.light_timer));
         t.u16(&mut *(&raw mut the_world.freeze_timer));
-        t.u16(&mut *(&raw mut the_ui.current_menu));
+        t.u16(&mut *(&raw mut game.ui.current_menu));
         t.u16(&mut *(&raw mut the_encounter.kind));
         t.u16(&mut *(&raw mut save_padding_1));
         t.u16(&mut *(&raw mut save_padding_2));
@@ -244,9 +245,9 @@ fn transfer_party(t: &mut Transfer) {
 
 /// Writes (`Transfer::saving`) or reads the whole game state: the misc variables, the region, the
 /// actors, the inventories and missiles, the extents and the object lists.
-pub fn transfer_all(t: &mut Transfer) {
+pub fn transfer_all(game: &mut Game, t: &mut Transfer) {
     unsafe {
-        transfer_variables(t);
+        transfer_variables(game, t);
         t.u16(&mut *(&raw mut the_world.region));
 
         t.u16(&mut *(&raw mut the_actors.active));

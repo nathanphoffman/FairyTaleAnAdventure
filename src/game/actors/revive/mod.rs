@@ -12,6 +12,7 @@ use self::brothers::{
     LAST_BROTHER, announce_brother, leave_fallen_brother, reset_raft_setfig, show_brother_placards,
     take_over_next_brother,
 };
+use crate::game::data::state::Game;
 
 use self::safe_spot::{put_hero_at_safe_spot, restore_hero};
 
@@ -37,7 +38,7 @@ const VIEW_GAME_OVER: i8 = 2;
 ///
 /// Either way the hero gets full health for the bravery, the clock is set to the morning
 /// (8000), and hunger and fatigue are cleared.
-pub fn revive(new: i16) {
+pub fn revive(game: &mut Game, new: i16) {
     unsafe {
         reset_raft_setfig();
 
@@ -54,7 +55,7 @@ pub fn revive(new: i16) {
             stopscore();
             leave_fallen_brother();
             take_over_next_brother(hero);
-            show_brother_placards();
+            show_brother_placards(game);
             announce_brother();
         } else {
             fade_down();

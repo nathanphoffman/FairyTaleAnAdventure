@@ -5,13 +5,14 @@ use super::{
     FAIRY_SPEED, FAIRY_X_OFFSET, FALL, NO_ACTORS_LOADED, OBJECTS, STILL,
 };
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Game;
 
 use crate::game::actors::revive::revive;
 use crate::game::data::state::{the_actors, the_hero};
 
 /// The hero is dead or falling: the fairy flies in, then the hero revives (or, with no luck left,
 /// the next brother takes over). Returns the hero's new state.
-pub(super) unsafe fn fairy_revival(state: i8, cycle: i16) -> i8 {
+pub(super) unsafe fn fairy_revival(game: &mut Game, state: i8, cycle: i16) -> i8 {
     unsafe {
         let (timer, action) = fairy_step(
             the_hero.good_fairy_timer,
@@ -23,13 +24,13 @@ pub(super) unsafe fn fairy_revival(state: i8, cycle: i16) -> i8 {
 
         match action {
             FairyAction::Revive => {
-                revive(0);
+                revive(game, 0);
 
                 return STILL;
             }
 
             FairyAction::NextBrother => {
-                revive(1);
+                revive(game, 1);
 
                 return STILL;
             }

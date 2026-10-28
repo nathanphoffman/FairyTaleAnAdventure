@@ -2,6 +2,7 @@
 
 use super::{CAVE, DOORCOUNT, LOWER_HALF_BIT, TILE_COLUMN_MASK, TILE_WIDTH};
 use crate::game::data::object_tables::page_colors;
+use crate::game::data::state::Game;
 use crate::game::data::state::player;
 use crate::game::data::state::{the_hero, the_world};
 use crate::game::data::tables::door_list;
@@ -71,7 +72,7 @@ pub(super) unsafe fn door_at(j: i32) -> &'static Door {
     unsafe { &*(&raw const door_list).cast::<Door>().add(j as usize) }
 }
 
-pub(super) unsafe fn enter_door(xtest: u16, ytest: u16) {
+pub(super) unsafe fn enter_door(game: &mut Game, xtest: u16, ytest: u16) {
     unsafe {
         let Some(index) = find_outdoor_door(xtest, ytest) else {
             return;
@@ -83,8 +84,8 @@ pub(super) unsafe fn enter_door(xtest: u16, ytest: u16) {
         if may_enter(d, the_hero.x, the_hero.y, statues) {
             let (x, y) = inside_spot(d);
             the_world.new_region = region_inside(d);
-            transfer_hero(x, y, 0);
-            find_place(2);
+            transfer_hero(game, x, y, 0);
+            find_place(game, 2);
             fade_page(
                 FADE_WHITE,
                 FADE_WHITE,

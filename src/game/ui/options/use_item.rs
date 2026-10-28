@@ -1,11 +1,11 @@
 //! The Use menu: picking a weapon, the key menu, the turtle shell and the sunstone, and using a key.
 
-use crate::game::data::state::Game;
 use super::shop::FIRST_MENU_ENTRY;
 use super::{ITEMS, KEYBASE, KEYS};
 use crate::game::actors::interaction::summon_turtle;
+use crate::game::data::state::Game;
 use crate::game::data::state::player;
-use crate::game::data::state::{the_actors, the_hero, the_ui};
+use crate::game::data::state::{the_actors, the_hero};
 use crate::game::ui::items_menu::item_name;
 use crate::game::ui::menus::go_to_menu;
 use crate::game::ui::messages::{print, print_cont, print_wrapped};
@@ -40,8 +40,8 @@ unsafe fn in_no_turtle_area() -> bool {
 pub(super) unsafe fn use_option(game: &mut Game, chosen_entry: i16) -> bool {
     unsafe {
         if chosen_entry == KEY_ENTRY {
-            if the_ui.menu_hit_enabled != 0 {
-                go_to_menu(KEYS as i16);
+            if game.ui.menu_hit_enabled != 0 {
+                go_to_menu(game, KEYS as i16);
             } else {
                 print_wrapped("% has no keys!");
             }
@@ -50,14 +50,14 @@ pub(super) unsafe fn use_option(game: &mut Game, chosen_entry: i16) -> bool {
         }
 
         if chosen_entry < WEAPONS {
-            if the_ui.menu_hit_enabled != 0 {
+            if game.ui.menu_hit_enabled != 0 {
                 the_actors.list[0].weapon = (chosen_entry + 1) as i8;
             } else {
                 print_wrapped("% doesn't have one.");
             }
         }
 
-        if chosen_entry == SHELL_ENTRY && the_ui.menu_hit_enabled != 0 {
+        if chosen_entry == SHELL_ENTRY && game.ui.menu_hit_enabled != 0 {
             if in_no_turtle_area() {
                 return true;
             }
@@ -69,14 +69,14 @@ pub(super) unsafe fn use_option(game: &mut Game, chosen_entry: i16) -> bool {
             speak(SUNSTONE_SPEECH);
         }
 
-        go_to_menu(ITEMS as i16);
+        go_to_menu(game, ITEMS as i16);
 
         true
     }
 }
 
 /// Tries a key on every door and chest around the hero.
-pub(super) unsafe fn keys_option(chosen_entry: i16) -> bool {
+pub(super) unsafe fn keys_option(game: &mut Game, chosen_entry: i16) -> bool {
     unsafe {
         let key = (chosen_entry - FIRST_MENU_ENTRY) as usize;
         bumped_locked_door = 0;
@@ -88,7 +88,7 @@ pub(super) unsafe fn keys_option(chosen_entry: i16) -> bool {
                 let x = step_x(the_hero.x as i32, direction, DOOR_REACH) as u16;
                 let y = step_y(the_hero.y as i32, direction, DOOR_REACH) as u16;
 
-                if open_door_near(x, y, key as u32 + 1) != 0 {
+                if open_door_near(game, x, y, key as u32 + 1) != 0 {
                     player().stuff_mut()[key + KEYBASE] -= 1;
                     break;
                 }
@@ -104,7 +104,7 @@ pub(super) unsafe fn keys_option(chosen_entry: i16) -> bool {
             }
         }
 
-        go_to_menu(ITEMS as i16);
+        go_to_menu(game, ITEMS as i16);
 
         true
     }

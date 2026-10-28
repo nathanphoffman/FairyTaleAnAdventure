@@ -12,11 +12,11 @@ mod menu_keys;
 
 pub use self::hero_state::update_hero;
 
-use crate::game::data::state::Game;
 use self::cheats::{cheat_items, cheat_move};
 use self::menu_keys::{menu_click, menu_letter};
+use crate::game::data::state::Game;
 
-use crate::game::data::state::{the_actors, the_screen, the_ui};
+use crate::game::data::state::{the_actors, the_screen};
 use crate::game::ui::menus::go_to_menu;
 use crate::game::ui::options::choose_menu_entry;
 
@@ -102,7 +102,7 @@ fn press_in_key_menu(game: &mut Game, key: i8) {
     if (b'1' as i8..=b'6' as i8).contains(&key) {
         choose_menu_entry(game, (key - b'1' as i8 + KEY_ENTRY_BASE) as i16);
     } else {
-        go_to_menu(ITEMS);
+        go_to_menu(game, ITEMS);
     }
 }
 
@@ -121,24 +121,24 @@ pub fn handle_key(game: &mut Game, key: i32, notpause: i32) {
         } else if the_actors.list[0].state == DEAD {
             // ignored while dead
         } else if (FIRST_DIRECTION_KEY..=LAST_DIRECTION_KEY).contains(&key) {
-            the_ui.held_direction = key as i16;
+            game.ui.held_direction = key as i16;
 
         // Masks with CODE_MASK, keeping only the bits that matter here.
-        } else if (key & CODE_MASK) as i16 == the_ui.held_direction {
-            the_ui.held_direction = 0;
+        } else if (key & CODE_MASK) as i16 == game.ui.held_direction {
+            game.ui.held_direction = 0;
         } else if key == FIGHT_KEY {
-            the_ui.fight_key_held = 1;
+            game.ui.fight_key_held = 1;
 
         // Masks with CODE_MASK, keeping only the bits that matter here.
         } else if key & CODE_MASK == FIGHT_KEY {
-            the_ui.fight_key_held = 0;
-        } else if cheat_items(key) {
+            game.ui.fight_key_held = 0;
+        } else if cheat_items(game, key) {
             // handled
         } else if key & CODE_MASK >= FIRST_MENU_CLICK {
             menu_click(game, key, notpause);
-        } else if cheat_move(key) {
+        } else if cheat_move(game, key) {
             // handled
-        } else if the_ui.current_menu == KEYS && key & RELEASED == 0 {
+        } else if game.ui.current_menu == KEYS && key & RELEASED == 0 {
             press_in_key_menu(game, key);
         } else if key == b' ' as i8 || notpause {
             menu_letter(game, key);

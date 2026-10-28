@@ -1,9 +1,9 @@
 //! The survival tick: noting the safe spot, picking the music and applying hunger once a frame.
 
-use crate::game::data::state::Game;
 use super::hunger::{eats_fruit, hunger_due, hunger_effects};
 use super::{MOOD_PERIOD_MASK, STARVING_AT, safe_check_due};
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Game;
 use crate::game::data::state::{Hero, the_actors, the_hero, the_world};
 use crate::game::data::types::Shape;
 use crate::game::ui::music::set_mood;
