@@ -11,7 +11,7 @@ use crate::game::actors::interaction::{blocked_at, rescue_princess};
 use crate::game::data::object_tables::ob_list8;
 use crate::game::data::state::Game;
 use crate::game::data::state::current_extent;
-use crate::game::data::state::{the_actors, the_encounter, the_hero, the_screen, the_world};
+use crate::game::data::state::{the_actors, the_hero, the_screen, the_world};
 
 use crate::game::data::story_text::{INSIDE_MSG, INSIDE_TBL, PLACE_MSG, PLACE_TBL};
 use crate::game::files::disk::motor_off;
@@ -96,7 +96,7 @@ pub fn transfer_hero(game: &mut Game, xtest: u16, ytest: u16, flag: u16) -> i32 
         the_hero.y = ytest;
         the_actors.list[0].abs_y = ytest;
 
-        the_encounter.number = 0;
+        game.encounter.number = 0;
 
         if flag != 0 {
             let (sector_x, sector_y) = center_sector();
@@ -125,24 +125,24 @@ pub fn transfer_hero(game: &mut Game, xtest: u16, ytest: u16, flag: u16) -> i32 
 
 /// Starts the monsters of the extent the hero is in: loads their pictures and places up to four
 /// of them (there must be room before the carrier slots).
-unsafe fn start_forced_encounter() {
+unsafe fn start_forced_encounter(game: &mut Game) {
     unsafe {
-        the_encounter.kind = current_extent().v3 as u16;
-        the_encounter.mix_flag = 0;
-        the_encounter.weapon_type = 0;
-        load_enemy_sprites();
+        game.encounter.kind = current_extent().v3 as u16;
+        game.encounter.mix_flag = 0;
+        game.encounter.weapon_type = 0;
+        load_enemy_sprites(game);
         finish_sprite_load(ENEMY_SLOT);
         motor_off();
         the_actors.loading = 0;
-        the_encounter.number = current_extent().v1;
+        game.encounter.number = current_extent().v1;
         the_actors.active = FIRST_MONSTER;
 
-        while the_encounter.number != 0 && the_actors.active < MONSTER_SLOTS_END {
-            if place_encounter(the_actors.active as u16, ENCOUNTER_SPREAD) != 0 {
+        while game.encounter.number != 0 && the_actors.active < MONSTER_SLOTS_END {
+            if place_encounter(game, the_actors.active as u16, ENCOUNTER_SPREAD) != 0 {
                 the_actors.active += 1;
             }
 
-            the_encounter.number -= 1;
+            game.encounter.number -= 1;
         }
     }
 }
@@ -294,19 +294,19 @@ unsafe fn enter_extent(game: &mut Game, flag: i16) -> bool {
         } else if the_world.extent_type >= XT_SPECIAL_MIN {
             // birds, turtles, special
             if boss_is_missing() {
-                aim_encounter_at_extent_middle();
+                aim_encounter_at_extent_middle(game);
                 force = true;
             }
         } else if the_world.extent_type == XT_SPIDER_PIT {
-            load_spiders();
+            load_spiders(game);
         } else if the_world.extent_type >= XT_MONSTER_ZONE_MIN && flag == 1 {
-            the_encounter.x = the_hero.x;
-            the_encounter.y = the_hero.y;
+            game.encounter.x = the_hero.x;
+            game.encounter.y = the_hero.y;
             force = true;
         }
 
         if force {
-            start_forced_encounter();
+            start_forced_encounter(game);
         }
 
         true
@@ -314,18 +314,16 @@ unsafe fn enter_extent(game: &mut Game, flag: i16) -> bool {
 }
 
 /// The forced encounter appears in the middle of the extent.
-unsafe fn aim_encounter_at_extent_middle() {
-    unsafe {
-        the_encounter.x = ((current_extent().x1 as u32 + current_extent().x2 as u32) / 2) as u16;
-        the_encounter.y = ((current_extent().y1 as u32 + current_extent().y2 as u32) / 2) as u16;
-    }
+fn aim_encounter_at_extent_middle(game: &mut Game) {
+    game.encounter.x = ((current_extent().x1 as u32 + current_extent().x2 as u32) / 2) as u16;
+    game.encounter.y = ((current_extent().y1 as u32 + current_extent().y2 as u32) / 2) as u16;
 }
 
 /// The spider pit loads its spiders at once (no waiting for the disk).
-unsafe fn load_spiders() {
+unsafe fn load_spiders(game: &mut Game) {
     unsafe {
-        the_encounter.kind = SPIDER_ENCOUNTER;
-        load_enemy_sprites();
+        game.encounter.kind = SPIDER_ENCOUNTER;
+        load_enemy_sprites(game);
         finish_sprite_load(ENEMY_SLOT);
         motor_off();
         the_actors.loading = 0;

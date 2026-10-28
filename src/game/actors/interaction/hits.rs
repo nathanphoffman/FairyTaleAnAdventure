@@ -5,6 +5,7 @@ use super::extents::summon_turtle;
 use super::{DEAD, DRAGON, ENEMY, FLEE, HERO, SETFIG, turtle_eggs};
 use crate::game::actors::encounters::check_death;
 use crate::game::data::random::{bitrand, rand64, rand256};
+use crate::game::data::state::Game;
 use crate::game::data::state::player;
 use crate::game::data::state::{ActorRef, the_actors, the_world};
 use crate::game::files::loading::play_effect;
@@ -157,7 +158,7 @@ fn vitality_after_hit(vitality: i16, wt: i16) -> i16 {
 
 /// After a fight: reports how many foes were defeated or fled, or "Bravely done!" if the hero is
 /// nearly dead. Then, if turtle eggs are around, the turtle story event is checked.
-pub fn report_battle_result() {
+pub fn report_battle_result(game: &mut Game) {
     unsafe {
         let (dead, fled) = count_casualties();
         let vitality = actor_at(HERO as i32).vitality;
@@ -182,7 +183,7 @@ pub fn report_battle_result() {
 
         // check for presence of turtle eggs
         if turtle_eggs != 0 {
-            summon_turtle();
+            summon_turtle(game);
         }
     }
 }

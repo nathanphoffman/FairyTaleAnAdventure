@@ -9,9 +9,7 @@ use crate::game::data::globals::{
 };
 use crate::game::data::object_tables::{dstobs, glbobs, mapobs, ob_listg, region_objects};
 use crate::game::data::state::Game;
-use crate::game::data::state::{
-    SAVED_STUFF_SLOTS, player, the_actors, the_encounter, the_hero, the_world,
-};
+use crate::game::data::state::{SAVED_STUFF_SLOTS, player, the_actors, the_hero, the_world};
 use crate::game::data::tables::extent_list;
 use crate::game::data::types::{Extent, Missile, Shape, WorldObject};
 
@@ -170,7 +168,7 @@ fn transfer_variables(game: &mut Game, t: &mut Transfer) {
         t.u16(&mut *(&raw mut the_world.light_timer));
         t.u16(&mut *(&raw mut the_world.freeze_timer));
         t.u16(&mut *(&raw mut game.ui.current_menu));
-        t.u16(&mut *(&raw mut the_encounter.kind));
+        t.u16(&mut *(&raw mut game.encounter.kind));
         t.u16(&mut *(&raw mut save_padding_1));
         t.u16(&mut *(&raw mut save_padding_2));
         t.u16(&mut *(&raw mut save_padding_3));

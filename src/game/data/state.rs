@@ -127,8 +127,6 @@ pub struct Encounters {
     pub weapon_type: i16,
 }
 
-pub static mut the_encounter: Encounters = unsafe { std::mem::zeroed() };
-
 /// The actors on the map, the missiles in flight, and who is near the hero.
 pub struct Actors {
     pub list: [Shape; ACTOR_SLOTS],
@@ -312,6 +310,7 @@ pub struct Witch {
 pub struct Game {
     pub witch: Witch,
     pub ui: Ui,
+    pub encounter: Encounters,
 }
 
 impl Game {
@@ -323,6 +322,7 @@ impl Game {
                 angle: 0,
             },
             ui: unsafe { std::mem::zeroed() },
+            encounter: unsafe { std::mem::zeroed() },
         }
     }
 }

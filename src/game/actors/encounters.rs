@@ -4,8 +4,9 @@ use crate::game::actors::interaction::blocked_at;
 use crate::game::data::object_tables::weapon_probs;
 use crate::game::data::random::{bitrand, rand2, rand4, rnd};
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Game;
 use crate::game::data::state::{
-    Hero, current_extent, memory, the_actors, the_encounter, the_hero, the_memory, the_world,
+    Hero, current_extent, memory, the_actors, the_hero, the_memory, the_world,
 };
 use crate::game::data::tables::{encounter_chart, extent_list};
 use crate::game::data::types::{Extent, Shape};
@@ -99,19 +100,19 @@ const FIRST_CARRIER_SLOT: usize = 3;
 /// encounter spot (`encounter_x`, `encounter_y`), on a free square. Its race is `encounter_type`
 /// (mixed with the one next to it when `mixflag` bit 1 is set). Returns 1 if it was placed and
 /// 0 if no free spot was found in 15 tries.
-pub fn place_encounter(i: u16, spread: u16) -> i32 {
+pub fn place_encounter(game: &mut Game, i: u16, spread: u16) -> i32 {
     unsafe {
         let mut actor = ActorRef::new(i as usize);
-        let Some((xtest, ytest)) = find_open_spot(i, spread) else {
+        let Some((xtest, ytest)) = find_open_spot(game, i, spread) else {
             return 0;
         };
 
         actor.abs_x = xtest;
         actor.abs_y = ytest;
         actor.kind = ENEMY;
-        let race = encounter_race();
+        let race = encounter_race(game);
         actor.race = race as u8;
-        arm_enemy(actor, race);
+        arm_enemy(game, actor, race);
 
         actor.rel_x = actor
             .abs_x
@@ -128,15 +129,15 @@ pub fn place_encounter(i: u16, spread: u16) -> i32 {
 
 /// Gives the new enemy its weapon (picked from the race's chart, at random for a mixed group),
 /// its goal (archers shoot, the rest attack, both as clever as the race is) and its hit points.
-unsafe fn arm_enemy(mut actor: ActorRef, race: i32) {
+unsafe fn arm_enemy(game: &mut Game, mut actor: ActorRef, race: i32) {
     unsafe {
         // Masks with MIX_RANDOM_WEAPON, keeping only the bits that matter here.
-        if the_encounter.mix_flag & MIX_RANDOM_WEAPON != 0 {
-            the_encounter.weapon_type = rand4() as i16;
+        if game.encounter.mix_flag & MIX_RANDOM_WEAPON != 0 {
+            game.encounter.weapon_type = rand4() as i16;
         }
 
         let chart = &encounter_chart[race as usize];
-        let w = (chart.arms as i32 * WEAPON_CHOICES) + the_encounter.weapon_type as i32;
+        let w = (chart.arms as i32 * WEAPON_CHOICES) + game.encounter.weapon_type as i32;
         actor.weapon = weapon_probs[w as usize];
         actor.state = STILL;
         actor.environ = 0;
@@ -156,7 +157,7 @@ unsafe fn arm_enemy(mut actor: ActorRef, race: i32) {
 /// Finds a place near the encounter point for actor `i`, trying up to `MAX_TRY` random spots
 /// within `spread` pixels. Some encounters always use one fixed place. Returns `None` if every
 /// spot was blocked.
-unsafe fn find_open_spot(i: u16, spread: u16) -> Option<(u16, u16)> {
+unsafe fn find_open_spot(game: &mut Game, i: u16, spread: u16) -> Option<(u16, u16)> {
     unsafe {
         if current_extent().v3 == FIXED_PLACE_ENCOUNTER {
             return Some(FIXED_PLACE);
@@ -164,9 +165,9 @@ unsafe fn find_open_spot(i: u16, spread: u16) -> Option<(u16, u16)> {
 
         for _ in 0..MAX_TRY {
             let xtest =
-                (the_encounter.x as i32 + bitrand(spread as i32) - (spread as i32 / 2)) as u16;
+                (game.encounter.x as i32 + bitrand(spread as i32) - (spread as i32 / 2)) as u16;
             let ytest =
-                (the_encounter.y as i32 + bitrand(spread as i32) - (spread as i32 / 2)) as u16;
+                (game.encounter.y as i32 + bitrand(spread as i32) - (spread as i32 / 2)) as u16;
 
             if blocked_at(xtest as i16, ytest as i16, i as i16) == 0 {
                 return Some((xtest, ytest));
@@ -185,15 +186,13 @@ unsafe fn find_open_spot(i: u16, spread: u16) -> Option<(u16, u16)> {
 
 /// The race of the next enemy: for mixed groups the two races of the pair are picked at random
 /// (except encounter type 4).
-unsafe fn encounter_race() -> i32 {
-    unsafe {
-        // Masks with MIX_RACE_PAIR, keeping only the bits that matter here.
-        if (the_encounter.mix_flag & MIX_RACE_PAIR) != 0 && the_encounter.kind != KIND_NO_MIX {
-            // Masks with PAIR_MASK, keeping only the bits that matter here.
-            (the_encounter.kind & PAIR_MASK) as i32 + rand2()
-        } else {
-            the_encounter.kind as i32
-        }
+fn encounter_race(game: &mut Game) -> i32 {
+    // Masks with MIX_RACE_PAIR, keeping only the bits that matter here.
+    if (game.encounter.mix_flag & MIX_RACE_PAIR) != 0 && game.encounter.kind != KIND_NO_MIX {
+        // Masks with PAIR_MASK, keeping only the bits that matter here.
+        (game.encounter.kind & PAIR_MASK) as i32 + rand2()
+    } else {
+        game.encounter.kind as i32
     }
 }
 
@@ -301,11 +300,12 @@ pub fn load_carrier(n: i16) {
 
 /// The actors' sprite file the monsters of this encounter need: sets how many appear and, if that
 /// file is not the one loaded, loads it (the carrier is dropped then).
-pub fn load_enemy_sprites() {
+pub fn load_enemy_sprites(game: &mut Game) {
     const FIRST_ENEMY_SLOT: i16 = 3;
     unsafe {
-        the_encounter.number = (current_extent().v1 as i32 + rnd(current_extent().v2 as i32)) as u8;
-        let file = encounter_chart[the_encounter.kind as usize].file_id as i16;
+        game.encounter.number =
+            (current_extent().v1 as i32 + rnd(current_extent().v2 as i32)) as u8;
+        let file = encounter_chart[game.encounter.kind as usize].file_id as i16;
 
         if the_actors.loaded_actor_file != file {
             the_actors.loaded_actor_file = file;

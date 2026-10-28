@@ -318,7 +318,7 @@ unsafe fn run_world_update(game: &mut Game) {
         if the_world.freeze_timer == 0 {
             spawn_encounters(game);
             speak_nearby();
-            update_enemy_goals();
+            update_enemy_goals(game);
             survival_tick(game);
         }
     }

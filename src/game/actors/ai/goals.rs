@@ -6,6 +6,7 @@ use crate::game::actors::interaction::{report_battle_result, run_tactic};
 use crate::game::actors::steering::steer_actor;
 use crate::game::data::random::{bitrand, rand2, rand4};
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Game;
 use crate::game::data::state::current_extent;
 use crate::game::data::state::{the_actors, the_hero, the_world};
 use crate::game::ui::music::set_mood;
@@ -56,7 +57,7 @@ const PRQ_STATS: i32 = 4;
 const PRQ_VITALITY: i32 = 7;
 
 /// Decides each enemy's goal and tactic, and starts or ends the battle mood.
-pub fn update_enemy_goals() {
+pub fn update_enemy_goals(game: &mut Game) {
     unsafe {
         the_actors.on_screen = 0;
         the_actors.leader = 0;
@@ -80,7 +81,7 @@ pub fn update_enemy_goals() {
         if the_actors.battle_flag == 0 && battle2 != 0 {
             queue_print(PRQ_VITALITY);
             queue_print(PRQ_STATS);
-            report_battle_result();
+            report_battle_result(game);
         }
     }
 }

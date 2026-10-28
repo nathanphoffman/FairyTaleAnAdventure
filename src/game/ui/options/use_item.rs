@@ -62,7 +62,7 @@ pub(super) unsafe fn use_option(game: &mut Game, chosen_entry: i16) -> bool {
                 return true;
             }
 
-            summon_turtle();
+            summon_turtle(game);
         }
 
         if chosen_entry == SUNSTONE_ENTRY && game.witch.on_screen != 0 {

@@ -7,7 +7,7 @@ mod transfer;
 
 use self::transfer::{Transfer, transfer_all};
 use crate::game::data::state::Game;
-use crate::game::data::state::{the_actors, the_encounter, the_screen};
+use crate::game::data::state::{the_actors, the_screen};
 use crate::game::files::loading::load_start_sprites;
 use crate::game::render::screen::{FontKind, screen};
 use crate::game::ui::menus::update_menu_availability;
@@ -43,7 +43,7 @@ pub fn savegame(game: &mut Game, slot: i16, saving: bool) {
             print("ERROR: Couldn't load game.");
         }
 
-        reset_after_load();
+        reset_after_load(game);
     }
 
     set_current_font(FontKind::Story);
@@ -76,10 +76,10 @@ fn set_current_font(kind: FontKind) {
 }
 
 /// After loading a game: clears the encounter state and redraws the status panel for the new hero.
-fn reset_after_load() {
+fn reset_after_load(game: &mut Game) {
     unsafe {
-        the_encounter.weapon_type = 0;
-        the_encounter.number = 0;
+        game.encounter.weapon_type = 0;
+        game.encounter.number = 0;
         load_start_sprites();
         update_menu_availability();
         the_screen.view_status = VIEW_CORRUPT;
@@ -88,7 +88,7 @@ fn reset_after_load() {
         print("");
         print("");
         print("");
-        the_encounter.kind = 0;
+        game.encounter.kind = 0;
         the_actors.loading = 0;
     }
 }
