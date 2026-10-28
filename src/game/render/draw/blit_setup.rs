@@ -4,8 +4,8 @@
 use super::images::sprite_sheet;
 use super::{Frame, OBJECTS, Sprite};
 use crate::game::data::state::Blitter;
-use crate::game::data::state::Game;
-use crate::game::data::state::Memory;
+use crate::game::data::state::Graphics;
+use crate::game::data::state::Video;
 use crate::game::data::types::SeqInfo;
 use crate::game::render::screen::Screen;
 
@@ -106,7 +106,7 @@ pub(super) fn assign_background_save(
 /// full.
 #[allow(clippy::too_many_arguments)] // the blit set-up of the original, kept as one call
 pub(super) fn set_up_blit(
-    game: &mut Game,
+    video: &mut Video,
     frame: &mut Frame,
     sprite: &Sprite,
     clip: &Clip,
@@ -117,31 +117,31 @@ pub(super) fn set_up_blit(
 ) -> bool {
     // The sheet is looked up again: a sunk actor is drawn from the objects sheet, but is as wide
     // and high as its own.
-    let seq = *sprite_sheet(game, sprite.atype);
-    game.blitter.sshape = SShape::new();
-    game.screen.planesize = seq.bytes;
-    game.blitter.sshape.savesize = (blitwide as i32 * blithigh as i32 * WORD_BYTES) as i16;
+    let seq = *sprite_sheet(video, sprite.atype);
+    video.blitter.sshape = SShape::new();
+    video.screen.planesize = seq.bytes;
+    video.blitter.sshape.savesize = (blitwide as i32 * blithigh as i32 * WORD_BYTES) as i16;
 
     // Blitter size word: height in the high bits, width in words in the low 6 bits.
-    game.blitter.sshape.blitsize =
+    video.blitter.sshape.blitsize =
         (((blithigh as i32) << BLIT_HEIGHT_SHIFT) + blitwide as i32) as i16;
 
-    locate_sprite_data(&mut game.memory, &game.screen, &seq, sprite.inum);
+    locate_sprite_data(&mut video.graphics, &video.screen, &seq, sprite.inum);
 
-    if !assign_background_save(&mut game.screen, &mut game.blitter, frame) {
+    if !assign_background_save(&mut video.screen, &mut video.blitter, frame) {
         return false;
     }
 
-    set_blitter_registers(&mut game.blitter, sprite, clip, cwide, xbw, blitwide);
+    set_blitter_registers(&mut video.blitter, sprite, clip, cwide, xbw, blitwide);
 
     true
 }
 
 /// Points the blitter at the picture and the mask of image `inum` in its sprite sheet.
-fn locate_sprite_data(memory: &mut Memory, screen: &Screen, seq: &SeqInfo, inum: i16) {
+fn locate_sprite_data(graphics: &mut Graphics, screen: &Screen, seq: &SeqInfo, inum: i16) {
     let planesize = screen.planesize as usize;
-    memory.shapedata = seq.location + planesize * PLANES as usize * inum as usize;
-    memory.mask_buffer = seq.maskloc + planesize * inum as usize;
+    graphics.shapedata = seq.location + planesize * PLANES as usize * inum as usize;
+    graphics.mask_buffer = seq.maskloc + planesize * inum as usize;
 }
 
 /// Sets the blitter's mask offsets, shift and modulo for the clipped sprite, and where in the page

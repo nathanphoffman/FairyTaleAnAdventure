@@ -86,7 +86,7 @@ pub(super) fn clamp_secy(v: i16) -> u16 {
 pub(super) fn sector_at(game: &Game, col: u16, row: u16) -> u8 {
     let origin_x = { game.world.origin_x };
 
-    game.memory
+    game.map
         .map_byte((row as usize * MAP_ROW_BYTES + col as usize + origin_x as usize) as u16 as usize)
 }
 
@@ -101,7 +101,7 @@ pub fn terrain_at(game: &Game, x: i32, y: i32) -> i32 {
 
     // The tile column and row: tiles are 16 pixels wide and 32 high.
     let tile = tile_number(game, ux >> TILE_WIDTH_SHIFT, uy >> TILE_HEIGHT_SHIFT) as usize;
-    let memory = &game.memory;
+    let memory = &game.map;
     let entry = tile * TERRAIN_ENTRY_BYTES;
 
     if memory.terrain_byte(entry + TERRAIN_MASK_BYTE) & bit == 0 {
@@ -187,7 +187,7 @@ pub fn fill_minimap(game: &mut Game, tile_x: i32, tile_y: i32) {
         x &= TILE_COLUMN_WRAP;
 
         for j in 0..SCREEN_ROWS as i32 {
-            game.memory.minimap[next] =
+            game.map.minimap[next] =
                 tile_number(game, x, (tile_y + j) as u16 & TILE_ROW_WRAP) as i16;
             next += 1;
         }
@@ -208,11 +208,11 @@ fn tile_number(game: &Game, x: u16, y: u16) -> u8 {
     let row = clamp_secy((y >> SECTOR_HEIGHT_SHIFT).wrapping_sub(game.world.origin_y) as i16);
     // The region map has 128 sectors in each row.
     let sec = game
-        .memory
+        .map
         .map_byte(((row as usize) << MAP_ROW_SHIFT).wrapping_add(col as usize) as u16 as usize)
         as usize;
 
-    game.memory.sector_byte(
+    game.map.sector_byte(
         (sec * SECTOR_BYTES
             + (y as usize & TILE_ROW_MASK) * SECTOR_ROW_TILES
             + (x as usize & TILE_COLUMN_MASK)) as u16 as usize,
@@ -229,7 +229,7 @@ fn hero_sector(game: &mut Game) -> i16 {
         ((game.hero.y >> SECTOR_POSITION_SHIFT).wrapping_sub(game.world.origin_y)) as i16 as i32;
     // The region map has 128 sectors in each row.
     let mut sec =
-        game.memory
+        game.map
             .map_byte(((hy << MAP_ROW_SHIFT).wrapping_add(hx)) as u16 as usize) as i32;
 
     if game.world.region & REGION_BYTE_MASK > LAST_FIRST_HALF_REGION {

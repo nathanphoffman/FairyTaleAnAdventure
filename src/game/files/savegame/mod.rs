@@ -7,6 +7,7 @@ mod transfer;
 
 use self::transfer::{Transfer, transfer_all};
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 use crate::game::files::loading::load_start_sprites;
 use crate::game::render::screen::FontKind;
 use crate::game::render::screen::Screen;
@@ -26,8 +27,8 @@ const PRINT_VITALITY: i32 = 4;
 const PRINT_STATS: i32 = 7;
 
 /// Saves the game into slot `slot` (0 = A ...) when `saving`, or loads it from there.
-pub fn savegame(game: &mut Game, slot: i16, saving: bool) {
-    set_current_font(&mut game.screen, FontKind::Panel);
+pub fn savegame(game: &mut Game, video: &mut Video, slot: i16, saving: bool) {
+    set_current_font(&mut video.screen, FontKind::Panel);
 
     let name = format!(
         "{}.faery",
@@ -36,17 +37,17 @@ pub fn savegame(game: &mut Game, slot: i16, saving: bool) {
 
     if saving {
         if write_game(game, &name).is_err() {
-            print(game, "ERROR: Couldn't save game.");
+            print(video, "ERROR: Couldn't save game.");
         }
     } else {
         if read_game(game, &name).is_err() {
-            print(game, "ERROR: Couldn't load game.");
+            print(video, "ERROR: Couldn't load game.");
         }
 
-        reset_after_load(game);
+        reset_after_load(game, video);
     }
 
-    set_current_font(&mut game.screen, FontKind::Story);
+    set_current_font(&mut video.screen, FontKind::Story);
 }
 
 /// Writes the game to the save file `name`.
@@ -75,17 +76,17 @@ fn set_current_font(screen: &mut Screen, kind: FontKind) {
 }
 
 /// After loading a game: clears the encounter state and redraws the status panel for the new hero.
-fn reset_after_load(game: &mut Game) {
+fn reset_after_load(game: &mut Game, video: &mut Video) {
     game.encounter.weapon_type = 0;
     game.encounter.number = 0;
-    load_start_sprites(game);
+    load_start_sprites(game, video);
     update_menu_availability(game);
-    game.screen.view_status = VIEW_CORRUPT;
+    video.screen.view_status = VIEW_CORRUPT;
     queue_print(&mut game.ui, PRINT_VITALITY);
     queue_print(&mut game.ui, PRINT_STATS);
-    print(game, "");
-    print(game, "");
-    print(game, "");
+    print(video, "");
+    print(video, "");
+    print(video, "");
     game.encounter.kind = 0;
     game.actors.loading = 0;
 }

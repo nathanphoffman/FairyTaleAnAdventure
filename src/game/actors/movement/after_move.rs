@@ -15,6 +15,7 @@ use super::{
     VELOCITY_QUARTER, WALKING, WITCH_BODY_VITALITY, WORLD_MAX, WORLD_MIN, diroff, terrain,
 };
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 
 use crate::game::actors::encounters::check_death;
 use crate::game::data::object_tables::fallstates;
@@ -104,12 +105,12 @@ impl Ctx {
 
     /// After the movement: finishes a death, then turns the terrain under the actor into its `environ`
     /// (water depth, ice, the pit).
-    pub(super) fn tail(&mut self, game: &mut Game) -> Pc {
+    pub(super) fn tail(&mut self, game: &mut Game, video: &mut Video) -> Pc {
         if self.state == DYING {
             self.finish_dying(game);
         }
 
-        self.settle_environ(game);
+        self.settle_environ(game, video);
 
         if self.environ == 0 && self.state == SINK {
             game.actor_mut(self.actor).state = STILL;
@@ -145,7 +146,7 @@ impl Ctx {
 
     /// Turns the terrain under the actor into its `environ`: water depth, slow ground, ice, going
     /// backwards, or falling into the pit.
-    fn settle_environ(&mut self, game: &mut Game) {
+    fn settle_environ(&mut self, game: &mut Game, video: &mut Video) {
         let actor = self.actor;
         let i = self.slot;
         let j = self.terrain;
@@ -175,13 +176,13 @@ impl Ctx {
         } else if j == TERRAIN_WADE {
             self.environ = ENVIRON_WADE;
         } else if j == TERRAIN_SLOW_SINK || j == TERRAIN_DEEP_WATER {
-            self.wade(game, j);
+            self.wade(game, video, j);
         }
     }
 
     /// Stores the environ, adjusts the sprite for some enemies, keeps the hero inside the world and
     /// scrolls the map to it, and applies lava and drowning damage.
-    pub(super) fn raise(&mut self, game: &mut Game) -> Pc {
+    pub(super) fn raise(&mut self, game: &mut Game, video: &mut Video) -> Pc {
         let actor = self.actor;
         let i = self.slot;
 
@@ -209,15 +210,15 @@ impl Ctx {
             return Pc::Statc;
         }
 
-        self.take_lava_damage(game);
-        self.take_drowning_damage(game);
+        self.take_lava_damage(game, video);
+        self.take_drowning_damage(game, video);
 
         Pc::Statc
     }
 
     /// While lava is flowing the actor in deep lava dies and one wading in it is hurt, unless the
     /// hero carries the fireproof item.
-    fn take_lava_damage(&mut self, game: &mut Game) {
+    fn take_lava_damage(&mut self, game: &mut Game, video: &mut Video) {
         let actor = self.actor;
         let i = self.slot;
 
@@ -230,13 +231,13 @@ impl Ctx {
                 game.actor_mut(actor).vitality = game.actor(actor).vitality.wrapping_sub(1);
             }
 
-            check_death(game, i, DEATH_LAVA);
+            check_death(game, video, i, DEATH_LAVA);
         }
     }
 
     /// A drowning actor loses a point of vitality every eighth frame (wraiths and snakes are
     /// immune).
-    fn take_drowning_damage(&mut self, game: &mut Game) {
+    fn take_drowning_damage(&mut self, game: &mut Game, video: &mut Video) {
         let actor = self.actor;
         let i = self.slot;
         let cycle = self.cycle as i32;
@@ -247,7 +248,7 @@ impl Ctx {
             && !DROWN_IMMUNE_RACES.contains(&race)
         {
             game.actor_mut(actor).vitality = game.actor(actor).vitality.wrapping_sub(1);
-            check_death(game, i, DEATH_DROWN);
+            check_death(game, video, i, DEATH_DROWN);
         }
     }
 

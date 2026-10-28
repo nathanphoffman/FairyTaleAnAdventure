@@ -7,6 +7,7 @@
 //! story tables, breaks it into lines that fit the panel and prints each one.
 
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 use crate::game::data::tables::brother_names;
 use crate::game::ui::text::{draw_text, move_to};
 use crate::gfx::bitmap::Rect;
@@ -44,11 +45,11 @@ fn brother_name(game: &Game) -> &'static str {
 
 /// Starts a new line in the panel and prints `s` on it.
 /// The old lines scroll up by one text line (10 pixels) inside the message area.
-pub fn print(game: &mut Game, s: &str) {
-    print_bytes(game, s.as_bytes());
+pub fn print(video: &mut Video, s: &str) {
+    print_bytes(video, s.as_bytes());
 }
 
-fn print_bytes(game: &mut Game, s: &[u8]) {
+fn print_bytes(video: &mut Video, s: &[u8]) {
     let area = Rect {
         x: TEXT_X_MIN,
         y: TEXT_Y_MIN,
@@ -56,16 +57,17 @@ fn print_bytes(game: &mut Game, s: &[u8]) {
         height: TEXT_Y_MAX - TEXT_Y_MIN + 1,
     };
 
-    game.screen
-        .scroll(game.screen.current_port, area, (0, LINE_HEIGHT));
+    video
+        .screen
+        .scroll(video.screen.current_port, area, (0, LINE_HEIGHT));
 
-    move_to(game, TEXT_X_MIN, NEW_LINE_Y);
-    draw_text(&mut game.screen, s);
+    move_to(video, TEXT_X_MIN, NEW_LINE_Y);
+    draw_text(&mut video.screen, s);
 }
 
 /// Continues the current line with `s`.
-pub fn print_cont(game: &mut Game, s: &str) {
-    draw_text(&mut game.screen, s.as_bytes());
+pub fn print_cont(video: &mut Video, s: &str) {
+    draw_text(&mut video.screen, s.as_bytes());
 }
 
 /// The line buffer of `print_wrapped`: message characters are collected here, and `end` is where the
@@ -118,7 +120,7 @@ impl LineBuffer {
 /// a line reaches 37 characters it is cut at that space (the space becomes the end of the string)
 /// and printed, and the leftover characters start the next line. The message ends at a zero byte
 /// (or the end of `message`).
-pub fn print_wrapped(game: &mut Game, message: impl AsRef<[u8]>) {
+pub fn print_wrapped(game: &mut Game, video: &mut Video, message: impl AsRef<[u8]>) {
     let message = message.as_ref();
     let mut buffer = LineBuffer {
         bytes: [0; LINE_BUFFER],
@@ -134,7 +136,7 @@ pub fn print_wrapped(game: &mut Game, message: impl AsRef<[u8]>) {
         if let Some(line_break) = line_break {
             // found a wrap point: end the line and print it
             buffer.terminate(line_break);
-            print_bytes(game, buffer.line(line_start));
+            print_bytes(video, buffer.line(line_start));
 
             if i > END_COLUMN {
                 break;
@@ -150,7 +152,7 @@ pub fn print_wrapped(game: &mut Game, message: impl AsRef<[u8]>) {
                 break;
             }
 
-            print_bytes(game, buffer.line(line_start));
+            print_bytes(video, buffer.line(line_start));
             i = 0;
             line_start = buffer.end;
         }
@@ -199,24 +201,24 @@ fn copy_up_to_a_line(
 }
 
 /// Prints "<Brother> found <container> containing ", ready for the contents to be added.
-pub fn announce_container(game: &mut Game, s: &str) {
+pub fn announce_container(game: &mut Game, video: &mut Video, s: &str) {
     let name = brother_name(game);
-    print(game, name);
-    print_cont(game, " found ");
-    print_cont(game, s);
-    print_cont(game, " containing ");
+    print(video, name);
+    print_cont(video, " found ");
+    print_cont(video, s);
+    print_cont(video, " containing ");
 }
 
 /// Prints "<Brother> found <treasure>".
-pub fn announce_treasure(game: &mut Game, s: &str) {
+pub fn announce_treasure(game: &mut Game, video: &mut Video, s: &str) {
     let name = brother_name(game);
-    print(game, name);
-    print_cont(game, " found ");
-    print_cont(game, s);
+    print(video, name);
+    print_cont(video, " found ");
+    print_cont(video, s);
 }
 
 /// Adds the current brother's name to the line being printed.
-pub fn name(game: &mut Game) {
+pub fn name(game: &mut Game, video: &mut Video) {
     let name = brother_name(game);
-    print_cont(game, name);
+    print_cont(video, name);
 }

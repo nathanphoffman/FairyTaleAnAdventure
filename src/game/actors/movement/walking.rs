@@ -7,6 +7,7 @@ use super::{
     RACE_WRAITH, RIDING_SWAN, RIDING_TURTLE, STUFF_GOLD_KEY_SLOT, diroff, pos_x, pos_y, terrain,
 };
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 
 use crate::game::actors::interaction::blocked_at;
 use crate::game::actors::steering::{STEER_OFFSET, steer_actor};
@@ -94,7 +95,7 @@ fn ice_velocity_toward(facing: i16, vel_x: i8, vel_y: i8) -> (i16, i16) {
 
 impl Ctx {
     /// Walking: sliding on ice, picking a step, and trying to go around what is in the way.
-    pub(super) fn walking(&mut self, game: &mut Game) -> Pc {
+    pub(super) fn walking(&mut self, game: &mut Game, video: &mut Video) -> Pc {
         let actor = self.actor;
 
         if self.environ == ENVIRON_ICE {
@@ -119,7 +120,7 @@ impl Ctx {
             self.slot as i16,
         ) as i16;
 
-        if self.slot == 0 && self.hero_bumps_into_door(game) {
+        if self.slot == 0 && self.hero_bumps_into_door(game, video) {
             return Pc::NewLoc;
         }
 
@@ -132,9 +133,9 @@ impl Ctx {
 
     /// The hero walking into a door opens it (key doors have their own keys); walking away from one
     /// forgets that it was locked. Returns true when the gold key lets him through.
-    fn hero_bumps_into_door(&mut self, game: &mut Game) -> bool {
+    fn hero_bumps_into_door(&mut self, game: &mut Game, video: &mut Video) -> bool {
         if self.terrain == BLOCK_DOOR {
-            open_door_near(game, game.actors.test_x, game.actors.test_y, 0);
+            open_door_near(game, video, game.actors.test_x, game.actors.test_y, 0);
         } else {
             game.world.bumped_locked_door = 0;
         }

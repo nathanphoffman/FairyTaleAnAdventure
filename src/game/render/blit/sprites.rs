@@ -6,8 +6,8 @@ use super::{
     ALL_BITS, Area, D_EQUALS_A_AND_NOT_C, D_EQUALS_A_THEN_B_ELSE_C, D_EQUALS_B, Loc, MASK_START,
     PLANE_COUNT, SHIFT_MASK, TILE_LINES, TILE_MASK_BYTES, USE_A, USE_B, USE_C, USE_D,
 };
-use crate::game::data::state::Game;
-use crate::game::data::state::Memory;
+use crate::game::data::state::Graphics;
+use crate::game::data::state::Video;
 use crate::game::render::blit::SShape;
 use crate::game::render::screen::Screen;
 
@@ -37,15 +37,15 @@ struct SpriteRegs {
 }
 
 impl SpriteRegs {
-    fn of(game: &Game) -> SpriteRegs {
+    fn of(video: &mut Video) -> SpriteRegs {
         SpriteRegs {
-            sshape: game.blitter.sshape,
-            shadow_mask_offset: game.blitter.shadow_mask_offset,
-            mask_offset: game.blitter.sprite_mask_offset,
-            mask_modulo: game.blitter.sprite_mask_modulo,
-            word_mask: game.blitter.last_word_mask,
-            planesize: game.screen.planesize as usize,
-            shapedata: game.memory.shapedata,
+            sshape: video.blitter.sshape,
+            shadow_mask_offset: video.blitter.shadow_mask_offset,
+            mask_offset: video.blitter.sprite_mask_offset,
+            mask_modulo: video.blitter.sprite_mask_modulo,
+            word_mask: video.blitter.last_word_mask,
+            planesize: video.screen.planesize as usize,
+            shapedata: video.graphics.shapedata,
         }
     }
 }
@@ -64,10 +64,10 @@ fn scenery_mask_at(regs: &SpriteRegs) -> Loc {
 }
 
 /// Zeroes the start of the scenery mask, a rectangle sized like a BLTSIZE value.
-pub fn clear_memory(game: &mut Game, size: i32) {
+pub fn clear_memory(video: &mut Video, size: i32) {
     let bytes = (blit_height(size as i16) * blit_width(size as i16) * 2) as usize;
 
-    with_mem(&mut game.screen, &mut game.memory.shape, |mem| {
+    with_mem(&mut video.screen, &mut video.graphics.shape, |mem| {
         for i in 0..bytes {
             mem.set_byte(Loc::new(Area::Mask, i), 0);
         }
@@ -75,11 +75,11 @@ pub fn clear_memory(game: &mut Game, size: i32) {
 }
 
 /// Copies the background under the sprite (all planes) to `savemem`.
-pub fn save_background(game: &mut Game, savemem: Loc) {
-    let regs = SpriteRegs::of(game);
-    let sshape = { game.blitter.sshape };
+pub fn save_background(video: &mut Video, savemem: Loc) {
+    let regs = SpriteRegs::of(video);
+    let sshape = { video.blitter.sshape };
 
-    with_mem(&mut game.screen, &mut game.memory.shape, |mem| {
+    with_mem(&mut video.screen, &mut video.graphics.shape, |mem| {
         for p in (0..PLANE_COUNT).rev() {
             let mut t = Blit::new(USE_B | USE_D, D_EQUALS_B, sshape.blitsize);
             t.b = plane_at_sprite(&regs, p);
@@ -91,11 +91,11 @@ pub fn save_background(game: &mut Game, savemem: Loc) {
 }
 
 /// Puts the saved background back (this erases the sprite).
-pub fn restore_background(game: &mut Game, savemem: Loc) {
-    let regs = SpriteRegs::of(game);
-    let sshape = { game.blitter.sshape };
+pub fn restore_background(video: &mut Video, savemem: Loc) {
+    let regs = SpriteRegs::of(video);
+    let sshape = { video.blitter.sshape };
 
-    with_mem(&mut game.screen, &mut game.memory.shape, |mem| {
+    with_mem(&mut video.screen, &mut video.graphics.shape, |mem| {
         for p in (0..PLANE_COUNT).rev() {
             let mut t = Blit::new(USE_B | USE_D, D_EQUALS_B, sshape.blitsize);
             t.b = savemem.add(sshape.savesize as isize * p as isize);
@@ -108,32 +108,32 @@ pub fn restore_background(game: &mut Game, savemem: Loc) {
 
 /// Combines the sprite's own mask with the scenery mask built by `add_scenery_mask`. The result goes in
 /// the scenery mask: the sprite is opaque here and nothing is in front of it (D = A and not C).
-pub fn combine_masks(game: &mut Game) {
+pub fn combine_masks(video: &mut Video) {
     let (sshape, mask_offset, mask_modulo, x_shift) = {
         (
-            game.blitter.sshape,
-            game.blitter.sprite_mask_offset,
-            game.blitter.sprite_mask_modulo,
-            game.blitter.sprite_x_shift,
+            video.blitter.sshape,
+            video.blitter.sprite_mask_offset,
+            video.blitter.sprite_mask_modulo,
+            video.blitter.sprite_x_shift,
         )
     };
     let mut t = Blit::new(USE_A | USE_C | USE_D, D_EQUALS_A_AND_NOT_C, sshape.blitsize);
 
-    t.a = Loc::new(Area::Shapes, game.memory.mask_buffer).add(mask_offset as isize);
+    t.a = Loc::new(Area::Shapes, video.graphics.mask_buffer).add(mask_offset as isize);
     t.amod = mask_modulo as i32;
 
     t.ashift = (x_shift & SHIFT_MASK) as u32;
-    t.c = scenery_mask_at(&SpriteRegs::of(game));
+    t.c = scenery_mask_at(&SpriteRegs::of(video));
     t.d = t.c;
-    with_mem(&mut game.screen, &mut game.memory.shape, |mem| {
+    with_mem(&mut video.screen, &mut video.graphics.shape, |mem| {
         blit(&mut t, mem)
     });
 }
 
 /// Draws the sprite into the planes through the mask: D = mask ? shape : screen.
 /// The first and last word masks stop the sprite's shifted edges leaking into neighbouring pixels.
-pub fn draw_shape(game: &mut Game) {
-    let bit_shift = ({ game.blitter.sprite_x_shift } & SHIFT_MASK) as u32;
+pub fn draw_shape(video: &mut Video) {
+    let bit_shift = ({ video.blitter.sprite_x_shift } & SHIFT_MASK) as u32;
 
     // The first word is masked so the bits left of the sprite's pixel offset stay clear.
     let first = ALL_BITS >> bit_shift;
@@ -144,9 +144,9 @@ pub fn draw_shape(game: &mut Game) {
         last = ALL_BITS;
     }
 
-    let regs = SpriteRegs::of(game);
+    let regs = SpriteRegs::of(video);
 
-    with_mem(&mut game.screen, &mut game.memory.shape, |mem| {
+    with_mem(&mut video.screen, &mut video.graphics.shape, |mem| {
         for p in (0..PLANE_COUNT).rev() {
             draw_shape_plane(&regs, mem, p, bit_shift, (first, last));
         }
@@ -193,15 +193,15 @@ fn draw_shape_plane(
 
 /// Copies the 32 line mask of scenery tile `tile` (from the shadow masks) into the scenery mask at
 /// word column `x`, tile row `y`; `mod_words` is the mask width in words.
-pub fn add_scenery_mask(game: &mut Game, x: i32, y: i32, mod_words: i32, tile: i32) {
+pub fn add_scenery_mask(video: &mut Video, x: i32, y: i32, mod_words: i32, tile: i32) {
     let row_bytes = mod_words as isize * 2;
     let mut dst = Loc::new(Area::Mask, MASK_START)
         .add(y as isize * row_bytes * TILE_LINES as isize + x as isize * 2);
-    let memory = &mut game.memory;
+    let memory = &mut video.graphics;
     let shadow = &memory.shadow;
     let mut src = tile as usize * TILE_MASK_BYTES;
 
-    with_mem(&mut game.screen, &mut memory.shape, |mem| {
+    with_mem(&mut video.screen, &mut memory.shape, |mem| {
         for _ in 0..TILE_LINES {
             mem.set_byte(dst, shadow[src]);
             mem.set_byte(dst.add(1), shadow[src + 1]);
@@ -215,7 +215,7 @@ pub fn add_scenery_mask(game: &mut Game, x: i32, y: i32, mod_words: i32, tile: i
 /// 31 (all bits set) is transparent. The frames start at `src` in the sprite memory and the masks
 /// are stored from `dest` on.
 pub fn make_sprite_masks(
-    memory: &mut Memory,
+    graphics: &mut Graphics,
     src: usize,
     dest: usize,
     words: i32,
@@ -223,7 +223,7 @@ pub fn make_sprite_masks(
     chars: i32,
 ) {
     let plane_bytes = (words * scans) as u16 as usize * 2;
-    let shapes = &mut memory.shape;
+    let shapes = &mut graphics.shape;
     let (mut src, mut dest) = (src, dest);
 
     for _ in 0..chars {

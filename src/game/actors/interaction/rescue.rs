@@ -2,6 +2,7 @@
 
 use super::extents::center_extent_on;
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 use crate::game::render::display::delay;
 use crate::game::render::screen::FontKind;
 
@@ -43,35 +44,35 @@ const REWARD_GOLD: i16 = 100;
 /// Shows the story pages, moves the hero to the princess's home, repositions the extent for the
 /// next princess, changes the princess object, gives 100 gold and three of each key, and bumps
 /// the `princess` count (each rescue shows different story pages).
-pub fn rescue_princess(game: &mut Game) {
-    map_message(game);
-    let current = game.screen.current_port;
-    game.screen.set_font_kind(current, FontKind::Story);
+pub fn rescue_princess(game: &mut Game, video: &mut Video) {
+    map_message(game, video);
+    let current = video.screen.current_port;
+    video.screen.set_font_kind(current, FontKind::Story);
     let line = game.hero.princesses_rescued as i32 * RESCUE_PLACARDS_EACH;
-    placard_text(game, RESCUE_PLACARD_BASE + line);
-    name(game);
-    placard_text(game, RESCUE_PLACARD_BASE + 1 + line);
-    name(game);
-    placard_text(game, RESCUE_PLACARD_BASE + 2 + line);
-    draw_placard_border(game);
-    delay(game, RESCUE_PAUSE);
-    game.screen.set_a_pen(current, 0);
+    placard_text(video, RESCUE_PLACARD_BASE + line);
+    name(game, video);
+    placard_text(video, RESCUE_PLACARD_BASE + 1 + line);
+    name(game, video);
+    placard_text(video, RESCUE_PLACARD_BASE + 2 + line);
+    draw_placard_border(video);
+    delay(game, video, RESCUE_PAUSE);
+    video.screen.set_a_pen(current, 0);
     let (x0, y0, x1, y1) = PLACARD_AREA;
-    game.screen.rect_fill(current, (x0, y0), (x1, y1));
-    delay(game, CLEAR_PAUSE);
-    game.screen.set_a_pen(current, PLACARD_PEN);
-    placard_text(game, AFTER_RESCUE_PLACARDS.0);
-    name(game);
-    placard_text(game, AFTER_RESCUE_PLACARDS.1);
-    delay(game, RESCUE_PAUSE);
-    message_off(game);
+    video.screen.rect_fill(current, (x0, y0), (x1, y1));
+    delay(game, video, CLEAR_PAUSE);
+    video.screen.set_a_pen(current, PLACARD_PEN);
+    placard_text(video, AFTER_RESCUE_PLACARDS.0);
+    name(game, video);
+    placard_text(video, AFTER_RESCUE_PLACARDS.1);
+    delay(game, video, RESCUE_PAUSE);
+    message_off(game, video);
 
     game.hero.princesses_rescued += 1;
-    transfer_hero(game, PRINCESS_HOME.0, PRINCESS_HOME.1, 0); // do princess transfer
+    transfer_hero(game, video, PRINCESS_HOME.0, PRINCESS_HOME.1, 0); // do princess transfer
     center_extent_on(game, 0, PRINCESS_EXTENT.0, PRINCESS_EXTENT.1);
     game.objects.region(INSIDE_OBJECTS)[PRINCESS_OBJECT].ob_id = PRINCESS_OBJECT_ID;
     game.hero.stuff_mut()[PRINCESS_STUFF] = 1;
-    speak(game, REWARD_MESSAGE);
+    speak(game, video, REWARD_MESSAGE);
     game.hero.wealth = game.hero.wealth.wrapping_add(REWARD_GOLD);
     game.objects.region(INSIDE_OBJECTS)[CAPTIVE_OBJECT].ob_stat = 0;
 

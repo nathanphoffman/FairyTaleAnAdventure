@@ -2,6 +2,7 @@
 
 use crate::game::data::state::Game;
 use crate::game::data::state::Ui;
+use crate::game::data::state::Video;
 use crate::game::files::iff_picture::load_picture;
 use crate::game::input::handler::next_key;
 use crate::game::render::display::delay;
@@ -33,12 +34,12 @@ const PAGE_DELAY: i32 = 350;
 
 /// Shows two pictures on the story page, then turns it over.
 /// The new pictures are drawn onto `pageb` while `pagea` keeps the old page for the turn.
-pub fn show_story_page(game: &mut Game, br1: &str, br2: &str, x: i16, y: i16) {
+pub fn show_story_page(game: &mut Game, video: &mut Video, br1: &str, br2: &str, x: i16, y: i16) {
     if game.ui.intro_skip_requested != 0 {
         return;
     }
 
-    delay(game, PAGE_DELAY);
+    delay(game, video, PAGE_DELAY);
 
     let whole = Rect {
         x: 0,
@@ -47,10 +48,11 @@ pub fn show_story_page(game: &mut Game, br1: &str, br2: &str, x: i16, y: i16) {
         height: SCREEN_HEIGHT,
     };
 
-    game.screen
+    video
+        .screen
         .copy(BitmapId::PageB, whole, BitmapId::PageA, (0, 0), ALL_PLANES);
 
-    let new_page = game.screen.bitmap_mut(BitmapId::PageB);
+    let new_page = video.screen.bitmap_mut(BitmapId::PageB);
     load_picture(br1, new_page, PICTURE_X, PICTURE_Y);
     load_picture(br2, new_page, x as usize, y as usize);
 
@@ -58,7 +60,7 @@ pub fn show_story_page(game: &mut Game, br1: &str, br2: &str, x: i16, y: i16) {
         return;
     }
 
-    turn_page(game);
+    turn_page(game, video);
     intro_skipped(&mut game.ui);
 }
 
@@ -92,7 +94,7 @@ const PAGE_EDGE_HEIGHT: i32 = 186;
 
 /// Copies a rectangle between bitmaps (all five planes, plain copy).
 fn copy_rect(
-    game: &mut Game,
+    video: &mut Video,
     src: BitmapId,
     from: (i32, i32),
     dst: BitmapId,
@@ -106,13 +108,13 @@ fn copy_rect(
         height: size.1,
     };
 
-    game.screen.copy(src, rect, dst, to, ALL_PLANES);
+    video.screen.copy(src, rect, dst, to, ALL_PLANES);
 }
 
 /// Copies the half page that starts at column `column` onto the screen, in the same place.
-fn copy_half_page(game: &mut Game, src: BitmapId, temp: BitmapId, column: i32) {
+fn copy_half_page(video: &mut Video, src: BitmapId, temp: BitmapId, column: i32) {
     copy_rect(
-        game,
+        video,
         src,
         (column, 0),
         temp,
@@ -124,7 +126,7 @@ fn copy_half_page(game: &mut Game, src: BitmapId, temp: BitmapId, column: i32) {
 /// Copies a strip `wide` columns wide from `from` to `to`, `inset` lines in from the top and bottom
 /// (the curl of the page).
 fn copy_strip(
-    game: &mut Game,
+    video: &mut Video,
     src: BitmapId,
     temp: BitmapId,
     (from, to): (i32, i32),
@@ -132,7 +134,7 @@ fn copy_strip(
     wide: i32,
 ) {
     copy_rect(
-        game,
+        video,
         src,
         (from, inset),
         temp,
@@ -147,24 +149,24 @@ fn copy_strip(
 /// get narrower and shorter (using `page_turn_inset` for the curl), on top of the new page. The last 11
 /// frames lay the curling page down on the left. `FLIP_RATE`, `FLIP_WIDE` and `FLIP_DELAY` give
 /// the strip step, strip width and pause for each frame.
-pub fn turn_page(game: &mut Game) {
+pub fn turn_page(game: &mut Game, video: &mut Video) {
     let (a, b) = (BitmapId::PageA, BitmapId::PageB);
 
     for frame in 0..FLIP_RATE.len() {
-        let temp = game.screen.drawing_bitmap_id();
+        let temp = video.screen.drawing_bitmap_id();
         let rate = FLIP_RATE[frame];
         let wide = FLIP_WIDE[frame] as i32;
 
         if frame < FIRST_HALF {
-            turn_right_page_frame(game, a, b, temp, rate, wide);
+            turn_right_page_frame(video, a, b, temp, rate, wide);
         } else {
-            turn_left_page_frame(game, a, b, temp, rate, wide);
+            turn_left_page_frame(video, a, b, temp, rate, wide);
         }
 
-        flip_pages(game);
+        flip_pages(game, video);
 
         if FLIP_DELAY[frame] != 0 {
-            delay(game, FLIP_DELAY[frame]);
+            delay(game, video, FLIP_DELAY[frame]);
         }
     }
 }
@@ -172,7 +174,7 @@ pub fn turn_page(game: &mut Game) {
 /// One frame of the first half of the page turn: the right page `b` stays and the strips of the old
 /// page `a` bend away from the spine, each `wide` pixels wide and `rate` apart.
 fn turn_right_page_frame(
-    game: &mut Game,
+    video: &mut Video,
     a: BitmapId,
     b: BitmapId,
     temp: BitmapId,
@@ -181,7 +183,7 @@ fn turn_right_page_frame(
 ) {
     let bcol = SPINE_RIGHT - wide;
     let mut dcol: i32 = 0;
-    copy_half_page(game, b, temp, SPINE);
+    copy_half_page(video, b, temp, SPINE);
 
     if rate == 0 {
         return;
@@ -193,7 +195,7 @@ fn turn_right_page_frame(
     while scol < PAGE_STRIP_END {
         h = crate::game::world::map::page_turn_inset(scol as i32);
         copy_strip(
-            game,
+            video,
             a,
             temp,
             (bcol + scol as i32, SPINE_RIGHT + dcol),
@@ -206,7 +208,7 @@ fn turn_right_page_frame(
     }
 
     copy_rect(
-        game,
+        video,
         a,
         (PAGE_RIGHT_EDGE, EDGE_INSET),
         temp,
@@ -217,7 +219,7 @@ fn turn_right_page_frame(
 
 /// One frame of the second half of the page turn: the strips of the new page `b` land on the left.
 fn turn_left_page_frame(
-    game: &mut Game,
+    video: &mut Video,
     a: BitmapId,
     b: BitmapId,
     temp: BitmapId,
@@ -227,25 +229,25 @@ fn turn_left_page_frame(
     let bcol = SPINE;
 
     if rate == 0 {
-        copy_half_page(game, b, temp, PAGE_LEFT_EDGE);
+        copy_half_page(video, b, temp, PAGE_LEFT_EDGE);
 
         return;
     }
 
-    copy_half_page(game, a, temp, PAGE_LEFT_EDGE);
+    copy_half_page(video, a, temp, PAGE_LEFT_EDGE);
     let mut dcol: i32 = 0;
     let mut scol = wide as i16;
 
     while scol < PAGE_STRIP_END {
         let h = crate::game::world::map::page_turn_inset(scol as i32);
         dcol += wide;
-        copy_strip(game, b, temp, (bcol - scol as i32, bcol - dcol), h, wide);
+        copy_strip(video, b, temp, (bcol - scol as i32, bcol - dcol), h, wide);
 
         scol += rate;
     }
 
     copy_strip(
-        game,
+        video,
         b,
         temp,
         (PAGE_LEFT_EDGE, SPINE - 1 - dcol),

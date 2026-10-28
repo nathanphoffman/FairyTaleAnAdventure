@@ -1,6 +1,7 @@
 //! The print queue: requests for the text panel (stats, vitality, menu, debug information).
 
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 use crate::game::render::display::delay;
 use crate::game::ui::menus::print_options;
 use crate::game::ui::messages::print;
@@ -34,9 +35,9 @@ const WEALTH_X: i32 = 321;
 /// Handles one request from the print queue (or waits a tick if there is none).
 /// Requests: 2 and 3 debug information, 4 the vitality figure, 5 the menu, 7 the stats line
 /// (bravery, luck, kindness, wealth), 10 "Take What?".
-pub fn handle_print_request(game: &mut Game) {
+pub fn handle_print_request(game: &mut Game, video: &mut Video) {
     if game.ui.print_queue.write == game.ui.print_queue.read {
-        delay(game, 1);
+        delay(game, video, 1);
 
         return;
     }
@@ -46,45 +47,45 @@ pub fn handle_print_request(game: &mut Game) {
     game.ui.print_queue.read = (game.ui.print_queue.read + 1) & QUEUE_MASK;
 
     match request {
-        REQUEST_DEBUG_COORDS => show_debug_coords(game),
-        REQUEST_DEBUG_SECTOR => show_debug_sector(game),
-        REQUEST_VITALITY => draw_vitality(game),
-        REQUEST_OPTIONS => print_options(game),
-        REQUEST_STATS => draw_stats(game),
-        REQUEST_TAKE_WHAT => print(game, "Take What?"),
+        REQUEST_DEBUG_COORDS => show_debug_coords(game, video),
+        REQUEST_DEBUG_SECTOR => show_debug_sector(game, video),
+        REQUEST_VITALITY => draw_vitality(game, video),
+        REQUEST_OPTIONS => print_options(game, video),
+        REQUEST_STATS => draw_stats(game, video),
+        REQUEST_TAKE_WHAT => print(video, "Take What?"),
         _ => {}
     }
 }
 
 /// Debug information: the hero's map position and the memory left.
-fn show_debug_coords(game: &mut Game) {
-    print(game, "Coords = ");
-    print_number(game, game.hero.x as i32, COORD_DIGITS);
-    print_number(game, game.hero.y as i32, COORD_DIGITS);
-    print(game, "Memory Available: ");
-    print_number(game, FAKE_FREE_BYTES, COORD_DIGITS);
+fn show_debug_coords(game: &mut Game, video: &mut Video) {
+    print(video, "Coords = ");
+    print_number(video, game.hero.x as i32, COORD_DIGITS);
+    print_number(video, game.hero.y as i32, COORD_DIGITS);
+    print(video, "Memory Available: ");
+    print_number(video, FAKE_FREE_BYTES, COORD_DIGITS);
 }
 
 /// Debug information: the hero's sector and the type of the extent the hero is in.
-fn show_debug_sector(game: &mut Game) {
-    print(game, "You are at: ");
-    print_number(game, game.hero.x as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
-    print_number(game, game.hero.y as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
-    print(game, "H/Sector = ");
-    print_number(game, game.hero.sector as i32, SECTOR_DIGITS);
-    draw_text(&mut game.screen, b" Extent = ");
-    print_number(game, game.world.extent_type as i32, EXTENT_DIGITS);
+fn show_debug_sector(game: &mut Game, video: &mut Video) {
+    print(video, "You are at: ");
+    print_number(video, game.hero.x as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
+    print_number(video, game.hero.y as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
+    print(video, "H/Sector = ");
+    print_number(video, game.hero.sector as i32, SECTOR_DIGITS);
+    draw_text(&mut video.screen, b" Extent = ");
+    print_number(video, game.world.extent_type as i32, EXTENT_DIGITS);
 }
 
 /// The hero's vitality on the stats line.
-fn draw_vitality(game: &mut Game) {
-    move_to(game, VITALITY_POSITION.0, VITALITY_POSITION.1);
-    draw_text(&mut game.screen, b"Vit:");
-    print_number(game, game.actors.list[0].vitality as i32, VITALITY_DIGITS);
+fn draw_vitality(game: &mut Game, video: &mut Video) {
+    move_to(video, VITALITY_POSITION.0, VITALITY_POSITION.1);
+    draw_text(&mut video.screen, b"Vit:");
+    print_number(video, game.actors.list[0].vitality as i32, VITALITY_DIGITS);
 }
 
 /// Draws the hero's four stats (bravery, luck, kindness, wealth) along the stats line.
-fn draw_stats(game: &mut Game) {
+fn draw_stats(game: &mut Game, video: &mut Video) {
     if game.hero.luck < 0 {
         game.hero.luck = 0;
     }
@@ -95,8 +96,8 @@ fn draw_stats(game: &mut Game) {
         (KINDNESS_X, b"Knd:", game.hero.kindness),
         (WEALTH_X, b"Wlth:", game.hero.wealth),
     ] {
-        move_to(game, x, STATS_Y);
-        draw_text(&mut game.screen, label);
-        print_number(game, value as i32, STAT_DIGITS);
+        move_to(video, x, STATS_Y);
+        draw_text(&mut video.screen, label);
+        print_number(video, value as i32, STAT_DIGITS);
     }
 }

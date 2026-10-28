@@ -7,6 +7,7 @@ use crate::game::data::random::{fta_rand, rand4, rand64};
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 use crate::game::data::state::World;
 use crate::game::files::disk::{motor_off, read_finished};
 use crate::game::files::loading::finish_sprite_load;
@@ -53,11 +54,11 @@ const INDOOR_REGION: u16 = 7;
 
 /// Says where the hero is, finishes loading monsters, places waiting ones and now and then
 /// starts a new random encounter.
-pub fn spawn_encounters(game: &mut Game) {
-    find_place(game, 2);
+pub fn spawn_encounters(game: &mut Game, video: &mut Video) {
+    find_place(game, video, 2);
 
     if game.actors.loading == 1 && read_finished(DISK_REQUEST_ACTORS) != 0 {
-        finish_sprite_load(game, ENEMY_SLOT);
+        finish_sprite_load(video, ENEMY_SLOT);
         motor_off();
         game.actors.loading = 0;
         game.actors.active = FIRST_ENEMY_ACTOR;
@@ -71,7 +72,7 @@ pub fn spawn_encounters(game: &mut Game) {
     }
 
     if random_encounter_due(&game.actors, &game.world) {
-        roll_random_encounter(game);
+        roll_random_encounter(game, video);
     }
 }
 
@@ -86,7 +87,7 @@ fn random_encounter_due(actors: &Actors, world: &World) -> bool {
 
 /// Rolls the danger of the area against a random number; if it is beaten, picks the kind of the
 /// encounter (a few extents decide it by rule) and starts loading the monsters' sprites.
-fn roll_random_encounter(game: &mut Game) {
+fn roll_random_encounter(game: &mut Game, video: &mut Video) {
     game.encounter.danger_level = (if game.world.region > INDOOR_REGION {
         DANGER_BASE_INDOORS + game.world.extent_type
     } else {
@@ -110,7 +111,7 @@ fn roll_random_encounter(game: &mut Game) {
             game.encounter.mix_flag = 0;
         }
 
-        load_enemy_sprites(game);
+        load_enemy_sprites(game, video);
     }
 }
 

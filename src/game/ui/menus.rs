@@ -6,6 +6,7 @@
 
 use crate::game::data::state::Game;
 use crate::game::data::state::Ui;
+use crate::game::data::state::Video;
 use crate::game::data::tables::{key_colors, label1};
 use crate::game::input::handler::forget_last_menu;
 use crate::game::render::screen::PortId;
@@ -96,7 +97,7 @@ const SHOWN: i8 = 2;
 
 /// Draws the current menu (`current_menu`): the entries that are switched on, in the order they are shown,
 /// and blanks over the slots that are left. `slot_entries` remembers which entry each slot is.
-pub fn print_options(game: &mut Game) {
+pub fn print_options(game: &mut Game, video: &mut Video) {
     let menu = game.menus[game.ui.current_menu as usize];
     let mut slot = 0usize;
 
@@ -109,7 +110,7 @@ pub fn print_options(game: &mut Game) {
 
         game.ui.slot_entries[slot] = entry as i8;
 
-        print_menu_entry(game, slot as i16, (enabled & 1) as i16);
+        print_menu_entry(game, video, slot as i16, (enabled & 1) as i16);
         slot += 1;
 
         if slot > SLOTS - 1 {
@@ -117,7 +118,7 @@ pub fn print_options(game: &mut Game) {
         }
     }
 
-    blank_slots_from(&mut game.ui, &mut game.screen, slot);
+    blank_slots_from(&mut game.ui, &mut video.screen, slot);
 }
 
 /// Blanks the slots from `first` to the last one: nothing is shown there.
@@ -140,14 +141,14 @@ fn blank_slots_from(ui: &mut Ui, screen: &mut Screen, first: usize) {
 }
 
 /// Switches to menu `mode` and redraws it, unless the game is paused.
-pub fn go_to_menu(game: &mut Game, mode: i16) {
+pub fn go_to_menu(game: &mut Game, video: &mut Video, mode: i16) {
     if game.menus[GAME].enabled[PAUSE_ENTRY] & 1 != 0 {
         return;
     }
 
     game.ui.current_menu = mode;
     forget_last_menu();
-    print_options(game);
+    print_options(game, video);
 }
 
 // Where the menu entries are drawn in the text panel: two columns, a row every 9 pixels.
@@ -171,11 +172,11 @@ const MAIN_PEN: u32 = 4;
 
 /// Draws entry slot `j` (0-11) of the current menu in the panel. `pena` is the text colour:
 /// 1 for a selected entry, 0 for a plain one. The box colour depends on the menu.
-pub fn print_menu_entry(game: &mut Game, j: i16, pena: i16) {
+pub fn print_menu_entry(game: &mut Game, video: &mut Video, j: i16, pena: i16) {
     let entry = game.ui.slot_entries[j as usize] as i32;
-    game.screen.set_a_pen(PortId::Text2, pena as u8);
+    video.screen.set_a_pen(PortId::Text2, pena as u8);
     let box_pen = entry_box_pen(game, entry) as u8;
-    game.screen.set_b_pen(PortId::Text2, box_pen);
+    video.screen.set_b_pen(PortId::Text2, box_pen);
 
     let offset = entry * LABEL_LEN;
 
@@ -187,10 +188,10 @@ pub fn print_menu_entry(game: &mut Game, j: i16, pena: i16) {
 
     let y = (j as i32 / 2) * ROW_HEIGHT + FIRST_ROW_Y;
     let label = entry_label(game, offset);
-    game.screen.move_to(PortId::Text2, x, y);
-    game.screen.text(PortId::Text2, BOX);
-    game.screen.move_to(PortId::Text2, x + TEXT_INSET, y);
-    game.screen.text(PortId::Text2, label);
+    video.screen.move_to(PortId::Text2, x, y);
+    video.screen.text(PortId::Text2, BOX);
+    video.screen.move_to(PortId::Text2, x + TEXT_INSET, y);
+    video.screen.text(PortId::Text2, label);
 }
 
 /// The colour of the box behind an entry of the current menu: fixed for the use and file menus and

@@ -20,6 +20,7 @@ use self::shop::buy_option;
 use self::talk::talk_option;
 use self::use_item::{keys_option, use_option};
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 
 use crate::game::ui::items_menu::items_option;
 use crate::game::ui::magic::magic_option;
@@ -47,23 +48,23 @@ const PRQ_STATS: i32 = 4;
 const PRQ_VITALITY: i32 = 7;
 
 /// Does what menu entry `chosen_entry` of the current menu `current_menu` says.
-pub fn choose_menu_entry(game: &mut Game, chosen_entry: i16) {
+pub fn choose_menu_entry(game: &mut Game, video: &mut Video, chosen_entry: i16) {
     let refresh = match game.ui.current_menu as i32 {
         ITEMS => {
-            items_option(game, chosen_entry);
+            items_option(game, video, chosen_entry);
 
             true
         }
 
-        MAGIC => magic_option(game, chosen_entry),
-        TALK => talk_option(game, chosen_entry),
-        BUY => buy_option(game, chosen_entry),
-        GAME => game_option(game, chosen_entry),
-        USE => use_option(game, chosen_entry),
-        SAVEX => save_exit_option(game, chosen_entry),
-        FILE => file_option(game, chosen_entry),
-        KEYS => keys_option(game, chosen_entry),
-        GIVE => give_option(game, chosen_entry),
+        MAGIC => magic_option(game, video, chosen_entry),
+        TALK => talk_option(game, video, chosen_entry),
+        BUY => buy_option(game, video, chosen_entry),
+        GAME => game_option(game, video, chosen_entry),
+        USE => use_option(game, video, chosen_entry),
+        SAVEX => save_exit_option(game, video, chosen_entry),
+        FILE => file_option(game, video, chosen_entry),
+        KEYS => keys_option(game, video, chosen_entry),
+        GIVE => give_option(game, video, chosen_entry),
         _ => true,
     };
 

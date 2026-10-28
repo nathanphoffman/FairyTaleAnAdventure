@@ -3,6 +3,7 @@
 use super::drawing::PLANE_COUNT;
 use super::lookup::{SECTOR_BYTES, SECTOR_ROWS_IN_REGION};
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 
 // The overview map (magic spell): each sector is drawn as 16 x 16 pixels, 18 x 9 sectors.
 pub(super) const OVERVIEW_COLUMNS: i16 = 18;
@@ -66,7 +67,7 @@ pub(super) fn overview_origin(mx: i32, my: i32, region_x: u16, region_y: u16) ->
 /// Draws the overview map (the magic map spell): each sector is one 16 by 8 block of pixels drawn
 /// twice as tall, 18 x 9 sectors across the screen. Each pixel's colour is the tile's overview
 /// colour (terrain table byte 3). `sector_x` / `sector_y` tell the caller which sector is at the top left.
-pub fn draw_overview_map(game: &mut Game, mx: i32, my: i32) {
+pub fn draw_overview_map(game: &mut Game, video: &mut Video, mx: i32, my: i32) {
     let (x, y) = overview_origin(mx, my, game.world.origin_x, game.world.origin_y);
     game.world.sector_x = x as i32;
     game.world.sector_y = y as i32;
@@ -77,9 +78,9 @@ pub fn draw_overview_map(game: &mut Game, mx: i32, my: i32) {
             let index =
                 // Index into the region map: the sector row times 128 plus the column.
                 game.world.origin_x as i32 + x as i32 + i as i32 + (((y + j) as i32) << MAP_ROW_SHIFT);
-            let sec = game.memory.map_byte(index as u16 as usize) as usize;
+            let sec = game.map.map_byte(index as u16 as usize) as usize;
 
-            draw_overview_sector(game, sec * SECTOR_BYTES, offset);
+            draw_overview_sector(game, video, sec * SECTOR_BYTES, offset);
             offset += 2;
         }
 
@@ -88,12 +89,12 @@ pub fn draw_overview_map(game: &mut Game, mx: i32, my: i32) {
 }
 
 /// Draws one sector of the overview, 8 lines of 16 pixels, `offset` bytes into the screen planes.
-fn draw_overview_sector(game: &mut Game, tiles: usize, offset: usize) {
+fn draw_overview_sector(game: &mut Game, video: &mut Video, tiles: usize, offset: usize) {
     for line in 0..SECTOR_TILE_ROWS {
         let words = overview_line_words(game, tiles, line);
 
         for (p, word) in words.iter().enumerate() {
-            let plane = game.screen.draw_bitmap_mut().plane_mut(p);
+            let plane = video.screen.draw_bitmap_mut().plane_mut(p);
             let d = offset + line * OVERVIEW_LINE_BYTES;
 
             // A 16 pixel row is two bytes, high byte first.
@@ -112,9 +113,9 @@ fn overview_line_words(game: &mut Game, tiles: usize, line: usize) -> [u32; PLAN
     let mut words = [0u32; PLANE_COUNT];
 
     for px in 0..SECTOR_PIXELS {
-        let tile = game.memory.sector_byte(tiles + line * TILE_ROW_PIXELS + px) as usize;
+        let tile = game.map.sector_byte(tiles + line * TILE_ROW_PIXELS + px) as usize;
         let color = game
-            .memory
+            .map
             .terrain_byte(tile * TERRAIN_ENTRY_BYTES + TERRAIN_COLOR_BYTE);
 
         for (p, word) in words.iter_mut().enumerate() {

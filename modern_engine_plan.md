@@ -41,16 +41,30 @@ Both engines share the rules. They differ only in how they draw and read input.
    `initial_*`. `ActorRef` and `MissileRef` are plain slot numbers: read an actor with
    `game.actors.list[r.slot()]`.
 
+9. Cleanup pass after the state move: the loose fields are grouped (`Blitter`, `PrintQueue`, `Witch`,
+   `Ui`, `Actors`, ...), actors are read with `game.actor(r)` / `game.actor_mut(r)`, the boilerplate
+   bit-mask comments are gone, table lookups that could be out of range use `tables::entry`, and 61
+   functions take only the parts of `Game` they use (`&Hero`, `&mut Rng`, `&mut Screen`, ...).
+10. Rules and drawing state are two values: `Game` (hero, world, actors, ui, encounter, witch, rng,
+   extents, menus, objects, `map`: sector and terrain data) and `Video` (`screen`, `graphics`: tile
+   images, shadow masks and sprite sheets, `blitter`, `page_colors`). `run_game` creates both and
+   passes `&mut Game` and `&mut Video` down. `platform/display` only takes a `Scene`; the state-dump
+   test hook lives in `game/render/display.rs`.
+
 **Not done.**
-- `Game` still holds the Amiga-flavoured pieces (`screen`, `memory`, blitter work variables like
-  `current_sshape`) next to the rules state, and the `platform/` display code takes `&mut Game` for
-  its test hooks. Rules and drawing are not separated yet.
+- The rules code still calls drawing code directly (printing text into the panel, fades, `delay`),
+  so most functions take both `game` and `video`. A real split would have the rules produce events
+  or messages and a renderer show them; that is what step 5 and 6 below need.
+- About 270 functions still take the whole `&mut Game`; 10 have more than six parameters (marked
+  `allow(clippy::too_many_arguments)`).
+- `platform/display/scripting.rs` still calls `game::statedump::queue_command` for the test commands,
+  and `platform/input` feeds keys to `game::input::handler`.
 - Steps 5 to 7 below (classic/modern engines, remastered, reimagined) have not been started.
 
 **Plan for what comes next, in order.**
-1. *Separate rules from drawing* (the "core idea" above): a `Game` without SDL or bitmaps, and a
-   renderer that reads it. Move `screen`, `memory` and the blitter variables out of `Game` into a
-   separate render state, and make the platform hooks work on that. This is what steps 5 and 6 need.
+1. *Make the rules independent of drawing*: give the rules a small output interface (print a message,
+   play a sound, fade, wait) that `Video` implements, so `Game` can run without a screen. Then the
+   modern renderer can read `Game` directly.
 2. Step 5 (classic engine, improved options), step 6 (modern renderer: RGBA tiles, zoom, bigger view),
    step 7 (data files for items, enemies, spells and text).
 

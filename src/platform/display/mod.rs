@@ -11,7 +11,6 @@ mod hooks;
 
 mod scripting;
 
-use crate::game::data::state::Game;
 use crate::gfx::scene::{FRAME_HEIGHT, FRAME_WIDTH, Scene, compose};
 use sdl2::EventPump;
 use sdl2::pixels::PixelFormatEnum;
@@ -183,25 +182,25 @@ fn draw(d: &mut Display, scene: &Scene) {
 }
 
 /// Shows the scene on screen (the game calls this when it flips pages).
-pub fn present(game: &mut Game) {
+pub fn present(scene: &Scene) {
     BEAT.fetch_add(1, Ordering::Relaxed);
     DISPLAY.with(|d| {
         let mut d = d.borrow_mut();
 
         let Some(d) = d.as_mut() else { return };
-        draw(d, &game.screen.scene());
+        draw(d, scene);
         d.presents += 1;
         events::handle_events(d);
-        hooks::test_hooks(game, d);
+        hooks::test_hooks(d);
     });
 }
 
 /// Redraws every tick. Some screens (the item list, story pages) never flip pages, but the pointer
 /// still moves and text is still printed into the bitmaps.
-fn redraw(game: &Game) {
+fn redraw(scene: &Scene) {
     DISPLAY.with(|d| {
         if let Some(d) = d.borrow_mut().as_mut() {
-            draw(d, &game.screen.scene());
+            draw(d, scene);
         }
     });
 }
@@ -220,13 +219,13 @@ fn pace(d: &mut Display) -> Duration {
 }
 
 /// Waits for the next 50 Hz tick (the Amiga's vertical blank), keeping the window alive.
-pub fn wait_frame(game: &mut Game) {
+pub fn wait_frame(scene: &Scene) {
     BEAT.fetch_add(1, Ordering::Relaxed);
     let wait = DISPLAY.with(|d| {
         let mut d = d.borrow_mut();
         let d = d.as_mut()?;
         events::handle_events(d);
-        hooks::test_hooks(game, d);
+        hooks::test_hooks(d);
         d.ticks += 1;
         scripting::run_script(d);
 
@@ -239,13 +238,11 @@ pub fn wait_frame(game: &mut Game) {
             std::thread::sleep(w);
         }
 
-        redraw(game);
+        redraw(scene);
     }
 }
 
-/// Waits n ticks of 1/50 second, showing the scene.
-pub fn delay(game: &mut Game, ticks: i32) {
-    for _ in 0..ticks.max(1) {
-        wait_frame(game);
-    }
+/// How many ticks of 1/50 second have passed since the window opened (0 without a window).
+pub fn ticks() -> u32 {
+    DISPLAY.with(|d| d.borrow().as_ref().map_or(0, |d| d.ticks))
 }

@@ -6,6 +6,7 @@
 
 use crate::game::actors::encounters::check_death;
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 use crate::game::data::types::Shape;
 use crate::game::world::places::transfer_hero;
 use std::path::Path;
@@ -55,35 +56,35 @@ pub fn queue_command(command: Command) {
 }
 
 /// Runs the queued command, if any. Called at the top of every frame.
-pub fn run_pending_command(game: &mut Game) {
+pub fn run_pending_command(game: &mut Game, video: &mut Video) {
     let Some(command) = lock_pending().take() else {
         return;
     };
 
     match command {
         Command::Teleport { x, y } => {
-            transfer_hero(game, x as u16, y as u16, 1);
+            transfer_hero(game, video, x as u16, y as u16, 1);
         }
 
         Command::Give { slot, count } => game.hero.stuff_mut()[slot as usize] = count as u8,
         Command::SetStat { stat: 0, value } => game.hero.hunger = value as i16,
         Command::SetStat { stat: 1, value } => game.hero.fatigue = value as i16,
         Command::SetStat { value, .. } => game.hero.wealth = value as i16,
-        Command::SlayEnemies => slay_enemies(game),
+        Command::SlayEnemies => slay_enemies(game, video),
         Command::KillHero { luck: remaining } => {
             game.hero.luck = remaining as i16;
             game.actors.list[0].vitality = 0;
-            check_death(game, 0, DEATH_BY_TEST);
+            check_death(game, video, 0, DEATH_BY_TEST);
         }
     }
 }
 
 /// Kills every enemy that is out, as if each had been defeated.
-fn slay_enemies(game: &mut Game) {
+fn slay_enemies(game: &mut Game, video: &mut Video) {
     for i in FIRST_ENEMY_SLOT..game.actors.active {
         if game.actors.list[i as usize].kind == ENEMY {
             game.actors.list[i as usize].vitality = 0;
-            check_death(game, i as i32, 0);
+            check_death(game, video, i as i32, 0);
         }
     }
 }

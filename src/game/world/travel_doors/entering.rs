@@ -2,6 +2,7 @@
 
 use super::{CAVE, DOORCOUNT, LOWER_HALF_BIT, TILE_COLUMN_MASK, TILE_WIDTH};
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 use crate::game::data::tables::door_list;
 use crate::game::data::types::Door;
 use crate::game::render::screen_fx::fade_page;
@@ -65,7 +66,7 @@ pub(super) fn door_at(j: i32) -> &'static Door {
     &door_list[j as usize]
 }
 
-pub(super) fn enter_door(game: &mut Game, xtest: u16, ytest: u16) {
+pub(super) fn enter_door(game: &mut Game, video: &mut Video, xtest: u16, ytest: u16) {
     let Some(index) = find_outdoor_door(xtest, ytest) else {
         return;
     };
@@ -76,10 +77,10 @@ pub(super) fn enter_door(game: &mut Game, xtest: u16, ytest: u16) {
     if may_enter(d, game.hero.x, game.hero.y, statues) {
         let (x, y) = inside_spot(d);
         game.world.new_region = region_inside(d);
-        transfer_hero(game, x, y, 0);
-        find_place(game, 2);
-        let colors = game.page_colors;
-        fade_page(game, FADE_WHITE, FADE_WHITE, FADE_WHITE, 1, &colors);
+        transfer_hero(game, video, x, y, 0);
+        find_place(game, video, 2);
+        let colors = video.page_colors;
+        fade_page(game, video, FADE_WHITE, FADE_WHITE, FADE_WHITE, 1, &colors);
     }
 }
 

@@ -4,6 +4,7 @@ use super::hunger::{eats_fruit, hunger_due, hunger_effects};
 use super::{MOOD_PERIOD_MASK, STARVING_AT, safe_check_due};
 use crate::game::data::state::Game;
 use crate::game::data::state::Hero;
+use crate::game::data::state::Video;
 use crate::game::data::types::Shape;
 use crate::game::ui::music::set_mood;
 use crate::game::ui::text::{queue_print, show_event};
@@ -25,7 +26,7 @@ fn mood_due(clock: u16, battle: bool) -> bool {
 }
 
 /// Notes a safe spot, picks the music, and makes the hero hungrier and more tired.
-pub fn survival_tick(game: &mut Game) {
+pub fn survival_tick(game: &mut Game, video: &mut Video) {
     let facts = SurvivalFacts {
         clock: game.world.day_clock,
         region: game.world.region,
@@ -39,7 +40,7 @@ pub fn survival_tick(game: &mut Game) {
 
     for step in steps {
         match step {
-            SurvivalStep::Event(e) => show_event(game, e),
+            SurvivalStep::Event(e) => show_event(game, video, e),
             SurvivalStep::RedrawStats => queue_print(&mut game.ui, PRQ_STATS),
             SurvivalStep::PickMusic => set_mood(game, 0),
         }

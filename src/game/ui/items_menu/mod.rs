@@ -15,6 +15,7 @@ use self::item_list::show_item_list;
 use self::look::look_around;
 use self::take::take_nearest;
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 
 use crate::game::data::tables::item_list;
 use crate::game::data::types::InvItem;
@@ -59,13 +60,13 @@ pub(in crate::game::ui) fn add_stuff(game: &mut Game, slot: usize, amount: u8) {
 }
 
 /// Handles an entry of the Items menu.
-pub fn items_option(game: &mut Game, chosen_entry: i16) {
+pub fn items_option(game: &mut Game, video: &mut Video, chosen_entry: i16) {
     match chosen_entry {
-        USE_ENTRY => go_to_menu(game, USE),
-        LIST => show_item_list(game),
-        TAKE => take_nearest(game),
-        LOOK => look_around(game),
-        GIVE_ENTRY => go_to_menu(game, GIVE),
+        USE_ENTRY => go_to_menu(game, video, USE),
+        LIST => show_item_list(game, video),
+        TAKE => take_nearest(game, video),
+        LOOK => look_around(game, video),
+        GIVE_ENTRY => go_to_menu(game, video, GIVE),
         _ => {}
     }
 }

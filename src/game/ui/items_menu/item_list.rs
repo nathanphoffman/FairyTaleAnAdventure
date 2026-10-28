@@ -3,6 +3,7 @@
 use super::{GOLDBASE, OBJECTS, item};
 use crate::game::data::state::Game;
 use crate::game::data::state::Hero;
+use crate::game::data::state::Video;
 use crate::game::render::screen::Screen;
 use crate::game::render::screen::{BitmapId, PortId, ViewPortId};
 use crate::game::render::screen_fx::show_still_screen;
@@ -31,29 +32,32 @@ const VIEW_ITEMS: i8 = 4;
 pub(super) const VIEW_GAME_OVER: i8 = 2;
 
 /// Draws every item the hero has, stacked, on a black page and shows it.
-pub(super) fn show_item_list(game: &mut Game) {
-    let page = game.screen.drawing_bitmap_id();
-    game.screen.port_mut(PortId::Map).target = Some(page);
-    game.screen.clear(PortId::Map, 0);
-    let pictures = item_pictures(game);
-    game.screen.set_bitmap(BitmapId::Items, pictures);
+pub(super) fn show_item_list(game: &mut Game, video: &mut Video) {
+    let page = video.screen.drawing_bitmap_id();
+    video.screen.port_mut(PortId::Map).target = Some(page);
+    video.screen.clear(PortId::Map, 0);
+    let pictures = item_pictures(video);
+    video.screen.set_bitmap(BitmapId::Items, pictures);
 
-    draw_item_icons(&mut game.screen, &mut game.hero, page);
+    draw_item_icons(&mut video.screen, &mut game.hero, page);
 
-    game.screen
+    video
+        .screen
         .set_color(ViewPortId::Page, BACKGROUND_PEN, (0, 0, 0));
-    show_still_screen(game);
-    game.screen.load_colors(ViewPortId::Page, &game.page_colors);
+    show_still_screen(game, video);
+    video
+        .screen
+        .load_colors(ViewPortId::Page, &video.page_colors);
 
-    game.screen.view_status = VIEW_ITEMS;
+    video.screen.view_status = VIEW_ITEMS;
     queue_print(&mut game.ui, PRQ_LIST);
 }
 
 /// The pictures of the objects as one long bitmap: the object sprite sheet holds each plane of an
 /// image 32 bytes after the one before, so plane `p` starts `p * 32` bytes into the sheet.
-fn item_pictures(game: &Game) -> Bitmap {
+fn item_pictures(video: &mut Video) -> Bitmap {
     {
-        let sheet = game.memory.seq_list[OBJECTS as usize].location;
+        let sheet = video.graphics.seq_list[OBJECTS as usize].location;
         let available = SHAPE_AREA_BYTES.saturating_sub(sheet);
         let mut pictures = Bitmap::new(ITEM_IMAGE_WIDTH, ITEM_IMAGE_ROWS, ITEM_IMAGE_PLANES);
 
@@ -64,7 +68,7 @@ fn item_pictures(game: &Game) -> Bitmap {
                 .len()
                 .min(available.saturating_sub(start));
             let from = sheet + start;
-            let source = &game.memory.shape[from..from + bytes];
+            let source = &video.graphics.shape[from..from + bytes];
             pictures.plane_mut(plane)[..bytes].copy_from_slice(source);
         }
 

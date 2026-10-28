@@ -2,7 +2,8 @@
 
 use super::{CARRIER, CFileInfo, DRAGON, cfile};
 use crate::game::data::state::Game;
-use crate::game::data::state::Memory;
+use crate::game::data::state::Graphics;
+use crate::game::data::state::Video;
 use crate::game::data::types::SeqInfo;
 use crate::game::files::disk::{
     is_last_read_pending, last_read_finished, load_track_range, mark_read_unused, motor_off,
@@ -65,40 +66,40 @@ const RAFT_FILE: i32 = 4;
 
 /// Loads the sprite sets the game starts with: objects, the current brother, the raft, the
 /// current monsters and set figures, then the region.
-pub fn load_start_sprites(game: &mut Game) {
-    game.memory.nextshape = 0;
-    load_sprite_file(game, OBJECTS_FILE);
-    finish_sprite_load(game, OBJECTS as i16);
-    load_sprite_file(game, game.hero.brother as i32 - 1);
-    finish_sprite_load(game, PHIL as i16);
-    load_sprite_file(game, RAFT_FILE);
-    finish_sprite_load(game, RAFT as i16);
-    sequence(&mut game.memory, ENEMY).location = game.memory.nextshape;
-    load_sprite_file(game, game.actors.loaded_actor_file as i32);
+pub fn load_start_sprites(game: &mut Game, video: &mut Video) {
+    video.graphics.nextshape = 0;
+    load_sprite_file(video, OBJECTS_FILE);
+    finish_sprite_load(video, OBJECTS as i16);
+    load_sprite_file(video, game.hero.brother as i32 - 1);
+    finish_sprite_load(video, PHIL as i16);
+    load_sprite_file(video, RAFT_FILE);
+    finish_sprite_load(video, RAFT as i16);
+    sequence(&mut video.graphics, ENEMY).location = video.graphics.nextshape;
+    load_sprite_file(video, game.actors.loaded_actor_file as i32);
     finish_sprite_load(
-        game,
+        video,
         SPRITE_FILES[game.actors.loaded_actor_file as usize].seq_num as i16,
     );
-    load_sprite_file(game, game.actors.loaded_setfig_file as i32);
-    finish_sprite_load(game, SETFIG as i16);
+    load_sprite_file(video, game.actors.loaded_setfig_file as i32);
+    finish_sprite_load(video, SETFIG as i16);
     game.world.new_region = game.world.region;
-    load_region_now(game);
+    load_region_now(game, video);
     motor_off();
 }
 
 /// The `seq_list` entry for a sprite slot (PHIL, OBJECTS, ENEMY ...).
-pub(super) fn sequence(memory: &mut Memory, slot: u8) -> &mut SeqInfo {
-    &mut memory.seq_list[slot as usize]
+pub(super) fn sequence(graphics: &mut Graphics, slot: u8) -> &mut SeqInfo {
+    &mut graphics.seq_list[slot as usize]
 }
 
 /// Starts loading sprite file `num` into the next free shape memory, if it fits.
 ///
 /// Each sequence is stored as 5 planes of `size` bytes followed by a one-plane mask (`size` bytes).
 /// The check makes sure that all of it, with room to spare, fits in the scratch area.
-pub fn load_sprite_file(game: &mut Game, num: i32) {
+pub fn load_sprite_file(video: &mut Video, num: i32) {
     let file = &SPRITE_FILES[num as usize];
-    let next = game.memory.nextshape;
-    let slot = sequence(&mut game.memory, file.seq_num);
+    let next = video.graphics.nextshape;
+    let slot = sequence(&mut video.graphics, file.seq_num);
     slot.bytes = file.height as i16 * file.width as i16 * 2;
     let size = slot.bytes as usize * file.count as usize;
     slot.location = next;
@@ -107,8 +108,8 @@ pub fn load_sprite_file(game: &mut Game, num: i32) {
     slot.count = file.count as i16;
 
     if next + size * SIZE_WITH_MASK <= SHAPE_SIZE {
-        let end = (next + file.numblocks as usize * BLOCK_BYTES).min(game.memory.shape.len());
-        let area = &mut game.memory.shape[next..end];
+        let end = (next + file.numblocks as usize * BLOCK_BYTES).min(video.graphics.shape.len());
+        let area = &mut video.graphics.shape[next..end];
         load_track_range(
             file.file_id as i16,
             file.numblocks as i16,
@@ -117,19 +118,19 @@ pub fn load_sprite_file(game: &mut Game, num: i32) {
         );
 
         let mask = next + size * SIZE_WITHOUT_MASK;
-        sequence(&mut game.memory, file.seq_num).maskloc = mask;
-        game.memory.nextshape = mask + size;
+        sequence(&mut video.graphics, file.seq_num).maskloc = mask;
+        video.graphics.nextshape = mask + size;
     }
 }
 
 /// Waits for the sprite load to finish and builds the masks for slot `slot`.
-pub fn finish_sprite_load(game: &mut Game, slot: i16) {
+pub fn finish_sprite_load(video: &mut Video, slot: i16) {
     wait_for_read(SPRITE_REQUEST as i32);
     mark_read_unused(SPRITE_REQUEST as i32);
     {
-        let s = *sequence(&mut game.memory, slot as u8);
+        let s = *sequence(&mut video.graphics, slot as u8);
         make_sprite_masks(
-            &mut game.memory,
+            &mut video.graphics,
             s.location,
             s.maskloc,
             s.width as i32,
@@ -141,9 +142,9 @@ pub fn finish_sprite_load(game: &mut Game, slot: i16) {
 
 /// Loads the next region once the previous disk read is done. On the Amiga the disk was slow, so
 /// the game kept playing while a region loaded in the background and called this to check.
-pub fn load_pending_region(game: &mut Game) {
+pub fn load_pending_region(game: &mut Game, video: &mut Video) {
     if is_last_read_pending() == 0 || last_read_finished() != 0 {
-        load_region_piece(game);
+        load_region_piece(game, video);
     }
 }
 

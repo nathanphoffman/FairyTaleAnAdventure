@@ -5,6 +5,7 @@ mod effects;
 
 use self::effects::{heal, scare_enemies, show_map, stone_jump};
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 
 use crate::game::ui::menus::update_menu_availability;
 use crate::game::ui::text::{show_event, speak};
@@ -35,12 +36,12 @@ const RIDING_BIG: i16 = 1;
 
 /// Handles an entry of the Magic menu. Returns false if `update_menu_availability` should not follow
 /// (the spell did not work, so the stone is not used up).
-pub fn magic_option(game: &mut Game, chosen_entry: i16) -> bool {
-    if let Some(result) = refuse_spell(game, chosen_entry) {
+pub fn magic_option(game: &mut Game, video: &mut Video, chosen_entry: i16) -> bool {
+    if let Some(result) = refuse_spell(game, video, chosen_entry) {
         return result;
     }
 
-    if !cast_spell(game, chosen_entry) {
+    if !cast_spell(game, video, chosen_entry) {
         return false;
     }
 
@@ -51,7 +52,7 @@ pub fn magic_option(game: &mut Game, chosen_entry: i16) -> bool {
 
 /// Checks that the spell can be cast here and now. Gives `Some(result)` for `magic_option` to
 /// return when it cannot, and `None` when the spell goes ahead.
-fn refuse_spell(game: &mut Game, chosen_entry: i16) -> Option<bool> {
+fn refuse_spell(game: &mut Game, video: &mut Video, chosen_entry: i16) -> Option<bool> {
     let count = if chosen_entry < FIRST_SPELL {
         0
     } else {
@@ -69,13 +70,13 @@ fn refuse_spell(game: &mut Game, chosen_entry: i16) -> Option<bool> {
 
     match gate {
         SpellGate::NoSpell => {
-            show_event(game, NO_SPELL_EVENT);
+            show_event(game, video, NO_SPELL_EVENT);
 
             Some(true)
         }
 
         SpellGate::QuietZone => {
-            speak(game, NO_MAGIC_SPEECH);
+            speak(game, video, NO_MAGIC_SPEECH);
 
             Some(true)
         }
@@ -86,22 +87,22 @@ fn refuse_spell(game: &mut Game, chosen_entry: i16) -> Option<bool> {
 }
 
 /// Casts the spell. Returns false if it did not work (the stone ring only works in a circle).
-fn cast_spell(game: &mut Game, chosen_entry: i16) -> bool {
+fn cast_spell(game: &mut Game, video: &mut Video, chosen_entry: i16) -> bool {
     match chosen_entry {
         SPELL_LIGHT => game.world.light_timer += LIGHT_TIME,
         SPELL_SECRET => game.world.secret_timer += SECRET_TIME,
         SPELL_FREEZE => game.world.freeze_timer += FREEZE_TIME,
-        SPELL_MAP => show_map(game),
+        SPELL_MAP => show_map(game, video),
         SPELL_STONE => {
-            if !stone_jump(game) {
+            if !stone_jump(game, video) {
                 return false;
             }
 
-            heal(game);
+            heal(game, video);
         }
 
-        SPELL_HEAL => heal(game),
-        SPELL_FEAR => scare_enemies(game),
+        SPELL_HEAL => heal(game, video),
+        SPELL_FEAR => scare_enemies(game, video),
         _ => {}
     }
 

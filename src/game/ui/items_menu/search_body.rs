@@ -5,15 +5,16 @@ use crate::game::data::object_tables::treasure_probs;
 use crate::game::data::random::{Rng, rand8};
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 use crate::game::data::tables::{encounter_chart, entry};
 use crate::game::ui::messages::{print, print_cont, print_wrapped};
 use crate::game::ui::text::print_number;
 
 /// Searches the dead body `nearest_object`: takes its weapon and any treasure.
-pub(super) fn search_body(game: &mut Game) {
+pub(super) fn search_body(game: &mut Game, video: &mut Video) {
     let actor = ActorRef::new(game.actors.nearest_object as usize);
-    print_wrapped(game, "% searched the body and found");
-    print(game, "");
+    print_wrapped(game, video, "% searched the body and found");
+    print(video, "");
     let (body_weapon, hero_weapon) = (game.actor(actor).weapon, game.actors.list[0].weapon);
     let race = game.actor(actor).race;
     let rng = &mut game.rng;
@@ -24,26 +25,26 @@ pub(super) fn search_body(game: &mut Game) {
 
     game.actor_mut(actor).weapon = -1;
 
-    take_found_weapon(game, &loot);
+    take_found_weapon(game, video, &loot);
 
     if let Some(arrows) = loot.arrows {
-        print_cont(game, " and ");
-        print_number(game, arrows, 1);
-        print_cont(game, " Arrows.");
+        print_cont(video, " and ");
+        print_number(video, arrows, 1);
+        print_cont(video, " Arrows.");
         add_stuff(game, ARROWS, arrows as u8);
 
         return;
     }
 
-    take_treasure(game, &loot);
-    print_cont(game, ".");
+    take_treasure(game, video, &loot);
+    print_cont(video, ".");
 }
 
 /// Says what weapon was found, adds it to the pack, and arms the hero with it if it is better.
-fn take_found_weapon(game: &mut Game, loot: &BodyLoot) {
+fn take_found_weapon(game: &mut Game, video: &mut Video, loot: &BodyLoot) {
     if loot.weapon != 0 {
-        print_cont(game, "a ");
-        print_cont(game, item_name(loot.weapon as usize - 1));
+        print_cont(video, "a ");
+        print_cont(video, item_name(loot.weapon as usize - 1));
         add_stuff(game, loot.weapon as usize - 1, 1);
         game.actors.list[0].weapon = loot.hero_weapon;
     }
@@ -51,17 +52,17 @@ fn take_found_weapon(game: &mut Game, loot: &BodyLoot) {
 
 /// Says what other treasure was found and takes it: gold into the purse, anything else into the
 /// pack. Says "nothing" if there was neither weapon nor treasure.
-fn take_treasure(game: &mut Game, loot: &BodyLoot) {
+fn take_treasure(game: &mut Game, video: &mut Video, loot: &BodyLoot) {
     if loot.treasure != 0 {
         if loot.weapon != 0 {
-            print_cont(game, " and ");
+            print_cont(video, " and ");
         }
 
         if loot.treasure < GOLDBASE as u32 {
-            print_cont(game, "a ");
+            print_cont(video, "a ");
         }
 
-        print_cont(game, item_name(loot.treasure as usize));
+        print_cont(video, item_name(loot.treasure as usize));
 
         if loot.treasure >= GOLDBASE as u32 {
             game.hero.wealth += item(loot.treasure as usize).maxshown as i16;
@@ -69,7 +70,7 @@ fn take_treasure(game: &mut Game, loot: &BodyLoot) {
             add_stuff(game, loot.treasure as usize, 1);
         }
     } else if loot.weapon == 0 {
-        print_cont(game, "nothing");
+        print_cont(video, "nothing");
     }
 }
 

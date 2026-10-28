@@ -5,6 +5,7 @@ use crate::game::data::state::ActorRef;
 use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
 use crate::game::data::state::Hero;
+use crate::game::data::state::Video;
 use crate::game::data::state::World;
 use crate::game::render::blit::{add_scenery_mask, clear_memory};
 
@@ -57,8 +58,8 @@ const TALL_HEIGHT: i16 = 35;
 const LOW_HEIGHT: i16 = 20;
 
 /// Zeroes the scenery mask buffer, ready for the next sprite.
-pub(super) fn clear_scenery_mask(game: &mut Game) {
-    clear_memory(game, MASK_CLEAR_SIZE);
+pub(super) fn clear_scenery_mask(video: &mut Video) {
+    clear_memory(video, MASK_CLEAR_SIZE);
 }
 
 /// True for sprites drawn in front of everything: carriers, the hero when riding the swan or in
@@ -142,6 +143,7 @@ struct SpriteTiles {
 #[allow(clippy::too_many_arguments)] // the tile loop of the original, kept as one call
 pub(super) fn mask_against_scenery(
     game: &mut Game,
+    video: &mut Video,
     actor: ActorRef,
     i: i32,
     ground: i16,
@@ -164,7 +166,7 @@ pub(super) fn mask_against_scenery(
     for xm in 0..blitwide.max(0) as i32 {
         for ym in 0..=ym2 as i32 {
             if let Some(mask) = tiles.mask_of_tile(game, xm, ym) {
-                add_scenery_mask(game, xm, ym, blitwide as i32, mask);
+                add_scenery_mask(video, xm, ym, blitwide as i32, mask);
             }
         }
     }
@@ -177,8 +179,8 @@ impl SpriteTiles {
         // Back from tile rows to pixels.
         let ystop = self.ground - (((ym + self.ym1 as i32) << TILE_ROW_SHIFT) as i16);
         let mut cm = ((xm + self.xbw as i32) * MINIMAP_COLUMN_TILES + ym + self.ym1 as i32) as i16;
-        cm = (game.memory.minimap[cm as usize] as i32 * TERRAIN_ENTRY_BYTES) as i16;
-        let mut k = (game.memory.terrain_byte(cm as usize + 1) & TERRAIN_TYPE_MASK) as i16;
+        cm = (game.map.minimap[cm as usize] as i32 * TERRAIN_ENTRY_BYTES) as i16;
+        let mut k = (game.map.terrain_byte(cm as usize + 1) & TERRAIN_TYPE_MASK) as i16;
 
         if game.actor(self.actor).state == FALL {
             if cm <= FALL_TILE_LIMIT {
@@ -196,7 +198,7 @@ impl SpriteTiles {
             SceneryRule::UseTileMask => {}
         }
 
-        Some(game.memory.terrain_byte(cm as usize) as i32)
+        Some(game.map.terrain_byte(cm as usize) as i32)
     }
 }
 

@@ -4,8 +4,8 @@ use super::weapons::weapon_image;
 use super::{CARRIER, DEAD, DYING, ENEMY, FALL, OBJECTS, PHIL, RAFT, Sprite};
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Actors;
-use crate::game::data::state::Game;
 use crate::game::data::state::Hero;
+use crate::game::data::state::Video;
 use crate::game::data::tables::{animation_frames, entry};
 use crate::game::data::types::{SeqInfo, StateEntry};
 
@@ -57,10 +57,11 @@ pub(super) fn byte_of(table: &[i8; 32], inum: i16) -> i16 {
 }
 
 /// Where the images of one kind of sprite are (`seq_list` entry `atype`).
-pub(super) fn sprite_sheet(game: &Game, atype: i16) -> &SeqInfo {
+pub(super) fn sprite_sheet(video: &Video, atype: i16) -> &SeqInfo {
     static NO_SHEET: SeqInfo = SeqInfo::EMPTY;
 
-    game.memory
+    video
+        .graphics
         .seq_list
         .get(atype as usize)
         .unwrap_or(&NO_SHEET)

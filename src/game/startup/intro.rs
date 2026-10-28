@@ -3,6 +3,7 @@
 
 use crate::game::actors::revive::revive;
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 use crate::game::data::story_text::TITLE_TEXT;
 use crate::game::data::tables::{black_colors, text_colors};
 use crate::game::files::disk::load_track_range;
@@ -77,10 +78,10 @@ const PLACARD_COPYRIGHT: i32 = 19;
 const SHADOW_BLOCK: (i16, i16) = (896, 24);
 
 /// Returns false if the player failed the copy protection.
-pub(super) fn start_up(game: &mut Game) -> bool {
+pub(super) fn start_up(game: &mut Game, video: &mut Video) -> bool {
     stopscore();
-    show_title_screen(game);
-    prepare_intro(game);
+    show_title_screen(game, video);
+    prepare_intro(game, video);
 
     if let Some(dir) = std::env::var_os("FTA_MUSIC_EXPORT") {
         crate::game::ui::music::export_tunes(std::path::Path::new(&dir));
@@ -89,18 +90,18 @@ pub(super) fn start_up(game: &mut Game) -> bool {
     }
 
     if intro_skipped(&mut game.ui) == 0 {
-        play_intro(game);
+        play_intro(game, video);
     }
 
     copy_protection_check();
-    show_play_screen_background(game);
+    show_play_screen_background(game, video);
 
     if copy_protection_riddle() == 0 {
         return false;
     }
 
-    delay(game, PLACARD_WAIT);
-    start_first_brother(game);
+    delay(game, video, PLACARD_WAIT);
+    start_first_brother(game, video);
 
     true
 }
@@ -119,134 +120,139 @@ fn set_page_color(screen: &mut Screen, color: usize, rgb: (u32, u32, u32)) {
 }
 
 /// The legal title text on a blue page, then the music and the sound effects are read in.
-fn show_title_screen(game: &mut Game) {
-    game.screen.vp_page.ras = Some(0);
-    game.screen.pages[1].ras = 1;
-    clear_both_pages(&mut game.screen);
-    game.screen.current_port = PortId::Map;
-    set_intro_zoom(game, ZOOM_NORMAL);
-    set_page_color(&mut game.screen, BACKGROUND_COLOR, TITLE_BLUE);
-    set_page_color(&mut game.screen, TEXT_COLOR, WHITE_RGB);
+fn show_title_screen(game: &mut Game, video: &mut Video) {
+    video.screen.vp_page.ras = Some(0);
+    video.screen.pages[1].ras = 1;
+    clear_both_pages(&mut video.screen);
+    video.screen.current_port = PortId::Map;
+    set_intro_zoom(game, video, ZOOM_NORMAL);
+    set_page_color(&mut video.screen, BACKGROUND_COLOR, TITLE_BLUE);
+    set_page_color(&mut video.screen, TEXT_COLOR, WHITE_RGB);
 
-    let pen = game.screen.port(PortId::Map).pen.fg;
-    game.screen.set_a_pen(PortId::Map, TITLE_PEN);
-    print_positioned(game, TITLE_TEXT);
-    game.screen.set_a_pen(PortId::Map, pen);
+    let pen = video.screen.port(PortId::Map).pen.fg;
+    video.screen.set_a_pen(PortId::Map, TITLE_PEN);
+    print_positioned(video, TITLE_TEXT);
+    video.screen.set_a_pen(PortId::Map, pen);
 
-    delay(game, TITLE_WAIT);
+    delay(game, video, TITLE_WAIT);
 
-    game.screen.current_port = PortId::Text;
-    game.screen.port_mut(PortId::Text).target = Some(BitmapId::TextPlane0);
-    game.screen.set_font_kind(PortId::Text, FontKind::Story);
-    game.screen.set_a_pen(PortId::Text, STORY_PEN);
-    game.screen.set_b_pen(PortId::Text, STORY_BACKGROUND_PEN);
+    video.screen.current_port = PortId::Text;
+    video.screen.port_mut(PortId::Text).target = Some(BitmapId::TextPlane0);
+    video.screen.set_font_kind(PortId::Text, FontKind::Story);
+    video.screen.set_a_pen(PortId::Text, STORY_PEN);
+    video.screen.set_b_pen(PortId::Text, STORY_BACKGROUND_PEN);
 
     read_score();
     read_sample();
 
-    delay(game, TITLE_WAIT);
+    delay(game, video, TITLE_WAIT);
 }
 
 /// Starts the intro tune, and flips the pages twice so both show the same thing.
-fn prepare_intro(game: &mut Game) {
-    game.screen.vp_page.ras = Some(0);
+fn prepare_intro(game: &mut Game, video: &mut Video) {
+    video.screen.vp_page.ras = Some(0);
 
     playscore(INTRO_TRACKS.map(track));
 
-    game.screen.load_colors(ViewPortId::Text, &black_colors);
-    game.screen.pages[1].ras = 1;
-    set_intro_zoom(game, 0);
+    video.screen.load_colors(ViewPortId::Text, &black_colors);
+    video.screen.pages[1].ras = 1;
+    set_intro_zoom(game, video, 0);
 
-    flip_pages(game); // "prime the pump"
-    flip_pages(game);
+    flip_pages(game, video); // "prime the pump"
+    flip_pages(game, video);
 }
 
 /// Switches to the normal playing screen: loads the shadow masks and the panel picture, and shows
 /// the copyright placard.
-fn show_play_screen_background(game: &mut Game) {
-    game.screen.pages[1].ras = 1;
-    clear_both_pages(&mut game.screen);
+fn show_play_screen_background(game: &mut Game, video: &mut Video) {
+    video.screen.pages[1].ras = 1;
+    clear_both_pages(&mut video.screen);
 
-    game.screen.load_colors(ViewPortId::Text, &black_colors);
+    video.screen.load_colors(ViewPortId::Text, &black_colors);
 
-    set_intro_zoom(game, ZOOM_NORMAL);
-    set_page_color(&mut game.screen, BACKGROUND_COLOR, LOADING_BLUE);
+    set_intro_zoom(game, video, ZOOM_NORMAL);
+    set_page_color(&mut video.screen, BACKGROUND_COLOR, LOADING_BLUE);
 
-    load_track_range(SHADOW_BLOCK.0, SHADOW_BLOCK.1, &mut game.memory.shadow, 0);
+    load_track_range(
+        SHADOW_BLOCK.0,
+        SHADOW_BLOCK.1,
+        &mut video.graphics.shadow,
+        0,
+    );
 
-    set_page_color(&mut game.screen, BACKGROUND_COLOR, TITLE_BLUE);
-    load_picture("hiscreen", game.screen.bitmap_mut(BitmapId::Text), 0, 0);
+    set_page_color(&mut video.screen, BACKGROUND_COLOR, TITLE_BLUE);
+    load_picture("hiscreen", video.screen.bitmap_mut(BitmapId::Text), 0, 0);
 
-    set_page_color(&mut game.screen, TEXT_COLOR, WHITE_RGB);
+    set_page_color(&mut video.screen, TEXT_COLOR, WHITE_RGB);
 
-    game.screen.current_port = PortId::Map;
-    game.screen.port_mut(PortId::Map).target = Some(game.screen.drawing_bitmap_id());
-    show_still_screen(game);
-    game.screen.set_a_pen(PortId::Map, TITLE_PEN);
-    placard_text(game, PLACARD_COPYRIGHT);
+    video.screen.current_port = PortId::Map;
+    video.screen.port_mut(PortId::Map).target = Some(video.screen.drawing_bitmap_id());
+    show_still_screen(game, video);
+    video.screen.set_a_pen(PortId::Map, TITLE_PEN);
+    placard_text(video, PLACARD_COPYRIGHT);
 
     reset_key_buffer();
 }
 
 /// Starts the first brother and sets up the text page and the colours for play.
-fn start_first_brother(game: &mut Game) {
-    for ras in &mut game.screen.ras[..2] {
+fn start_first_brother(game: &mut Game, video: &mut Video) {
+    for ras in &mut video.screen.ras[..2] {
         ras.x = 0;
         ras.y = 0;
     }
 
     stopscore();
-    revive(game, 1);
+    revive(game, video, 1);
 
-    game.screen.port_mut(PortId::Map).target = Some(game.screen.drawing_bitmap_id());
+    video.screen.port_mut(PortId::Map).target = Some(video.screen.drawing_bitmap_id());
 
-    game.screen.vp_text.y = PAGE_HEIGHT;
-    game.screen.vp_text.height = TEXT_HEIGHT;
-    game.screen.vp_page.height = PAGE_VIEW_HEIGHT;
-    game.screen.vp_page.x = PAGE_VIEW_X;
-    game.screen.vp_page.width = LOWRES_WIDTH;
-    game.screen.vp_page.y = 0;
-    game.screen.load_colors(ViewPortId::Text, &text_colors);
+    video.screen.vp_text.y = PAGE_HEIGHT;
+    video.screen.vp_text.height = TEXT_HEIGHT;
+    video.screen.vp_page.height = PAGE_VIEW_HEIGHT;
+    video.screen.vp_page.x = PAGE_VIEW_X;
+    video.screen.vp_page.width = LOWRES_WIDTH;
+    video.screen.vp_page.y = 0;
+    video.screen.load_colors(ViewPortId::Text, &text_colors);
 
-    for page in &mut game.screen.pages {
+    for page in &mut video.screen.pages {
         page.obcount = 0;
         page.wflag = 0;
     }
 
-    game.screen.view_status = VIEW_REDRAW;
+    video.screen.view_status = VIEW_REDRAW;
 
     game.ui.current_menu = 0;
-    print_options(game);
+    print_options(game, video);
 }
 
 /// The story pictures with the zoom in and out (skipped if the player presses Space).
-fn play_intro(game: &mut Game) {
-    load_picture("page0", game.screen.bitmap_mut(BitmapId::PageB), 0, 0);
-    copy_title_picture_to(&mut game.screen, BitmapId::Page1);
-    copy_title_picture_to(&mut game.screen, BitmapId::Page2);
+fn play_intro(game: &mut Game, video: &mut Video) {
+    load_picture("page0", video.screen.bitmap_mut(BitmapId::PageB), 0, 0);
+    copy_title_picture_to(&mut video.screen, BitmapId::Page1);
+    copy_title_picture_to(&mut video.screen, BitmapId::Page2);
 
-    game.screen.pages[1].ras = 0;
+    video.screen.pages[1].ras = 0;
 
     for x in (0..=ZOOM_FULL).step_by(ZOOM_STEP) {
-        set_intro_zoom(game, x);
+        set_intro_zoom(game, video, x);
     }
 
-    game.screen.pages[1].ras = 1;
+    video.screen.pages[1].ras = 1;
 
     if intro_skipped(&mut game.ui) == 0 {
         for (first, second, first_wait, second_wait) in STORY_PAGES {
-            show_story_page(game, first, second, first_wait, second_wait);
+            show_story_page(game, video, first, second, first_wait, second_wait);
         }
 
         if { game.ui.intro_skip_requested } == 0 {
-            delay(game, INTRO_PAGES_WAIT);
+            delay(game, video, INTRO_PAGES_WAIT);
         }
     }
 
-    game.screen.pages[1].ras = 0;
+    video.screen.pages[1].ras = 0;
 
     for x in (0..=ZOOM_NORMAL).rev().step_by(ZOOM_STEP) {
-        set_intro_zoom(game, x);
+        set_intro_zoom(game, video, x);
     }
 }
 

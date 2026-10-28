@@ -26,6 +26,7 @@ pub use self::rescue::rescue_princess;
 pub use self::tactics::run_tactic;
 
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 use crate::game::ui::messages::print;
 use crate::game::ui::text::show_event;
 
@@ -61,15 +62,15 @@ const RAFT_SLOT: usize = 1;
 
 /// Eats: lowers hunger by `amt`. If that would go below zero the hero is simply full
 /// (message 13); otherwise "Yum!".
-pub fn eat_food(game: &mut Game, amt: i32) {
+pub fn eat_food(game: &mut Game, video: &mut Video, amt: i32) {
     const HUNGER_FULL_MESSAGE: i32 = 13;
     game.hero.hunger = (game.hero.hunger as i32 - amt) as i16;
 
     if game.hero.hunger < 0 {
         game.hero.hunger = 0;
-        show_event(game, HUNGER_FULL_MESSAGE);
+        show_event(game, video, HUNGER_FULL_MESSAGE);
     } else {
-        print(game, "Yum!");
+        print(video, "Yum!");
     }
 }
 

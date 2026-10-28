@@ -4,7 +4,8 @@ use super::{
     BACKSAVE_OFFSET, IMAGE_SZ, S_VOLBUF, S_WAVBUF, SECTOR_SZ, SHADOW_SZ, SHAPE_SZ, TERRA_SZ,
 };
 use crate::game::data::state::Game;
-use crate::game::data::state::Memory;
+use crate::game::data::state::Video;
+use crate::game::data::state::{Graphics, MapData};
 use crate::game::data::story_text::{HINOR, HIVAR};
 use crate::game::data::tables::{instrument_waves, pointer_sprite_data};
 use crate::game::files::disk::open_disk;
@@ -29,28 +30,28 @@ const WAVEFORM_FILE: &str = "v6";
 const AREA_SLACK: usize = 128;
 
 /// Opens everything the game needs. Returns 0, or the error number `show_error` shows.
-pub fn open_all(game: &mut Game) -> i32 {
-    match open_everything(game) {
+pub fn open_all(game: &mut Game, video: &mut Video) -> i32 {
+    match open_everything(game, video) {
         Ok(()) => 0,
         Err(error) => error,
     }
 }
 
 /// The start-up steps in order; the first one that fails gives the error number.
-fn open_everything(game: &mut Game) -> Result<(), i32> {
-    game.screen.set_up([&HINOR, &HIVAR]);
+fn open_everything(game: &mut Game, video: &mut Video) -> Result<(), i32> {
+    video.screen.set_up([&HINOR, &HIVAR]);
 
     match open_disk() {
         0 => {}
         error => return Err(error),
     }
 
-    open_fonts(&mut game.screen)?;
-    set_up_blitter_memory(&mut game.screen);
-    allocate_game_memory(&mut game.memory);
+    open_fonts(&mut video.screen)?;
+    set_up_blitter_memory(&mut video.screen);
+    allocate_game_memory(&mut game.map, &mut video.graphics);
 
     load_music_waveforms();
-    game.screen.pointer = Some(&pointer_sprite_data);
+    video.screen.pointer = Some(&pointer_sprite_data);
 
     Ok(())
 }
@@ -78,12 +79,12 @@ fn set_up_blitter_memory(screen: &mut Screen) {
 }
 
 /// Makes the picture, sector, shape, shadow-mask and terrain areas.
-fn allocate_game_memory(memory: &mut Memory) {
-    memory.image = area(IMAGE_SZ);
-    memory.sector = area(SECTOR_SZ);
-    memory.shape = area(SHAPE_SZ);
-    memory.shadow = area(SHADOW_SZ);
-    memory.terrain = area(TERRA_SZ);
+fn allocate_game_memory(map: &mut MapData, graphics: &mut Graphics) {
+    graphics.image = area(IMAGE_SZ);
+    map.sector = area(SECTOR_SZ);
+    graphics.shape = area(SHAPE_SZ);
+    graphics.shadow = area(SHADOW_SZ);
+    map.terrain = area(TERRA_SZ);
 }
 
 /// Reads the waveforms and volume envelopes for the music from the file `v6` (the waveforms, then as

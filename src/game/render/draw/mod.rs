@@ -17,6 +17,7 @@ use self::blit_setup::set_up_blit;
 use self::scenery::mask_against_scenery;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 use crate::game::render::screen::Screen;
 
 pub use self::map_edge::repair_edges;
@@ -62,8 +63,8 @@ enum Drawn {
 
 /// Draws every actor, and its weapon, into the page being drawn, and saves the background under each
 /// (`backsave`) so it can be undone next frame. `cycle` is the frame counter.
-pub fn draw_sprites(game: &mut Game, cycle: i16) {
-    let page = game.screen.drawing_page_mut();
+pub fn draw_sprites(game: &mut Game, video: &mut Video, cycle: i16) {
+    let page = video.screen.drawing_page_mut();
     page.obcount = 0;
     page.saveused = 0;
     let mut frame = Frame {
@@ -80,7 +81,7 @@ pub fn draw_sprites(game: &mut Game, cycle: i16) {
         loop {
             let passmode = weapon_passmode(&game.actors, &game.world, actor, &mut pass);
 
-            if let Drawn::OutOfRoom = draw_one(game, &mut frame, actor, i, cycle, passmode) {
+            if let Drawn::OutOfRoom = draw_one(game, video, &mut frame, actor, i, cycle, passmode) {
                 return;
             }
 
@@ -106,21 +107,23 @@ struct Sprite {
 }
 
 /// Draws one actor (or its weapon) for the current pass.
+#[allow(clippy::too_many_arguments)] // the sprite and its clip, plus the game and video state
 fn draw_one(
     game: &mut Game,
+    video: &mut Video,
     frame: &mut Frame,
     actor: ActorRef,
     i: i32,
     cycle: i16,
     passmode: bool,
 ) -> Drawn {
-    clear_scenery_mask(game);
+    clear_scenery_mask(video);
 
     let Some(mut sprite) = choose_image(&game.actors, &game.hero, actor, i, passmode) else {
         return Drawn::Done;
     };
 
-    let bytes_wide = place_on_screen(game, &mut sprite);
+    let bytes_wide = place_on_screen(game, video, &mut sprite);
 
     if !adjust_for_depth(
         &game.actors,
@@ -140,7 +143,7 @@ fn draw_one(
 
     let clip = clip_to_screen(&mut sprite);
 
-    blit_sprite(game, frame, actor, i, &sprite, &clip, bytes_wide)
+    blit_sprite(game, video, frame, actor, i, &sprite, &clip, bytes_wide)
 }
 
 /// Moves the sprite from map to screen coordinates and works out its size and bottom right corner.
@@ -154,14 +157,14 @@ const WORD_SHIFT: u32 = 4;
 const PIXELS_PER_BYTE: i8 = 8;
 const WORD_PIXELS_MASK: i16 = 15;
 
-fn place_on_screen(game: &mut Game, sprite: &mut Sprite) -> i8 {
+fn place_on_screen(game: &mut Game, video: &mut Video, sprite: &mut Sprite) -> i8 {
     sprite.xstart += (game.world.map_x as i32 & TILE_X_MASK) as i16;
 
     sprite.ystart += (game.world.map_y as i32 & TILE_Y_MASK) as i16;
 
     sprite.ground += (game.world.map_y as i32 & TILE_Y_MASK) as i16;
 
-    let seq = sprite_sheet(game, sprite.atype);
+    let seq = sprite_sheet(video, sprite.atype);
 
     // Sprite width in pixels: 16 pixels to each word.
     let xsize = (seq.width << WORD_SHIFT) as i8;
@@ -201,6 +204,7 @@ fn blit_extent(clip: &Clip) -> (i8, i8, i8) {
 #[allow(clippy::too_many_arguments)] // the sprite and its clip, plus the game state
 fn blit_sprite(
     game: &mut Game,
+    video: &mut Video,
     frame: &mut Frame,
     actor: ActorRef,
     i: i32,
@@ -211,11 +215,11 @@ fn blit_sprite(
     let (xbw, blitwide, blithigh) = blit_extent(clip);
 
     if !set_up_blit(
-        game, frame, sprite, clip, bytes_wide, xbw, blitwide, blithigh,
+        video, frame, sprite, clip, bytes_wide, xbw, blitwide, blithigh,
     ) {
         return Drawn::OutOfRoom; // no more blits if no room
     }
-    save_background(game, game.blitter.sshape.backsave);
+    save_background(video, video.blitter.sshape.backsave);
 
     if !drawn_in_front(
         &game.actors,
@@ -228,6 +232,7 @@ fn blit_sprite(
     ) {
         mask_against_scenery(
             game,
+            video,
             actor,
             i,
             sprite.ground,
@@ -238,10 +243,10 @@ fn blit_sprite(
         );
     }
 
-    combine_masks(game);
-    draw_shape(game);
+    combine_masks(video);
+    draw_shape(video);
     game.actor_mut(actor).visible = 1;
-    queue_shape(&mut game.screen, game.blitter.sshape);
+    queue_shape(&mut video.screen, video.blitter.sshape);
 
     Drawn::Done
 }

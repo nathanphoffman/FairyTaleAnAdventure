@@ -1,7 +1,8 @@
 //! Drawing the map into the play field: single tiles, whole screens, new edges and scrolling.
 
 use crate::game::data::state::Game;
-use crate::game::data::state::Memory;
+use crate::game::data::state::Graphics;
+use crate::game::data::state::Video;
 use crate::game::render::screen::Screen;
 
 /// One bitplane of 256 tiles, 64 bytes per tile.
@@ -18,10 +19,10 @@ pub(super) const SCREEN_COLUMNS: usize = 19;
 pub(super) const SCREEN_ROWS: usize = 6;
 
 /// Draws one tile at byte offset `dst` in each of the five planes (2 bytes wide, 32 lines).
-pub(super) fn draw_tile(memory: &Memory, screen: &mut Screen, tile: i32, dst: usize) {
+pub(super) fn draw_tile(graphics: &Graphics, screen: &mut Screen, tile: i32, dst: usize) {
     for p in 0..PLANE_COUNT {
         let mut src = p * IMAGE_PLANE_SIZE + tile as usize * TILE_BYTES;
-        let image = &memory.image;
+        let image = &graphics.image;
         let plane = screen.draw_bitmap_mut().plane_mut(p);
         let mut d = dst;
 
@@ -35,35 +36,35 @@ pub(super) fn draw_tile(memory: &Memory, screen: &mut Screen, tile: i32, dst: us
 }
 
 /// Draws the tile at minimap position (col, row) to its place on screen.
-pub(super) fn draw_minimap_tile(game: &mut Game, col: usize, row: usize) {
+pub(super) fn draw_minimap_tile(game: &mut Game, video: &mut Video, col: usize, row: usize) {
     draw_tile(
-        &game.memory,
-        &mut game.screen,
-        game.memory.minimap[col * SCREEN_ROWS + row] as i32,
+        &video.graphics,
+        &mut video.screen,
+        game.map.minimap[col * SCREEN_ROWS + row] as i32,
         row * TILE_LINES * ROW_BYTES + col * 2,
     )
 }
 
 /// The whole screen, 19 x 6 tiles.
-pub fn draw_map(game: &mut Game) {
+pub fn draw_map(game: &mut Game, video: &mut Video) {
     for col in 0..SCREEN_COLUMNS {
         for row in 0..SCREEN_ROWS {
-            draw_minimap_tile(game, col, row);
+            draw_minimap_tile(game, video, col, row);
         }
     }
 }
 
 /// One column of tiles; `x` is the byte offset on screen (0 or 36).
-pub fn draw_map_column(game: &mut Game, x: i32) {
+pub fn draw_map_column(game: &mut Game, video: &mut Video, x: i32) {
     for row in 0..SCREEN_ROWS {
-        draw_minimap_tile(game, x as usize / 2, row);
+        draw_minimap_tile(game, video, x as usize / 2, row);
     }
 }
 
 /// One row of tiles; `r` is twice the row number (0 or 10).
-pub fn draw_map_row(game: &mut Game, r: i32) {
+pub fn draw_map_row(game: &mut Game, video: &mut Video, r: i32) {
     for col in 0..SCREEN_COLUMNS {
-        draw_minimap_tile(game, col, r as usize / 2);
+        draw_minimap_tile(game, video, col, r as usize / 2);
     }
 }
 

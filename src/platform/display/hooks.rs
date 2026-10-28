@@ -1,7 +1,6 @@
 //! Test helpers driven by environment variables.
 
 use super::{BEAT, Display, HEIGHT, WIDTH};
-use crate::game::data::state::Game;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
@@ -47,20 +46,6 @@ fn ticks_from_env(name: &str) -> u32 {
         .unwrap_or(DEFAULT_AFTER_TICKS)
 }
 
-/// FTA_STATE=file writes the game state as text at tick FTA_STATE_AFTER (then quits).
-fn dump_state_hook(game: &mut Game, d: &Display) {
-    let Some(path) = std::env::var_os("FTA_STATE") else {
-        return;
-    };
-
-    if d.ticks < ticks_from_env("FTA_STATE_AFTER") {
-        return;
-    }
-
-    crate::game::statedump::dump_state(game, std::path::Path::new(&path));
-    std::process::exit(0);
-}
-
 /// The frame as a binary PPM image.
 fn frame_as_ppm(frame: &[u32]) -> Vec<u8> {
     let mut out = format!("P6\n{WIDTH} {HEIGHT}\n255\n").into_bytes();
@@ -93,8 +78,7 @@ fn screenshot_hook(d: &Display) {
 
 /// Test helpers: FTA_SHOT=file.ppm saves the screen after FTA_SHOT_AFTER ticks of 1/50 s (default 1)
 /// and quits; FTA_SECONDS=n quits after n seconds; FTA_FAST=1 skips the 50 Hz pacing.
-pub(super) fn test_hooks(game: &mut Game, d: &mut Display) {
-    dump_state_hook(game, d);
+pub(super) fn test_hooks(d: &mut Display) {
     screenshot_hook(d);
 
     if let Some(secs) = std::env::var("FTA_SECONDS")

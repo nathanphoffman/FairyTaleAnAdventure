@@ -4,6 +4,7 @@ use super::{BONE, ITEMS, PRQ_STATS, PRQ_VITALITY};
 use crate::game::data::random::rand64;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 use crate::game::ui::menus::go_to_menu;
 use crate::game::ui::text::{queue_print, speak};
 use crate::game::world::objects::leave_item;
@@ -21,7 +22,7 @@ const SPECTRE_THANKS: i32 = 48;
 const SPECTRE_BONE_DROP: i16 = 140;
 
 /// Gives gold to a beggar, or the bone to the spectre.
-pub(super) fn give_option(game: &mut Game, chosen_entry: i16) -> bool {
+pub(super) fn give_option(game: &mut Game, video: &mut Video, chosen_entry: i16) -> bool {
     if game.actors.nearest_person == 0 {
         return true;
     }
@@ -40,15 +41,15 @@ pub(super) fn give_option(game: &mut Game, chosen_entry: i16) -> bool {
         queue_print(&mut game.ui, PRQ_VITALITY);
 
         if race == BEGGAR_RACE {
-            speak(game, BEGGAR_SPEECH + game.actor(person).goal as i32);
+            speak(game, video, BEGGAR_SPEECH + game.actor(person).goal as i32);
         } else {
-            speak(game, BEGGAR_THANKS);
+            speak(game, video, BEGGAR_THANKS);
         }
     } else if chosen_entry == GIVE_BONE && game.hero.stuff()[BONE] != 0 {
         if race != SPECTRE_RACE {
-            speak(game, SPECTRE_NOT_HERE);
+            speak(game, video, SPECTRE_NOT_HERE);
         } else {
-            speak(game, SPECTRE_THANKS);
+            speak(game, video, SPECTRE_THANKS);
             game.hero.stuff_mut()[BONE] = 0;
             leave_item(
                 &mut game.objects,
@@ -59,7 +60,7 @@ pub(super) fn give_option(game: &mut Game, chosen_entry: i16) -> bool {
         }
     }
 
-    go_to_menu(game, ITEMS as i16);
+    go_to_menu(game, video, ITEMS as i16);
 
     true
 }

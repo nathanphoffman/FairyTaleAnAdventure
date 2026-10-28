@@ -2,6 +2,7 @@
 //! the world and drawing.
 
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 use crate::game::data::state::World;
 use crate::game::render::draw::{draw_sprites, repair_edges};
 use crate::game::render::screen::Screen;
@@ -110,7 +111,7 @@ struct FrameState {
 }
 
 /// The main loop: one pass per frame until the player quits.
-pub(super) fn main_loop(game: &mut Game) {
+pub(super) fn main_loop(game: &mut Game, video: &mut Video) {
     let mut state = FrameState {
         cycle: 0,
         last_terrain: 0,
@@ -120,78 +121,79 @@ pub(super) fn main_loop(game: &mut Game) {
     game.ui.quit_requested = 0;
 
     while game.ui.quit_requested == 0 {
-        run_frame(game, &mut state);
+        run_frame(game, video, &mut state);
     }
 }
 
 /// One frame: input, moving everything, updating the map and the world, then drawing.
-fn run_frame(game: &mut Game, state: &mut FrameState) {
+fn run_frame(game: &mut Game, video: &mut Video, state: &mut FrameState) {
     state.cycle = state.cycle.wrapping_add(1);
-    game.screen.flasher = game.screen.flasher.wrapping_add(1);
-    crate::game::statedump::run_pending_command(game); // test commands, does nothing normally
+    video.screen.flasher = video.screen.flasher.wrapping_add(1);
+    crate::game::statedump::run_pending_command(game, video); // test commands, does nothing normally
 
-    read_keyboard(game);
+    read_keyboard(game, video);
 
-    if handle_view_status(game) {
+    if handle_view_status(game, video) {
         return;
     }
 
-    read_walk_direction(game);
+    read_walk_direction(game, video);
 
     if game.menus[GAME_MENU].enabled[PAUSE_ENTRY] & 1 != 0 {
-        delay(game, 1);
+        delay(game, video, 1);
 
         return;
     }
 
-    update_hero(game, state.cycle);
-    move_everything(game, state);
-    check_bed(game);
-    check_door(game);
+    update_hero(game, video, state.cycle);
+    move_everything(game, video, state);
+    check_bed(game, video);
+    check_door(game, video);
 
     game.hero.x = game.actors.list[0].abs_x;
     game.hero.y = game.actors.list[0].abs_y;
 
-    undo_sprites(game);
-    let (scroll_x, scroll_y, world_update) = update_map_view(game);
+    undo_sprites(game, video);
+    let (scroll_x, scroll_y, world_update) = update_map_view(game, video);
 
     if world_update {
-        run_world_update(game);
+        run_world_update(game, video);
     }
 
-    draw_frame(game, state, scroll_x, scroll_y);
+    draw_frame(game, video, state, scroll_x, scroll_y);
 }
 
 /// Reads one key and handles it.
-fn read_keyboard(game: &mut Game) {
+fn read_keyboard(game: &mut Game, video: &mut Video) {
     let key = next_key() as i8;
 
     let notpause = game.menus[GAME_MENU].enabled[PAUSE_ENTRY] & 1 == 0;
 
     if key != 0 {
-        handle_key(game, key as i32, notpause as i32);
+        handle_key(game, video, key as i32, notpause as i32);
     }
 }
 
 /// The screen modes that stop a normal frame. Returns true if this frame ends here (the item list
 /// and the like only flash the pointer and handle the print queue).
-fn handle_view_status(game: &mut Game) -> bool {
-    if game.screen.view_status == VIEW_PAUSED {
-        delay(game, PAUSE_WAIT);
-        game.screen.view_status = VIEW_REDRAW;
-    } else if game.screen.view_status == VIEW_BIG || game.screen.view_status == VIEW_BIG_STILL {
-        if game.screen.flasher & FLASH_BIT != 0 && game.screen.view_status == VIEW_BIG {
-            game.screen.set_color(
+fn handle_view_status(game: &mut Game, video: &mut Video) -> bool {
+    if video.screen.view_status == VIEW_PAUSED {
+        delay(game, video, PAUSE_WAIT);
+        video.screen.view_status = VIEW_REDRAW;
+    } else if video.screen.view_status == VIEW_BIG || video.screen.view_status == VIEW_BIG_STILL {
+        if video.screen.flasher & FLASH_BIT != 0 && video.screen.view_status == VIEW_BIG {
+            video.screen.set_color(
                 ViewPortId::Page,
                 STATUS_COLOR,
                 (FLASH_COLOR, FLASH_COLOR, FLASH_COLOR),
             );
         } else {
-            game.screen
+            video
+                .screen
                 .set_color(ViewPortId::Page, STATUS_COLOR, (0, 0, 0));
         }
 
-        handle_print_request(game);
+        handle_print_request(game, video);
 
         return true;
     }
@@ -201,12 +203,12 @@ fn handle_view_status(game: &mut Game) -> bool {
 
 /// Moves the hero, the raft and every monster and person (the actor count is read each time round,
 /// as in the original).
-fn move_everything(game: &mut Game, state: &mut FrameState) {
+fn move_everything(game: &mut Game, video: &mut Video, state: &mut FrameState) {
     raft_proximity(game);
     let mut i = 0;
 
     while i < game.actors.active as i32 {
-        move_actor(game, i, state.cycle, &mut state.last_terrain);
+        move_actor(game, video, i, state.cycle, &mut state.last_terrain);
         i += 1;
     }
 }
@@ -228,21 +230,21 @@ fn scroll_direction(scroll_x: i16, scroll_y: i16) -> Option<i32> {
 
 /// Redraws the whole map when the view asks for it (two frames in a row after a change, so both
 /// pages get it). Returns true if it did.
-fn redraw_whole_map(game: &mut Game) -> bool {
-    if game.screen.view_status != VIEW_REDRAW
-        && game.screen.view_status != VIEW_REDRAW_2
-        && game.screen.view_status != VIEW_CHANGED
+fn redraw_whole_map(game: &mut Game, video: &mut Video) -> bool {
+    if video.screen.view_status != VIEW_REDRAW
+        && video.screen.view_status != VIEW_REDRAW_2
+        && video.screen.view_status != VIEW_CHANGED
     {
         return false;
     }
 
-    refresh_minimap(game);
-    draw_map(game);
+    refresh_minimap(game, video);
+    draw_map(game, video);
 
-    if game.screen.view_status == VIEW_REDRAW {
-        game.screen.view_status = VIEW_REDRAW_2;
-    } else if game.screen.view_status == VIEW_REDRAW_2 {
-        game.screen.view_status = VIEW_NORMAL;
+    if video.screen.view_status == VIEW_REDRAW {
+        video.screen.view_status = VIEW_REDRAW_2;
+    } else if video.screen.view_status == VIEW_REDRAW_2 {
+        video.screen.view_status = VIEW_NORMAL;
     }
 
     true
@@ -251,30 +253,30 @@ fn redraw_whole_map(game: &mut Game) -> bool {
 /// Brings the map in line with the camera: loads a waiting region, then redraws the whole map or
 /// scrolls it by one tile. Returns the scroll step used and whether the world gets its turn this
 /// frame (it does when the map is redrawn from scratch, or did not move at all).
-fn update_map_view(game: &mut Game) -> (i16, i16, bool) {
-    let (mut scroll_x, mut scroll_y) = scroll_step(&game.screen, &mut game.world);
+fn update_map_view(game: &mut Game, video: &mut Video) -> (i16, i16, bool) {
+    let (mut scroll_x, mut scroll_y) = scroll_step(&video.screen, &mut game.world);
 
     if game.world.new_region < NO_REGION {
-        load_pending_region(game);
+        load_pending_region(game, video);
     }
 
-    if redraw_whole_map(game) {
+    if redraw_whole_map(game, video) {
         return (0, 0, true);
     }
 
     if scroll_x != 0 || scroll_y != 0 {
-        refresh_minimap(game);
+        refresh_minimap(game, video);
     }
 
     if let Some(direction) = scroll_direction(scroll_x, scroll_y) {
-        scroll_map(&mut game.screen, direction);
+        scroll_map(&mut video.screen, direction);
 
         return (scroll_x, scroll_y, false);
     }
 
     if scroll_x == 0 && scroll_y == 0 {
         // no motion: the world gets its turn here
-        handle_print_request(game);
+        handle_print_request(game, video);
 
         return (scroll_x, scroll_y, true);
     }
@@ -282,57 +284,63 @@ fn update_map_view(game: &mut Game) -> (i16, i16, bool) {
     // moved too far to scroll: redraw the whole map
     scroll_x = 0;
     scroll_y = 0;
-    draw_map(game);
+    draw_map(game, video);
 
     (scroll_x, scroll_y, false)
 }
 
 /// The once-per-frame world update: the clock, then (unless time is frozen) new monsters, talking,
 /// what the monsters want to do, and hunger.
-fn run_world_update(game: &mut Game) {
-    day_night_tick(game);
+fn run_world_update(game: &mut Game, video: &mut Video) {
+    day_night_tick(game, video);
 
     if game.world.freeze_timer == 0 {
-        spawn_encounters(game);
-        speak_nearby(game);
-        update_enemy_goals(game);
-        survival_tick(game);
+        spawn_encounters(game, video);
+        speak_nearby(game, video);
+        update_enemy_goals(game, video);
+        survival_tick(game, video);
     }
 }
 
 /// Fights, missiles and drawing, then shows the page that was just drawn.
-fn draw_frame(game: &mut Game, state: &mut FrameState, scroll_x: i16, scroll_y: i16) {
-    let page = game.screen.drawing_page_mut();
+fn draw_frame(
+    game: &mut Game,
+    video: &mut Video,
+    state: &mut FrameState,
+    scroll_x: i16,
+    scroll_y: i16,
+) {
+    let page = video.screen.drawing_page_mut();
     page.isv_x = game.world.tile_x as i32;
     page.isv_y = game.world.tile_y as i32;
 
-    game.screen.set_a_pen(PortId::Map, SPRITE_PEN);
+    video.screen.set_a_pen(PortId::Map, SPRITE_PEN);
 
-    resolve_melee(game);
-    advance_missiles(game);
+    resolve_melee(game, video);
+    advance_missiles(game, video);
 
     game.actors.drawn = game.actors.active;
-    spawn_object_actors(game);
+    spawn_object_actors(game, video);
 
     // the flying missiles, then sort the actors by position
     queue_missile_sprites(game);
     sort_actors(game);
 
     // now that the scroll blit is done, finish repairing the map
-    repair_edges(game, scroll_x, scroll_y);
+    repair_edges(game, video, scroll_x, scroll_y);
 
-    draw_sprites(game, state.cycle);
+    draw_sprites(game, video, state.cycle);
 
     // The drawing loop used to leave `j` here; the next frame's actor loop reads it.
     state.last_terrain = game.actors.drawn;
-    let ras = game.screen.drawing_page().ras;
-    game.screen.ras[ras].x = (game.world.map_x as i32 & TILE_X_MASK) as i16;
-    game.screen.ras[ras].y = (game.world.map_y as i32 & TILE_Y_MASK) as i16;
-    flip_pages(game);
+    let ras = video.screen.drawing_page().ras;
+    video.screen.ras[ras].x = (game.world.map_x as i32 & TILE_X_MASK) as i16;
+    video.screen.ras[ras].y = (game.world.map_y as i32 & TILE_Y_MASK) as i16;
+    flip_pages(game, video);
 
-    if game.screen.view_status == VIEW_CHANGED {
-        fade_normal(game);
-        game.screen.view_status = VIEW_NORMAL;
+    if video.screen.view_status == VIEW_CHANGED {
+        fade_normal(game, video);
+        video.screen.view_status = VIEW_NORMAL;
     }
 }
 

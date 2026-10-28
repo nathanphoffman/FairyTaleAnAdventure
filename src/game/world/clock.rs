@@ -4,6 +4,7 @@
 use crate::game::data::random::rand64;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 use crate::game::render::screen_fx::day_fade;
 use crate::game::ui::text::{queue_print, show_event};
 
@@ -92,7 +93,7 @@ fn heal_due(clock: u16, vitality: i16, bravery: i16, state: i8) -> bool {
 }
 
 /// Sleeping, the day clock, the light level, the messages for the time of day and slow healing.
-pub fn day_night_tick(game: &mut Game) {
+pub fn day_night_tick(game: &mut Game, video: &mut Video) {
     let hero = ActorRef::new(0);
 
     if game.actor(hero).state == SLEEP {
@@ -115,10 +116,10 @@ pub fn day_night_tick(game: &mut Game) {
     game.world.day_period = tick.period;
 
     if let Some(e) = tick.period_event {
-        show_event(game, e);
+        show_event(game, video, e);
     }
 
-    day_fade(game);
+    day_fade(game, video);
 
     if tick.heal {
         game.actor_mut(hero).vitality += 1;

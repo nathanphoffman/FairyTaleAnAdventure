@@ -225,46 +225,28 @@ impl MissileRef {
     }
 }
 
-/// The screen: bitmaps, display pages, pens and view ports, and what is shown.
-/// The big memory areas the game loads its data into.
-pub struct Memory {
-    /// The tile pictures: five planes of 256 tiles for each of the four image banks.
-    pub image: Vec<u8>,
+/// The map data the rules read: the sectors and the region map, the terrain table, and the overview
+/// map.
+pub struct MapData {
     /// The 256 sectors of 128 tile numbers each, then (from `MAP_OFFSET`) the region map.
     pub sector: Vec<u8>,
     /// The terrain table: four bytes per tile.
     pub terrain: Vec<u8>,
-    /// The masks that hide sprites behind scenery tiles.
-    pub shadow: Vec<u8>,
-    /// The sprite sheets: each sheet is its frames (five planes each) followed by their masks.
-    pub shape: Vec<u8>,
-    /// Where the image and the mask of the sprite being drawn start in `shape`.
-    pub shapedata: usize,
-    pub mask_buffer: usize,
-    /// Where the next sprite sheet loads in `shape`.
-    pub nextshape: usize,
-    pub seq_list: [SeqInfo; SPRITE_SHEETS],
-    /// Which disk blocks are loaded now (image banks, terrain, sectors, region, characters).
-    pub loaded_blocks: Need,
     /// The overview map of the world sectors (see `world::regions`).
     pub minimap: [i16; 120],
+    /// Which disk blocks are loaded now (image banks, terrain, sectors, region, characters).
+    pub loaded_blocks: Need,
 }
 
-/// Where the region map starts in `Memory::sector`.
+/// Where the region map starts in `MapData::sector`.
 pub const MAP_OFFSET: usize = 128 * 256;
 
-impl Memory {
-    pub const fn new() -> Memory {
-        Memory {
-            image: Vec::new(),
+impl MapData {
+    pub const fn new() -> MapData {
+        MapData {
             sector: Vec::new(),
             terrain: Vec::new(),
-            shadow: Vec::new(),
-            shape: Vec::new(),
-            shapedata: 0,
-            mask_buffer: 0,
-            nextshape: 0,
-            seq_list: [const { SeqInfo::EMPTY }; SPRITE_SHEETS],
+            minimap: [0; 120],
             loaded_blocks: Need {
                 image: [0, 0, 0, 0],
                 terra1: 1,
@@ -273,7 +255,6 @@ impl Memory {
                 region: 0,
                 setchar: 0,
             },
-            minimap: [0; 120],
         }
     }
 
@@ -304,6 +285,57 @@ impl Memory {
     /// Byte `index` of the terrain table (0 outside it).
     pub fn terrain_byte(&self, index: usize) -> u8 {
         self.terrain.get(index).copied().unwrap_or(0)
+    }
+}
+
+/// The picture data the drawing code reads: the tile pictures, the shadow masks and the sprite
+/// sheets.
+pub struct Graphics {
+    /// The tile pictures: five planes of 256 tiles for each of the four image banks.
+    pub image: Vec<u8>,
+    /// The masks that hide sprites behind scenery tiles.
+    pub shadow: Vec<u8>,
+    /// The sprite sheets: each sheet is its frames (five planes each) followed by their masks.
+    pub shape: Vec<u8>,
+    /// Where the image and the mask of the sprite being drawn start in `shape`.
+    pub shapedata: usize,
+    pub mask_buffer: usize,
+    /// Where the next sprite sheet loads in `shape`.
+    pub nextshape: usize,
+    pub seq_list: [SeqInfo; SPRITE_SHEETS],
+}
+
+impl Graphics {
+    pub const fn new() -> Graphics {
+        Graphics {
+            image: Vec::new(),
+            shadow: Vec::new(),
+            shape: Vec::new(),
+            shapedata: 0,
+            mask_buffer: 0,
+            nextshape: 0,
+            seq_list: [const { SeqInfo::EMPTY }; SPRITE_SHEETS],
+        }
+    }
+}
+
+/// Everything about how the game is drawn: the screen, the picture data, the sprite blitter's work
+/// values and the page colours. The rules never read it, they only ask for things to be drawn.
+pub struct Video {
+    pub screen: Screen,
+    pub graphics: Graphics,
+    pub blitter: Blitter,
+    pub page_colors: [u16; 32],
+}
+
+impl Video {
+    pub fn new() -> Video {
+        Video {
+            screen: Screen::new(),
+            graphics: Graphics::new(),
+            blitter: Blitter::new(),
+            page_colors: initial_page_colors,
+        }
     }
 }
 
@@ -373,14 +405,11 @@ pub struct Game {
     pub witch: Witch,
     pub ui: Ui,
     pub encounter: Encounters,
-    pub memory: Memory,
-    pub screen: Screen,
-    pub blitter: Blitter,
+    pub map: MapData,
     pub save_padding: [u16; 3],
     pub rng: Rng,
     pub extents: [Extent; 23],
     pub menus: [Menu; 10],
-    pub page_colors: [u16; 32],
     pub objects: ObjectLists,
     pub actors: Actors,
     pub world: World,
@@ -420,13 +449,11 @@ impl Game {
                 ..Default::default()
             },
             encounter: Default::default(),
-            screen: Screen::new(),
-            blitter: Blitter::new(),
+            map: MapData::new(),
             save_padding: [0; 3],
             rng: Rng::new(),
             extents: initial_extents,
             menus: initial_menus,
-            page_colors: initial_page_colors,
             objects: ObjectLists::new(),
             actors: Default::default(),
             world: World {
@@ -434,7 +461,6 @@ impl Game {
                 ..Default::default()
             },
             hero: Default::default(),
-            memory: Memory::new(),
         }
     }
 }

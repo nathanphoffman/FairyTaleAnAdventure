@@ -5,6 +5,7 @@ use crate::game::actors::interaction::hit_actor;
 use crate::game::data::random::{bitrand, rand8};
 use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 use crate::game::data::state::{ActorRef, MissileRef};
 use crate::game::data::types::Missile;
 use crate::game::world::map::{step_x, step_y, terrain_at};
@@ -47,19 +48,19 @@ pub(super) const BY_FIREBALL: i32 = -2;
 
 /// Moves the six arrows and fireballs; they hit actors in the way and stop at walls. Nothing
 /// moves while time is frozen.
-pub fn advance_missiles(game: &mut Game) {
+pub fn advance_missiles(game: &mut Game, video: &mut Video) {
     if game.world.freeze_timer != 0 {
         return;
     }
 
     for i in 0..MISSILES {
         let ms = MissileRef::new(i);
-        fly(game, i, ms);
+        fly(game, video, i, ms);
     }
 }
 
 /// One missile's flight for this frame.
-pub(super) fn fly(game: &mut Game, i: usize, ms: MissileRef) {
+pub(super) fn fly(game: &mut Game, video: &mut Video, i: usize, ms: MissileRef) {
     let mut s = game.missile(ms).speed as i16 * 2;
 
     if missile_expired(game.missile_mut(ms), s) {
@@ -77,7 +78,7 @@ pub(super) fn fly(game: &mut Game, i: usize, ms: MissileRef) {
     }
 
     let fc = game.missile(ms).direction as i32;
-    hit_first_actor_in_path(game, i, ms, xs, ys);
+    hit_first_actor_in_path(game, video, i, ms, xs, ys);
     game.missile_mut(ms).abs_x = step_x(game.missile(ms).abs_x as i32, fc, s as i32) as u16;
     game.missile_mut(ms).abs_y = step_y(game.missile(ms).abs_y as i32, fc, s as i32) as u16;
 }
@@ -99,7 +100,14 @@ pub(super) fn missile_expired(ms: &mut Missile, s: i16) -> bool {
 /// Hits the first actor close enough to the missile at (`xs`, `ys`) and stops the missile.
 /// `i` is the missile's own index; the hero (actor 0) gets a dodge chance from `brave`, others a
 /// fixed one.
-pub(super) fn hit_first_actor_in_path(game: &mut Game, i: usize, ms: MissileRef, xs: i16, ys: i16) {
+pub(super) fn hit_first_actor_in_path(
+    game: &mut Game,
+    video: &mut Video,
+    i: usize,
+    ms: MissileRef,
+    xs: i16,
+    ys: i16,
+) {
     let fc = game.missile(ms).direction as i32;
     let is_rock = game.missile(ms).missile_type == MISSILE_ROCK;
     let range = if is_rock {
@@ -127,7 +135,7 @@ pub(super) fn hit_first_actor_in_path(game: &mut Game, i: usize, ms: MissileRef,
         }) {
             let by = if is_rock { BY_FIREBALL } else { BY_ARROW };
             let damage = (rand8(&mut game.rng) + MISSILE_DAMAGE_BASE) as i16;
-            hit_actor(game, by, target as i32, fc, damage);
+            hit_actor(game, video, by, target as i32, fc, damage);
 
             game.missile_mut(ms).speed = 0;
 

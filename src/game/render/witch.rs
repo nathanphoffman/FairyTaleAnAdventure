@@ -8,6 +8,7 @@
 
 use crate::game::data::object_tables::witchpoints;
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 use crate::game::data::types::FPage;
 use crate::game::render::screen::PortId;
 use crate::gfx::bitmap::Rect;
@@ -53,8 +54,8 @@ fn side(p1: (i16, i16), p2: (i16, i16), xh: i16, yh: i16) -> i16 {
 
 /// Draws the witch's beam on page `page` and records on which side of its edges the hero is.
 /// The drawing is clipped to the map area.
-pub fn witch_fx(game: &mut Game, page: usize) {
-    let fp = &game.screen.pages[page];
+pub fn witch_fx(game: &mut Game, video: &mut Video, page: usize) {
+    let fp = &video.screen.pages[page];
 
     let xh = game.hero.x.wrapping_sub(game.world.map_x & TILE_X_MASK) as i16;
 
@@ -65,12 +66,12 @@ pub fn witch_fx(game: &mut Game, page: usize) {
     game.witch.side_1 = side(p1, p2, xh, yh);
     game.witch.side_2 = side(p3, p4, xh, yh);
 
-    paint_beam(game, [p1, p2, p4, p3]);
+    paint_beam(video, [p1, p2, p4, p3]);
 }
 
 /// Fills the beam's quadrilateral with corners `p` (in drawing order) in complement mode, so
 /// drawing it a second time erases it.
-fn paint_beam(game: &mut Game, p: [(i16, i16); BEAM_CORNERS]) {
+fn paint_beam(video: &mut Video, p: [(i16, i16); BEAM_CORNERS]) {
     let points = p.map(|(x, y)| (x as i32, y as i32));
     let clip = Rect {
         x: 0,
@@ -79,8 +80,8 @@ fn paint_beam(game: &mut Game, p: [(i16, i16); BEAM_CORNERS]) {
         height: CLIP_HEIGHT + 1,
     };
 
-    game.screen.set_draw_mode(PortId::Map, COMPLEMENT);
-    game.screen.fill_polygon(PortId::Map, &points, clip);
+    video.screen.set_draw_mode(PortId::Map, COMPLEMENT);
+    video.screen.fill_polygon(PortId::Map, &points, clip);
 }
 
 #[cfg(test)]

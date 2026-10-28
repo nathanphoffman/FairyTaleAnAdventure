@@ -14,6 +14,7 @@
 use crate::game::data::object_tables::ObjectLists;
 use crate::game::data::object_tables::{CHEST, ObjectList, TURTLE, glbobs, rand_treasure};
 use crate::game::data::state::Actors;
+use crate::game::data::state::Video;
 use crate::game::data::state::World;
 use crate::game::data::state::{ActorRef, Game};
 
@@ -92,12 +93,19 @@ fn inside(value: i16, (low, high): (i16, i16)) -> bool {
 
 /// Turns the global and current region's object lists into actors.
 /// Called when the screen changes (new region, scrolling far, after loading a game).
-pub fn spawn_object_actors(game: &mut Game) {
+pub fn spawn_object_actors(game: &mut Game, video: &mut Video) {
     game.actors.free_slot = FIRST_OBJECT_ACTOR;
-    add_objects_near(game, ObjectList::Global, glbobs, GLOBAL_LIST_BIT as i32);
+    add_objects_near(
+        game,
+        video,
+        ObjectList::Global,
+        glbobs,
+        GLOBAL_LIST_BIT as i32,
+    );
     let region = game.world.region as usize;
     add_objects_near(
         game,
+        video,
         ObjectList::Region(region),
         game.objects.used[region],
         0,
@@ -196,16 +204,16 @@ fn distribute_treasure(game: &mut Game) {
 
 /// Makes sure the sprite file for the kind of person `id` is loaded. Several kinds share one
 /// file, so it is only reloaded when the needed file differs from the loaded one.
-fn load_set_figure(game: &mut Game, id: i8) {
+fn load_set_figure(game: &mut Game, video: &mut Video, id: i8) {
     let entry = entry(&setfig_table, id as usize).cfile_entry;
 
     if SPRITE_FILES[entry as usize].file_id
         != SPRITE_FILES[game.actors.loaded_setfig_file as usize].file_id
     {
         game.actors.loaded_setfig_file = entry as i16;
-        game.memory.nextshape = game.memory.seq_list[SETFIG as usize].location;
-        load_sprite_file(game, entry as i32);
-        finish_sprite_load(game, SETFIG as i16);
+        video.graphics.nextshape = video.graphics.seq_list[SETFIG as usize].location;
+        load_sprite_file(video, entry as i32);
+        finish_sprite_load(video, SETFIG as i16);
         motor_off();
     }
 }
@@ -217,7 +225,13 @@ fn load_set_figure(game: &mut Game, id: i8) {
 /// centre it); people are only loaded if within about 100-400 pixels, and shown if within the
 /// screen; items that are hidden or taken are skipped. A person already in the actor list at the
 /// same place is not added twice (and is marked dead if its actor died).
-pub fn add_objects_near(game: &mut Game, which: ObjectList, mut length: i16, f: i32) {
+pub fn add_objects_near(
+    game: &mut Game,
+    video: &mut Video,
+    which: ObjectList,
+    mut length: i16,
+    f: i32,
+) {
     game.actors.turtle_eggs = 0;
     game.witch.on_screen = 0;
 
@@ -237,21 +251,21 @@ pub fn add_objects_near(game: &mut Game, which: ObjectList, mut length: i16, f: 
         }
 
         let mut object = game.objects.list(which)[index as usize];
-        add_object(game, &mut object, index, f);
+        add_object(game, video, &mut object, index, f);
         game.objects.list(which)[index as usize] = object;
         index += 1;
     }
 }
 
 /// Adds one object of a list as an actor, if it is near enough and not hidden or taken.
-fn add_object(game: &mut Game, object: &mut WorldObject, index: i16, f: i32) {
+fn add_object(game: &mut Game, video: &mut Video, object: &mut WorldObject, index: i16, f: i32) {
     let xstart = (object.xc as i32 - game.world.map_x as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
     let ystart = (object.yc as i32 - game.world.map_y as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
 
     // States 3 and 4 are people; everything else is an item.
     let is_person = object.ob_stat == STAT_PERSON || object.ob_stat == STAT_DEAD_PERSON;
 
-    if is_person && !load_person_if_near(game, object, xstart, ystart) {
+    if is_person && !load_person_if_near(game, video, object, xstart, ystart) {
         return;
     }
 
@@ -281,12 +295,18 @@ fn add_object(game: &mut Game, object: &mut WorldObject, index: i16, f: i32) {
 
 /// A person close enough to the screen gets their pictures loaded (the witch also marks herself as
 /// on screen). Returns false if the person is too far away.
-fn load_person_if_near(game: &mut Game, object: &WorldObject, xstart: i16, ystart: i16) -> bool {
+fn load_person_if_near(
+    game: &mut Game,
+    video: &mut Video,
+    object: &WorldObject,
+    xstart: i16,
+    ystart: i16,
+) -> bool {
     if !(inside(xstart, PERSON_LOAD_X) && inside(ystart, PERSON_LOAD_Y)) {
         return false;
     }
 
-    load_set_figure(game, object.ob_id);
+    load_set_figure(game, video, object.ob_id);
 
     if object.ob_id == WITCH && object.ob_stat == STAT_PERSON {
         game.witch.on_screen = 1;

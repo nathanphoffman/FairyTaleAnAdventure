@@ -4,6 +4,7 @@ use super::OBJECTS;
 use crate::game::actors::interaction::actor_distance;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 use crate::game::ui::text::show_event;
 use crate::game::world::objects::change_object;
 
@@ -13,7 +14,7 @@ const EVENT_NOTHING_HIDDEN: i32 = 20;
 const EVENT_FOUND_HIDDEN: i32 = 38;
 
 /// Reveals hidden objects within reach.
-pub(super) fn look_around(game: &mut Game) {
+pub(super) fn look_around(game: &mut Game, video: &mut Video) {
     let mut found = false;
 
     for i in 0..game.actors.drawn as i32 {
@@ -30,6 +31,7 @@ pub(super) fn look_around(game: &mut Game) {
 
     show_event(
         game,
+        video,
         if found {
             EVENT_FOUND_HIDDEN
         } else {

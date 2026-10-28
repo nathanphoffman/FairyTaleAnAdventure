@@ -8,6 +8,7 @@ use super::{
     WALKING, WEAPON_BOW, WEAPON_WAND, ZONE_ARROW_FAST, ZONE_ARROW_SLOW,
 };
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 
 use crate::game::actors::interaction::blocked_at;
 use crate::game::data::random::fta_rand;
@@ -17,7 +18,7 @@ use crate::game::ui::text::show_event;
 
 /// Counts the timers down and sets the hero's state from the controls: the good fairy when dead
 /// or falling, shooting, riding, fighting or walking. `cycle` is the main loop's frame counter.
-pub fn update_hero(game: &mut Game, cycle: i16) {
+pub fn update_hero(game: &mut Game, video: &mut Video, cycle: i16) {
     game.world.light_timer = timer_step(game.world.light_timer);
     game.world.secret_timer = timer_step(game.world.secret_timer);
     game.world.freeze_timer = timer_step(game.world.freeze_timer);
@@ -30,12 +31,12 @@ pub fn update_hero(game: &mut Game, cycle: i16) {
     let mut state = game.actors.list[0].state;
 
     if state == DEAD || state == FALL {
-        state = fairy_revival(game, state, cycle);
+        state = fairy_revival(game, video, state, cycle);
     } else if state == DYING || state == SINK || state == SLEEP {
         // nothing to do
     } else if mouse_buttons() & RIGHT_BUTTON != 0 || game.ui.fight_key_held != 0 || joystick_fire()
     {
-        state = fighting_state(game, state);
+        state = fighting_state(game, video, state);
     } else if state == SHOOT1 {
         state = SHOOT3; // release the arrow
     } else {
@@ -51,15 +52,15 @@ pub(super) fn timer_step(timer: i16) -> i16 {
 }
 
 /// The fight button is down: shoot in a shooting zone, dismount, or fight with the weapon held.
-pub(super) fn fighting_state(game: &mut Game, state: i8) -> i8 {
+pub(super) fn fighting_state(game: &mut Game, video: &mut Video, state: i8) -> i8 {
     let hero = ActorRef::new(0);
 
     if game.world.extent_type > SHOOTING_ZONE {
-        return enter_shooting_zone(game, state);
+        return enter_shooting_zone(game, video, state);
     }
 
     if game.hero.riding == BIRD {
-        try_to_dismount(game, hero);
+        try_to_dismount(game, video, hero);
 
         return state;
     }
@@ -76,13 +77,13 @@ pub(super) fn fighting_state(game: &mut Game, state: i8) -> i8 {
 }
 
 /// In a shooting zone the hero shoots; the two special zones say so the first time.
-fn enter_shooting_zone(game: &mut Game, state: i8) -> i8 {
+fn enter_shooting_zone(game: &mut Game, video: &mut Video, state: i8) -> i8 {
     if state != SHOOT1 && game.world.extent_type == ZONE_ARROW_SLOW {
-        show_event(game, EVENT_ZONE_81);
+        show_event(game, video, EVENT_ZONE_81);
     }
 
     if state != SHOOT1 && game.world.extent_type == ZONE_ARROW_FAST {
-        show_event(game, EVENT_ZONE_82);
+        show_event(game, video, EVENT_ZONE_82);
     }
 
     SHOOT1
@@ -90,11 +91,11 @@ fn enter_shooting_zone(game: &mut Game, state: i8) -> i8 {
 
 /// On the bird, the fight button tries to land: not over lava, not when moving too fast, and only
 /// where there is room to stand.
-fn try_to_dismount(game: &mut Game, hero: ActorRef) {
+fn try_to_dismount(game: &mut Game, video: &mut Video, hero: ActorRef) {
     let (dif_x, dif_y) = (game.actor(hero).vel_x, game.actor(hero).vel_y);
 
     if game.actors.fiery_death != 0 {
-        show_event(game, EVENT_LAVA);
+        show_event(game, video, EVENT_LAVA);
     } else if dif_x > -DISMOUNT_SPEED
         && dif_x < DISMOUNT_SPEED
         && dif_y > -DISMOUNT_SPEED
@@ -114,7 +115,7 @@ fn try_to_dismount(game: &mut Game, hero: ActorRef) {
             game.actor_mut(hero).abs_y = ytest;
         }
     } else {
-        show_event(game, EVENT_TOO_FAST);
+        show_event(game, video, EVENT_TOO_FAST);
     }
 }
 

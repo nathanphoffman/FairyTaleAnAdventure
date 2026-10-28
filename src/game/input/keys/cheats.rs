@@ -7,6 +7,7 @@ use super::{
 };
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 
 use crate::game::actors::encounters::load_carrier;
 use crate::game::actors::interaction::{center_extent_on, rescue_princess};
@@ -15,7 +16,7 @@ use crate::game::ui::menus::update_menu_availability;
 use crate::game::ui::text::queue_print;
 
 /// Debug keys that give the hero a carrier or items. Returns true if the key was one.
-pub(super) fn cheat_items(game: &mut Game, key: i8) -> bool {
+pub(super) fn cheat_items(game: &mut Game, video: &mut Video, key: i8) -> bool {
     if game.ui.cheat_enabled == 0 {
         return false;
     }
@@ -32,7 +33,7 @@ pub(super) fn cheat_items(game: &mut Game, key: i8) -> bool {
             (game.hero.y as i16).wrapping_add(CARRIER_OFFSET),
         );
 
-        load_carrier(game, CARRIER_BIRD);
+        load_carrier(game, video, CARRIER_BIRD);
 
         true
     } else if key == CHEAT_STUFF {
@@ -53,7 +54,7 @@ const PRQ_DEBUG_COORDS: i32 = 2;
 const PRQ_DEBUG_SECTOR: i32 = 3;
 
 /// Debug keys that rescue, redraw or move the hero about. Returns true if the key was one.
-pub(super) fn cheat_move(game: &mut Game, key: i8) -> bool {
+pub(super) fn cheat_move(game: &mut Game, video: &mut Video, key: i8) -> bool {
     if game.ui.cheat_enabled == 0 {
         return false;
     }
@@ -61,7 +62,7 @@ pub(super) fn cheat_move(game: &mut Game, key: i8) -> bool {
     let hero = ActorRef::new(0);
 
     match key {
-        CHEAT_RESCUE => rescue_princess(game),
+        CHEAT_RESCUE => rescue_princess(game, video),
         CHEAT_PRQ_2 => queue_print(&mut game.ui, PRQ_DEBUG_COORDS),
         CHEAT_PRQ_3 => queue_print(&mut game.ui, PRQ_DEBUG_SECTOR),
         CHEAT_TIME => game.world.day_clock = game.world.day_clock.wrapping_add(CHEAT_TIME_STEP),

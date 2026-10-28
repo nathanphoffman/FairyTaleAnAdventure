@@ -8,8 +8,9 @@
 use crate::game::data::state::Game;
 use crate::game::data::state::Hero;
 use crate::game::data::state::MAP_OFFSET;
-use crate::game::data::state::Memory;
+use crate::game::data::state::Video;
 use crate::game::data::state::World;
+use crate::game::data::state::{Graphics, MapData};
 use crate::game::data::tables::region_disk_blocks;
 use crate::game::data::types::Need;
 use crate::game::files::disk::{
@@ -81,9 +82,9 @@ const BLOCKED_TILE: u8 = 254;
 ///
 /// Outdoors the region comes from the middle of the screen: bit 6 of the sector column gives
 /// west or east, and two bits of the sector row give which of four rows.
-pub fn refresh_minimap(game: &mut Game) {
+pub fn refresh_minimap(game: &mut Game, video: &mut Video) {
     if game.world.region < FIRST_INDOOR_REGION {
-        follow_outdoor_region(game);
+        follow_outdoor_region(game, video);
     } else {
         game.world.target_region = game.world.region;
     }
@@ -97,14 +98,14 @@ pub fn refresh_minimap(game: &mut Game) {
 
 /// Outdoors: loads a pending region when the camera is in the loadable band, then works out the
 /// region at the middle of the screen and starts loading it if it is not the current one.
-fn follow_outdoor_region(game: &mut Game) {
+fn follow_outdoor_region(game: &mut Game, video: &mut Video) {
     if game.world.new_region < NO_REGION {
         let xs = game.world.map_x as u32 & MAP_X_WRAP;
 
         let ys = game.world.map_y as u32 & MAP_Y_WRAP;
 
         if (ys > MAP_Y_MIN_FOR_LOAD && ys < MAP_Y_MAX_FOR_LOAD) && !DEAD_STRIP_X.contains(&xs) {
-            load_region_now(game);
+            load_region_now(game, video);
         }
     }
 
@@ -119,7 +120,7 @@ fn follow_outdoor_region(game: &mut Game) {
 
     if game.world.target_region != game.world.region {
         game.world.new_region = game.world.target_region;
-        load_region_now(game);
+        load_region_now(game, video);
     }
 }
 
@@ -148,9 +149,9 @@ pub fn center_sector(world: &mut World) -> (u32, u32) {
 }
 
 /// Loads the pending region completely (`load_region_piece` does one piece per call).
-pub fn load_region_now(game: &mut Game) {
+pub fn load_region_now(game: &mut Game, video: &mut Video) {
     while game.world.new_region < NO_REGION {
-        load_region_piece(game);
+        load_region_piece(game, video);
     }
 }
 
@@ -158,7 +159,7 @@ pub fn load_region_now(game: &mut Game) {
 /// terrain tables, then one image bank per call. Each piece is only read if the loaded one is
 /// different (`loaded_blocks`). When everything is there, waits for the reads, turns the drive
 /// off, and `new_region` becomes the current region.
-pub fn load_region_piece(game: &mut Game) {
+pub fn load_region_piece(game: &mut Game, video: &mut Video) {
     if game.world.new_region >= NO_REGION {
         return;
     }
@@ -167,11 +168,11 @@ pub fn load_region_piece(game: &mut Game) {
 
     load_changed_tables(game, need);
 
-    if load_next_image_bank(&mut game.memory, need) {
+    if load_next_image_bank(&mut video.graphics, &mut game.map, need) {
         return;
     }
 
-    block_desert_door_without_statues(&mut game.memory, &mut game.world, &mut game.hero);
+    block_desert_door_without_statues(&mut game.map, &mut game.world, &mut game.hero);
     wait_for_all_reads();
     motor_off();
     game.world.region = game.world.new_region;
@@ -180,12 +181,12 @@ pub fn load_region_piece(game: &mut Game) {
 
 /// Loads the sector data, region map and two terrain tables that differ from the loaded ones.
 fn load_changed_tables(game: &mut Game, need: &Need) {
-    load_changed_map_tables(&mut game.memory, need);
-    load_changed_terrain(&mut game.memory, need);
+    load_changed_map_tables(&mut game.map, need);
+    load_changed_terrain(&mut game.map, need);
 }
 
 /// Loads the sector table and the region map if they changed.
-fn load_changed_map_tables(memory: &mut Memory, need: &Need) {
+fn load_changed_map_tables(memory: &mut MapData, need: &Need) {
     if need.sector != memory.loaded_blocks.sector {
         load_track_range(
             need.sector as i16,
@@ -210,7 +211,7 @@ fn load_changed_map_tables(memory: &mut Memory, need: &Need) {
 }
 
 /// Loads the two terrain tables if they changed.
-fn load_changed_terrain(memory: &mut Memory, need: &Need) {
+fn load_changed_terrain(memory: &mut MapData, need: &Need) {
     if need.terra1 != memory.loaded_blocks.terra1 {
         load_track_range(
             TERRA_BLOCK + need.terra1 as i16,
@@ -231,7 +232,7 @@ fn load_changed_terrain(memory: &mut Memory, need: &Need) {
 
 /// Loads the first of the four image banks that differs from the loaded one. Returns true if it
 /// loaded one (only one bank per call, so the game keeps running), false if all are up to date.
-fn load_next_image_bank(memory: &mut Memory, need: &Need) -> bool {
+fn load_next_image_bank(graphics: &mut Graphics, memory: &mut MapData, need: &Need) -> bool {
     let mut bank_mem = 0;
 
     for bank in 0..4 {
@@ -240,7 +241,7 @@ fn load_next_image_bank(memory: &mut Memory, need: &Need) -> bool {
 
             for plane in 0..5 {
                 let from = bank_mem + plane * IMAGE_PLANE_SIZE;
-                let dest = &mut memory.image[from..];
+                let dest = &mut graphics.image[from..];
                 let block = first + plane as i16 * IMAGE_PLANE_BLOCKS;
                 load_track_range(
                     block,
@@ -262,7 +263,7 @@ fn load_next_image_bank(memory: &mut Memory, need: &Need) -> bool {
 }
 
 /// Until the hero has enough statues, the desert fort door is covered with blocked tiles.
-fn block_desert_door_without_statues(memory: &mut Memory, world: &mut World, hero: &mut Hero) {
+fn block_desert_door_without_statues(memory: &mut MapData, world: &mut World, hero: &mut Hero) {
     if world.new_region == DESERT_REGION && hero.stuff()[STATUE_SLOT] < STATUES_NEEDED {
         for offset in [0, 1, MAP_ROW_BYTES, MAP_ROW_BYTES + 1] {
             memory.set_map_byte(DESERT_DOOR_TILE + offset, BLOCKED_TILE);

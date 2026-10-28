@@ -5,6 +5,7 @@ use super::{ITEMS, KEYBASE, KEYS};
 use crate::game::actors::interaction::summon_turtle;
 use crate::game::data::state::Game;
 use crate::game::data::state::Hero;
+use crate::game::data::state::Video;
 use crate::game::ui::items_menu::item_name;
 use crate::game::ui::menus::go_to_menu;
 use crate::game::ui::messages::{print, print_cont, print_wrapped};
@@ -34,12 +35,12 @@ fn in_no_turtle_area(hero: &Hero) -> bool {
 }
 
 /// Picks a weapon, the key menu, the turtle shell, or the sunstone.
-pub(super) fn use_option(game: &mut Game, chosen_entry: i16) -> bool {
+pub(super) fn use_option(game: &mut Game, video: &mut Video, chosen_entry: i16) -> bool {
     if chosen_entry == KEY_ENTRY {
         if game.ui.menu_hit_enabled != 0 {
-            go_to_menu(game, KEYS as i16);
+            go_to_menu(game, video, KEYS as i16);
         } else {
-            print_wrapped(game, "% has no keys!");
+            print_wrapped(game, video, "% has no keys!");
         }
 
         return false;
@@ -49,7 +50,7 @@ pub(super) fn use_option(game: &mut Game, chosen_entry: i16) -> bool {
         if game.ui.menu_hit_enabled != 0 {
             game.actors.list[0].weapon = (chosen_entry + 1) as i8;
         } else {
-            print_wrapped(game, "% doesn't have one.");
+            print_wrapped(game, video, "% doesn't have one.");
         }
     }
 
@@ -58,20 +59,20 @@ pub(super) fn use_option(game: &mut Game, chosen_entry: i16) -> bool {
             return true;
         }
 
-        summon_turtle(game);
+        summon_turtle(game, video);
     }
 
     if chosen_entry == SUNSTONE_ENTRY && game.witch.on_screen != 0 {
-        speak(game, SUNSTONE_SPEECH);
+        speak(game, video, SUNSTONE_SPEECH);
     }
 
-    go_to_menu(game, ITEMS as i16);
+    go_to_menu(game, video, ITEMS as i16);
 
     true
 }
 
 /// Tries a key on every door and chest around the hero.
-pub(super) fn keys_option(game: &mut Game, chosen_entry: i16) -> bool {
+pub(super) fn keys_option(game: &mut Game, video: &mut Video, chosen_entry: i16) -> bool {
     let key = (chosen_entry - FIRST_MENU_ENTRY) as usize;
     game.world.bumped_locked_door = 0;
 
@@ -82,7 +83,7 @@ pub(super) fn keys_option(game: &mut Game, chosen_entry: i16) -> bool {
             let x = step_x(game.hero.x as i32, direction, DOOR_REACH) as u16;
             let y = step_y(game.hero.y as i32, direction, DOOR_REACH) as u16;
 
-            if open_door_near(game, x, y, key as u32 + 1) != 0 {
+            if open_door_near(game, video, x, y, key as u32 + 1) != 0 {
                 game.hero.stuff_mut()[key + KEYBASE] -= 1;
                 break;
             }
@@ -91,14 +92,14 @@ pub(super) fn keys_option(game: &mut Game, chosen_entry: i16) -> bool {
         }
 
         if direction >= DIRECTIONS {
-            print_wrapped(game, "% tried a ");
-            print_cont(game, item_name(KEYBASE + key));
-            print_cont(game, " but it didn't");
-            print(game, "fit.");
+            print_wrapped(game, video, "% tried a ");
+            print_cont(video, item_name(KEYBASE + key));
+            print_cont(video, " but it didn't");
+            print(video, "fit.");
         }
     }
 
-    go_to_menu(game, ITEMS as i16);
+    go_to_menu(game, video, ITEMS as i16);
 
     true
 }

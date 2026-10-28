@@ -9,6 +9,7 @@ use crate::game::actors::encounters::load_enemy_sprites;
 use crate::game::actors::encounters::{load_carrier, place_encounter};
 use crate::game::actors::interaction::{blocked_at, rescue_princess};
 use crate::game::data::state::Game;
+use crate::game::data::state::Video;
 use crate::game::data::state::World;
 
 use crate::game::data::story_text::{INSIDE_MSG, INSIDE_TBL, PLACE_MSG, PLACE_TBL};
@@ -85,7 +86,7 @@ const SPIDER_ENCOUNTER: u16 = 8;
 /// Moves the hero to the world position (x, y) and reloads what is needed there. With `flag`
 /// set the region is worked out from the position (like walking through a door); otherwise
 /// `new_region` must already be set. If the spot is blocked the hero is moved down until it is free.
-pub fn transfer_hero(game: &mut Game, xtest: u16, ytest: u16, flag: u16) -> i32 {
+pub fn transfer_hero(game: &mut Game, video: &mut Video, xtest: u16, ytest: u16, flag: u16) -> i32 {
     game.world.map_x = game
         .world
         .map_x
@@ -111,9 +112,9 @@ pub fn transfer_hero(game: &mut Game, xtest: u16, ytest: u16, flag: u16) -> i32 
     }
 
     game.ui.held_direction = 0;
-    load_region_now(game);
-    refresh_minimap(game); // to set region_origin_x and region_origin_y
-    game.screen.view_status = VIEW_REBUILD_ALL;
+    load_region_now(game, video);
+    refresh_minimap(game, video); // to set region_origin_x and region_origin_y
+    video.screen.view_status = VIEW_REBUILD_ALL;
     set_mood(game, 1);
 
     while blocked_at(game, game.hero.x as i16, game.hero.y as i16, 0) != 0 {
@@ -125,12 +126,12 @@ pub fn transfer_hero(game: &mut Game, xtest: u16, ytest: u16, flag: u16) -> i32 
 
 /// Starts the monsters of the extent the hero is in: loads their pictures and places up to four
 /// of them (there must be room before the carrier slots).
-fn start_forced_encounter(game: &mut Game) {
+fn start_forced_encounter(game: &mut Game, video: &mut Video) {
     game.encounter.kind = game.extents[game.world.extent].v3 as u16;
     game.encounter.mix_flag = 0;
     game.encounter.weapon_type = 0;
-    load_enemy_sprites(game);
-    finish_sprite_load(game, ENEMY_SLOT);
+    load_enemy_sprites(game, video);
+    finish_sprite_load(video, ENEMY_SLOT);
     motor_off();
     game.actors.loading = 0;
     game.encounter.number = game.extents[game.world.extent].v1;
@@ -149,21 +150,21 @@ fn start_forced_encounter(game: &mut Game) {
 /// extent the hero stands in, and whatever that extent starts.
 ///
 /// `flag` 0 is silent, 1 also starts monster zones, 2 only says the place name.
-pub fn find_place(game: &mut Game, flag: i16) -> i32 {
+pub fn find_place(game: &mut Game, video: &mut Video, flag: i16) -> i32 {
     let mut flag = flag;
 
     loop {
-        announce_place(game, flag);
+        announce_place(game, video, flag);
         locate_extent(game);
 
-        if !enter_extent(game, flag) {
+        if !enter_extent(game, video, flag) {
             // the princess was rescued: look again from the top, without the messages
             flag = 0;
 
             continue;
         }
 
-        update_carrier(game);
+        update_carrier(game, video);
 
         return 0;
     }
@@ -228,7 +229,7 @@ fn hero_on_loaded_edge(game: &mut Game) -> bool {
 }
 
 /// Remembers the place the hero is in, and says its name when it changes (if `flag` is set).
-fn announce_place(game: &mut Game, flag: i16) {
+fn announce_place(game: &mut Game, video: &mut Video, flag: i16) {
     let message = place_message_number(game);
 
     if message != 0 && message as u16 != game.hero.place {
@@ -241,7 +242,7 @@ fn announce_place(game: &mut Game, flag: i16) {
                 PLACE_MSG
             };
 
-            show_message(game, messages, message as i32);
+            show_message(game, video, messages, message as i32);
         }
     }
 }
@@ -264,7 +265,7 @@ fn locate_extent(game: &mut Game) {
 /// What happens when the hero walks into a different kind of extent: the princess is rescued, a
 /// boss or the turtle eggs call up their monsters, the spider pit loads the spiders, and monster
 /// zones may send a fight. Returns false if the princess was rescued (the caller starts over).
-fn enter_extent(game: &mut Game, flag: i16) -> bool {
+fn enter_extent(game: &mut Game, video: &mut Video, flag: i16) -> bool {
     if game.world.extent_type == game.extents[game.world.extent].etype as u16 {
         return true;
     }
@@ -274,7 +275,7 @@ fn enter_extent(game: &mut Game, flag: i16) -> bool {
 
     if game.world.extent_type == XT_PRINCESS && game.objects.region[8][PRINCESS_OBJECT].ob_stat != 0
     {
-        rescue_princess(game);
+        rescue_princess(game, video);
 
         return false;
     } else if game.world.extent_type >= XT_SPECIAL_MIN {
@@ -284,7 +285,7 @@ fn enter_extent(game: &mut Game, flag: i16) -> bool {
             force = true;
         }
     } else if game.world.extent_type == XT_SPIDER_PIT {
-        load_spiders(game);
+        load_spiders(game, video);
     } else if game.world.extent_type >= XT_MONSTER_ZONE_MIN && flag == 1 {
         game.encounter.x = game.hero.x;
         game.encounter.y = game.hero.y;
@@ -292,7 +293,7 @@ fn enter_extent(game: &mut Game, flag: i16) -> bool {
     }
 
     if force {
-        start_forced_encounter(game);
+        start_forced_encounter(game, video);
     }
 
     true
@@ -309,10 +310,10 @@ fn aim_encounter_at_extent_middle(game: &mut Game) {
 }
 
 /// The spider pit loads its spiders at once (no waiting for the disk).
-fn load_spiders(game: &mut Game) {
+fn load_spiders(game: &mut Game, video: &mut Video) {
     game.encounter.kind = SPIDER_ENCOUNTER;
-    load_enemy_sprites(game);
-    finish_sprite_load(game, ENEMY_SLOT);
+    load_enemy_sprites(game, video);
+    finish_sprite_load(video, ENEMY_SLOT);
     motor_off();
     game.actors.loading = 0;
 }
@@ -327,7 +328,7 @@ fn boss_is_missing(game: &mut Game) -> bool {
 
 /// Drops the carrier when the hero is outside the carrier extents, and loads the swan, turtle or
 /// dragon inside them.
-fn update_carrier(game: &mut Game) {
+fn update_carrier(game: &mut Game, video: &mut Video) {
     if game.world.extent_type < XT_CARRIER_MIN {
         game.actors.active_carrier = 0;
     } else if game.world.extent_type == XT_CARRIER
@@ -336,6 +337,6 @@ fn update_carrier(game: &mut Game) {
                 && game.actors.loaded_actor_file != game.extents[game.world.extent].v3 as i16))
     {
         let carrier_file = game.extents[game.world.extent].v3 as i16;
-        load_carrier(game, carrier_file);
+        load_carrier(game, video, carrier_file);
     }
 }
