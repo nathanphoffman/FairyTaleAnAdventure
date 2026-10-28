@@ -26,6 +26,7 @@ use crate::game::data::state::Video;
 use crate::game::data::state::World;
 use crate::game::data::state::{ActorRef, MissileRef};
 use crate::game::data::tables::{entry, facing_frame_offsets};
+use crate::game::output::Output;
 use crate::game::world::map::{step_x, step_y, terrain_at};
 
 // Actor kinds and states (csrc/ftale.h).
@@ -336,7 +337,7 @@ impl Ctx {
 
 impl Ctx {
     /// Picks the code for this kind of actor and state (the `if` chain at the top of the C).
-    fn dispatch(&mut self, game: &mut Game, video: &mut Video) -> Pc {
+    fn dispatch(&mut self, game: &mut Game, out: &mut dyn Output) -> Pc {
         let actor = self.actor;
         let kind = game.actor(actor).kind;
 
@@ -361,11 +362,11 @@ impl Ctx {
 
             Pc::Cpx
         } else if self.state == WALKING {
-            self.walking(game, video)
+            self.walking(game, out)
         } else if self.state == STILL as i16 {
             Pc::Still
         } else if self.state >= SHOOT1 {
-            self.shooting(game, video)
+            self.shooting(game, out)
         } else if self.state <= LAST_FIGHT_STATE {
             self.fighting(game)
         } else {

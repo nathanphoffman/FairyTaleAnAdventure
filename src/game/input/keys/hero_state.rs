@@ -9,6 +9,7 @@ use super::{
 };
 use crate::game::data::state::Game;
 use crate::game::data::state::Video;
+use crate::game::output::Output;
 
 use crate::game::actors::interaction::blocked_at;
 use crate::game::data::random::fta_rand;
@@ -52,15 +53,15 @@ pub(super) fn timer_step(timer: i16) -> i16 {
 }
 
 /// The fight button is down: shoot in a shooting zone, dismount, or fight with the weapon held.
-pub(super) fn fighting_state(game: &mut Game, video: &mut Video, state: i8) -> i8 {
+pub(super) fn fighting_state(game: &mut Game, out: &mut dyn Output, state: i8) -> i8 {
     let hero = ActorRef::new(0);
 
     if game.world.extent_type > SHOOTING_ZONE {
-        return enter_shooting_zone(game, video, state);
+        return enter_shooting_zone(game, out, state);
     }
 
     if game.hero.riding == BIRD {
-        try_to_dismount(game, video, hero);
+        try_to_dismount(game, out, hero);
 
         return state;
     }
@@ -77,13 +78,13 @@ pub(super) fn fighting_state(game: &mut Game, video: &mut Video, state: i8) -> i
 }
 
 /// In a shooting zone the hero shoots; the two special zones say so the first time.
-fn enter_shooting_zone(game: &mut Game, video: &mut Video, state: i8) -> i8 {
+fn enter_shooting_zone(game: &mut Game, out: &mut dyn Output, state: i8) -> i8 {
     if state != SHOOT1 && game.world.extent_type == ZONE_ARROW_SLOW {
-        show_event(game, video, EVENT_ZONE_81);
+        show_event(game, out, EVENT_ZONE_81);
     }
 
     if state != SHOOT1 && game.world.extent_type == ZONE_ARROW_FAST {
-        show_event(game, video, EVENT_ZONE_82);
+        show_event(game, out, EVENT_ZONE_82);
     }
 
     SHOOT1
@@ -91,11 +92,11 @@ fn enter_shooting_zone(game: &mut Game, video: &mut Video, state: i8) -> i8 {
 
 /// On the bird, the fight button tries to land: not over lava, not when moving too fast, and only
 /// where there is room to stand.
-fn try_to_dismount(game: &mut Game, video: &mut Video, hero: ActorRef) {
+fn try_to_dismount(game: &mut Game, out: &mut dyn Output, hero: ActorRef) {
     let (dif_x, dif_y) = (game.actor(hero).vel_x, game.actor(hero).vel_y);
 
     if game.actors.fiery_death != 0 {
-        show_event(game, video, EVENT_LAVA);
+        show_event(game, out, EVENT_LAVA);
     } else if dif_x > -DISMOUNT_SPEED
         && dif_x < DISMOUNT_SPEED
         && dif_y > -DISMOUNT_SPEED
@@ -115,7 +116,7 @@ fn try_to_dismount(game: &mut Game, video: &mut Video, hero: ActorRef) {
             game.actor_mut(hero).abs_y = ytest;
         }
     } else {
-        show_event(game, video, EVENT_TOO_FAST);
+        show_event(game, out, EVENT_TOO_FAST);
     }
 }
 

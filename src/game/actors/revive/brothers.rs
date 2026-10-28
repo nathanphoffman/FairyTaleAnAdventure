@@ -9,10 +9,10 @@ use crate::game::data::state::{Hero, World};
 use crate::game::data::tables::brother_stats;
 use crate::game::data::types::{Bro, Shape};
 use crate::game::files::loading::load_start_sprites;
+use crate::game::output::Output;
 use crate::game::render::display::delay;
 use crate::game::render::screen::{FontKind, PortId};
 use crate::game::render::screen_fx::{map_message, message_off};
-use crate::game::ui::messages::print_cont;
 use crate::game::ui::text::{draw_placard_border, placard_text, show_event};
 use crate::game::world::map::move_camera_to;
 
@@ -109,7 +109,7 @@ pub(super) fn leave_fallen_brother(objects: &mut ObjectLists, hero: &Hero) {
 
 /// The next brother takes over: his stats and item list, nothing in the timers, and the first
 /// safe spot.
-pub(super) fn take_over_next_brother(game: &mut Game, video: &mut Video, hero: ActorRef) {
+pub(super) fn take_over_next_brother(game: &mut Game, _out: &mut dyn Output, hero: ActorRef) {
     let stats = &brother_stats[game.hero.brother as usize];
     start_next_brother(&mut game.hero, &mut game.actors.list[hero.slot()], stats);
 
@@ -119,7 +119,7 @@ pub(super) fn take_over_next_brother(game: &mut Game, video: &mut Video, hero: A
         game.hero.safe_x as i32,
         game.hero.safe_y as i32,
     );
-    video.screen.view_status = VIEW_REDRAW;
+    game.ui.view_status = VIEW_REDRAW;
     game.actors.on_screen = 1;
     game.actors.loading = 0;
 }
@@ -222,7 +222,7 @@ pub(super) fn announce_brother(game: &mut Game, video: &mut Video) {
         show_event(game, video, EVENT_SETTING_OUT);
 
         if game.hero.brother == JULIAN {
-            print_cont(video, ".");
+            video.print_cont(".");
         } else if game.hero.brother == PHILLIP {
             show_event(game, video, EVENT_PHILLIP_SETS_OUT);
         } else if game.hero.brother == KEVIN {

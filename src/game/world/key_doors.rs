@@ -5,8 +5,7 @@
 //! which tiles to swap in and which key is needed.
 
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
-use crate::game::ui::messages::print;
+use crate::game::output::Output;
 use crate::game::world::map::{terrain_at, tile_index};
 
 /// The terrain type that marks a door.
@@ -101,7 +100,7 @@ fn set_tile(game: &mut Game, x: i32, y: i32, value: u8) {
 /// without a key). Looks 4 pixels either side for the door terrain, then walks left and down to
 /// the door's top-left tile. Returns 1 if a door opened, 0 if not ("It's locked." is said the
 /// first time).
-pub fn open_door_near(game: &mut Game, video: &mut Video, x: u16, y: u16, keytype: u32) -> i32 {
+pub fn open_door_near(game: &mut Game, out: &mut dyn Output, x: u16, y: u16, keytype: u32) -> i32 {
     let Some((x, y)) = find_door_corner(game, x, y) else {
         return 0;
     };
@@ -113,15 +112,15 @@ pub fn open_door_near(game: &mut Game, video: &mut Video, x: u16, y: u16, keytyp
 
     if let Some(open) = find_open(sector_id, map_id, keytype) {
         swap_in_open_door_tiles(game, open, x, y);
-        video.screen.view_status = REDRAW_MAP;
+        game.ui.view_status = REDRAW_MAP;
         game.ui.held_direction = 0;
-        print(video, "It opened.");
+        out.print("It opened.");
 
         return 1;
     }
 
     if game.world.bumped_locked_door == 0 && keytype == 0 {
-        print(video, "It's locked.");
+        out.print("It's locked.");
     }
 
     game.world.bumped_locked_door = 1;

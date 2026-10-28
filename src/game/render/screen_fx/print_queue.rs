@@ -2,10 +2,10 @@
 
 use crate::game::data::state::Game;
 use crate::game::data::state::Video;
+use crate::game::output::Output;
 use crate::game::render::display::delay;
 use crate::game::ui::menus::print_options;
-use crate::game::ui::messages::print;
-use crate::game::ui::text::{draw_text, move_to, print_number};
+use crate::game::ui::text::{draw_text, move_to};
 
 // Field widths for printed numbers, and the map-coordinate shift (256 pixels to a sector).
 /// There is no memory shortage to report; the debug display shows this.
@@ -52,36 +52,36 @@ pub fn handle_print_request(game: &mut Game, video: &mut Video) {
         REQUEST_VITALITY => draw_vitality(game, video),
         REQUEST_OPTIONS => print_options(game, video),
         REQUEST_STATS => draw_stats(game, video),
-        REQUEST_TAKE_WHAT => print(video, "Take What?"),
+        REQUEST_TAKE_WHAT => video.print("Take What?"),
         _ => {}
     }
 }
 
 /// Debug information: the hero's map position and the memory left.
-fn show_debug_coords(game: &mut Game, video: &mut Video) {
-    print(video, "Coords = ");
-    print_number(video, game.hero.x as i32, COORD_DIGITS);
-    print_number(video, game.hero.y as i32, COORD_DIGITS);
-    print(video, "Memory Available: ");
-    print_number(video, FAKE_FREE_BYTES, COORD_DIGITS);
+fn show_debug_coords(game: &mut Game, out: &mut dyn Output) {
+    out.print("Coords = ");
+    out.print_number(game.hero.x as i32, COORD_DIGITS);
+    out.print_number(game.hero.y as i32, COORD_DIGITS);
+    out.print("Memory Available: ");
+    out.print_number(FAKE_FREE_BYTES, COORD_DIGITS);
 }
 
 /// Debug information: the hero's sector and the type of the extent the hero is in.
 fn show_debug_sector(game: &mut Game, video: &mut Video) {
-    print(video, "You are at: ");
-    print_number(video, game.hero.x as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
-    print_number(video, game.hero.y as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
-    print(video, "H/Sector = ");
-    print_number(video, game.hero.sector as i32, SECTOR_DIGITS);
+    video.print("You are at: ");
+    video.print_number(game.hero.x as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
+    video.print_number(game.hero.y as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
+    video.print("H/Sector = ");
+    video.print_number(game.hero.sector as i32, SECTOR_DIGITS);
     draw_text(&mut video.screen, b" Extent = ");
-    print_number(video, game.world.extent_type as i32, EXTENT_DIGITS);
+    video.print_number(game.world.extent_type as i32, EXTENT_DIGITS);
 }
 
 /// The hero's vitality on the stats line.
 fn draw_vitality(game: &mut Game, video: &mut Video) {
     move_to(video, VITALITY_POSITION.0, VITALITY_POSITION.1);
     draw_text(&mut video.screen, b"Vit:");
-    print_number(video, game.actors.list[0].vitality as i32, VITALITY_DIGITS);
+    video.print_number(game.actors.list[0].vitality as i32, VITALITY_DIGITS);
 }
 
 /// Draws the hero's four stats (bravery, luck, kindness, wealth) along the stats line.
@@ -98,6 +98,6 @@ fn draw_stats(game: &mut Game, video: &mut Video) {
     ] {
         move_to(video, x, STATS_Y);
         draw_text(&mut video.screen, label);
-        print_number(video, value as i32, STAT_DIGITS);
+        video.print_number(value as i32, STAT_DIGITS);
     }
 }

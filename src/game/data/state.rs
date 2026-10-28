@@ -320,12 +320,11 @@ impl Graphics {
 }
 
 /// Everything about how the game is drawn: the screen, the picture data, the sprite blitter's work
-/// values and the page colours. The rules never read it, they only ask for things to be drawn.
+/// values. The rules never read it, they only ask for things to be drawn.
 pub struct Video {
     pub screen: Screen,
     pub graphics: Graphics,
     pub blitter: Blitter,
-    pub page_colors: [u16; 32],
 }
 
 impl Video {
@@ -334,7 +333,6 @@ impl Video {
             screen: Screen::new(),
             graphics: Graphics::new(),
             blitter: Blitter::new(),
-            page_colors: initial_page_colors,
         }
     }
 }
@@ -349,6 +347,9 @@ pub struct Ui {
     pub fight_key_held: i16,
     pub cheat_enabled: i16,
     pub quit_requested: i8,
+    /// What the screen is showing or must do next: 0 is the normal view, the other values (game
+    /// over, fade in, redraw, items, map message, ...) are named where they are used.
+    pub view_status: i8,
     /// The file menu is for saving (else for loading).
     pub saving: bool,
     pub slot_entries: [i8; MENU_SLOTS],
@@ -411,6 +412,8 @@ pub struct Game {
     pub extents: [Extent; 23],
     pub menus: [Menu; 10],
     pub objects: ObjectLists,
+    /// The palette of the play field at full light; the fades start from it.
+    pub page_colors: [u16; 32],
     pub actors: Actors,
     pub world: World,
     pub hero: Hero,
@@ -454,6 +457,7 @@ impl Game {
             rng: Rng::new(),
             extents: initial_extents,
             menus: initial_menus,
+            page_colors: initial_page_colors,
             objects: ObjectLists::new(),
             actors: Default::default(),
             world: World {

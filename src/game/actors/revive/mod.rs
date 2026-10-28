@@ -65,9 +65,9 @@ pub fn revive(game: &mut Game, video: &mut Video, new: i16) {
     restore_hero(game, hero);
 
     if game.hero.brother > LAST_BROTHER {
-        video.screen.view_status = VIEW_GAME_OVER;
+        game.ui.view_status = VIEW_GAME_OVER;
     } else {
-        video.screen.view_status = VIEW_FADE_IN;
+        game.ui.view_status = VIEW_FADE_IN;
         set_mood(game, 1);
     }
 

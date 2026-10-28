@@ -8,10 +8,9 @@ use crate::game::data::random::{bitrand, rand64, rand256};
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
 use crate::game::files::loading::play_effect;
-use crate::game::ui::messages::{print, print_cont};
-use crate::game::ui::text::{print_number, speak};
+use crate::game::output::Output;
+use crate::game::ui::text::speak;
 
 // Races with special rules when hit.
 pub(super) const RACE_WRAITH: u8 = 2;
@@ -60,13 +59,13 @@ pub(super) fn actor_at(i: i32) -> ActorRef {
 /// kind 9) cannot be hurt by weak weapons (weapon below 4); the witch can be hurt anyway if the hero
 /// holds the item in inventory slot 7 (the sun stone). Races 0x8a and 0x8b (the spectre and the
 /// ghost brothers) are never hurt. Dragons and people are not pushed back.
-pub fn hit_actor(game: &mut Game, video: &mut Video, i: i32, j: i32, fc: i32, wt: i16) {
+pub fn hit_actor(game: &mut Game, out: &mut dyn Output, i: i32, j: i32, fc: i32, wt: i16) {
     let target = actor_at(j);
     let hero_weapon = game.actors.list[actor_at(HERO as i32).slot()].weapon;
     let has_spirit_item = game.hero.stuff()[SPIRIT_HURT_ITEM] != 0;
 
     if too_weak_to_hurt(game.actor(target).race, hero_weapon, has_spirit_item) {
-        speak(game, video, MESSAGE_NEEDS_WEAPON);
+        speak(game, out, MESSAGE_NEEDS_WEAPON);
 
         return;
     }
@@ -105,7 +104,7 @@ pub fn hit_actor(game: &mut Game, video: &mut Video, i: i32, j: i32, fc: i32, wt
         step_figure(game, i as i16, fc as i16, KNOCKBACK);
     }
 
-    check_death(game, video, j, WORLD_DEAD_CHECK);
+    check_death(game, out, j, WORLD_DEAD_CHECK);
 }
 
 /// Which sound a hit makes: `i` is the attacker (-1 an arrow, -2 a fireball), `j` the target.
@@ -172,31 +171,31 @@ fn vitality_after_hit(vitality: i16, wt: i16) -> i16 {
 
 /// After a fight: reports how many foes were defeated or fled, or "Bravely done!" if the hero is
 /// nearly dead. Then, if turtle eggs are around, the turtle story event is checked.
-pub fn report_battle_result(game: &mut Game, video: &mut Video) {
+pub fn report_battle_result(game: &mut Game, out: &mut dyn Output) {
     let (dead, fled) = count_casualties(&game.actors);
     let vitality = game.actors.list[actor_at(HERO as i32).slot()].vitality;
 
     match battle_report(vitality, dead, fled, game.world.extent_type) {
         BattleReport::Silent => {}
-        BattleReport::Bravely => print(video, "Bravely done!"),
+        BattleReport::Bravely => out.print("Bravely done!"),
         BattleReport::Foes { dead, fled } => {
             if dead != 0 {
-                print(video, "");
-                print_number(video, dead, 1);
-                print_cont(video, "foes were defeated in battle.");
+                out.print("");
+                out.print_number(dead, 1);
+                out.print_cont("foes were defeated in battle.");
             }
 
             if fled != 0 {
-                print(video, "");
-                print_number(video, fled, 1);
-                print_cont(video, "foes fled in retreat.");
+                out.print("");
+                out.print_number(fled, 1);
+                out.print_cont("foes fled in retreat.");
             }
         }
     }
 
     // check for presence of turtle eggs
     if game.actors.turtle_eggs != 0 {
-        summon_turtle(game, video);
+        summon_turtle(game, out);
     }
 }
 

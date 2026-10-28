@@ -192,7 +192,6 @@ pub struct Screen {
     pub queue_region: Vec<u8>,
     pub mask_region: Vec<u8>,
     pub planesize: i16,
-    pub view_status: i8,
     pub flasher: i8,
 }
 
@@ -226,7 +225,6 @@ impl Screen {
             queue_region: Vec::new(),
             mask_region: Vec::new(),
             planesize: 0,
-            view_status: 0,
             flasher: 0,
         }
     }

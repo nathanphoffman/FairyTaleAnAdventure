@@ -6,6 +6,7 @@ mod effects;
 use self::effects::{heal, scare_enemies, show_map, stone_jump};
 use crate::game::data::state::Game;
 use crate::game::data::state::Video;
+use crate::game::output::Output;
 
 use crate::game::ui::menus::update_menu_availability;
 use crate::game::ui::text::{show_event, speak};
@@ -52,7 +53,7 @@ pub fn magic_option(game: &mut Game, video: &mut Video, chosen_entry: i16) -> bo
 
 /// Checks that the spell can be cast here and now. Gives `Some(result)` for `magic_option` to
 /// return when it cannot, and `None` when the spell goes ahead.
-fn refuse_spell(game: &mut Game, video: &mut Video, chosen_entry: i16) -> Option<bool> {
+fn refuse_spell(game: &mut Game, out: &mut dyn Output, chosen_entry: i16) -> Option<bool> {
     let count = if chosen_entry < FIRST_SPELL {
         0
     } else {
@@ -70,13 +71,13 @@ fn refuse_spell(game: &mut Game, video: &mut Video, chosen_entry: i16) -> Option
 
     match gate {
         SpellGate::NoSpell => {
-            show_event(game, video, NO_SPELL_EVENT);
+            show_event(game, out, NO_SPELL_EVENT);
 
             Some(true)
         }
 
         SpellGate::QuietZone => {
-            speak(game, video, NO_MAGIC_SPEECH);
+            speak(game, out, NO_MAGIC_SPEECH);
 
             Some(true)
         }

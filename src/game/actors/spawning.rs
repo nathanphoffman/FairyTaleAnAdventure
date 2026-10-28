@@ -10,7 +10,7 @@ use crate::game::data::state::Game;
 use crate::game::data::state::Video;
 use crate::game::data::state::World;
 use crate::game::files::disk::{motor_off, read_finished};
-use crate::game::files::loading::finish_sprite_load;
+use crate::game::output::Output;
 use crate::game::world::map::terrain_at;
 use crate::game::world::places::find_place;
 
@@ -58,7 +58,7 @@ pub fn spawn_encounters(game: &mut Game, video: &mut Video) {
     find_place(game, video, 2);
 
     if game.actors.loading == 1 && read_finished(DISK_REQUEST_ACTORS) != 0 {
-        finish_sprite_load(video, ENEMY_SLOT);
+        video.finish_sprite_load(ENEMY_SLOT);
         motor_off();
         game.actors.loading = 0;
         game.actors.active = FIRST_ENEMY_ACTOR;
@@ -87,7 +87,7 @@ fn random_encounter_due(actors: &Actors, world: &World) -> bool {
 
 /// Rolls the danger of the area against a random number; if it is beaten, picks the kind of the
 /// encounter (a few extents decide it by rule) and starts loading the monsters' sprites.
-fn roll_random_encounter(game: &mut Game, video: &mut Video) {
+fn roll_random_encounter(game: &mut Game, out: &mut dyn Output) {
     game.encounter.danger_level = (if game.world.region > INDOOR_REGION {
         DANGER_BASE_INDOORS + game.world.extent_type
     } else {
@@ -111,7 +111,7 @@ fn roll_random_encounter(game: &mut Game, video: &mut Video) {
             game.encounter.mix_flag = 0;
         }
 
-        load_enemy_sprites(game, video);
+        load_enemy_sprites(game, out);
     }
 }
 

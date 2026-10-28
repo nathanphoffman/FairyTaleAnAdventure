@@ -6,6 +6,8 @@ pub mod display;
 
 pub mod draw;
 
+pub mod output;
+
 pub mod restore;
 
 pub mod screen;

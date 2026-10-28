@@ -79,7 +79,7 @@ pub(super) fn enter_door(game: &mut Game, video: &mut Video, xtest: u16, ytest: 
         game.world.new_region = region_inside(d);
         transfer_hero(game, video, x, y, 0);
         find_place(game, video, 2);
-        let colors = video.page_colors;
+        let colors = game.page_colors;
         fade_page(game, video, FADE_WHITE, FADE_WHITE, FADE_WHITE, 1, &colors);
     }
 }

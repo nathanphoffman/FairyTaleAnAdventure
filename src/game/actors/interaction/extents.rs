@@ -3,13 +3,13 @@
 use crate::game::actors::encounters::load_carrier;
 use crate::game::data::random::{rand8, rand64};
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
+use crate::game::output::Output;
 use crate::game::world::map::{step_x, step_y, terrain_at};
 
 /// Places the turtle: tries up to 25 random spots around the hero for one on water (terrain 5),
 /// then moves the turtle extent there and loads the turtle as the carrier. Called when turtle
 /// eggs are in view. Leaves the loop count in C's global `i`, as the original did.
-pub fn summon_turtle(game: &mut Game, video: &mut Video) {
+pub fn summon_turtle(game: &mut Game, out: &mut dyn Output) {
     const TRIES: i32 = 25;
     const WATER: i32 = 5;
     const TURTLE_EXTENT: i16 = 1;
@@ -37,7 +37,7 @@ pub fn summon_turtle(game: &mut Game, video: &mut Video) {
         game.encounter.y as i16,
     );
 
-    load_carrier(game, video, TURTLE_CARRIER);
+    load_carrier(game, out, TURTLE_CARRIER);
 }
 
 /// Centres extent `e` on a point (it covers 500 by 400 pixels around it).

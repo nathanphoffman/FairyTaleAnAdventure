@@ -219,7 +219,7 @@ fn start_first_brother(game: &mut Game, video: &mut Video) {
         page.wflag = 0;
     }
 
-    video.screen.view_status = VIEW_REDRAW;
+    game.ui.view_status = VIEW_REDRAW;
 
     game.ui.current_menu = 0;
     print_options(game, video);

@@ -112,9 +112,9 @@ pub fn handle_key(game: &mut Game, video: &mut Video, key: i32, notpause: i32) {
     let key = key as i8;
     let notpause = notpause as i16 != 0;
 
-    if video.screen.view_status != 0 && notpause {
+    if game.ui.view_status != 0 && notpause {
         if key & RELEASED == 0 {
-            video.screen.view_status = VIEW_REDRAW;
+            game.ui.view_status = VIEW_REDRAW;
         }
     } else if game.actors.list[0].state == DEAD {
         // ignored while dead

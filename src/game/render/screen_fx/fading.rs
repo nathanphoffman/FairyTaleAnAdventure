@@ -3,10 +3,9 @@
 use super::COLOR_COUNT;
 use crate::game::data::random::bitrand;
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
 use crate::game::data::state::World;
+use crate::game::output::Output;
 use crate::game::render::display::delay;
-use crate::game::render::screen::ViewPortId;
 
 // Colour 31 of the page changes with where the hero is.
 const COLOR_31: usize = 31;
@@ -50,14 +49,14 @@ const RANDOM_COLOR_MASK: i32 = 0xfff;
 #[allow(clippy::too_many_arguments)] // the three colour levels and the palette, plus the game and video state
 pub fn fade_page(
     game: &mut Game,
-    video: &mut Video,
+    out: &mut dyn Output,
     r: i16,
     g: i16,
     b: i16,
     limit: i16,
     colors: &[u16],
 ) {
-    video.page_colors[COLOR_31] = color_31_here(&game.world);
+    game.page_colors[COLOR_31] = color_31_here(&game.world);
 
     let ((r, g, b), g2) = clamp_levels((r as i32, g as i32, b as i32), limit != 0);
 
@@ -74,7 +73,7 @@ pub fn fade_page(
         );
     }
 
-    video.screen.load_colors(ViewPortId::Page, &faded);
+    out.load_page_colors(&faded);
 }
 
 /// Colour 31 depends on where the hero is: the swamp, the secret room (open or shut), or neither.
@@ -146,7 +145,7 @@ fn faded_color(
 }
 
 /// The teleport effect: random colours flicker for a moment (32 flashes).
-pub fn flicker_colors(game: &mut Game, video: &mut Video) {
+pub fn flicker_colors(game: &mut Game, out: &mut dyn Output) {
     for _ in 0..COLOR_COUNT {
         let mut flash = [0u16; COLOR_COUNT];
 
@@ -154,9 +153,9 @@ pub fn flicker_colors(game: &mut Game, video: &mut Video) {
             *slot = bitrand(&mut game.rng, RANDOM_COLOR_MASK) as u16;
         }
 
-        video.screen.load_colors(ViewPortId::Page, &flash);
+        out.load_page_colors(&flash);
 
-        delay(game, video, 1);
+        delay(game, out, 1);
     }
 }
 
@@ -164,12 +163,12 @@ pub fn flicker_colors(game: &mut Game, video: &mut Video) {
 const FADE_STEP: usize = 5;
 
 /// Fades the page out to black.
-pub fn fade_down(game: &mut Game, video: &mut Video) {
+pub fn fade_down(game: &mut Game, out: &mut dyn Output) {
     for level in (0..=FULL_LEVEL).rev().step_by(FADE_STEP) {
-        let colors = video.page_colors;
+        let colors = game.page_colors;
         fade_page(
             game,
-            video,
+            out,
             level as i16,
             level as i16,
             level as i16,
@@ -177,17 +176,17 @@ pub fn fade_down(game: &mut Game, video: &mut Video) {
             &colors,
         );
 
-        delay(game, video, 1);
+        delay(game, out, 1);
     }
 }
 
 /// Fades the page back in from black.
-pub fn fade_normal(game: &mut Game, video: &mut Video) {
+pub fn fade_normal(game: &mut Game, out: &mut dyn Output) {
     for level in (0..=FULL_LEVEL).step_by(FADE_STEP) {
-        let colors = video.page_colors;
+        let colors = game.page_colors;
         fade_page(
             game,
-            video,
+            out,
             level as i16,
             level as i16,
             level as i16,
@@ -195,7 +194,7 @@ pub fn fade_normal(game: &mut Game, video: &mut Video) {
             &colors,
         );
 
-        delay(game, video, 1);
+        delay(game, out, 1);
     }
 }
 
@@ -214,21 +213,21 @@ const VIEW_REBUILD: i8 = 97;
 
 /// Updates the page colours for the time of day, every fourth tick. `light_level` follows the sun;
 /// inside buildings (regions 8 and 9) it is always bright.
-pub fn day_fade(game: &mut Game, video: &mut Video) {
+pub fn day_fade(game: &mut Game, out: &mut dyn Output) {
     let bonus = if game.world.light_timer != 0 {
         LIGHT_SPELL_BONUS
     } else {
         0
     };
 
-    if game.world.day_clock & FADE_TICK_MASK == 0 || video.screen.view_status > VIEW_REBUILD {
-        let colors = video.page_colors;
+    if game.world.day_clock & FADE_TICK_MASK == 0 || game.ui.view_status > VIEW_REBUILD {
+        let colors = game.page_colors;
 
         if game.world.region < FIRST_INDOOR_REGION {
             let level = game.world.light_level as i32;
             fade_page(
                 game,
-                video,
+                out,
                 (level - DAY_DARKEN.0 + bonus) as i16,
                 (level - DAY_DARKEN.1) as i16,
                 (level - DAY_DARKEN.2) as i16,
@@ -238,7 +237,7 @@ pub fn day_fade(game: &mut Game, video: &mut Video) {
         } else {
             fade_page(
                 game,
-                video,
+                out,
                 FULL_LEVEL as i16,
                 FULL_LEVEL as i16,
                 FULL_LEVEL as i16,

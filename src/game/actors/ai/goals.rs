@@ -9,7 +9,7 @@ use crate::game::data::state::ActorRef;
 use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
 use crate::game::data::state::Hero;
-use crate::game::data::state::Video;
+use crate::game::output::Output;
 use crate::game::ui::music::set_mood;
 use crate::game::ui::text::queue_print;
 
@@ -58,7 +58,7 @@ const PRQ_STATS: i32 = 4;
 const PRQ_VITALITY: i32 = 7;
 
 /// Decides each enemy's goal and tactic, and starts or ends the battle mood.
-pub fn update_enemy_goals(game: &mut Game, video: &mut Video) {
+pub fn update_enemy_goals(game: &mut Game, out: &mut dyn Output) {
     game.actors.on_screen = 0;
     game.actors.leader = 0;
     let battle2 = game.actors.battle_flag;
@@ -81,7 +81,7 @@ pub fn update_enemy_goals(game: &mut Game, video: &mut Video) {
     if game.actors.battle_flag == 0 && battle2 != 0 {
         queue_print(&mut game.ui, PRQ_VITALITY);
         queue_print(&mut game.ui, PRQ_STATS);
-        report_battle_result(game, video);
+        report_battle_result(game, out);
     }
 }
 

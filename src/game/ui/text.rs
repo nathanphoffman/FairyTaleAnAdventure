@@ -14,6 +14,7 @@ use crate::game::data::state::Hero;
 use crate::game::data::state::Ui;
 use crate::game::data::state::Video;
 use crate::game::data::story_text::{EVENT_MSG, PLACARD_MSGS, SPEECHES};
+use crate::game::output::Output;
 use crate::game::render::screen::PortId;
 use crate::game::render::screen::Screen;
 use crate::game::ui::messages::print_wrapped;
@@ -50,14 +51,6 @@ pub fn format_number(mut value: u32) -> [u8; NUMBER_DIGITS + 1] {
     }
 
     text
-}
-
-/// Prints the number in a field of `len` characters, plus the trailing space.
-pub fn print_number(video: &mut Video, value: i32, len: i32) {
-    let text = format_number(value as u32);
-    let from = (NUMBER_DIGITS as i32 - len).max(0) as usize;
-
-    draw_text(&mut video.screen, &text[from..]);
 }
 
 // `move` is a Rust keyword, so this one is exported under the C name.
@@ -119,18 +112,18 @@ fn nth_string(list: &[u8], n: i32) -> &[u8] {
 }
 
 /// Shows the `num`-th string of a list of messages, word-wrapped (see `print_wrapped`).
-pub fn show_message(game: &mut Game, video: &mut Video, list: &[u8], num: i32) {
-    print_wrapped(game, video, nth_string(list, num));
+pub fn show_message(game: &mut Game, out: &mut dyn Output, list: &[u8], num: i32) {
+    print_wrapped(game, out, nth_string(list, num));
 }
 
 /// Shows event message `n` (things that happen to the hero, such as hunger).
-pub fn show_event(game: &mut Game, video: &mut Video, n: i32) {
-    show_message(game, video, EVENT_MSG, n);
+pub fn show_event(game: &mut Game, out: &mut dyn Output, n: i32) {
+    show_message(game, out, EVENT_MSG, n);
 }
 
 /// Shows speech number `n` (what people say).
-pub fn speak(game: &mut Game, video: &mut Video, n: i32) {
-    show_message(game, video, SPEECHES, n);
+pub fn speak(game: &mut Game, out: &mut dyn Output, n: i32) {
+    show_message(game, out, SPEECHES, n);
 }
 
 /// Adds a request to the print queue (ignored if the queue is full). `handle_print_request` handles them one
@@ -264,5 +257,5 @@ pub fn show_error(video: &mut Video, n: i32) {
 
     move_to(video, ERROR_SCREEN_X, ERROR_SCREEN_Y);
     draw_text(&mut video.screen, b"ERROR ");
-    print_number(video, n, 2);
+    video.print_number(n, 2);
 }

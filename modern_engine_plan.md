@@ -51,10 +51,20 @@ Both engines share the rules. They differ only in how they draw and read input.
    passes `&mut Game` and `&mut Video` down. `platform/display` only takes a `Scene`; the state-dump
    test hook lives in `game/render/display.rs`.
 
+11. The rules talk to the screen through `Output` (`src/game/output.rs`), and `Video` implements it
+   (`src/game/render/output.rs`). It covers printing into the text panel, loading the page colours,
+   swapping and showing pages, waiting a frame, and loading sprite sheets and image banks. About 85
+   functions that only needed those now take `out: &mut dyn Output` instead of `&mut Video`.
+   `view_status` (which screen is showing) moved from `Screen` to `Game.ui`, and the page colours
+   from `Video` to `Game`.
+
 **Not done.**
-- The rules code still calls drawing code directly (printing text into the panel, fades, `delay`),
-  so most functions take both `game` and `video`. A real split would have the rules produce events
-  or messages and a renderer show them; that is what step 5 and 6 below need.
+- About 110 functions still take `video: &mut Video`: they use the screen directly, for fonts, pens,
+  text positions, placards and story pages (`actors/revive`, `rescue_princess`, `ui/text.rs`,
+  `ui/menus.rs`, `ui/magic`, `ui/items_menu/item_list.rs`, `files/loading/story_pages.rs`,
+  `files/savegame`), for drawing the map and compass (`world/map`, `input/handler.rs`), and the
+  main loop, intro and `render/` themselves, which are meant to keep it. The rules functions that
+  only pass `video` on to those need the same treatment.
 - About 270 functions still take the whole `&mut Game`; 10 have more than six parameters (marked
   `allow(clippy::too_many_arguments)`).
 - `platform/display/scripting.rs` still calls `game::statedump::queue_command` for the test commands,
@@ -62,9 +72,9 @@ Both engines share the rules. They differ only in how they draw and read input.
 - Steps 5 to 7 below (classic/modern engines, remastered, reimagined) have not been started.
 
 **Plan for what comes next, in order.**
-1. *Make the rules independent of drawing*: give the rules a small output interface (print a message,
-   play a sound, fade, wait) that `Video` implements, so `Game` can run without a screen. Then the
-   modern renderer can read `Game` directly.
+1. *Make the rules independent of drawing*: keep moving what is left of the screen use behind
+   `Output` (text drawing and placards, menus, story pages, the map and compass), then drop the unused
+   `out` parameters. Then `Game` can run without a screen and the modern renderer can read it directly.
 2. Step 5 (classic engine, improved options), step 6 (modern renderer: RGBA tiles, zoom, bigger view),
    step 7 (data files for items, enemies, spells and text).
 

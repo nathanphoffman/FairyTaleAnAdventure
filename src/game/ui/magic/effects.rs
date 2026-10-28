@@ -7,9 +7,9 @@ use crate::game::data::state::Game;
 use crate::game::data::state::Video;
 use crate::game::data::tables::stone_ring_sectors;
 use crate::game::data::types::Shape;
+use crate::game::output::Output;
 use crate::game::render::screen::PortId;
 use crate::game::render::screen_fx::{flicker_colors, show_still_screen};
-use crate::game::ui::messages::print;
 use crate::game::ui::text::{queue_print, show_event};
 use crate::game::world::map::draw_overview_map;
 use crate::game::world::places::transfer_hero;
@@ -76,14 +76,14 @@ pub(super) fn show_map(game: &mut Game, video: &mut Video) {
         video.screen.text(PortId::Map, b"+");
     }
 
-    video.screen.view_status = VIEW_MAP;
+    game.ui.view_status = VIEW_MAP;
     show_still_screen(game, video);
     queue_print(&mut game.ui, PRQ_MAP);
 }
 
 /// The stone ring spell: only works standing in the middle of a stone circle. Takes the hero to
 /// the next circle in the direction faced. Returns false if the spell did not work.
-pub(super) fn stone_jump(game: &mut Game, video: &mut Video) -> bool {
+pub(super) fn stone_jump(game: &mut Game, out: &mut dyn Output) -> bool {
     let ring_list = stone_ring_sectors;
 
     match stone_target(
@@ -96,8 +96,8 @@ pub(super) fn stone_jump(game: &mut Game, video: &mut Video) -> bool {
         StoneJump::Refused => false,
         StoneJump::NoRing => true,
         StoneJump::To(x, y) => {
-            flicker_colors(game, video);
-            transfer_hero(game, video, x, y, 1);
+            flicker_colors(game, out);
+            transfer_hero(game, out, x, y, 1);
 
             if game.hero.riding != 0 {
                 game.actors.list[game.actors.carrier_slot as usize].abs_x =
@@ -156,7 +156,7 @@ fn stone_target(sector: i16, px: u16, py: u16, facing: i8, list: &[u8]) -> Stone
 }
 
 /// Heals the hero a little, up to a limit set by bravery.
-pub(super) fn heal(game: &mut Game, video: &mut Video) {
+pub(super) fn heal(game: &mut Game, out: &mut dyn Output) {
     let hero = ActorRef::new(0);
     let (vitality, capped) = healed_vitality(
         game.actor(hero).vitality,
@@ -166,7 +166,7 @@ pub(super) fn heal(game: &mut Game, video: &mut Video) {
     game.actor_mut(hero).vitality = vitality;
 
     if !capped {
-        print(video, "That feels a lot better!");
+        out.print("That feels a lot better!");
     }
 
     queue_print(&mut game.ui, PRQ_STATS);
@@ -191,7 +191,7 @@ fn is_scared_by_fear_spell(actor: &Shape) -> bool {
 }
 
 /// Kills every weak enemy on the screen (and costs a little bravery for each).
-pub(super) fn scare_enemies(game: &mut Game, video: &mut Video) {
+pub(super) fn scare_enemies(game: &mut Game, out: &mut dyn Output) {
     let mut i = 1;
 
     while i < game.actors.active as usize {
@@ -199,7 +199,7 @@ pub(super) fn scare_enemies(game: &mut Game, video: &mut Video) {
 
         if is_scared_by_fear_spell(game.actor(actor)) {
             game.actor_mut(actor).vitality = 0;
-            check_death(game, video, i as i32, 0);
+            check_death(game, out, i as i32, 0);
             game.hero.brave -= 1;
         }
 
@@ -207,7 +207,7 @@ pub(super) fn scare_enemies(game: &mut Game, video: &mut Video) {
     }
 
     if game.actors.battle_flag != 0 {
-        show_event(game, video, BATTLE_EVENT);
+        show_event(game, out, BATTLE_EVENT);
     }
 }
 

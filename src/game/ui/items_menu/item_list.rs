@@ -4,6 +4,7 @@ use super::{GOLDBASE, OBJECTS, item};
 use crate::game::data::state::Game;
 use crate::game::data::state::Hero;
 use crate::game::data::state::Video;
+use crate::game::output::Output;
 use crate::game::render::screen::Screen;
 use crate::game::render::screen::{BitmapId, PortId, ViewPortId};
 use crate::game::render::screen_fx::show_still_screen;
@@ -45,11 +46,9 @@ pub(super) fn show_item_list(game: &mut Game, video: &mut Video) {
         .screen
         .set_color(ViewPortId::Page, BACKGROUND_PEN, (0, 0, 0));
     show_still_screen(game, video);
-    video
-        .screen
-        .load_colors(ViewPortId::Page, &video.page_colors);
+    video.load_page_colors(&game.page_colors);
 
-    video.screen.view_status = VIEW_ITEMS;
+    game.ui.view_status = VIEW_ITEMS;
     queue_print(&mut game.ui, PRQ_LIST);
 }
 

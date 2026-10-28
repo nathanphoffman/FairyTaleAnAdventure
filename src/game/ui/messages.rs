@@ -7,20 +7,8 @@
 //! story tables, breaks it into lines that fit the panel and prints each one.
 
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
 use crate::game::data::tables::brother_names;
-use crate::game::ui::text::{draw_text, move_to};
-use crate::gfx::bitmap::Rect;
-
-// The scrolling message area of the text panel.
-const TEXT_X_MIN: i32 = 16;
-const TEXT_X_MAX: i32 = 400;
-const TEXT_Y_MIN: i32 = 5;
-const TEXT_Y_MAX: i32 = 44;
-
-/// Pixels the panel scrolls up for each new line, and the baseline of that new line.
-const LINE_HEIGHT: i32 = 10;
-const NEW_LINE_Y: i32 = 42;
+use crate::game::output::Output;
 
 /// Characters on a line before `print_wrapped` looks for a place to wrap it.
 const WRAP_COLUMN: i16 = 37;
@@ -41,33 +29,6 @@ const LINE_BUFFER: usize = 200;
 /// The current brother's name.
 fn brother_name(game: &Game) -> &'static str {
     brother_names[{ game.hero.brother } as usize - 1]
-}
-
-/// Starts a new line in the panel and prints `s` on it.
-/// The old lines scroll up by one text line (10 pixels) inside the message area.
-pub fn print(video: &mut Video, s: &str) {
-    print_bytes(video, s.as_bytes());
-}
-
-fn print_bytes(video: &mut Video, s: &[u8]) {
-    let area = Rect {
-        x: TEXT_X_MIN,
-        y: TEXT_Y_MIN,
-        width: TEXT_X_MAX - TEXT_X_MIN + 1,
-        height: TEXT_Y_MAX - TEXT_Y_MIN + 1,
-    };
-
-    video
-        .screen
-        .scroll(video.screen.current_port, area, (0, LINE_HEIGHT));
-
-    move_to(video, TEXT_X_MIN, NEW_LINE_Y);
-    draw_text(&mut video.screen, s);
-}
-
-/// Continues the current line with `s`.
-pub fn print_cont(video: &mut Video, s: &str) {
-    draw_text(&mut video.screen, s.as_bytes());
 }
 
 /// The line buffer of `print_wrapped`: message characters are collected here, and `end` is where the
@@ -120,7 +81,7 @@ impl LineBuffer {
 /// a line reaches 37 characters it is cut at that space (the space becomes the end of the string)
 /// and printed, and the leftover characters start the next line. The message ends at a zero byte
 /// (or the end of `message`).
-pub fn print_wrapped(game: &mut Game, video: &mut Video, message: impl AsRef<[u8]>) {
+pub fn print_wrapped(game: &mut Game, out: &mut dyn Output, message: impl AsRef<[u8]>) {
     let message = message.as_ref();
     let mut buffer = LineBuffer {
         bytes: [0; LINE_BUFFER],
@@ -136,7 +97,7 @@ pub fn print_wrapped(game: &mut Game, video: &mut Video, message: impl AsRef<[u8
         if let Some(line_break) = line_break {
             // found a wrap point: end the line and print it
             buffer.terminate(line_break);
-            print_bytes(video, buffer.line(line_start));
+            out.print_bytes(buffer.line(line_start));
 
             if i > END_COLUMN {
                 break;
@@ -152,7 +113,7 @@ pub fn print_wrapped(game: &mut Game, video: &mut Video, message: impl AsRef<[u8
                 break;
             }
 
-            print_bytes(video, buffer.line(line_start));
+            out.print_bytes(buffer.line(line_start));
             i = 0;
             line_start = buffer.end;
         }
@@ -201,24 +162,24 @@ fn copy_up_to_a_line(
 }
 
 /// Prints "<Brother> found <container> containing ", ready for the contents to be added.
-pub fn announce_container(game: &mut Game, video: &mut Video, s: &str) {
+pub fn announce_container(game: &mut Game, out: &mut dyn Output, s: &str) {
     let name = brother_name(game);
-    print(video, name);
-    print_cont(video, " found ");
-    print_cont(video, s);
-    print_cont(video, " containing ");
+    out.print(name);
+    out.print_cont(" found ");
+    out.print_cont(s);
+    out.print_cont(" containing ");
 }
 
 /// Prints "<Brother> found <treasure>".
-pub fn announce_treasure(game: &mut Game, video: &mut Video, s: &str) {
+pub fn announce_treasure(game: &mut Game, out: &mut dyn Output, s: &str) {
     let name = brother_name(game);
-    print(video, name);
-    print_cont(video, " found ");
-    print_cont(video, s);
+    out.print(name);
+    out.print_cont(" found ");
+    out.print_cont(s);
 }
 
 /// Adds the current brother's name to the line being printed.
-pub fn name(game: &mut Game, video: &mut Video) {
+pub fn name(game: &mut Game, out: &mut dyn Output) {
     let name = brother_name(game);
-    print_cont(video, name);
+    out.print_cont(name);
 }

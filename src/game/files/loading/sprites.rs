@@ -9,6 +9,7 @@ use crate::game::files::disk::{
     is_last_read_pending, last_read_finished, load_track_range, mark_read_unused, motor_off,
     wait_for_read,
 };
+use crate::game::output::Output;
 
 use crate::game::render::blit::make_sprite_masks;
 use crate::game::world::regions::{load_region_now, load_region_piece};
@@ -66,24 +67,21 @@ const RAFT_FILE: i32 = 4;
 
 /// Loads the sprite sets the game starts with: objects, the current brother, the raft, the
 /// current monsters and set figures, then the region.
-pub fn load_start_sprites(game: &mut Game, video: &mut Video) {
-    video.graphics.nextshape = 0;
-    load_sprite_file(video, OBJECTS_FILE);
-    finish_sprite_load(video, OBJECTS as i16);
-    load_sprite_file(video, game.hero.brother as i32 - 1);
-    finish_sprite_load(video, PHIL as i16);
-    load_sprite_file(video, RAFT_FILE);
-    finish_sprite_load(video, RAFT as i16);
-    sequence(&mut video.graphics, ENEMY).location = video.graphics.nextshape;
-    load_sprite_file(video, game.actors.loaded_actor_file as i32);
-    finish_sprite_load(
-        video,
-        SPRITE_FILES[game.actors.loaded_actor_file as usize].seq_num as i16,
-    );
-    load_sprite_file(video, game.actors.loaded_setfig_file as i32);
-    finish_sprite_load(video, SETFIG as i16);
+pub fn load_start_sprites(game: &mut Game, out: &mut dyn Output) {
+    out.forget_sprites();
+    out.load_sprite_file(OBJECTS_FILE);
+    out.finish_sprite_load(OBJECTS as i16);
+    out.load_sprite_file(game.hero.brother as i32 - 1);
+    out.finish_sprite_load(PHIL as i16);
+    out.load_sprite_file(RAFT_FILE);
+    out.finish_sprite_load(RAFT as i16);
+    out.start_sprite_sheet(ENEMY);
+    out.load_sprite_file(game.actors.loaded_actor_file as i32);
+    out.finish_sprite_load(SPRITE_FILES[game.actors.loaded_actor_file as usize].seq_num as i16);
+    out.load_sprite_file(game.actors.loaded_setfig_file as i32);
+    out.finish_sprite_load(SETFIG as i16);
     game.world.new_region = game.world.region;
-    load_region_now(game, video);
+    load_region_now(game, out);
     motor_off();
 }
 
@@ -142,9 +140,9 @@ pub fn finish_sprite_load(video: &mut Video, slot: i16) {
 
 /// Loads the next region once the previous disk read is done. On the Amiga the disk was slow, so
 /// the game kept playing while a region loaded in the background and called this to check.
-pub fn load_pending_region(game: &mut Game, video: &mut Video) {
+pub fn load_pending_region(game: &mut Game, out: &mut dyn Output) {
     if is_last_read_pending() == 0 || last_read_finished() != 0 {
-        load_region_piece(game, video);
+        load_region_piece(game, out);
     }
 }
 

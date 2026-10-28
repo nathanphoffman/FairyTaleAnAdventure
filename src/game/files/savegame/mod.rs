@@ -9,10 +9,10 @@ use self::transfer::{Transfer, transfer_all};
 use crate::game::data::state::Game;
 use crate::game::data::state::Video;
 use crate::game::files::loading::load_start_sprites;
+use crate::game::output::Output;
 use crate::game::render::screen::FontKind;
 use crate::game::render::screen::Screen;
 use crate::game::ui::menus::update_menu_availability;
-use crate::game::ui::messages::print;
 use crate::game::ui::text::queue_print;
 use crate::platform::paths::resolve;
 
@@ -37,11 +37,11 @@ pub fn savegame(game: &mut Game, video: &mut Video, slot: i16, saving: bool) {
 
     if saving {
         if write_game(game, &name).is_err() {
-            print(video, "ERROR: Couldn't save game.");
+            video.print("ERROR: Couldn't save game.");
         }
     } else {
         if read_game(game, &name).is_err() {
-            print(video, "ERROR: Couldn't load game.");
+            video.print("ERROR: Couldn't load game.");
         }
 
         reset_after_load(game, video);
@@ -76,17 +76,17 @@ fn set_current_font(screen: &mut Screen, kind: FontKind) {
 }
 
 /// After loading a game: clears the encounter state and redraws the status panel for the new hero.
-fn reset_after_load(game: &mut Game, video: &mut Video) {
+fn reset_after_load(game: &mut Game, out: &mut dyn Output) {
     game.encounter.weapon_type = 0;
     game.encounter.number = 0;
-    load_start_sprites(game, video);
+    load_start_sprites(game, out);
     update_menu_availability(game);
-    video.screen.view_status = VIEW_CORRUPT;
+    game.ui.view_status = VIEW_CORRUPT;
     queue_print(&mut game.ui, PRINT_VITALITY);
     queue_print(&mut game.ui, PRINT_STATS);
-    print(video, "");
-    print(video, "");
-    print(video, "");
+    out.print("");
+    out.print("");
+    out.print("");
     game.encounter.kind = 0;
     game.actors.loading = 0;
 }

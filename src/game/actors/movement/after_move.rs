@@ -16,6 +16,7 @@ use super::{
 };
 use crate::game::data::state::Game;
 use crate::game::data::state::Video;
+use crate::game::output::Output;
 
 use crate::game::actors::encounters::check_death;
 use crate::game::data::object_tables::fallstates;
@@ -182,7 +183,7 @@ impl Ctx {
 
     /// Stores the environ, adjusts the sprite for some enemies, keeps the hero inside the world and
     /// scrolls the map to it, and applies lava and drowning damage.
-    pub(super) fn raise(&mut self, game: &mut Game, video: &mut Video) -> Pc {
+    pub(super) fn raise(&mut self, game: &mut Game, out: &mut dyn Output) -> Pc {
         let actor = self.actor;
         let i = self.slot;
 
@@ -210,15 +211,15 @@ impl Ctx {
             return Pc::Statc;
         }
 
-        self.take_lava_damage(game, video);
-        self.take_drowning_damage(game, video);
+        self.take_lava_damage(game, out);
+        self.take_drowning_damage(game, out);
 
         Pc::Statc
     }
 
     /// While lava is flowing the actor in deep lava dies and one wading in it is hurt, unless the
     /// hero carries the fireproof item.
-    fn take_lava_damage(&mut self, game: &mut Game, video: &mut Video) {
+    fn take_lava_damage(&mut self, game: &mut Game, out: &mut dyn Output) {
         let actor = self.actor;
         let i = self.slot;
 
@@ -231,13 +232,13 @@ impl Ctx {
                 game.actor_mut(actor).vitality = game.actor(actor).vitality.wrapping_sub(1);
             }
 
-            check_death(game, video, i, DEATH_LAVA);
+            check_death(game, out, i, DEATH_LAVA);
         }
     }
 
     /// A drowning actor loses a point of vitality every eighth frame (wraiths and snakes are
     /// immune).
-    fn take_drowning_damage(&mut self, game: &mut Game, video: &mut Video) {
+    fn take_drowning_damage(&mut self, game: &mut Game, out: &mut dyn Output) {
         let actor = self.actor;
         let i = self.slot;
         let cycle = self.cycle as i32;
@@ -248,7 +249,7 @@ impl Ctx {
             && !DROWN_IMMUNE_RACES.contains(&race)
         {
             game.actor_mut(actor).vitality = game.actor(actor).vitality.wrapping_sub(1);
-            check_death(game, video, i, DEATH_DROWN);
+            check_death(game, out, i, DEATH_DROWN);
         }
     }
 

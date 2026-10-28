@@ -177,11 +177,11 @@ fn read_keyboard(game: &mut Game, video: &mut Video) {
 /// The screen modes that stop a normal frame. Returns true if this frame ends here (the item list
 /// and the like only flash the pointer and handle the print queue).
 fn handle_view_status(game: &mut Game, video: &mut Video) -> bool {
-    if video.screen.view_status == VIEW_PAUSED {
+    if game.ui.view_status == VIEW_PAUSED {
         delay(game, video, PAUSE_WAIT);
-        video.screen.view_status = VIEW_REDRAW;
-    } else if video.screen.view_status == VIEW_BIG || video.screen.view_status == VIEW_BIG_STILL {
-        if video.screen.flasher & FLASH_BIT != 0 && video.screen.view_status == VIEW_BIG {
+        game.ui.view_status = VIEW_REDRAW;
+    } else if game.ui.view_status == VIEW_BIG || game.ui.view_status == VIEW_BIG_STILL {
+        if video.screen.flasher & FLASH_BIT != 0 && game.ui.view_status == VIEW_BIG {
             video.screen.set_color(
                 ViewPortId::Page,
                 STATUS_COLOR,
@@ -231,9 +231,9 @@ fn scroll_direction(scroll_x: i16, scroll_y: i16) -> Option<i32> {
 /// Redraws the whole map when the view asks for it (two frames in a row after a change, so both
 /// pages get it). Returns true if it did.
 fn redraw_whole_map(game: &mut Game, video: &mut Video) -> bool {
-    if video.screen.view_status != VIEW_REDRAW
-        && video.screen.view_status != VIEW_REDRAW_2
-        && video.screen.view_status != VIEW_CHANGED
+    if game.ui.view_status != VIEW_REDRAW
+        && game.ui.view_status != VIEW_REDRAW_2
+        && game.ui.view_status != VIEW_CHANGED
     {
         return false;
     }
@@ -241,10 +241,10 @@ fn redraw_whole_map(game: &mut Game, video: &mut Video) -> bool {
     refresh_minimap(game, video);
     draw_map(game, video);
 
-    if video.screen.view_status == VIEW_REDRAW {
-        video.screen.view_status = VIEW_REDRAW_2;
-    } else if video.screen.view_status == VIEW_REDRAW_2 {
-        video.screen.view_status = VIEW_NORMAL;
+    if game.ui.view_status == VIEW_REDRAW {
+        game.ui.view_status = VIEW_REDRAW_2;
+    } else if game.ui.view_status == VIEW_REDRAW_2 {
+        game.ui.view_status = VIEW_NORMAL;
     }
 
     true
@@ -338,9 +338,9 @@ fn draw_frame(
     video.screen.ras[ras].y = (game.world.map_y as i32 & TILE_Y_MASK) as i16;
     flip_pages(game, video);
 
-    if video.screen.view_status == VIEW_CHANGED {
+    if game.ui.view_status == VIEW_CHANGED {
         fade_normal(game, video);
-        video.screen.view_status = VIEW_NORMAL;
+        game.ui.view_status = VIEW_NORMAL;
     }
 }
 

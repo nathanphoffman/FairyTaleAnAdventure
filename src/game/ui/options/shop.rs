@@ -4,9 +4,9 @@ use super::{ARROWS, PRQ_VITALITY};
 use crate::game::actors::interaction::eat_food;
 use crate::game::data::object_tables::jtrans;
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
+use crate::game::output::Output;
 use crate::game::ui::items_menu::{add_stuff, item_name};
-use crate::game::ui::messages::{print, print_cont, print_wrapped};
+use crate::game::ui::messages::print_wrapped;
 use crate::game::ui::text::{queue_print, show_event};
 
 // Buy menu: the bartender is race 0x88; entries 5-11 pick a pair in `jtrans`.
@@ -87,7 +87,7 @@ fn purchase(wealth: i16, price: i16, item: usize) -> Purchase {
 }
 
 /// Buys what the bartender sells, if the hero can pay.
-pub(super) fn buy_option(game: &mut Game, video: &mut Video, chosen_entry: i16) -> bool {
+pub(super) fn buy_option(game: &mut Game, out: &mut dyn Output, chosen_entry: i16) -> bool {
     game.actors.nearest_object = game.actors.nearest_person;
     let near = game.actors.nearest_object;
     let race = if near == 0 {
@@ -103,11 +103,11 @@ pub(super) fn buy_option(game: &mut Game, video: &mut Video, chosen_entry: i16) 
     };
 
     match purchase(game.hero.wealth, price, item) {
-        Purchase::TooPoor => print(video, "Not enough money!"),
+        Purchase::TooPoor => out.print("Not enough money!"),
         Purchase::Bought { wealth_left, what } => {
             game.hero.wealth = wealth_left;
             queue_print(&mut game.ui, PRQ_VITALITY);
-            receive_purchase(game, video, item, what);
+            receive_purchase(game, out, item, what);
         }
     }
 
@@ -116,23 +116,23 @@ pub(super) fn buy_option(game: &mut Game, video: &mut Video, chosen_entry: i16) 
 
 /// Hands over what was bought: food is eaten at once, arrows come in a bundle, anything else is
 /// added to the pack with a message.
-fn receive_purchase(game: &mut Game, video: &mut Video, item: usize, what: Bought) {
+fn receive_purchase(game: &mut Game, out: &mut dyn Output, item: usize, what: Bought) {
     match what {
         Bought::Food => {
-            show_event(game, video, BOUGHT_FOOD_EVENT);
-            eat_food(game, video, FOOD_HUNGER);
+            show_event(game, out, BOUGHT_FOOD_EVENT);
+            eat_food(game, out, FOOD_HUNGER);
         }
 
         Bought::Arrows => {
             add_stuff(game, item, ARROWS_BOUGHT);
-            show_event(game, video, BOUGHT_ARROWS_EVENT);
+            show_event(game, out, BOUGHT_ARROWS_EVENT);
         }
 
         Bought::Item => {
             add_stuff(game, item, 1);
-            print_wrapped(game, video, "% bought a ");
-            print_cont(video, item_name(item));
-            print_cont(video, ".");
+            print_wrapped(game, out, "% bought a ");
+            out.print_cont(item_name(item));
+            out.print_cont(".");
         }
     }
 }

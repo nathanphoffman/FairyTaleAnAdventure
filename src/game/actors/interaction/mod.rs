@@ -26,8 +26,7 @@ pub use self::rescue::rescue_princess;
 pub use self::tactics::run_tactic;
 
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
-use crate::game::ui::messages::print;
+use crate::game::output::Output;
 use crate::game::ui::text::show_event;
 
 // Actor kinds (csrc/ftale.h `enum sequences`, used for the `type` field).
@@ -62,15 +61,15 @@ const RAFT_SLOT: usize = 1;
 
 /// Eats: lowers hunger by `amt`. If that would go below zero the hero is simply full
 /// (message 13); otherwise "Yum!".
-pub fn eat_food(game: &mut Game, video: &mut Video, amt: i32) {
+pub fn eat_food(game: &mut Game, out: &mut dyn Output, amt: i32) {
     const HUNGER_FULL_MESSAGE: i32 = 13;
     game.hero.hunger = (game.hero.hunger as i32 - amt) as i16;
 
     if game.hero.hunger < 0 {
         game.hero.hunger = 0;
-        show_event(game, video, HUNGER_FULL_MESSAGE);
+        show_event(game, out, HUNGER_FULL_MESSAGE);
     } else {
-        print(video, "Yum!");
+        out.print("Yum!");
     }
 }
 

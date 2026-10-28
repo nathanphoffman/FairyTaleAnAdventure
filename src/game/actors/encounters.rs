@@ -6,11 +6,10 @@ use crate::game::data::random::{bitrand, rand2, rand4, rnd};
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
 use crate::game::data::state::Hero;
-use crate::game::data::state::Video;
 use crate::game::data::tables::{encounter_chart, entry};
 use crate::game::data::types::Shape;
 use crate::game::files::disk::motor_off;
-use crate::game::files::loading::{finish_sprite_load, load_sprite_file};
+use crate::game::output::Output;
 use crate::game::ui::music::set_mood;
 use crate::game::ui::text::{queue_print, show_event, speak};
 use crate::game::world::map::terrain_at;
@@ -191,16 +190,16 @@ fn encounter_race(game: &mut Game) -> i32 {
 /// DYING, the hero gains bravery for a kill, and killing a person (not the lasso keeper) costs
 /// 3 kindness. If it is the hero, `dtype` is the death message, luck drops by 5 and the music
 /// changes. The hero's stats are always refreshed on screen.
-pub fn check_death(game: &mut Game, video: &mut Video, i: i32, dtype: i32) {
+pub fn check_death(game: &mut Game, out: &mut dyn Output, i: i32, dtype: i32) {
     let actor = ActorRef::new(i as usize);
 
     if let Some(death) = start_dying(i, &mut game.actors.list[actor.slot()], &mut game.hero) {
         if death.dark_knight {
-            speak(game, video, SPEAK_DARK_KNIGHT_DIES);
+            speak(game, out, SPEAK_DARK_KNIGHT_DIES);
         }
 
         if i == 0 {
-            show_event(game, video, dtype);
+            show_event(game, out, dtype);
             set_mood(game, 1);
         }
 
@@ -252,7 +251,7 @@ fn start_dying(i: i32, actor: &mut Shape, hero: &mut Hero) -> Option<Death> {
 
 /// Puts carrier `n` (5 turtle, 10 dragon, otherwise the swan) in actor slot 3, loading its sprites
 /// if they are not the ones already loaded, in the middle of its extent.
-pub fn load_carrier(game: &mut Game, video: &mut Video, n: i16) {
+pub fn load_carrier(game: &mut Game, out: &mut dyn Output, n: i16) {
     let actor = ActorRef::new(FIRST_CARRIER_SLOT);
 
     game.actor_mut(actor).kind = if n == CARRIER_DRAGON { DRAGON } else { CARRIER };
@@ -265,9 +264,9 @@ pub fn load_carrier(game: &mut Game, video: &mut Video, n: i16) {
     };
 
     if game.actors.loaded_actor_file != n {
-        video.graphics.nextshape = video.graphics.seq_list[SEQ_ENEMY].location;
-        load_sprite_file(video, n as i32);
-        finish_sprite_load(video, game.actor(actor).kind as i16);
+        out.rewind_sprites_to(SEQ_ENEMY as u8);
+        out.load_sprite_file(n as i32);
+        out.finish_sprite_load(game.actor(actor).kind as i16);
         motor_off();
     }
 
@@ -287,7 +286,7 @@ pub fn load_carrier(game: &mut Game, video: &mut Video, n: i16) {
 
 /// The actors' sprite file the monsters of this encounter need: sets how many appear and, if that
 /// file is not the one loaded, loads it (the carrier is dropped then).
-pub fn load_enemy_sprites(game: &mut Game, video: &mut Video) {
+pub fn load_enemy_sprites(game: &mut Game, out: &mut dyn Output) {
     const FIRST_ENEMY_SLOT: i16 = 3;
     game.encounter.number = (game.extents[game.world.extent].v1 as i32
         + rnd(&mut game.rng, game.extents[game.world.extent].v2 as i32))
@@ -297,8 +296,8 @@ pub fn load_enemy_sprites(game: &mut Game, video: &mut Video) {
     if game.actors.loaded_actor_file != file {
         game.actors.loaded_actor_file = file;
         game.actors.active = FIRST_ENEMY_SLOT;
-        video.graphics.nextshape = video.graphics.seq_list[ENEMY as usize].location;
-        load_sprite_file(video, game.actors.loaded_actor_file as i32);
+        out.rewind_sprites_to(ENEMY as u8);
+        out.load_sprite_file(game.actors.loaded_actor_file as i32);
         game.actors.loading = 1;
         game.actors.active_carrier = 0;
     }

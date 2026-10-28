@@ -5,8 +5,8 @@ use crate::game::actors::interaction::find_nearest_figure;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
 use crate::game::data::tables::{entry, setfig_table};
+use crate::game::output::Output;
 use crate::game::ui::text::speak;
 
 // Actor kinds and states (csrc/ftale.h).
@@ -40,7 +40,7 @@ const YELL: i16 = 5;
 const CARRIER_TURTLE: i16 = 5;
 
 /// Yell (louder, reaches further) or say something to the nearest person.
-pub(super) fn talk_option(game: &mut Game, video: &mut Video, chosen_entry: i16) -> bool {
+pub(super) fn talk_option(game: &mut Game, out: &mut dyn Output, chosen_entry: i16) -> bool {
     let distance = find_nearest_figure(
         game,
         1,
@@ -66,7 +66,7 @@ pub(super) fn talk_option(game: &mut Game, video: &mut Video, chosen_entry: i16)
         game.hero.stuff()[SHELL] != 0,
     );
 
-    carry_out(game, video, action, actor);
+    carry_out(game, out, action, actor);
 
     true
 }
@@ -85,26 +85,26 @@ fn describe_target(actors: &Actors, actor: ActorRef) -> Target {
 }
 
 /// Does what `talk_action` decided: speaks, and turns the person to talk or hands over the shell.
-fn carry_out(game: &mut Game, video: &mut Video, action: TalkAction, actor: ActorRef) {
+fn carry_out(game: &mut Game, out: &mut dyn Output, action: TalkAction, actor: ActorRef) {
     match action {
         TalkAction::Nothing => {}
-        TalkAction::TooCloseToYell => speak(game, video, SPEECH_TOO_CLOSE_TO_YELL),
+        TalkAction::TooCloseToYell => speak(game, out, SPEECH_TOO_CLOSE_TO_YELL),
         TalkAction::Person { starts_talking } => {
             if starts_talking {
                 game.actor_mut(actor).state = TALKING;
                 game.actor_mut(actor).tactic = TACTIC_TALK;
             }
 
-            person_speaks(game, video, game.actor(actor).race & PERSON_MASK, actor);
+            person_speaks(game, out, game.actor(actor).race & PERSON_MASK, actor);
         }
 
-        TalkAction::TurtleHasShell => speak(game, video, SPEECH_TURTLE_HAS_SHELL),
+        TalkAction::TurtleHasShell => speak(game, out, SPEECH_TURTLE_HAS_SHELL),
         TalkAction::TurtleGivesShell => {
             game.hero.stuff_mut()[SHELL] = 1;
-            speak(game, video, SPEECH_TURTLE_GIVES_SHELL);
+            speak(game, out, SPEECH_TURTLE_GIVES_SHELL);
         }
 
-        TalkAction::EnemyShouts(race) => speak(game, video, race as i32),
+        TalkAction::EnemyShouts(race) => speak(game, out, race as i32),
     }
 }
 

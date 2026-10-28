@@ -3,8 +3,9 @@
 use super::fading::fade_down;
 use crate::game::data::state::Game;
 use crate::game::data::state::Video;
+use crate::game::output::Output;
 use crate::game::render::display::flip_pages;
-use crate::game::render::screen::{HIRES, PortId, SPRITES, VP_HIDE, ViewPortId};
+use crate::game::render::screen::{HIRES, PortId, SPRITES, VP_HIDE};
 use crate::gfx::draw::JAM1;
 
 const MAP_PEN: u8 = 24;
@@ -34,11 +35,9 @@ pub fn map_message(game: &mut Game, video: &mut Video) {
 
     video.screen.vp_text.modes = HIRES | SPRITES | VP_HIDE;
     show_still_screen(game, video);
-    video
-        .screen
-        .load_colors(ViewPortId::Page, &video.page_colors);
+    video.load_page_colors(&game.page_colors);
 
-    video.screen.view_status = VIEW_MESSAGE;
+    game.ui.view_status = VIEW_MESSAGE;
 }
 
 /// Goes back from the map message to the normal view.
@@ -48,5 +47,5 @@ pub fn message_off(game: &mut Game, video: &mut Video) {
     video.screen.current_port = PortId::Text;
     video.screen.vp_text.modes = HIRES | SPRITES;
     flip_pages(game, video);
-    video.screen.view_status = VIEW_NORMAL_AGAIN;
+    game.ui.view_status = VIEW_NORMAL_AGAIN;
 }

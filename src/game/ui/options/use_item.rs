@@ -6,9 +6,10 @@ use crate::game::actors::interaction::summon_turtle;
 use crate::game::data::state::Game;
 use crate::game::data::state::Hero;
 use crate::game::data::state::Video;
+use crate::game::output::Output;
 use crate::game::ui::items_menu::item_name;
 use crate::game::ui::menus::go_to_menu;
-use crate::game::ui::messages::{print, print_cont, print_wrapped};
+use crate::game::ui::messages::print_wrapped;
 use crate::game::ui::text::speak;
 use crate::game::world::key_doors::open_door_near;
 use crate::game::world::map::{step_x, step_y};
@@ -93,9 +94,9 @@ pub(super) fn keys_option(game: &mut Game, video: &mut Video, chosen_entry: i16)
 
         if direction >= DIRECTIONS {
             print_wrapped(game, video, "% tried a ");
-            print_cont(video, item_name(KEYBASE + key));
-            print_cont(video, " but it didn't");
-            print(video, "fit.");
+            video.print_cont(item_name(KEYBASE + key));
+            video.print_cont(" but it didn't");
+            video.print("fit.");
         }
     }
 

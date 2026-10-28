@@ -8,6 +8,7 @@ use super::{
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
 use crate::game::data::state::Video;
+use crate::game::output::Output;
 
 use crate::game::actors::encounters::load_carrier;
 use crate::game::actors::interaction::{center_extent_on, rescue_princess};
@@ -16,7 +17,7 @@ use crate::game::ui::menus::update_menu_availability;
 use crate::game::ui::text::queue_print;
 
 /// Debug keys that give the hero a carrier or items. Returns true if the key was one.
-pub(super) fn cheat_items(game: &mut Game, video: &mut Video, key: i8) -> bool {
+pub(super) fn cheat_items(game: &mut Game, out: &mut dyn Output, key: i8) -> bool {
     if game.ui.cheat_enabled == 0 {
         return false;
     }
@@ -33,7 +34,7 @@ pub(super) fn cheat_items(game: &mut Game, video: &mut Video, key: i8) -> bool {
             (game.hero.y as i16).wrapping_add(CARRIER_OFFSET),
         );
 
-        load_carrier(game, video, CARRIER_BIRD);
+        load_carrier(game, out, CARRIER_BIRD);
 
         true
     } else if key == CHEAT_STUFF {

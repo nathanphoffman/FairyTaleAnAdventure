@@ -3,8 +3,7 @@
 use super::{ARROWBASE, GOLDBASE, KEYBASE, add_stuff, item_name};
 use crate::game::data::random::fta_rand;
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
-use crate::game::ui::messages::{print, print_cont};
+use crate::game::output::Output;
 
 /// The container items start at this entry of `item_list`; a roll of 0 there means arrows (or 100
 /// gold when it is the first of two things).
@@ -43,22 +42,22 @@ fn container_key(roll: i32) -> i32 {
 }
 
 /// What was inside a container. Returns true (the container is always used up).
-pub(super) fn container_contents(game: &mut Game, video: &mut Video) -> bool {
+pub(super) fn container_contents(game: &mut Game, out: &mut dyn Output) -> bool {
     let rng = &mut game.rng;
     let contents = roll_contents(|n| fta_rand(rng) & (n - 1));
 
     match contents {
-        Contents::Nothing => print(video, "nothing."),
+        Contents::Nothing => out.print("nothing."),
         Contents::One(i) => {
-            print(video, "a ");
-            print_cont(video, item_name(i));
-            print_cont(video, ".");
+            out.print("a ");
+            out.print_cont(item_name(i));
+            out.print_cont(".");
             add_stuff(game, i, 1);
         }
 
-        Contents::Two { first, second } => take_two_things(game, video, first, second),
+        Contents::Two { first, second } => take_two_things(game, out, first, second),
         Contents::ThreeKeys(keys) => {
-            print(video, "3 keys.");
+            out.print("3 keys.");
 
             for key in keys {
                 add_stuff(game, key as usize, 1);
@@ -66,9 +65,9 @@ pub(super) fn container_contents(game: &mut Game, video: &mut Video) -> bool {
         }
 
         Contents::ThreeOf(i) => {
-            print(video, "3 ");
-            print_cont(video, item_name(i));
-            print_cont(video, "s.");
+            out.print("3 ");
+            out.print_cont(item_name(i));
+            out.print_cont("s.");
             add_stuff(game, i, MANY as u8);
         }
     }
@@ -77,16 +76,16 @@ pub(super) fn container_contents(game: &mut Game, video: &mut Video) -> bool {
 }
 
 /// Tells what two things were found and adds them (the first may be 100 gold pieces).
-fn take_two_things(game: &mut Game, video: &mut Video, first: usize, second: usize) {
+fn take_two_things(game: &mut Game, out: &mut dyn Output, first: usize, second: usize) {
     if first == HUNDRED_GOLD as usize {
         game.hero.wealth += CONTAINER_GOLD;
     } else {
-        print_cont(video, " a");
+        out.print_cont(" a");
     }
 
-    print(video, item_name(first));
-    print_cont(video, " and a ");
-    print_cont(video, item_name(second));
+    out.print(item_name(first));
+    out.print_cont(" and a ");
+    out.print_cont(item_name(second));
 
     if first < GOLDBASE {
         add_stuff(game, first, 1);

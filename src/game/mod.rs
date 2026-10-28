@@ -23,6 +23,8 @@ pub mod files;
 
 pub mod input;
 
+pub mod output;
+
 pub mod render;
 
 pub mod startup;
