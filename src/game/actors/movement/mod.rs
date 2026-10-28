@@ -22,7 +22,7 @@ mod water;
 
 use crate::game::data::state::Game;
 use crate::game::data::state::{ActorRef, MissileRef};
-use crate::game::data::tables::facing_frame_offsets;
+use crate::game::data::tables::{entry, facing_frame_offsets};
 use crate::game::world::map::{step_x, step_y, terrain_at};
 
 // Actor kinds and states (csrc/ftale.h).
@@ -255,7 +255,7 @@ struct Ctx {
 
 fn diroff(d: i16) -> i16 {
     // Like the C this does not check the range; facings are 0-7 (+8 for shooting).
-    facing_frame_offsets[d as usize] as i16
+    *entry(&facing_frame_offsets, d as usize) as i16
 }
 
 fn pos_x(x: i32, dir: i16, speed: i16) -> u16 {

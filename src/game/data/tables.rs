@@ -9,6 +9,12 @@ use crate::game::actors::encounters::Encounter;
 use crate::game::world::objects::SetFigEntry;
 use crate::game::data::types::{Bro, Door, Extent, InvItem, Letter, Menu, Need, StateEntry};
 
+/// Entry `index` of a table, or the first entry if `index` is out of range. (The C code read
+/// whatever lay after the table; this keeps the game running with a harmless value instead.)
+pub fn entry<T>(table: &[T], index: usize) -> &T {
+    table.get(index).unwrap_or(&table[0])
+}
+
 /// The kinds of people (setfigs): which sprite file, the first image, and whether they can talk.
 pub static setfig_table: [SetFigEntry; 14] = [
     SetFigEntry { cfile_entry: 13, image_base: 0, can_talk: 1 },

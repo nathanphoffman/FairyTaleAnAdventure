@@ -11,7 +11,7 @@ use crate::game::data::state::Game;
 use crate::game::actors::interaction::blocked_at;
 use crate::game::actors::steering::{STEER_OFFSET, steer_actor};
 use crate::game::data::random::rand4;
-use crate::game::data::tables::swing_transitions;
+use crate::game::data::tables::{entry, swing_transitions};
 use crate::game::world::key_doors::open_door_near;
 use crate::game::world::map::{step_x, step_y};
 
@@ -346,7 +346,8 @@ impl Ctx {
     pub(super) fn fighting(&mut self, game: &mut Game) -> Pc {
         let actor = self.actor;
         self.frame_base = diroff(self.facing + 8);
-        let next = swing_transitions[self.state as usize][rand4(&mut game.rng) as usize] as i16;
+        let next =
+            entry(&swing_transitions, self.state as usize)[rand4(&mut game.rng) as usize] as i16;
         game.actor_mut(actor).state = next as i8;
         self.state = next;
 

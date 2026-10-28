@@ -4,7 +4,7 @@ use super::speeches::person_speaks;
 use crate::game::actors::interaction::find_nearest_figure;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::tables::setfig_table;
+use crate::game::data::tables::{entry, setfig_table};
 use crate::game::ui::text::speak;
 
 // Actor kinds and states (csrc/ftale.h).
@@ -72,7 +72,7 @@ pub(super) fn talk_option(game: &mut Game, chosen_entry: i16) -> bool {
 /// What the Talk code needs to know about the actor the hero is talking to.
 fn describe_target(game: &mut Game, actor: ActorRef) -> Target {
     let person = game.actor(actor).race & PERSON_MASK;
-    let can_talk = (setfig_table[person as usize]).can_talk != 0;
+    let can_talk = entry(&setfig_table, person as usize).can_talk != 0;
 
     Target {
         kind: game.actor(actor).kind,

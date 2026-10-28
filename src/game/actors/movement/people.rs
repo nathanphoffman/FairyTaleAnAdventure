@@ -8,7 +8,7 @@ use crate::game::data::state::Game;
 
 use crate::game::actors::steering::steer_actor;
 use crate::game::data::random::rand2;
-use crate::game::data::tables::setfig_table;
+use crate::game::data::tables::{entry, setfig_table};
 
 /// The witch's dying and dead frames come two further on than other people's.
 fn witch_extra(witch: bool) -> i16 {
@@ -21,7 +21,7 @@ impl Ctx {
         let actor = self.actor;
 
         self.terrain = (game.actor(actor).race & PERSON_MASK) as i16;
-        let entry = &setfig_table[self.terrain as usize];
+        let entry = entry(&setfig_table, self.terrain as usize);
         self.image = entry.image_base as i16;
         let witch = self.terrain == SETFIG_WITCH;
 

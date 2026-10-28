@@ -4,7 +4,7 @@ use super::weapons::weapon_image;
 use super::{CARRIER, DEAD, DYING, ENEMY, FALL, OBJECTS, PHIL, RAFT, Sprite};
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::tables::animation_frames;
+use crate::game::data::tables::{animation_frames, entry};
 use crate::game::data::types::{SeqInfo, StateEntry};
 
 /// Enemy race 8 (the spectre) and 4 (snakes) look different.
@@ -47,7 +47,7 @@ const OBJ_BURNING: i16 = 0x58;
 const OBJ_SUNK: i16 = 97;
 
 pub(super) fn state_entry(inum: i16) -> &'static StateEntry {
-    &animation_frames[inum as usize]
+    entry(&animation_frames, inum as usize)
 }
 
 pub(super) fn byte_of(table: &[i8; 32], inum: i16) -> i16 {

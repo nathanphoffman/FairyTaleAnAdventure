@@ -5,7 +5,7 @@ use crate::game::data::object_tables::treasure_probs;
 use crate::game::data::random::rand8;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::tables::encounter_chart;
+use crate::game::data::tables::{encounter_chart, entry};
 use crate::game::ui::messages::{print, print_cont, print_wrapped};
 use crate::game::ui::text::print_number;
 
@@ -152,7 +152,7 @@ fn roll_body_treasure(game: &mut Game, actor: ActorRef) -> u32 {
         return 0;
     }
 
-    let class = (encounter_chart[game.actor(actor).race as usize]).treasure;
+    let class = entry(&encounter_chart, game.actor(actor).race as usize).treasure;
 
     treasure_probs[(class as i32 * TREASURE_CLASS_SIZE + rand8(&mut game.rng)) as usize] as i32
         as u32

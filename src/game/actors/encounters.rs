@@ -6,7 +6,7 @@ use crate::game::data::random::{bitrand, rand2, rand4, rnd};
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
 use crate::game::data::state::Hero;
-use crate::game::data::tables::encounter_chart;
+use crate::game::data::tables::{encounter_chart, entry};
 use crate::game::data::types::Shape;
 use crate::game::files::disk::motor_off;
 use crate::game::files::loading::{finish_sprite_load, load_sprite_file};
@@ -132,7 +132,7 @@ fn arm_enemy(game: &mut Game, actor: ActorRef, race: i32) {
         game.encounter.weapon_type = rand4(&mut game.rng) as i16;
     }
 
-    let chart = &encounter_chart[race as usize];
+    let chart = entry(&encounter_chart, race as usize);
     let w = (chart.arms as i32 * WEAPON_CHOICES) + game.encounter.weapon_type as i32;
     game.actor_mut(actor).weapon = weapon_probs[w as usize];
     game.actor_mut(actor).state = STILL;
@@ -291,7 +291,7 @@ pub fn load_enemy_sprites(game: &mut Game) {
     game.encounter.number = (game.extents[game.world.extent].v1 as i32
         + rnd(&mut game.rng, game.extents[game.world.extent].v2 as i32))
         as u8;
-    let file = encounter_chart[game.encounter.kind as usize].file_id as i16;
+    let file = entry(&encounter_chart, game.encounter.kind as usize).file_id as i16;
 
     if game.actors.loaded_actor_file != file {
         game.actors.loaded_actor_file = file;

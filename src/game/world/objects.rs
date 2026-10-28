@@ -15,7 +15,7 @@ use crate::game::data::object_tables::{CHEST, ObjectList, TURTLE, glbobs, rand_t
 use crate::game::data::state::{ActorRef, Game};
 
 use crate::game::data::random::bitrand;
-use crate::game::data::tables::setfig_table;
+use crate::game::data::tables::{entry, setfig_table};
 use crate::game::data::types::WorldObject;
 use crate::game::files::disk::motor_off;
 use crate::game::files::loading::SPRITE_FILES;
@@ -188,7 +188,7 @@ fn distribute_treasure(game: &mut Game) {
 /// Makes sure the sprite file for the kind of person `id` is loaded. Several kinds share one
 /// file, so it is only reloaded when the needed file differs from the loaded one.
 fn load_set_figure(game: &mut Game, id: i8) {
-    let entry = (setfig_table[id as usize]).cfile_entry;
+    let entry = entry(&setfig_table, id as usize).cfile_entry;
 
     if SPRITE_FILES[entry as usize].file_id
         != SPRITE_FILES[game.actors.loaded_setfig_file as usize].file_id
@@ -309,7 +309,7 @@ fn add_person_actor(
     }
 
     actor.kind = SETFIG;
-    actor.index = (setfig_table[id as usize]).image_base;
+    actor.index = entry(&setfig_table, id as usize).image_base;
     actor.weapon = 0;
     actor.vitality = 2 + id as i16 + id as i16;
     actor.goal = index as i8;
