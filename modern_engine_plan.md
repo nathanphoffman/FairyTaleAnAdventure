@@ -293,3 +293,21 @@ their module (`platform::gfx`, `exec`, `dos`, `audio`, ...) and imported with `u
 from the Amiga CamelCase to snake_case (`SetAPen` is `set_a_pen`, `BltBitMap` is `blt_bit_map`, `Open`
 is `open_file`). The platform calls the game's input handlers (`fta_key`, `fta_mouse_move`, ...)
 directly the same way. About 150 `unsafe` blocks that only wrapped those calls were removed.
+
+## Owned memory instead of Amiga structs and raw pointers
+
+The Amiga-style structs (`RastPort`, `BitMap`, `ViewPort`, `src/amiga.rs`) are gone. Drawing uses the
+safe `gfx` module (owned bitmaps, pens, fonts, a `Scene` per frame). The big memory areas are owned
+buffers in `Memory` (`image`, `sector` with the region map at `MAP_OFFSET`, `terrain`, `shadow`,
+`shape`), read through `map_byte`, `sector_byte`, `terrain_byte`. The sprite blitter works on
+`Loc { area, pos }` places (a bit plane of the page being drawn, the queue or mask region, or the
+sprite memory) through `BlitMem`, which reads zeros outside an area and drops writes outside it;
+`SeqInfo` and the background saves hold offsets, not pointers. Text is `&str` (word wrap uses a local
+buffer), menu labels and item names are static data, and the save file is written field by field.
+Actors and missiles are handed around as `ActorRef` / `MissileRef` (a number that looks the actor up
+on each use), the brothers' item counts are `Hero::stuff()`, and the object lists are
+`region_objects(n)` / `global_objects()`. No `*mut` / `*const` is left in the game code.
+
+What is still `unsafe` is the shared game state itself: the `static mut` structs (`the_hero`,
+`the_world`, `the_actors`, ...) and the `screen()`, `memory()`, `player()` accessors. Replacing those
+with one `Game` value passed down the call tree is the next step.
