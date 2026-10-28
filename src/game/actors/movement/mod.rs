@@ -272,8 +272,8 @@ fn pos_y(y: i32, dir: i16, speed: i16) -> u16 {
     step_y(y, dir as i32, speed as i32) as u16
 }
 
-fn terrain(x: u16, y: u16) -> i16 {
-    terrain_at(x as i32, y as i32) as i16
+fn terrain(game: &Game, x: u16, y: u16) -> i16 {
+    terrain_at(game, x as i32, y as i32) as i16
 }
 
 /// Moves and animates actor `i`; `cycle` is the frame counter. `*jp` is the main loop's `j`, which
@@ -286,15 +286,15 @@ pub fn move_actor(game: &mut Game, i: i32, cycle: i16, jp: &mut i16) {
         loop {
             pc = match pc {
                 Pc::Dispatch => c.dispatch(game),
-                Pc::CheckDev1 => c.check_dev1(),
-                Pc::CheckDev2 => c.check_dev2(),
-                Pc::NewLoc => c.new_loc(),
+                Pc::CheckDev1 => c.check_dev1(game),
+                Pc::CheckDev2 => c.check_dev2(game),
+                Pc::NewLoc => c.new_loc(game),
                 Pc::Blocked => c.blocked(),
-                Pc::Still => c.still(),
+                Pc::Still => c.still(game),
                 Pc::DragShoot => c.drag_shoot(),
-                Pc::Cpx => c.cpx(),
+                Pc::Cpx => c.cpx(game),
                 Pc::Tail => c.tail(game),
-                Pc::Raise => c.raise(),
+                Pc::Raise => c.raise(game),
                 Pc::Statc => break,
             };
         }
@@ -355,11 +355,11 @@ impl Ctx {
             } else if kind == DRAGON {
                 self.dragon()
             } else if kind == CARRIER {
-                self.carrier()
+                self.carrier(game)
             } else if kind == SETFIG {
                 self.setfig(game)
             } else if kind == RAFT {
-                self.raft()
+                self.raft(game)
             } else if self.state == SINK {
                 if actor.vitality > 0 {
                     self.image = FRAME_SINK;
@@ -373,7 +373,7 @@ impl Ctx {
             } else if self.state == STILL as i16 {
                 Pc::Still
             } else if self.state >= SHOOT1 {
-                self.shooting()
+                self.shooting(game)
             } else if self.state <= LAST_FIGHT_STATE {
                 self.fighting()
             } else {

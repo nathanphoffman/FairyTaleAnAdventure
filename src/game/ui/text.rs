@@ -10,9 +10,10 @@
 //! skipping `n` zero bytes.
 
 use crate::game::data::object_tables::{pplay, prec, print_que};
+use crate::game::data::state::Game;
 use crate::game::data::state::player;
 use crate::game::data::story_text::{EVENT_MSG, PLACARD_MSGS, SPEECHES};
-use crate::game::render::screen::{PortId, screen};
+use crate::game::render::screen::PortId;
 use crate::game::ui::messages::print_wrapped;
 
 /// In a string: followed by x/2 and y, moves the text position.
@@ -50,36 +51,34 @@ pub fn format_number(mut value: u32) -> [u8; NUMBER_DIGITS + 1] {
 }
 
 /// Prints the number in a field of `len` characters, plus the trailing space.
-pub fn print_number(value: i32, len: i32) {
+pub fn print_number(game: &mut Game, value: i32, len: i32) {
     let text = format_number(value as u32);
     let from = (NUMBER_DIGITS as i32 - len).max(0) as usize;
 
-    draw_text(&text[from..]);
+    draw_text(game, &text[from..]);
 }
 
 // `move` is a Rust keyword, so this one is exported under the C name.
 /// Moves the text position (the C name is `move`, a keyword in Rust).
-pub fn move_to(x: i32, y: i32) {
-    let screen = screen();
-    screen.move_to(screen.current_port, x, y);
+pub fn move_to(game: &mut Game, x: i32, y: i32) {
+    game.screen.move_to(game.screen.current_port, x, y);
 }
 
 /// Prints the characters at the text position.
-pub fn draw_text(bytes: &[u8]) {
-    let screen = screen();
-    screen.text(screen.current_port, bytes);
+pub fn draw_text(game: &mut Game, bytes: &[u8]) {
+    game.screen.text(game.screen.current_port, bytes);
 }
 
 /// Prints a string that may hold XY escapes (128, x/2, y) to move the text position. A string
 /// ends at a zero byte (or its end); bytes of 128 and above end each plain run of text.
 /// (The x position is stored halved so it fits in a byte.)
-pub fn print_positioned(s: &[u8]) {
+pub fn print_positioned(game: &mut Game, s: &[u8]) {
     let mut at = 0;
     let byte = |i: usize| s.get(i).copied().unwrap_or(0);
 
     while byte(at) != 0 {
         if byte(at) == XY {
-            move_to(byte(at + 1) as i32 * XY_X_SCALE, byte(at + 2) as i32);
+            move_to(game, byte(at + 1) as i32 * XY_X_SCALE, byte(at + 2) as i32);
 
             at += XY_BYTES;
         } else {
@@ -89,7 +88,7 @@ pub fn print_positioned(s: &[u8]) {
                 n += 1;
             }
 
-            draw_text(&s[at..at + n]);
+            draw_text(game, &s[at..at + n]);
             at += n;
 
             if n == 0 {
@@ -100,8 +99,8 @@ pub fn print_positioned(s: &[u8]) {
 }
 
 /// Prints story page text number `n` (the strings use position escapes, see `print_positioned`).
-pub fn placard_text(n: i32) {
-    print_positioned(PLACARD_MSGS[n as usize]);
+pub fn placard_text(game: &mut Game, n: i32) {
+    print_positioned(game, PLACARD_MSGS[n as usize]);
 }
 
 /// The `n`-th zero-terminated string of a list of messages (the first is number 0). A number past
@@ -118,18 +117,18 @@ fn nth_string(list: &[u8], n: i32) -> &[u8] {
 }
 
 /// Shows the `num`-th string of a list of messages, word-wrapped (see `print_wrapped`).
-pub fn show_message(list: &[u8], num: i32) {
-    print_wrapped(nth_string(list, num));
+pub fn show_message(game: &mut Game, list: &[u8], num: i32) {
+    print_wrapped(game, nth_string(list, num));
 }
 
 /// Shows event message `n` (things that happen to the hero, such as hunger).
-pub fn show_event(n: i32) {
-    show_message(EVENT_MSG, n);
+pub fn show_event(game: &mut Game, n: i32) {
+    show_message(game, EVENT_MSG, n);
 }
 
 /// Shows speech number `n` (what people say).
-pub fn speak(n: i32) {
-    show_message(SPEECHES, n);
+pub fn speak(game: &mut Game, n: i32) {
+    show_message(game, SPEECHES, n);
 }
 
 /// Adds a request to the print queue (ignored if the queue is full). `handle_print_request` handles them one
@@ -171,15 +170,14 @@ const BORDER_HIGHLIGHT_PEN: u8 = 24;
 const STROKES_PER_STEP: i32 = 5;
 
 /// Draws a line from (x0, y0) to (x1, y1).
-fn line(x0: i32, y0: i32, x1: i32, y1: i32) {
-    let screen = screen();
-    screen.move_to(PortId::Map, x0, y0);
-    screen.line_to(PortId::Map, x1, y1);
+fn line(game: &mut Game, x0: i32, y0: i32, x1: i32, y1: i32) {
+    game.screen.move_to(PortId::Map, x0, y0);
+    game.screen.line_to(PortId::Map, x1, y1);
 }
 
 /// Draws the decorative border around a story page: many short strokes, five each with the last in
 /// a highlight colour, winding around the four edges. The first passes also draw the top and bottom.
-pub fn draw_placard_border() {
+pub fn draw_placard_border(game: &mut Game) {
     let (mut xorg, mut yorg) = (BORDER_START_X, 0);
 
     for pass in (0..BORDER_PASSES).rev() {
@@ -194,8 +192,8 @@ pub fn draw_placard_border() {
                     BORDER_PEN
                 };
 
-                screen().set_a_pen(PortId::Map, pen);
-                draw_border_stroke(pass > LONG_EDGE_ABOVE_PASS, (xorg, yorg), (dx, dy));
+                game.screen.set_a_pen(PortId::Map, pen);
+                draw_border_stroke(game, pass > LONG_EDGE_ABOVE_PASS, (xorg, yorg), (dx, dy));
             }
 
             xorg = dx;
@@ -206,10 +204,16 @@ pub fn draw_placard_border() {
 
 /// One stroke of the border from `from` to `to`, repeated on the opposite edge, and on the short
 /// edges (turned a quarter) with the x and y swapped.
-fn draw_border_stroke(long_edges: bool, (xorg, yorg): (i32, i32), (dx, dy): (i32, i32)) {
+fn draw_border_stroke(
+    game: &mut Game,
+    long_edges: bool,
+    (xorg, yorg): (i32, i32),
+    (dx, dy): (i32, i32),
+) {
     if long_edges {
-        line(xorg, yorg, dx, dy);
+        line(game, xorg, yorg, dx, dy);
         line(
+            game,
             LONG_EDGE_FAR.0 - xorg,
             LONG_EDGE_FAR.1 - yorg,
             LONG_EDGE_FAR.0 - dx,
@@ -218,6 +222,7 @@ fn draw_border_stroke(long_edges: bool, (xorg, yorg): (i32, i32), (dx, dy): (i32
     }
 
     line(
+        game,
         SHORT_EDGE_NEAR.0 + yorg,
         SHORT_EDGE_NEAR.1 - xorg,
         SHORT_EDGE_NEAR.0 + dy,
@@ -225,6 +230,7 @@ fn draw_border_stroke(long_edges: bool, (xorg, yorg): (i32, i32), (dx, dy): (i32
     );
 
     line(
+        game,
         SHORT_EDGE_FAR.0 - yorg,
         SHORT_EDGE_FAR.1 + xorg,
         SHORT_EDGE_FAR.0 - dy,
@@ -252,12 +258,12 @@ const ERROR_SCREEN_Y: i32 = 90;
 const ERROR_NO_GRAPHICS: i32 = 2;
 
 /// Shows "ERROR n" on the text panel (startup failures). Error 2 (no graphics) cannot be shown.
-pub fn show_error(n: i32) {
+pub fn show_error(game: &mut Game, n: i32) {
     if n == ERROR_NO_GRAPHICS {
         return;
     }
 
-    move_to(ERROR_SCREEN_X, ERROR_SCREEN_Y);
-    draw_text(b"ERROR ");
-    print_number(n, 2);
+    move_to(game, ERROR_SCREEN_X, ERROR_SCREEN_Y);
+    draw_text(game, b"ERROR ");
+    print_number(game, n, 2);
 }

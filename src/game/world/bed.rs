@@ -2,7 +2,8 @@
 //! the main loop in csrc/fmain.c).
 
 use crate::game::data::state::ActorRef;
-use crate::game::data::state::{memory, the_hero, the_world};
+use crate::game::data::state::Game;
+use crate::game::data::state::{the_hero, the_world};
 use crate::game::ui::text::show_event;
 use crate::game::world::map::tile_index;
 
@@ -26,7 +27,7 @@ const EVENT_SLEEPING: i32 = 26;
 const BED_Y_MASK: u16 = 0x1f;
 
 /// Copies the hero's position, and puts the hero to bed after standing on a bed for 30 ticks.
-pub fn check_bed() {
+pub fn check_bed(game: &mut Game) {
     unsafe {
         let mut hero = ActorRef::new(0);
 
@@ -38,7 +39,8 @@ pub fn check_bed() {
         the_hero.y = hero.abs_y;
 
         if the_world.region == INSIDE_REGION {
-            let tile = memory().sector_byte(tile_index(
+            let tile = game.memory.sector_byte(tile_index(
+                game,
                 // Shifts by TILE_WIDTH_SHIFT, converting between pixels, tiles, sectors or bytes.
                 (the_hero.x >> TILE_WIDTH_SHIFT) as i32,
                 // Shifts by TILE_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
@@ -55,9 +57,9 @@ pub fn check_bed() {
 
             match action {
                 BedAction::Nothing => {}
-                BedAction::NotTired => show_event(EVENT_NOT_TIRED),
+                BedAction::NotTired => show_event(game, EVENT_NOT_TIRED),
                 BedAction::FallAsleep => {
-                    show_event(EVENT_SLEEPING);
+                    show_event(game, EVENT_SLEEPING);
                     hero.abs_y |= BED_Y_MASK;
                     the_hero.y = hero.abs_y;
                     hero.state = SLEEP;

@@ -102,7 +102,7 @@ impl Ctx {
             let actor = self.actor;
 
             if self.environ == ENVIRON_ICE {
-                if let Some(next) = self.slide_on_ice() {
+                if let Some(next) = self.slide_on_ice(game) {
                     return next;
                 }
 
@@ -116,7 +116,7 @@ impl Ctx {
 
             XTEST = pos_x(actor.abs_x as i32, self.facing, self.step);
             YTEST = pos_y(actor.abs_y as i32, self.facing, self.step);
-            self.terrain = blocked_at(XTEST as i16, YTEST as i16, self.slot as i16) as i16;
+            self.terrain = blocked_at(game, XTEST as i16, YTEST as i16, self.slot as i16) as i16;
 
             if self.slot == 0 && self.hero_bumps_into_door(game) {
                 return Pc::NewLoc;
@@ -147,7 +147,7 @@ impl Ctx {
     /// On ice the actor keeps its momentum: pushes the velocity toward the wanted direction up to a
     /// limit and moves by it. Returns where to go next, or `None` when it hit something and should
     /// walk normally this tick.
-    unsafe fn slide_on_ice(&mut self) -> Option<Pc> {
+    unsafe fn slide_on_ice(&mut self, game: &mut Game) -> Option<Pc> {
         unsafe {
             let mut actor = self.actor;
             self.step = if the_hero.riding == RIDING_SWAN {
@@ -176,7 +176,7 @@ impl Ctx {
                 return Some(Pc::NewLoc);
             }
 
-            if blocked_at(XTEST as i16, YTEST as i16, self.slot as i16) == 0 {
+            if blocked_at(game, XTEST as i16, YTEST as i16, self.slot as i16) == 0 {
                 return Some(Pc::NewLoc);
             }
 
@@ -185,7 +185,7 @@ impl Ctx {
     }
 
     /// Blocked: try one direction to the right.
-    pub(super) unsafe fn check_dev1(&mut self) -> Pc {
+    pub(super) unsafe fn check_dev1(&mut self, game: &mut Game) -> Pc {
         unsafe {
             let actor = self.actor;
 
@@ -194,7 +194,7 @@ impl Ctx {
             XTEST = pos_x(actor.abs_x as i32, self.facing, self.step);
             YTEST = pos_y(actor.abs_y as i32, self.facing, self.step);
 
-            if blocked_at(XTEST as i16, YTEST as i16, self.slot as i16) != 0 {
+            if blocked_at(game, XTEST as i16, YTEST as i16, self.slot as i16) != 0 {
                 Pc::CheckDev2
             } else {
                 Pc::NewLoc
@@ -203,7 +203,7 @@ impl Ctx {
     }
 
     /// Still blocked: try one direction to the left of the original.
-    pub(super) unsafe fn check_dev2(&mut self) -> Pc {
+    pub(super) unsafe fn check_dev2(&mut self, game: &mut Game) -> Pc {
         unsafe {
             let actor = self.actor;
 
@@ -212,7 +212,7 @@ impl Ctx {
             XTEST = pos_x(actor.abs_x as i32, self.facing, self.step);
             YTEST = pos_y(actor.abs_y as i32, self.facing, self.step);
 
-            if blocked_at(XTEST as i16, YTEST as i16, self.slot as i16) != 0 {
+            if blocked_at(game, XTEST as i16, YTEST as i16, self.slot as i16) != 0 {
                 Pc::Blocked
             } else {
                 Pc::NewLoc
@@ -222,7 +222,7 @@ impl Ctx {
 
     /// A free step was found: face that way, pick the walking frame, and move (unless the terrain
     /// slows the actor to a halt).
-    pub(super) unsafe fn new_loc(&mut self) -> Pc {
+    pub(super) unsafe fn new_loc(&mut self, game: &mut Game) -> Pc {
         unsafe {
             self.pick_walking_frame();
 
@@ -235,7 +235,7 @@ impl Ctx {
                 self.image ^= WALK_FRAMES_MASK as i16;
             }
 
-            self.look_at_new_terrain();
+            self.look_at_new_terrain(game);
 
             if climbs_out_of_water(self.environ, self.terrain) {
                 if the_hero.sector != PIT_SECTOR {
@@ -271,10 +271,10 @@ impl Ctx {
 
     /// The terrain at the new place; wraiths and snakes are immune to water, and snakes have their
     /// own pictures.
-    unsafe fn look_at_new_terrain(&mut self) {
+    unsafe fn look_at_new_terrain(&mut self, game: &mut Game) {
         unsafe {
             let actor = self.actor;
-            self.terrain = terrain(XTEST, YTEST);
+            self.terrain = terrain(game, XTEST, YTEST);
 
             if actor.race == RACE_WRAITH || actor.race == RACE_SNAKE {
                 self.terrain = 0;
@@ -320,14 +320,14 @@ impl Ctx {
     }
 
     /// Standing still: the frame after the first of the facing's walking frames.
-    pub(super) fn still(&mut self) -> Pc {
+    pub(super) fn still(&mut self, game: &mut Game) -> Pc {
         self.image = self.frame_base + 1;
 
         if self.environ == ENVIRON_ICE {
             return Pc::Cpx;
         }
 
-        self.terrain = terrain(self.actor.abs_x, self.actor.abs_y);
+        self.terrain = terrain(game, self.actor.abs_x, self.actor.abs_y);
 
         Pc::Tail
     }

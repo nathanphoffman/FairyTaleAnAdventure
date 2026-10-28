@@ -8,7 +8,7 @@ use crate::game::data::tables::brother_stats;
 use crate::game::data::types::{Bro, Shape};
 use crate::game::files::loading::load_start_sprites;
 use crate::game::render::display::delay;
-use crate::game::render::screen::{FontKind, PortId, screen};
+use crate::game::render::screen::{FontKind, PortId};
 use crate::game::render::screen_fx::{map_message, message_off};
 use crate::game::ui::messages::print_cont;
 use crate::game::ui::text::{draw_placard_border, placard_text, show_event};
@@ -109,7 +109,7 @@ pub(super) unsafe fn leave_fallen_brother() {
 
 /// The next brother takes over: his stats and item list, nothing in the timers, and the first
 /// safe spot.
-pub(super) unsafe fn take_over_next_brother(mut hero: ActorRef) {
+pub(super) unsafe fn take_over_next_brother(game: &mut Game, mut hero: ActorRef) {
     unsafe {
         start_next_brother(
             &mut *(&raw mut the_hero),
@@ -119,7 +119,7 @@ pub(super) unsafe fn take_over_next_brother(mut hero: ActorRef) {
 
         reset_for_next_brother(&mut *(&raw mut the_hero), &mut *(&raw mut the_world));
         move_camera_to(the_hero.safe_x as i32, the_hero.safe_y as i32);
-        screen().view_status = VIEW_REDRAW;
+        game.screen.view_status = VIEW_REDRAW;
         the_actors.on_screen = 1;
         the_actors.loading = 0;
     }
@@ -156,81 +156,82 @@ pub(super) fn start_next_brother(hero: &mut Hero, body: &mut Shape, next: &Bro) 
 /// The story pages between brothers (and the game over page after the last).
 pub(super) unsafe fn show_brother_placards(game: &mut Game) {
     unsafe {
-        map_message();
-        let current = screen().current_port;
-        screen().set_font_kind(current, FontKind::Story);
+        map_message(game);
+        let current = game.screen.current_port;
+        game.screen.set_font_kind(current, FontKind::Story);
 
         if the_hero.brother == JULIAN {
-            placard_text(PLACARD_JULIAN);
-            let screen = screen();
-            screen.port_mut(PortId::Map).target = Some(screen.drawing_bitmap_id());
-            screen.clear(PortId::Map, PEN_BLACK);
-            screen.port_mut(PortId::Map).target = Some(screen.viewing_bitmap_id());
+            placard_text(game, PLACARD_JULIAN);
+            game.screen.port_mut(PortId::Map).target = Some(game.screen.drawing_bitmap_id());
+            game.screen.clear(PortId::Map, PEN_BLACK);
+            game.screen.port_mut(PortId::Map).target = Some(game.screen.viewing_bitmap_id());
         } else if the_hero.brother == PHILLIP {
-            placard_text(PLACARD_PHILLIP);
+            placard_text(game, PLACARD_PHILLIP);
         } else if the_hero.brother == KEVIN {
-            placard_text(PLACARD_KEVIN);
+            placard_text(game, PLACARD_KEVIN);
         } else {
-            placard_text(PLACARD_GAME_OVER);
+            placard_text(game, PLACARD_GAME_OVER);
         }
 
-        draw_placard_border();
-        delay(SHOW_PLACARD);
+        draw_placard_border(game);
+        delay(game, SHOW_PLACARD);
 
         if the_hero.brother > LAST_BROTHER {
             game.ui.quit_requested = 1;
-            delay(GAME_OVER_PAUSE);
+            delay(game, GAME_OVER_PAUSE);
         } else if the_hero.brother > JULIAN {
-            show_follow_up_placard();
+            show_follow_up_placard(game);
         }
     }
 }
 
 /// After the first story page the panel is cleared and the follow-up page for this brother is shown.
-unsafe fn show_follow_up_placard() {
+unsafe fn show_follow_up_placard(game: &mut Game) {
     unsafe {
-        delay(SHORT_PAUSE);
-        let screen = screen();
-        let current = screen.current_port;
-        screen.set_a_pen(current, PEN_BLACK);
-        screen.rect_fill(current, (PANEL.0, PANEL.1), (PANEL.2, PANEL.3));
+        delay(game, SHORT_PAUSE);
+        let current = game.screen.current_port;
+        game.screen.set_a_pen(current, PEN_BLACK);
+        game.screen
+            .rect_fill(current, (PANEL.0, PANEL.1), (PANEL.2, PANEL.3));
 
-        delay(TINY_PAUSE);
-        screen.set_a_pen(current, PEN_TEXT);
+        delay(game, TINY_PAUSE);
+        game.screen.set_a_pen(current, PEN_TEXT);
 
-        placard_text(if the_hero.brother == PHILLIP {
-            PLACARD_PHILLIP_FOLLOW_UP
-        } else {
-            PLACARD_KEVIN_FOLLOW_UP
-        });
+        placard_text(
+            game,
+            if the_hero.brother == PHILLIP {
+                PLACARD_PHILLIP_FOLLOW_UP
+            } else {
+                PLACARD_KEVIN_FOLLOW_UP
+            },
+        );
 
-        delay(SHOW_PLACARD);
+        delay(game, SHOW_PLACARD);
     }
 }
 
 /// Loads the brother's sprites and tells where the story starts.
-pub(super) unsafe fn announce_brother() {
+pub(super) unsafe fn announce_brother(game: &mut Game) {
     unsafe {
-        let screen = screen();
-        let current = screen.current_port;
-        screen.set_font_kind(current, FontKind::Panel);
-        screen.current_port = PortId::Text;
+        let current = game.screen.current_port;
+        game.screen.set_font_kind(current, FontKind::Panel);
+        game.screen.current_port = PortId::Text;
 
         the_actors.loaded_actor_file = HERO_SPRITE_FILE;
         the_actors.loaded_setfig_file = HERO_SET_FILE;
-        load_start_sprites();
+        load_start_sprites(game);
 
         if the_hero.brother <= LAST_BROTHER {
-            message_off();
+            message_off(game);
             the_hero.place = START_PLACE;
-            show_event(EVENT_SETTING_OUT);
+            show_event(game, EVENT_SETTING_OUT);
 
             if the_hero.brother == JULIAN {
-                print_cont(".");
+                print_cont(game, ".");
             } else if the_hero.brother == PHILLIP {
-                show_event(EVENT_PHILLIP_SETS_OUT);
+                show_event(game, EVENT_PHILLIP_SETS_OUT);
             } else if the_hero.brother == KEVIN {
-                show_event(EVENT_KEVIN_SETS_OUT);
+                show_event(game, EVENT_KEVIN_SETS_OUT);
             }
         }
     }

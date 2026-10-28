@@ -66,6 +66,7 @@ pub struct Missile {
 
 /// Where a sprite sequence (all the frames of one kind of character) is in memory (`struct seq_info`),
 /// and where its transparency mask is.
+#[derive(Clone, Copy)]
 pub struct SeqInfo {
     pub width: i16,
     pub height: i16,

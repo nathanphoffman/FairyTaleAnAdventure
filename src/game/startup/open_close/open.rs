@@ -3,7 +3,7 @@
 use super::{
     BACKSAVE_OFFSET, IMAGE_SZ, S_VOLBUF, S_WAVBUF, SECTOR_SZ, SHADOW_SZ, SHAPE_SZ, TERRA_SZ,
 };
-use crate::game::data::state::{the_memory, the_screen};
+use crate::game::data::state::Game;
 use crate::game::data::story_text::{HINOR, HIVAR};
 use crate::game::data::tables::{instrument_waves, pointer_sprite_data};
 use crate::game::files::disk::open_disk;
@@ -27,46 +27,39 @@ const WAVEFORM_FILE: &str = "v6";
 const AREA_SLACK: usize = 128;
 
 /// Opens everything the game needs. Returns 0, or the error number `show_error` shows.
-pub fn open_all() -> i32 {
-    match open_everything() {
+pub fn open_all(game: &mut Game) -> i32 {
+    match open_everything(game) {
         Ok(()) => 0,
         Err(error) => error,
     }
 }
 
 /// The start-up steps in order; the first one that fails gives the error number.
-fn open_everything() -> Result<(), i32> {
-    unsafe {
-        (*(&raw mut the_screen)).set_up([&HINOR, &HIVAR]);
-    }
+fn open_everything(game: &mut Game) -> Result<(), i32> {
+    game.screen.set_up([&HINOR, &HIVAR]);
 
     match open_disk() {
         0 => {}
         error => return Err(error),
     }
 
-    open_fonts()?;
-    unsafe {
-        set_up_blitter_memory();
-        allocate_game_memory();
-    }
+    open_fonts(game)?;
+    set_up_blitter_memory(game);
+    allocate_game_memory(game);
 
     load_music_waveforms();
-    unsafe { (*(&raw mut the_screen)).pointer = Some(&pointer_sprite_data) };
+    game.screen.pointer = Some(&pointer_sprite_data);
 
     Ok(())
 }
 
 /// Loads the story font; the panel uses the built-in one.
-fn open_fonts() -> Result<(), i32> {
+fn open_fonts(game: &mut Game) -> Result<(), i32> {
     let story = resolve(STORY_FONT_FILE, false).ok_or(ERROR_NO_FONT)?;
     let story = Font::load(&story).unwrap_or(Font::Builtin);
 
-    unsafe {
-        let screen = &mut *(&raw mut the_screen);
-        screen.set_font(FontKind::Panel, Font::Builtin);
-        screen.set_font(FontKind::Story, story);
-    }
+    game.screen.set_font(FontKind::Panel, Font::Builtin);
+    game.screen.set_font(FontKind::Story, story);
 
     Ok(())
 }
@@ -77,21 +70,18 @@ fn area(size: usize) -> Vec<u8> {
 }
 
 /// Points the saved backgrounds of the two pages into the blitter's work memory.
-fn set_up_blitter_memory() {
-    let screen = crate::game::render::screen::screen();
-    screen.pages[0].backsave = Loc::new(Area::Queue, BACKSAVE_OFFSET);
-    screen.pages[1].backsave = Loc::new(Area::Mask, BACKSAVE_OFFSET);
+fn set_up_blitter_memory(game: &mut Game) {
+    game.screen.pages[0].backsave = Loc::new(Area::Queue, BACKSAVE_OFFSET);
+    game.screen.pages[1].backsave = Loc::new(Area::Mask, BACKSAVE_OFFSET);
 }
 
 /// Makes the picture, sector, shape, shadow-mask and terrain areas.
-unsafe fn allocate_game_memory() {
-    unsafe {
-        the_memory.image = area(IMAGE_SZ);
-        the_memory.sector = area(SECTOR_SZ);
-        the_memory.shape = area(SHAPE_SZ);
-        the_memory.shadow = area(SHADOW_SZ);
-        the_memory.terrain = area(TERRA_SZ);
-    }
+fn allocate_game_memory(game: &mut Game) {
+    game.memory.image = area(IMAGE_SZ);
+    game.memory.sector = area(SECTOR_SZ);
+    game.memory.shape = area(SHAPE_SZ);
+    game.memory.shadow = area(SHADOW_SZ);
+    game.memory.terrain = area(TERRA_SZ);
 }
 
 /// Reads the waveforms and volume envelopes for the music from the file `v6` (the waveforms, then as

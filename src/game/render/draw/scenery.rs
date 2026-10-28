@@ -3,7 +3,8 @@
 use super::{CARRIER, FALL, OBJECTS, RAFT_SLOT};
 use crate::game::data::object_tables::minimap;
 use crate::game::data::state::ActorRef;
-use crate::game::data::state::{memory, the_hero, the_world};
+use crate::game::data::state::Game;
+use crate::game::data::state::{the_hero, the_world};
 use crate::game::render::blit::{add_scenery_mask, clear_memory};
 
 /// The mask buffer (the mask region) is cleared before each sprite: 96 lines of 64 words, plus 5.
@@ -55,8 +56,8 @@ const TALL_HEIGHT: i16 = 35;
 const LOW_HEIGHT: i16 = 20;
 
 /// Zeroes the scenery mask buffer, ready for the next sprite.
-pub(super) fn clear_scenery_mask() {
-    clear_memory(MASK_CLEAR_SIZE);
+pub(super) fn clear_scenery_mask(game: &mut Game) {
+    clear_memory(game, MASK_CLEAR_SIZE);
 }
 
 /// True for sprites drawn in front of everything: carriers, the hero when riding the swan or in
@@ -132,6 +133,7 @@ struct SpriteTiles {
 /// time, by marking them in the mask buffer.
 #[allow(clippy::too_many_arguments)] // the tile loop of the original, kept as one call
 pub(super) unsafe fn mask_against_scenery(
+    game: &mut Game,
     actor: ActorRef,
     i: i32,
     ground: i16,
@@ -156,8 +158,8 @@ pub(super) unsafe fn mask_against_scenery(
 
         for xm in 0..blitwide.max(0) as i32 {
             for ym in 0..=ym2 as i32 {
-                if let Some(mask) = tiles.mask_of_tile(xm, ym) {
-                    add_scenery_mask(xm, ym, blitwide as i32, mask);
+                if let Some(mask) = tiles.mask_of_tile(game, xm, ym) {
+                    add_scenery_mask(game, xm, ym, blitwide as i32, mask);
                 }
             }
         }
@@ -167,7 +169,7 @@ pub(super) unsafe fn mask_against_scenery(
 impl SpriteTiles {
     /// The mask byte to cut out of the sprite for the tile at column `xm` and row `ym` of the
     /// sprite, or `None` when that tile does not hide it.
-    unsafe fn mask_of_tile(&self, xm: i32, ym: i32) -> Option<i32> {
+    unsafe fn mask_of_tile(&self, game: &mut Game, xm: i32, ym: i32) -> Option<i32> {
         unsafe {
             // Back from tile rows to pixels.
             let ystop = self.ground - (((ym + self.ym1 as i32) << TILE_ROW_SHIFT) as i16);
@@ -176,7 +178,7 @@ impl SpriteTiles {
             cm = (minimap[cm as usize] as i32 * TERRAIN_ENTRY_BYTES) as i16;
             let mut k =
                 // Masks with TERRAIN_TYPE_MASK, keeping only the bits that matter here.
-                (memory().terrain_byte(cm as usize + 1) & TERRAIN_TYPE_MASK) as i16;
+                (game.memory.terrain_byte(cm as usize + 1) & TERRAIN_TYPE_MASK) as i16;
 
             if self.actor.state == FALL {
                 if cm <= FALL_TILE_LIMIT {
@@ -194,7 +196,7 @@ impl SpriteTiles {
                 SceneryRule::UseTileMask => {}
             }
 
-            Some(memory().terrain_byte(cm as usize) as i32)
+            Some(game.memory.terrain_byte(cm as usize) as i32)
         }
     }
 }

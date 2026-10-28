@@ -10,7 +10,7 @@ use crate::game::actors::combat::{advance_missiles, queue_missile_sprites, resol
 use crate::game::actors::movement::move_actor;
 use crate::game::actors::nearby_speech::speak_nearby;
 use crate::game::actors::spawning::spawn_encounters;
-use crate::game::data::state::{the_actors, the_hero, the_screen, the_world};
+use crate::game::data::state::{the_actors, the_hero, the_world};
 use crate::game::data::tables::menus;
 use crate::game::files::loading::load_pending_region;
 use crate::game::input::handler::{next_key, read_walk_direction};
@@ -28,7 +28,7 @@ use crate::game::world::survival::survival_tick;
 use crate::game::world::travel_doors::check_door;
 
 use crate::game::render::display::delay;
-use crate::game::render::screen::{PortId, ViewPortId, screen};
+use crate::game::render::screen::{PortId, ViewPortId};
 
 // Screen modes (`view_status`).
 const VIEW_NORMAL: i8 = 0;
@@ -80,14 +80,14 @@ const FLASH_BIT: i8 = 16;
 const STATUS_COLOR: usize = 31;
 
 /// How the map moved since the last frame, in sectors (x wraps at 10 bits).
-unsafe fn scroll_step() -> (i16, i16) {
+unsafe fn scroll_step(game: &mut Game) -> (i16, i16) {
     unsafe {
         // Shifts by TILE_WIDTH_SHIFT, converting between pixels, tiles, sectors or bytes.
         the_world.tile_x = the_world.map_x >> TILE_WIDTH_SHIFT;
 
         // Shifts by TILE_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
         the_world.tile_y = the_world.map_y >> TILE_HEIGHT_SHIFT;
-        let page = screen().drawing_page();
+        let page = game.screen.drawing_page();
         let dif_x = (the_world.tile_x as i32 - page.isv_x) as i16;
         let dif_y = (the_world.tile_y as i32 - page.isv_y) as i16;
 
@@ -136,7 +136,7 @@ pub(super) unsafe fn main_loop(game: &mut Game) {
 unsafe fn run_frame(game: &mut Game, state: &mut FrameState) {
     unsafe {
         state.cycle = state.cycle.wrapping_add(1);
-        the_screen.flasher = the_screen.flasher.wrapping_add(1);
+        game.screen.flasher = game.screen.flasher.wrapping_add(1);
         crate::game::statedump::run_pending_command(game); // test commands, does nothing normally
 
         read_keyboard(game);
@@ -149,20 +149,20 @@ unsafe fn run_frame(game: &mut Game, state: &mut FrameState) {
 
         // Masks with GAME_MENU, keeping only the bits that matter here.
         if menus[GAME_MENU].enabled[PAUSE_ENTRY] & 1 != 0 {
-            delay(1);
+            delay(game, 1);
 
             return;
         }
 
         update_hero(game, state.cycle);
         move_everything(game, state);
-        check_bed();
+        check_bed(game);
         check_door(game);
 
         the_hero.x = the_actors.list[0].abs_x;
         the_hero.y = the_actors.list[0].abs_y;
 
-        undo_sprites();
+        undo_sprites(game);
         let (scroll_x, scroll_y, world_update) = update_map_view(game);
 
         if world_update {
@@ -189,30 +189,29 @@ unsafe fn read_keyboard(game: &mut Game) {
 
 /// The screen modes that stop a normal frame. Returns true if this frame ends here (the item list
 /// and the like only flash the pointer and handle the print queue).
-unsafe fn handle_view_status(game: &mut Game) -> bool {
-    unsafe {
-        if the_screen.view_status == VIEW_PAUSED {
-            delay(PAUSE_WAIT);
-            the_screen.view_status = VIEW_REDRAW;
-        } else if the_screen.view_status == VIEW_BIG || the_screen.view_status == VIEW_BIG_STILL {
-            // Masks with FLASH_BIT, keeping only the bits that matter here.
-            if the_screen.flasher & FLASH_BIT != 0 && the_screen.view_status == VIEW_BIG {
-                screen().set_color(
-                    ViewPortId::Page,
-                    STATUS_COLOR,
-                    (FLASH_COLOR, FLASH_COLOR, FLASH_COLOR),
-                );
-            } else {
-                screen().set_color(ViewPortId::Page, STATUS_COLOR, (0, 0, 0));
-            }
-
-            handle_print_request(game);
-
-            return true;
+fn handle_view_status(game: &mut Game) -> bool {
+    if game.screen.view_status == VIEW_PAUSED {
+        delay(game, PAUSE_WAIT);
+        game.screen.view_status = VIEW_REDRAW;
+    } else if game.screen.view_status == VIEW_BIG || game.screen.view_status == VIEW_BIG_STILL {
+        // Masks with FLASH_BIT, keeping only the bits that matter here.
+        if game.screen.flasher & FLASH_BIT != 0 && game.screen.view_status == VIEW_BIG {
+            game.screen.set_color(
+                ViewPortId::Page,
+                STATUS_COLOR,
+                (FLASH_COLOR, FLASH_COLOR, FLASH_COLOR),
+            );
+        } else {
+            game.screen
+                .set_color(ViewPortId::Page, STATUS_COLOR, (0, 0, 0));
         }
 
-        false
+        handle_print_request(game);
+
+        return true;
     }
+
+    false
 }
 
 /// Moves the hero, the raft and every monster and person (the actor count is read each time round,
@@ -246,26 +245,24 @@ fn scroll_direction(scroll_x: i16, scroll_y: i16) -> Option<i32> {
 
 /// Redraws the whole map when the view asks for it (two frames in a row after a change, so both
 /// pages get it). Returns true if it did.
-unsafe fn redraw_whole_map() -> bool {
-    unsafe {
-        if the_screen.view_status != VIEW_REDRAW
-            && the_screen.view_status != VIEW_REDRAW_2
-            && the_screen.view_status != VIEW_CHANGED
-        {
-            return false;
-        }
-
-        refresh_minimap();
-        draw_map();
-
-        if the_screen.view_status == VIEW_REDRAW {
-            the_screen.view_status = VIEW_REDRAW_2;
-        } else if the_screen.view_status == VIEW_REDRAW_2 {
-            the_screen.view_status = VIEW_NORMAL;
-        }
-
-        true
+fn redraw_whole_map(game: &mut Game) -> bool {
+    if game.screen.view_status != VIEW_REDRAW
+        && game.screen.view_status != VIEW_REDRAW_2
+        && game.screen.view_status != VIEW_CHANGED
+    {
+        return false;
     }
+
+    refresh_minimap(game);
+    draw_map(game);
+
+    if game.screen.view_status == VIEW_REDRAW {
+        game.screen.view_status = VIEW_REDRAW_2;
+    } else if game.screen.view_status == VIEW_REDRAW_2 {
+        game.screen.view_status = VIEW_NORMAL;
+    }
+
+    true
 }
 
 /// Brings the map in line with the camera: loads a waiting region, then redraws the whole map or
@@ -273,22 +270,22 @@ unsafe fn redraw_whole_map() -> bool {
 /// frame (it does when the map is redrawn from scratch, or did not move at all).
 unsafe fn update_map_view(game: &mut Game) -> (i16, i16, bool) {
     unsafe {
-        let (mut scroll_x, mut scroll_y) = scroll_step();
+        let (mut scroll_x, mut scroll_y) = scroll_step(game);
 
         if the_world.new_region < NO_REGION {
-            load_pending_region();
+            load_pending_region(game);
         }
 
-        if redraw_whole_map() {
+        if redraw_whole_map(game) {
             return (0, 0, true);
         }
 
         if scroll_x != 0 || scroll_y != 0 {
-            refresh_minimap();
+            refresh_minimap(game);
         }
 
         if let Some(direction) = scroll_direction(scroll_x, scroll_y) {
-            scroll_map(direction);
+            scroll_map(game, direction);
 
             return (scroll_x, scroll_y, false);
         }
@@ -303,7 +300,7 @@ unsafe fn update_map_view(game: &mut Game) -> (i16, i16, bool) {
         // moved too far to scroll: redraw the whole map
         scroll_x = 0;
         scroll_y = 0;
-        draw_map();
+        draw_map(game);
 
         (scroll_x, scroll_y, false)
     }
@@ -313,11 +310,11 @@ unsafe fn update_map_view(game: &mut Game) -> (i16, i16, bool) {
 /// what the monsters want to do, and hunger.
 unsafe fn run_world_update(game: &mut Game) {
     unsafe {
-        day_night_tick();
+        day_night_tick(game);
 
         if the_world.freeze_timer == 0 {
             spawn_encounters(game);
-            speak_nearby();
+            speak_nearby(game);
             update_enemy_goals(game);
             survival_tick(game);
         }
@@ -327,14 +324,14 @@ unsafe fn run_world_update(game: &mut Game) {
 /// Fights, missiles and drawing, then shows the page that was just drawn.
 unsafe fn draw_frame(game: &mut Game, state: &mut FrameState, scroll_x: i16, scroll_y: i16) {
     unsafe {
-        let page = screen().drawing_page_mut();
+        let page = game.screen.drawing_page_mut();
         page.isv_x = the_world.tile_x as i32;
         page.isv_y = the_world.tile_y as i32;
 
-        screen().set_a_pen(PortId::Map, SPRITE_PEN);
+        game.screen.set_a_pen(PortId::Map, SPRITE_PEN);
 
-        resolve_melee();
-        advance_missiles();
+        resolve_melee(game);
+        advance_missiles(game);
 
         the_actors.drawn = the_actors.active;
         spawn_object_actors(game);
@@ -346,21 +343,20 @@ unsafe fn draw_frame(game: &mut Game, state: &mut FrameState, scroll_x: i16, scr
         // now that the scroll blit is done, finish repairing the map
         repair_edges(game, scroll_x, scroll_y);
 
-        draw_sprites(state.cycle);
+        draw_sprites(game, state.cycle);
 
         // The drawing loop used to leave `j` here; the next frame's actor loop reads it.
         state.last_terrain = the_actors.drawn;
-        let screen = screen();
-        let ras = screen.drawing_page().ras;
+        let ras = game.screen.drawing_page().ras;
         // Masks with TILE_X_MASK, keeping only the bits that matter here.
-        screen.ras[ras].x = (the_world.map_x as i32 & TILE_X_MASK) as i16;
+        game.screen.ras[ras].x = (the_world.map_x as i32 & TILE_X_MASK) as i16;
         // Masks with TILE_Y_MASK, keeping only the bits that matter here.
-        screen.ras[ras].y = (the_world.map_y as i32 & TILE_Y_MASK) as i16;
-        flip_pages();
+        game.screen.ras[ras].y = (the_world.map_y as i32 & TILE_Y_MASK) as i16;
+        flip_pages(game);
 
-        if the_screen.view_status == VIEW_CHANGED {
-            fade_normal();
-            the_screen.view_status = VIEW_NORMAL;
+        if game.screen.view_status == VIEW_CHANGED {
+            fade_normal(game);
+            game.screen.view_status = VIEW_NORMAL;
         }
     }
 }

@@ -3,7 +3,7 @@
 //! The game draws on one of two pages while the other is on screen (`drawing`, `viewing`), then
 //! swaps them.
 
-use crate::game::data::state::the_screen;
+use crate::game::data::state::Game;
 use crate::game::input::handler::reset_key_buffer;
 use crate::platform::display;
 
@@ -13,19 +13,16 @@ pub fn reset_input() {
 }
 
 /// Waits `ticks` ticks, showing the screen as it is now.
-pub fn delay(ticks: i32) {
-    unsafe { display::delay(&(*(&raw const the_screen)).scene(), ticks) };
+pub fn delay(game: &mut Game, ticks: i32) {
+    display::delay(&game.screen.scene(), ticks);
 }
 
 /// Swaps the page being drawn with the one being shown, and shows the one just finished.
-pub fn flip_pages() {
-    unsafe {
-        let screen = &mut *(&raw mut the_screen);
-        let finished = screen.drawing;
-        std::mem::swap(&mut screen.drawing, &mut screen.viewing);
-        screen.vp_page.ras = Some(screen.pages[finished].ras);
+pub fn flip_pages(game: &mut Game) {
+    let finished = game.screen.drawing;
+    std::mem::swap(&mut game.screen.drawing, &mut game.screen.viewing);
+    game.screen.vp_page.ras = Some(game.screen.pages[finished].ras);
 
-        display::present(&screen.scene());
-        display::wait_frame(&screen.scene());
-    }
+    display::present(&game.screen.scene());
+    display::wait_frame(&game.screen.scene());
 }

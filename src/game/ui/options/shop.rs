@@ -3,6 +3,7 @@
 use super::{ARROWS, PRQ_VITALITY};
 use crate::game::actors::interaction::eat_food;
 use crate::game::data::object_tables::jtrans;
+use crate::game::data::state::Game;
 use crate::game::data::state::{the_actors, the_hero};
 use crate::game::ui::items_menu::{add_stuff, item_name};
 use crate::game::ui::messages::{print, print_cont, print_wrapped};
@@ -86,7 +87,7 @@ fn purchase(wealth: i16, price: i16, item: usize) -> Purchase {
 }
 
 /// Buys what the bartender sells, if the hero can pay.
-pub(super) unsafe fn buy_option(chosen_entry: i16) -> bool {
+pub(super) unsafe fn buy_option(game: &mut Game, chosen_entry: i16) -> bool {
     unsafe {
         the_actors.nearest_object = the_actors.nearest_person;
         let near = the_actors.nearest_object;
@@ -103,11 +104,11 @@ pub(super) unsafe fn buy_option(chosen_entry: i16) -> bool {
         };
 
         match purchase(the_hero.wealth, price, item) {
-            Purchase::TooPoor => print("Not enough money!"),
+            Purchase::TooPoor => print(game, "Not enough money!"),
             Purchase::Bought { wealth_left, what } => {
                 the_hero.wealth = wealth_left;
                 queue_print(PRQ_VITALITY);
-                receive_purchase(item, what);
+                receive_purchase(game, item, what);
             }
         }
 
@@ -117,23 +118,23 @@ pub(super) unsafe fn buy_option(chosen_entry: i16) -> bool {
 
 /// Hands over what was bought: food is eaten at once, arrows come in a bundle, anything else is
 /// added to the pack with a message.
-fn receive_purchase(item: usize, what: Bought) {
+fn receive_purchase(game: &mut Game, item: usize, what: Bought) {
     match what {
         Bought::Food => {
-            show_event(BOUGHT_FOOD_EVENT);
-            eat_food(FOOD_HUNGER);
+            show_event(game, BOUGHT_FOOD_EVENT);
+            eat_food(game, FOOD_HUNGER);
         }
 
         Bought::Arrows => {
             add_stuff(item, ARROWS_BOUGHT);
-            show_event(BOUGHT_ARROWS_EVENT);
+            show_event(game, BOUGHT_ARROWS_EVENT);
         }
 
         Bought::Item => {
             add_stuff(item, 1);
-            print_wrapped("% bought a ");
-            print_cont(item_name(item));
-            print_cont(".");
+            print_wrapped(game, "% bought a ");
+            print_cont(game, item_name(item));
+            print_cont(game, ".");
         }
     }
 }

@@ -41,7 +41,7 @@ pub fn update_hero(game: &mut Game, cycle: i16) {
             // Masks with keeping only the bits that matter here.
             || joystick_fire()
         {
-            state = fighting_state(state);
+            state = fighting_state(game, state);
         } else if state == SHOOT1 {
             state = SHOOT3; // release the arrow
         } else {
@@ -58,16 +58,16 @@ pub(super) fn timer_step(timer: i16) -> i16 {
 }
 
 /// The fight button is down: shoot in a shooting zone, dismount, or fight with the weapon held.
-pub(super) unsafe fn fighting_state(state: i8) -> i8 {
+pub(super) unsafe fn fighting_state(game: &mut Game, state: i8) -> i8 {
     unsafe {
         let mut hero = ActorRef::new(0);
 
         if the_world.extent_type > SHOOTING_ZONE {
-            return enter_shooting_zone(state);
+            return enter_shooting_zone(game, state);
         }
 
         if the_hero.riding == BIRD {
-            try_to_dismount(hero);
+            try_to_dismount(game, hero);
 
             return state;
         }
@@ -85,14 +85,14 @@ pub(super) unsafe fn fighting_state(state: i8) -> i8 {
 }
 
 /// In a shooting zone the hero shoots; the two special zones say so the first time.
-unsafe fn enter_shooting_zone(state: i8) -> i8 {
+unsafe fn enter_shooting_zone(game: &mut Game, state: i8) -> i8 {
     unsafe {
         if state != SHOOT1 && the_world.extent_type == ZONE_ARROW_SLOW {
-            show_event(EVENT_ZONE_81);
+            show_event(game, EVENT_ZONE_81);
         }
 
         if state != SHOOT1 && the_world.extent_type == ZONE_ARROW_FAST {
-            show_event(EVENT_ZONE_82);
+            show_event(game, EVENT_ZONE_82);
         }
 
         SHOOT1
@@ -101,12 +101,12 @@ unsafe fn enter_shooting_zone(state: i8) -> i8 {
 
 /// On the bird, the fight button tries to land: not over lava, not when moving too fast, and only
 /// where there is room to stand.
-fn try_to_dismount(mut hero: ActorRef) {
+fn try_to_dismount(game: &mut Game, mut hero: ActorRef) {
     unsafe {
         let (dif_x, dif_y) = (hero.vel_x, hero.vel_y);
 
         if the_actors.fiery_death != 0 {
-            show_event(EVENT_LAVA);
+            show_event(game, EVENT_LAVA);
         } else if dif_x > -DISMOUNT_SPEED
             && dif_x < DISMOUNT_SPEED
             && dif_y > -DISMOUNT_SPEED
@@ -114,8 +114,9 @@ fn try_to_dismount(mut hero: ActorRef) {
         {
             let ytest = hero.abs_y.wrapping_sub(DISMOUNT_STEP);
 
-            if blocked_at(hero.abs_x as i16, ytest as i16, 0) == 0
+            if blocked_at(game, hero.abs_x as i16, ytest as i16, 0) == 0
                 && blocked_at(
+                    game,
                     hero.abs_x as i16,
                     ytest.wrapping_add(DISMOUNT_CHECK) as i16,
                     0,
@@ -125,7 +126,7 @@ fn try_to_dismount(mut hero: ActorRef) {
                 hero.abs_y = ytest;
             }
         } else {
-            show_event(EVENT_TOO_FAST);
+            show_event(game, EVENT_TOO_FAST);
         }
     }
 }

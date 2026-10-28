@@ -2,6 +2,7 @@
 
 use super::hits::{RACE_WRAITH, actor_at};
 use super::{DEAD, ENEMY, RAFT_SLOT, RAFT_TYPE};
+use crate::game::data::state::Game;
 use crate::game::data::state::the_actors;
 use crate::game::world::map::{probe_collision, step_x, step_y};
 
@@ -21,12 +22,12 @@ const SOFT_TERRAIN: [i32; 2] = [8, 9];
 /// and 9). Then every other actor is checked: it blocks if it is within 10 pixels sideways and
 /// 8 pixels up or down.
 /// Dead actors and the raft can be walked over.
-pub fn blocked_at(x: i16, y: i16, i: i16) -> i32 {
+pub fn blocked_at(game: &mut Game, x: i16, y: i16, i: i16) -> i32 {
     unsafe {
         let me = actor_at(i as i32);
 
         if me.kind != ENEMY || me.race != RACE_WRAITH {
-            let mut terrain = probe_collision(x as i32, y as i32);
+            let mut terrain = probe_collision(game, x as i32, y as i32);
 
             if i == 0 && SOFT_TERRAIN.contains(&terrain) {
                 terrain = 0;
@@ -64,12 +65,12 @@ fn blocked_by_actor(x: i16, y: i16, i: i16, j: i32) -> bool {
 }
 
 /// Moves an actor `dist` in direction `dir` if nothing blocks it. Returns TRUE if it moved.
-pub fn step_figure(fig: i16, dir: i16, dist: i16) -> i32 {
+pub fn step_figure(game: &mut Game, fig: i16, dir: i16, dist: i16) -> i32 {
     let mut a = actor_at(fig as i32);
     let xtest = step_x(a.abs_x as i32, dir as i32, dist as i32) as u16;
     let ytest = step_y(a.abs_y as i32, dir as i32, dist as i32) as u16;
 
-    if blocked_at(xtest as i16, ytest as i16, fig) != 0 {
+    if blocked_at(game, xtest as i16, ytest as i16, fig) != 0 {
         return 0;
     }
 

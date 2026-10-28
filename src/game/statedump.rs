@@ -74,23 +74,23 @@ pub fn run_pending_command(game: &mut Game) {
             Command::SetStat { stat: 0, value } => the_hero.hunger = value as i16,
             Command::SetStat { stat: 1, value } => the_hero.fatigue = value as i16,
             Command::SetStat { value, .. } => the_hero.wealth = value as i16,
-            Command::SlayEnemies => slay_enemies(),
+            Command::SlayEnemies => slay_enemies(game),
             Command::KillHero { luck: remaining } => {
                 the_hero.luck = remaining as i16;
                 the_actors.list[0].vitality = 0;
-                check_death(0, DEATH_BY_TEST);
+                check_death(game, 0, DEATH_BY_TEST);
             }
         }
     }
 }
 
 /// Kills every enemy that is out, as if each had been defeated.
-unsafe fn slay_enemies() {
+unsafe fn slay_enemies(game: &mut Game) {
     unsafe {
         for i in FIRST_ENEMY_SLOT..the_actors.active {
             if the_actors.list[i as usize].kind == ENEMY {
                 the_actors.list[i as usize].vitality = 0;
-                check_death(i as i32, 0);
+                check_death(game, i as i32, 0);
             }
         }
     }

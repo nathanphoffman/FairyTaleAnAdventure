@@ -34,7 +34,7 @@ pub(super) unsafe fn cheat_items(game: &mut Game, key: i8) -> bool {
                 (the_hero.y as i16).wrapping_add(CARRIER_OFFSET),
             );
 
-            load_carrier(CARRIER_BIRD);
+            load_carrier(game, CARRIER_BIRD);
 
             true
         } else if key == CHEAT_STUFF {

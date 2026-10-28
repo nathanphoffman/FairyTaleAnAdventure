@@ -21,7 +21,7 @@ pub fn summon_turtle(game: &mut Game) {
     while tries_used < TRIES {
         pick_encounter_spot(game);
 
-        if terrain_at(game.encounter.x as i32, game.encounter.y as i32) == WATER {
+        if terrain_at(game, game.encounter.x as i32, game.encounter.y as i32) == WATER {
             break;
         }
 
@@ -38,7 +38,7 @@ pub fn summon_turtle(game: &mut Game) {
         game.encounter.y as i16,
     );
 
-    load_carrier(TURTLE_CARRIER);
+    load_carrier(game, TURTLE_CARRIER);
 }
 
 /// Centres extent `e` on a point (it covers 500 by 400 pixels around it).

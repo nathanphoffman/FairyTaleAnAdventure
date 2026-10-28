@@ -16,7 +16,7 @@ use self::cheats::{cheat_items, cheat_move};
 use self::menu_keys::{menu_click, menu_letter};
 use crate::game::data::state::Game;
 
-use crate::game::data::state::{the_actors, the_screen};
+use crate::game::data::state::the_actors;
 use crate::game::ui::menus::go_to_menu;
 use crate::game::ui::options::choose_menu_entry;
 
@@ -113,10 +113,10 @@ pub fn handle_key(game: &mut Game, key: i32, notpause: i32) {
         let key = key as i8;
         let notpause = notpause as i16 != 0;
 
-        if the_screen.view_status != 0 && notpause {
+        if game.screen.view_status != 0 && notpause {
             // Masks with RELEASED, keeping only the bits that matter here.
             if key & RELEASED == 0 {
-                the_screen.view_status = VIEW_REDRAW;
+                game.screen.view_status = VIEW_REDRAW;
             }
         } else if the_actors.list[0].state == DEAD {
             // ignored while dead

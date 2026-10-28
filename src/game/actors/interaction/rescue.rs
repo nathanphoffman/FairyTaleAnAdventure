@@ -4,7 +4,7 @@ use super::extents::center_extent_on;
 use crate::game::data::state::Game;
 use crate::game::data::state::player;
 use crate::game::render::display::delay;
-use crate::game::render::screen::{FontKind, screen};
+use crate::game::render::screen::FontKind;
 
 use crate::game::data::globals::princesses_rescued;
 use crate::game::data::object_tables::region_objects;
@@ -49,27 +49,27 @@ const REWARD_GOLD: i16 = 100;
 /// the `princess` count (each rescue shows different story pages).
 pub fn rescue_princess(game: &mut Game) {
     unsafe {
-        map_message();
-        let current = screen().current_port;
-        screen().set_font_kind(current, FontKind::Story);
+        map_message(game);
+        let current = game.screen.current_port;
+        game.screen.set_font_kind(current, FontKind::Story);
         let line = princesses_rescued as i32 * RESCUE_PLACARDS_EACH;
-        placard_text(RESCUE_PLACARD_BASE + line);
-        name();
-        placard_text(RESCUE_PLACARD_BASE + 1 + line);
-        name();
-        placard_text(RESCUE_PLACARD_BASE + 2 + line);
-        draw_placard_border();
-        delay(RESCUE_PAUSE);
-        screen().set_a_pen(current, 0);
+        placard_text(game, RESCUE_PLACARD_BASE + line);
+        name(game);
+        placard_text(game, RESCUE_PLACARD_BASE + 1 + line);
+        name(game);
+        placard_text(game, RESCUE_PLACARD_BASE + 2 + line);
+        draw_placard_border(game);
+        delay(game, RESCUE_PAUSE);
+        game.screen.set_a_pen(current, 0);
         let (x0, y0, x1, y1) = PLACARD_AREA;
-        screen().rect_fill(current, (x0, y0), (x1, y1));
-        delay(CLEAR_PAUSE);
-        screen().set_a_pen(current, PLACARD_PEN);
-        placard_text(AFTER_RESCUE_PLACARDS.0);
-        name();
-        placard_text(AFTER_RESCUE_PLACARDS.1);
-        delay(RESCUE_PAUSE);
-        message_off();
+        game.screen.rect_fill(current, (x0, y0), (x1, y1));
+        delay(game, CLEAR_PAUSE);
+        game.screen.set_a_pen(current, PLACARD_PEN);
+        placard_text(game, AFTER_RESCUE_PLACARDS.0);
+        name(game);
+        placard_text(game, AFTER_RESCUE_PLACARDS.1);
+        delay(game, RESCUE_PAUSE);
+        message_off(game);
 
         princesses_rescued += 1;
         transfer_hero(game, PRINCESS_HOME.0, PRINCESS_HOME.1, 0); // do princess transfer
@@ -77,7 +77,7 @@ pub fn rescue_princess(game: &mut Game) {
         let objects = region_objects(INSIDE_OBJECTS);
         objects[PRINCESS_OBJECT].ob_id = PRINCESS_OBJECT_ID;
         player().stuff_mut()[PRINCESS_STUFF] = 1;
-        speak(REWARD_MESSAGE);
+        speak(game, REWARD_MESSAGE);
         the_hero.wealth = the_hero.wealth.wrapping_add(REWARD_GOLD);
         objects[CAPTIVE_OBJECT].ob_stat = 0;
 

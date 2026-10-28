@@ -2,9 +2,9 @@
 
 use super::{GOLDBASE, OBJECTS, item};
 use crate::game::data::object_tables::page_colors;
-use crate::game::data::state::memory;
+use crate::game::data::state::Game;
 use crate::game::data::state::player;
-use crate::game::render::screen::{BitmapId, PortId, ViewPortId, screen};
+use crate::game::render::screen::{BitmapId, PortId, ViewPortId};
 use crate::game::render::screen_fx::show_still_screen;
 use crate::game::ui::text::queue_print;
 use crate::gfx::Bitmap;
@@ -31,28 +31,30 @@ const VIEW_ITEMS: i8 = 4;
 pub(super) const VIEW_GAME_OVER: i8 = 2;
 
 /// Draws every item the hero has, stacked, on a black page and shows it.
-pub(super) unsafe fn show_item_list() {
-    let screen = screen();
-    let page = screen.drawing_bitmap_id();
-    screen.port_mut(PortId::Map).target = Some(page);
-    screen.clear(PortId::Map, 0);
-    screen.set_bitmap(BitmapId::Items, item_pictures());
+pub(super) unsafe fn show_item_list(game: &mut Game) {
+    let page = game.screen.drawing_bitmap_id();
+    game.screen.port_mut(PortId::Map).target = Some(page);
+    game.screen.clear(PortId::Map, 0);
+    let pictures = item_pictures(game);
+    game.screen.set_bitmap(BitmapId::Items, pictures);
 
-    draw_item_icons(page);
+    draw_item_icons(game, page);
 
-    screen.set_color(ViewPortId::Page, BACKGROUND_PEN, (0, 0, 0));
-    show_still_screen();
-    screen.load_colors(ViewPortId::Page, unsafe { &*(&raw const page_colors) });
+    game.screen
+        .set_color(ViewPortId::Page, BACKGROUND_PEN, (0, 0, 0));
+    show_still_screen(game);
+    game.screen
+        .load_colors(ViewPortId::Page, unsafe { &*(&raw const page_colors) });
 
-    screen.view_status = VIEW_ITEMS;
+    game.screen.view_status = VIEW_ITEMS;
     queue_print(PRQ_LIST);
 }
 
 /// The pictures of the objects as one long bitmap: the object sprite sheet holds each plane of an
 /// image 32 bytes after the one before, so plane `p` starts `p * 32` bytes into the sheet.
-fn item_pictures() -> Bitmap {
+fn item_pictures(game: &Game) -> Bitmap {
     {
-        let sheet = memory().seq_list[OBJECTS as usize].location;
+        let sheet = game.memory.seq_list[OBJECTS as usize].location;
         let available = SHAPE_AREA_BYTES.saturating_sub(sheet);
         let mut pictures = Bitmap::new(ITEM_IMAGE_WIDTH, ITEM_IMAGE_ROWS, ITEM_IMAGE_PLANES);
 
@@ -63,7 +65,7 @@ fn item_pictures() -> Bitmap {
                 .len()
                 .min(available.saturating_sub(start));
             let from = sheet + start;
-            let source = &memory().shape[from..from + bytes];
+            let source = &game.memory.shape[from..from + bytes];
             pictures.plane_mut(plane)[..bytes].copy_from_slice(source);
         }
 
@@ -73,7 +75,7 @@ fn item_pictures() -> Bitmap {
 
 /// Draws one small picture for each item the hero holds (up to the most the screen shows),
 /// stacked down the item's column. The pictures are read from `Items`.
-fn draw_item_icons(page: BitmapId) {
+fn draw_item_icons(game: &mut Game, page: BitmapId) {
     for slot in 0..GOLDBASE {
         let it = item(slot);
         let shown = (player().stuff()[slot]).min(it.maxshown);
@@ -88,7 +90,8 @@ fn draw_item_icons(page: BitmapId) {
         };
 
         for _ in 0..shown {
-            screen().copy(BitmapId::Items, picture, page, (x, y as i32), ALL_PLANES);
+            game.screen
+                .copy(BitmapId::Items, picture, page, (x, y as i32), ALL_PLANES);
 
             y = y.wrapping_add(it.ydelta as u16);
         }

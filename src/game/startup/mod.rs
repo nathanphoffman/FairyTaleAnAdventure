@@ -23,10 +23,10 @@ pub fn run_game() {
     let mut game = Game::new();
     unsafe {
         the_world.light_timer = 0;
-        let err = open_all();
+        let err = open_all(&mut game);
 
         if err != 0 {
-            show_error(err);
+            show_error(&mut game, err);
             quit_all();
 
             return;

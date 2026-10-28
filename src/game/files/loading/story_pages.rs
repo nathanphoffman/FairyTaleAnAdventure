@@ -1,10 +1,11 @@
 //! The story pages of the intro: showing them and the page-turn animation between them.
 
+use crate::game::data::state::Game;
 use crate::game::files::iff_picture::load_picture;
 use crate::game::input::handler::next_key;
 use crate::game::render::display::delay;
 use crate::game::render::display::flip_pages;
-use crate::game::render::screen::{BitmapId, screen};
+use crate::game::render::screen::BitmapId;
 use crate::gfx::bitmap::Rect;
 
 const ALL_PLANES: u32 = 0x1f;
@@ -36,14 +37,14 @@ const PAGE_DELAY: i32 = 350;
 
 /// Shows two pictures on the story page, then turns it over.
 /// The new pictures are drawn onto `pageb` while `pagea` keeps the old page for the turn.
-pub fn show_story_page(br1: &str, br2: &str, x: i16, y: i16) {
+pub fn show_story_page(game: &mut Game, br1: &str, br2: &str, x: i16, y: i16) {
     unsafe {
         if intro_skip_requested != 0 {
             return;
         }
     }
 
-    delay(PAGE_DELAY);
+    delay(game, PAGE_DELAY);
 
     let whole = Rect {
         x: 0,
@@ -52,10 +53,10 @@ pub fn show_story_page(br1: &str, br2: &str, x: i16, y: i16) {
         height: SCREEN_HEIGHT,
     };
 
-    let screen = screen();
-    screen.copy(BitmapId::PageB, whole, BitmapId::PageA, (0, 0), ALL_PLANES);
+    game.screen
+        .copy(BitmapId::PageB, whole, BitmapId::PageA, (0, 0), ALL_PLANES);
 
-    let new_page = screen.bitmap_mut(BitmapId::PageB);
+    let new_page = game.screen.bitmap_mut(BitmapId::PageB);
     load_picture(br1, new_page, PICTURE_X, PICTURE_Y);
     load_picture(br2, new_page, x as usize, y as usize);
 
@@ -63,7 +64,7 @@ pub fn show_story_page(br1: &str, br2: &str, x: i16, y: i16) {
         return;
     }
 
-    turn_page();
+    turn_page(game);
     intro_skipped();
 }
 
@@ -96,7 +97,14 @@ const EDGE_INSET: i32 = 7;
 const PAGE_EDGE_HEIGHT: i32 = 186;
 
 /// Copies a rectangle between bitmaps (all five planes, plain copy).
-fn copy_rect(src: BitmapId, from: (i32, i32), dst: BitmapId, to: (i32, i32), size: (i32, i32)) {
+fn copy_rect(
+    game: &mut Game,
+    src: BitmapId,
+    from: (i32, i32),
+    dst: BitmapId,
+    to: (i32, i32),
+    size: (i32, i32),
+) {
     let rect = Rect {
         x: from.0,
         y: from.1,
@@ -104,12 +112,13 @@ fn copy_rect(src: BitmapId, from: (i32, i32), dst: BitmapId, to: (i32, i32), siz
         height: size.1,
     };
 
-    screen().copy(src, rect, dst, to, ALL_PLANES);
+    game.screen.copy(src, rect, dst, to, ALL_PLANES);
 }
 
 /// Copies the half page that starts at column `column` onto the screen, in the same place.
-fn copy_half_page(src: BitmapId, temp: BitmapId, column: i32) {
+fn copy_half_page(game: &mut Game, src: BitmapId, temp: BitmapId, column: i32) {
     copy_rect(
+        game,
         src,
         (column, 0),
         temp,
@@ -120,8 +129,16 @@ fn copy_half_page(src: BitmapId, temp: BitmapId, column: i32) {
 
 /// Copies a strip `wide` columns wide from `from` to `to`, `inset` lines in from the top and bottom
 /// (the curl of the page).
-fn copy_strip(src: BitmapId, temp: BitmapId, (from, to): (i32, i32), inset: i32, wide: i32) {
+fn copy_strip(
+    game: &mut Game,
+    src: BitmapId,
+    temp: BitmapId,
+    (from, to): (i32, i32),
+    inset: i32,
+    wide: i32,
+) {
     copy_rect(
+        game,
         src,
         (from, inset),
         temp,
@@ -136,34 +153,41 @@ fn copy_strip(src: BitmapId, temp: BitmapId, (from, to): (i32, i32), inset: i32,
 /// get narrower and shorter (using `page_turn_inset` for the curl), on top of the new page. The last 11
 /// frames lay the curling page down on the left. `FLIP_RATE`, `FLIP_WIDE` and `FLIP_DELAY` give
 /// the strip step, strip width and pause for each frame.
-pub fn turn_page() {
+pub fn turn_page(game: &mut Game) {
     let (a, b) = (BitmapId::PageA, BitmapId::PageB);
 
     for frame in 0..FLIP_RATE.len() {
-        let temp = screen().drawing_bitmap_id();
+        let temp = game.screen.drawing_bitmap_id();
         let rate = FLIP_RATE[frame];
         let wide = FLIP_WIDE[frame] as i32;
 
         if frame < FIRST_HALF {
-            turn_right_page_frame(a, b, temp, rate, wide);
+            turn_right_page_frame(game, a, b, temp, rate, wide);
         } else {
-            turn_left_page_frame(a, b, temp, rate, wide);
+            turn_left_page_frame(game, a, b, temp, rate, wide);
         }
 
-        flip_pages();
+        flip_pages(game);
 
         if FLIP_DELAY[frame] != 0 {
-            delay(FLIP_DELAY[frame]);
+            delay(game, FLIP_DELAY[frame]);
         }
     }
 }
 
 /// One frame of the first half of the page turn: the right page `b` stays and the strips of the old
 /// page `a` bend away from the spine, each `wide` pixels wide and `rate` apart.
-fn turn_right_page_frame(a: BitmapId, b: BitmapId, temp: BitmapId, rate: i16, wide: i32) {
+fn turn_right_page_frame(
+    game: &mut Game,
+    a: BitmapId,
+    b: BitmapId,
+    temp: BitmapId,
+    rate: i16,
+    wide: i32,
+) {
     let bcol = SPINE_RIGHT - wide;
     let mut dcol: i32 = 0;
-    copy_half_page(b, temp, SPINE);
+    copy_half_page(game, b, temp, SPINE);
 
     if rate == 0 {
         return;
@@ -174,13 +198,21 @@ fn turn_right_page_frame(a: BitmapId, b: BitmapId, temp: BitmapId, rate: i16, wi
 
     while scol < PAGE_STRIP_END {
         h = crate::game::world::map::page_turn_inset(scol as i32);
-        copy_strip(a, temp, (bcol + scol as i32, SPINE_RIGHT + dcol), h, wide);
+        copy_strip(
+            game,
+            a,
+            temp,
+            (bcol + scol as i32, SPINE_RIGHT + dcol),
+            h,
+            wide,
+        );
 
         dcol += wide;
         scol += rate;
     }
 
     copy_rect(
+        game,
         a,
         (PAGE_RIGHT_EDGE, EDGE_INSET),
         temp,
@@ -190,28 +222,42 @@ fn turn_right_page_frame(a: BitmapId, b: BitmapId, temp: BitmapId, rate: i16, wi
 }
 
 /// One frame of the second half of the page turn: the strips of the new page `b` land on the left.
-fn turn_left_page_frame(a: BitmapId, b: BitmapId, temp: BitmapId, rate: i16, wide: i32) {
+fn turn_left_page_frame(
+    game: &mut Game,
+    a: BitmapId,
+    b: BitmapId,
+    temp: BitmapId,
+    rate: i16,
+    wide: i32,
+) {
     let bcol = SPINE;
 
     if rate == 0 {
-        copy_half_page(b, temp, PAGE_LEFT_EDGE);
+        copy_half_page(game, b, temp, PAGE_LEFT_EDGE);
 
         return;
     }
 
-    copy_half_page(a, temp, PAGE_LEFT_EDGE);
+    copy_half_page(game, a, temp, PAGE_LEFT_EDGE);
     let mut dcol: i32 = 0;
     let mut scol = wide as i16;
 
     while scol < PAGE_STRIP_END {
         let h = crate::game::world::map::page_turn_inset(scol as i32);
         dcol += wide;
-        copy_strip(b, temp, (bcol - scol as i32, bcol - dcol), h, wide);
+        copy_strip(game, b, temp, (bcol - scol as i32, bcol - dcol), h, wide);
 
         scol += rate;
     }
 
-    copy_strip(b, temp, (PAGE_LEFT_EDGE, SPINE - 1 - dcol), EDGE_INSET, 1);
+    copy_strip(
+        game,
+        b,
+        temp,
+        (PAGE_LEFT_EDGE, SPINE - 1 - dcol),
+        EDGE_INSET,
+        1,
+    );
 }
 
 #[cfg(test)]

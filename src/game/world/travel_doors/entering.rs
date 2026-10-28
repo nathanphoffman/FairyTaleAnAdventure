@@ -87,6 +87,7 @@ pub(super) unsafe fn enter_door(game: &mut Game, xtest: u16, ytest: u16) {
             transfer_hero(game, x, y, 0);
             find_place(game, 2);
             fade_page(
+                game,
                 FADE_WHITE,
                 FADE_WHITE,
                 FADE_WHITE,

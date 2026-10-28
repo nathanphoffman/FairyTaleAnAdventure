@@ -7,7 +7,7 @@ use crate::game::data::state::Game;
 use crate::game::data::state::{the_actors, the_hero, the_world};
 use crate::game::data::tables::stone_ring_sectors;
 use crate::game::data::types::Shape;
-use crate::game::render::screen::{PortId, screen};
+use crate::game::render::screen::PortId;
 use crate::game::render::screen_fx::{flicker_colors, show_still_screen};
 use crate::game::ui::messages::print;
 use crate::game::ui::text::{queue_print, show_event};
@@ -49,11 +49,10 @@ const FEAR_RACE_LIMIT: u8 = 7;
 const ENEMY: i8 = 2;
 
 /// Draws the overview map with a "+" where the hero is, and shows it.
-pub(super) unsafe fn show_map() {
+pub(super) unsafe fn show_map(game: &mut Game) {
     unsafe {
-        let current = screen();
-        current.draw_target = current.drawing_bitmap_id();
-        draw_overview_map(the_world.map_x as i32, the_world.map_y as i32);
+        game.screen.draw_target = game.screen.drawing_bitmap_id();
+        draw_overview_map(game, the_world.map_x as i32, the_world.map_y as i32);
 
         // The hero on the overview map: his tile column minus the left edge of the shown sectors.
         let x = ((the_hero.x >> TILE_SHIFT) as i64
@@ -66,18 +65,17 @@ pub(super) unsafe fn show_map() {
             // Shifts by TILE_SHIFT, converting between pixels, tiles, sectors or bytes.
             - ((the_world.sector_y as i64 + the_world.origin_y as i64) << TILE_SHIFT)
             + MARK_Y_OFFSET) as u32;
-        let screen = screen();
-        screen.port_mut(PortId::Map).target = Some(screen.draw_target);
-        screen.set_draw_mode(PortId::Map, JAM1);
-        screen.set_a_pen(PortId::Map, MAP_MARK_PEN);
+        game.screen.port_mut(PortId::Map).target = Some(game.screen.draw_target);
+        game.screen.set_draw_mode(PortId::Map, JAM1);
+        game.screen.set_a_pen(PortId::Map, MAP_MARK_PEN);
 
         if x > 0 && x < MARK_MAX.0 && y > 0 && y < MARK_MAX.1 {
-            screen.move_to(PortId::Map, x as i32, y as i32);
-            screen.text(PortId::Map, b"+");
+            game.screen.move_to(PortId::Map, x as i32, y as i32);
+            game.screen.text(PortId::Map, b"+");
         }
 
-        screen.view_status = VIEW_MAP;
-        show_still_screen();
+        game.screen.view_status = VIEW_MAP;
+        show_still_screen(game);
         queue_print(PRQ_MAP);
     }
 }
@@ -98,7 +96,7 @@ pub(super) unsafe fn stone_jump(game: &mut Game) -> bool {
             StoneJump::Refused => false,
             StoneJump::NoRing => true,
             StoneJump::To(x, y) => {
-                flicker_colors();
+                flicker_colors(game);
                 transfer_hero(game, x, y, 1);
 
                 if the_hero.riding != 0 {
@@ -162,14 +160,14 @@ fn stone_target(sector: i16, px: u16, py: u16, facing: i8, list: &[u8]) -> Stone
 }
 
 /// Heals the hero a little, up to a limit set by bravery.
-pub(super) unsafe fn heal() {
+pub(super) unsafe fn heal(game: &mut Game) {
     unsafe {
         let mut hero = ActorRef::new(0);
         let (vitality, capped) = healed_vitality(hero.vitality, the_hero.brave, rand8());
         hero.vitality = vitality;
 
         if !capped {
-            print("That feels a lot better!");
+            print(game, "That feels a lot better!");
         }
 
         queue_print(PRQ_STATS);
@@ -195,7 +193,7 @@ fn is_scared_by_fear_spell(actor: &Shape) -> bool {
 }
 
 /// Kills every weak enemy on the screen (and costs a little bravery for each).
-pub(super) unsafe fn scare_enemies() {
+pub(super) unsafe fn scare_enemies(game: &mut Game) {
     unsafe {
         let mut i = 1;
 
@@ -204,7 +202,7 @@ pub(super) unsafe fn scare_enemies() {
 
             if is_scared_by_fear_spell(&actor) {
                 actor.vitality = 0;
-                check_death(i as i32, 0);
+                check_death(game, i as i32, 0);
                 the_hero.brave -= 1;
             }
 
@@ -212,7 +210,7 @@ pub(super) unsafe fn scare_enemies() {
         }
 
         if the_actors.battle_flag != 0 {
-            show_event(BATTLE_EVENT);
+            show_event(game, BATTLE_EVENT);
         }
     }
 }

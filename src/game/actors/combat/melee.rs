@@ -4,6 +4,7 @@ use super::{CARRIER, DEAD, RAFT, WALKING, distance_to_point};
 use crate::game::actors::interaction::hit_actor;
 use crate::game::data::random::{bitrand, rand4, rand8, rand256};
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Game;
 use crate::game::data::state::{the_actors, the_hero, the_world};
 use crate::game::files::loading::play_effect;
 use crate::game::world::map::{step_x, step_y};
@@ -32,7 +33,7 @@ pub(super) const WHOOSH_MARGIN: i16 = 2;
 
 /// Everything not walking swings its weapon (or bites) at whatever is within reach of the tip:
 /// `hit_actor` if it lands, a whoosh if it nearly does. Only the hero acts while time is frozen.
-pub fn resolve_melee() {
+pub fn resolve_melee(game: &mut Game) {
     unsafe {
         let mut i = 0;
 
@@ -44,7 +45,7 @@ pub fn resolve_melee() {
             let attacker = ActorRef::new(i);
 
             if i != RAFT && attacker.state < WALKING {
-                swing(i);
+                swing(game, i);
             }
 
             i += 1;
@@ -94,7 +95,7 @@ struct Swing {
 }
 
 /// One actor's swing.
-pub(super) unsafe fn swing(i: usize) {
+pub(super) unsafe fn swing(game: &mut Game, i: usize) {
     unsafe {
         let attacker = ActorRef::new(i);
         let Some(base) = melee_weapon(attacker.weapon as i16) else {
@@ -116,7 +117,7 @@ pub(super) unsafe fn swing(i: usize) {
         };
 
         for j in 0..the_actors.active as usize {
-            if swing_at(&swing, j) {
+            if swing_at(game, &swing, j) {
                 break;
             }
         }
@@ -125,7 +126,7 @@ pub(super) unsafe fn swing(i: usize) {
 
 /// Swings at actor `j` if it is a target (not the raft, the attacker, the dead, or by a carrier).
 /// Returns true when the swing hit, which ends it.
-unsafe fn swing_at(swing: &Swing, j: usize) -> bool {
+unsafe fn swing_at(game: &mut Game, swing: &Swing, j: usize) -> bool {
     unsafe {
         let attacker = ActorRef::new(swing.attacker);
         let target = ActorRef::new(j);
@@ -145,6 +146,7 @@ unsafe fn swing_at(swing: &Swing, j: usize) -> bool {
         ) {
             SwingResult::Hit => {
                 hit_actor(
+                    game,
                     swing.attacker as i32,
                     j as i32,
                     swing.facing,

@@ -3,6 +3,7 @@
 use super::speeches::person_speaks;
 use crate::game::actors::interaction::find_nearest_figure;
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Game;
 use crate::game::data::state::player;
 use crate::game::data::state::the_actors;
 use crate::game::data::tables::setfig_table;
@@ -40,7 +41,7 @@ const YELL: i16 = 5;
 const CARRIER_TURTLE: i16 = 5;
 
 /// Yell (louder, reaches further) or say something to the nearest person.
-pub(super) unsafe fn talk_option(chosen_entry: i16) -> bool {
+pub(super) unsafe fn talk_option(game: &mut Game, chosen_entry: i16) -> bool {
     unsafe {
         let distance = find_nearest_figure(
             1,
@@ -66,7 +67,7 @@ pub(super) unsafe fn talk_option(chosen_entry: i16) -> bool {
             player().stuff()[SHELL] != 0,
         );
 
-        carry_out(action, actor);
+        carry_out(game, action, actor);
 
         true
     }
@@ -93,11 +94,11 @@ unsafe fn describe_target(actor: ActorRef) -> Target {
 }
 
 /// Does what `talk_action` decided: speaks, and turns the person to talk or hands over the shell.
-unsafe fn carry_out(action: TalkAction, mut actor: ActorRef) {
+unsafe fn carry_out(game: &mut Game, action: TalkAction, mut actor: ActorRef) {
     unsafe {
         match action {
             TalkAction::Nothing => {}
-            TalkAction::TooCloseToYell => speak(SPEECH_TOO_CLOSE_TO_YELL),
+            TalkAction::TooCloseToYell => speak(game, SPEECH_TOO_CLOSE_TO_YELL),
             TalkAction::Person { starts_talking } => {
                 if starts_talking {
                     actor.state = TALKING;
@@ -105,16 +106,16 @@ unsafe fn carry_out(action: TalkAction, mut actor: ActorRef) {
                 }
 
                 // Masks with PERSON_MASK, keeping only the bits that matter here.
-                person_speaks(actor.race & PERSON_MASK, actor);
+                person_speaks(game, actor.race & PERSON_MASK, actor);
             }
 
-            TalkAction::TurtleHasShell => speak(SPEECH_TURTLE_HAS_SHELL),
+            TalkAction::TurtleHasShell => speak(game, SPEECH_TURTLE_HAS_SHELL),
             TalkAction::TurtleGivesShell => {
                 player().stuff_mut()[SHELL] = 1;
-                speak(SPEECH_TURTLE_GIVES_SHELL);
+                speak(game, SPEECH_TURTLE_GIVES_SHELL);
             }
 
-            TalkAction::EnemyShouts(race) => speak(race as i32),
+            TalkAction::EnemyShouts(race) => speak(game, race as i32),
         }
     }
 }

@@ -5,6 +5,7 @@ use super::{
     MISSILE_SPEED_FIREBALL, NO_SHOOT_XTYPE, Pc, SHOOT1, SHOOT3, STILL, STUFF_ARROWS,
     WEAPON_FIREBALL, diroff,
 };
+use crate::game::data::state::Game;
 use crate::game::data::state::player;
 
 use crate::game::data::random::rand256;
@@ -28,7 +29,7 @@ const EFFECT_ARROW_PITCH: i32 = 400;
 
 impl Ctx {
     /// Aiming and firing a bow or a fireball. No shooting under water or in peaceful places.
-    pub(super) unsafe fn shooting(&mut self) -> Pc {
+    pub(super) unsafe fn shooting(&mut self, game: &mut Game) -> Pc {
         unsafe {
             if self.environ > ENVIRON_SINKING || the_world.extent_type > NO_SHOOT_XTYPE {
                 return Pc::Cpx;
@@ -37,7 +38,7 @@ impl Ctx {
             let early_exit = if self.state == SHOOT3 {
                 self.release_shot()
             } else if self.state == SHOOT1 {
-                self.start_shot()
+                self.start_shot(game)
             } else {
                 None
             };
@@ -86,7 +87,7 @@ impl Ctx {
 
     /// The actor starts to shoot: a fireball is fired at once, a bow needs arrows (for the hero).
     /// `Some` means nothing is fired.
-    unsafe fn start_shot(&mut self) -> Option<Pc> {
+    unsafe fn start_shot(&mut self, game: &mut Game) -> Option<Pc> {
         unsafe {
             let mut actor = self.actor;
             let d8 = self.facing + SHOOTING_FACING_OFFSET;
@@ -105,7 +106,7 @@ impl Ctx {
                 self.image = diroff(d8);
                 play_effect(EFFECT_FIREBALL, EFFECT_FIREBALL_PITCH + rand256());
             } else if self.slot == 0 && player().stuff()[STUFF_ARROWS] == 0 {
-                print("No Arrows!");
+                print(game, "No Arrows!");
 
                 return Some(Pc::Cpx);
             } else {

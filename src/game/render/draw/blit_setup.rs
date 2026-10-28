@@ -7,11 +7,10 @@ use crate::game::data::globals::current_sshape;
 use crate::game::data::globals::{
     last_word_mask, shadow_mask_offset, sprite_mask_modulo, sprite_mask_offset, sprite_x_shift,
 };
+use crate::game::data::state::Game;
 use crate::game::data::types::SeqInfo;
 
-use crate::game::data::state::memory;
 use crate::game::render::blit::{Area, Loc, SShape};
-use crate::game::render::screen::screen;
 
 // ---- draw_sprites ----
 /// Screen size in pixels the sprites are clipped to (the play field is 320 by 174).
@@ -82,9 +81,9 @@ pub(super) fn clip_to_screen(sprite: &mut Sprite) -> Clip {
 
 /// Reserves room to save the background under the sprite: a spare bit plane while they last (for
 /// small sprites), otherwise the page's save buffer. Returns false when the buffer is full.
-pub(super) unsafe fn assign_background_save(frame: &mut Frame) -> bool {
+pub(super) unsafe fn assign_background_save(game: &mut Game, frame: &mut Frame) -> bool {
     unsafe {
-        let page = screen().drawing_page_mut();
+        let page = game.screen.drawing_page_mut();
 
         if current_sshape.savesize < SMALL_SAVE && frame.crack < SPARE_SAVES {
             current_sshape.backsave = Loc::new(Area::Plane(frame.crack), SPARE_PLANE_OFFSET);
@@ -107,6 +106,7 @@ pub(super) unsafe fn assign_background_save(frame: &mut Frame) -> bool {
 /// full.
 #[allow(clippy::too_many_arguments)] // the blit set-up of the original, kept as one call
 pub(super) unsafe fn set_up_blit(
+    game: &mut Game,
     frame: &mut Frame,
     sprite: &Sprite,
     clip: &Clip,
@@ -118,9 +118,9 @@ pub(super) unsafe fn set_up_blit(
     unsafe {
         // The sheet is looked up again: a sunk actor is drawn from the objects sheet, but is as wide
         // and high as its own.
-        let seq = sprite_sheet(sprite.atype);
+        let seq = *sprite_sheet(game, sprite.atype);
         current_sshape = SShape::new();
-        screen().planesize = seq.bytes;
+        game.screen.planesize = seq.bytes;
         current_sshape.savesize = (blitwide as i32 * blithigh as i32 * WORD_BYTES) as i16;
 
         // Blitter size word: height in the high bits, width in words in the low 6 bits.
@@ -128,9 +128,9 @@ pub(super) unsafe fn set_up_blit(
             // Shifts by BLIT_HEIGHT_SHIFT, converting between pixels, tiles, sectors or bytes.
             (((blithigh as i32) << BLIT_HEIGHT_SHIFT) + blitwide as i32) as i16;
 
-        locate_sprite_data(seq, sprite.inum);
+        locate_sprite_data(game, &seq, sprite.inum);
 
-        if !assign_background_save(frame) {
+        if !assign_background_save(game, frame) {
             return false;
         }
 
@@ -141,10 +141,10 @@ pub(super) unsafe fn set_up_blit(
 }
 
 /// Points the blitter at the picture and the mask of image `inum` in its sprite sheet.
-fn locate_sprite_data(seq: &SeqInfo, inum: i16) {
-    let planesize = screen().planesize as usize;
-    memory().shapedata = seq.location + planesize * PLANES as usize * inum as usize;
-    memory().mask_buffer = seq.maskloc + planesize * inum as usize;
+fn locate_sprite_data(game: &mut Game, seq: &SeqInfo, inum: i16) {
+    let planesize = game.screen.planesize as usize;
+    game.memory.shapedata = seq.location + planesize * PLANES as usize * inum as usize;
+    game.memory.mask_buffer = seq.maskloc + planesize * inum as usize;
 }
 
 /// Sets the blitter's mask offsets, shift and modulo for the clipped sprite, and where in the page

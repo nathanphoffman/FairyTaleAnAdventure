@@ -39,7 +39,7 @@ const WEALTH_X: i32 = 321;
 pub fn handle_print_request(game: &mut Game) {
     unsafe {
         if prec == pplay {
-            delay(1);
+            delay(game, 1);
 
             return;
         }
@@ -50,52 +50,52 @@ pub fn handle_print_request(game: &mut Game) {
         pplay = (pplay + 1) & QUEUE_MASK;
 
         match request {
-            REQUEST_DEBUG_COORDS => show_debug_coords(),
-            REQUEST_DEBUG_SECTOR => show_debug_sector(),
-            REQUEST_VITALITY => draw_vitality(),
+            REQUEST_DEBUG_COORDS => show_debug_coords(game),
+            REQUEST_DEBUG_SECTOR => show_debug_sector(game),
+            REQUEST_VITALITY => draw_vitality(game),
             REQUEST_OPTIONS => print_options(game),
-            REQUEST_STATS => draw_stats(),
-            REQUEST_TAKE_WHAT => print("Take What?"),
+            REQUEST_STATS => draw_stats(game),
+            REQUEST_TAKE_WHAT => print(game, "Take What?"),
             _ => {}
         }
     }
 }
 
 /// Debug information: the hero's map position and the memory left.
-unsafe fn show_debug_coords() {
+unsafe fn show_debug_coords(game: &mut Game) {
     unsafe {
-        print("Coords = ");
-        print_number(the_hero.x as i32, COORD_DIGITS);
-        print_number(the_hero.y as i32, COORD_DIGITS);
-        print("Memory Available: ");
-        print_number(FAKE_FREE_BYTES, COORD_DIGITS);
+        print(game, "Coords = ");
+        print_number(game, the_hero.x as i32, COORD_DIGITS);
+        print_number(game, the_hero.y as i32, COORD_DIGITS);
+        print(game, "Memory Available: ");
+        print_number(game, FAKE_FREE_BYTES, COORD_DIGITS);
     }
 }
 
 /// Debug information: the hero's sector and the type of the extent the hero is in.
-unsafe fn show_debug_sector() {
+unsafe fn show_debug_sector(game: &mut Game) {
     unsafe {
-        print("You are at: ");
-        print_number(the_hero.x as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
-        print_number(the_hero.y as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
-        print("H/Sector = ");
-        print_number(the_hero.sector as i32, SECTOR_DIGITS);
-        draw_text(b" Extent = ");
-        print_number(the_world.extent_type as i32, EXTENT_DIGITS);
+        print(game, "You are at: ");
+        print_number(game, the_hero.x as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
+        print_number(game, the_hero.y as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
+        print(game, "H/Sector = ");
+        print_number(game, the_hero.sector as i32, SECTOR_DIGITS);
+        draw_text(game, b" Extent = ");
+        print_number(game, the_world.extent_type as i32, EXTENT_DIGITS);
     }
 }
 
 /// The hero's vitality on the stats line.
-unsafe fn draw_vitality() {
+unsafe fn draw_vitality(game: &mut Game) {
     unsafe {
-        move_to(VITALITY_POSITION.0, VITALITY_POSITION.1);
-        draw_text(b"Vit:");
-        print_number(the_actors.list[0].vitality as i32, VITALITY_DIGITS);
+        move_to(game, VITALITY_POSITION.0, VITALITY_POSITION.1);
+        draw_text(game, b"Vit:");
+        print_number(game, the_actors.list[0].vitality as i32, VITALITY_DIGITS);
     }
 }
 
 /// Draws the hero's four stats (bravery, luck, kindness, wealth) along the stats line.
-unsafe fn draw_stats() {
+unsafe fn draw_stats(game: &mut Game) {
     unsafe {
         if the_hero.luck < 0 {
             the_hero.luck = 0;
@@ -107,9 +107,9 @@ unsafe fn draw_stats() {
             (KINDNESS_X, b"Knd:", the_hero.kindness),
             (WEALTH_X, b"Wlth:", the_hero.wealth),
         ] {
-            move_to(x, STATS_Y);
-            draw_text(label);
-            print_number(value as i32, STAT_DIGITS);
+            move_to(game, x, STATS_Y);
+            draw_text(game, label);
+            print_number(game, value as i32, STAT_DIGITS);
         }
     }
 }

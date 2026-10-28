@@ -57,8 +57,8 @@ pub fn choose_menu_entry(game: &mut Game, chosen_entry: i16) {
             }
 
             MAGIC => magic_option(game, chosen_entry),
-            TALK => talk_option(chosen_entry),
-            BUY => buy_option(chosen_entry),
+            TALK => talk_option(game, chosen_entry),
+            BUY => buy_option(game, chosen_entry),
             GAME => game_option(game, chosen_entry),
             USE => use_option(game, chosen_entry),
             SAVEX => save_exit_option(game, chosen_entry),

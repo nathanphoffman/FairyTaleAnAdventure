@@ -1,8 +1,7 @@
 //! Drawing the map into the play field: single tiles, whole screens, new edges and scrolling.
 
 use crate::game::data::object_tables::minimap;
-use crate::game::data::state::memory;
-use crate::game::render::screen::screen;
+use crate::game::data::state::Game;
 
 /// One bitplane of 256 tiles, 64 bytes per tile.
 pub(super) const IMAGE_PLANE_SIZE: usize = 16384;
@@ -18,11 +17,11 @@ pub(super) const SCREEN_COLUMNS: usize = 19;
 pub(super) const SCREEN_ROWS: usize = 6;
 
 /// Draws one tile at byte offset `dst` in each of the five planes (2 bytes wide, 32 lines).
-pub(super) fn draw_tile(tile: i32, dst: usize) {
+pub(super) fn draw_tile(game: &mut Game, tile: i32, dst: usize) {
     for p in 0..PLANE_COUNT {
         let mut src = p * IMAGE_PLANE_SIZE + tile as usize * TILE_BYTES;
-        let image = &memory().image;
-        let plane = screen().draw_bitmap_mut().plane_mut(p);
+        let image = &game.memory.image;
+        let plane = game.screen.draw_bitmap_mut().plane_mut(p);
         let mut d = dst;
 
         for _ in 0..TILE_LINES {
@@ -35,9 +34,10 @@ pub(super) fn draw_tile(tile: i32, dst: usize) {
 }
 
 /// Draws the tile at minimap position (col, row) to its place on screen.
-pub(super) unsafe fn draw_minimap_tile(col: usize, row: usize) {
+pub(super) unsafe fn draw_minimap_tile(game: &mut Game, col: usize, row: usize) {
     unsafe {
         draw_tile(
+            game,
             minimap[col * SCREEN_ROWS + row] as i32,
             row * TILE_LINES * ROW_BYTES + col * 2,
         )
@@ -45,25 +45,25 @@ pub(super) unsafe fn draw_minimap_tile(col: usize, row: usize) {
 }
 
 /// The whole screen, 19 x 6 tiles.
-pub fn draw_map() {
+pub fn draw_map(game: &mut Game) {
     for col in 0..SCREEN_COLUMNS {
         for row in 0..SCREEN_ROWS {
-            unsafe { draw_minimap_tile(col, row) };
+            unsafe { draw_minimap_tile(game, col, row) };
         }
     }
 }
 
 /// One column of tiles; `x` is the byte offset on screen (0 or 36).
-pub fn draw_map_column(x: i32) {
+pub fn draw_map_column(game: &mut Game, x: i32) {
     for row in 0..SCREEN_ROWS {
-        unsafe { draw_minimap_tile(x as usize / 2, row) };
+        unsafe { draw_minimap_tile(game, x as usize / 2, row) };
     }
 }
 
 /// One row of tiles; `r` is twice the row number (0 or 10).
-pub fn draw_map_row(r: i32) {
+pub fn draw_map_row(game: &mut Game, r: i32) {
     for col in 0..SCREEN_COLUMNS {
-        unsafe { draw_minimap_tile(col, r as usize / 2) };
+        unsafe { draw_minimap_tile(game, col, r as usize / 2) };
     }
 }
 
@@ -115,10 +115,10 @@ const DIRECTION_MASK: usize = 7;
 
 /// Shifts the map one tile in one of 8 directions (the blitter did this on the Amiga).
 /// Moving down copies from the bottom up, so lines are not overwritten before they are read.
-pub fn scroll_map(dir: i32) {
+pub fn scroll_map(game: &mut Game, dir: i32) {
     // Masks with SCROLL_MODES, keeping only the bits that matter here.
     let m = &SCROLL_MODES[dir as usize & DIRECTION_MASK];
-    let bitmap = screen().draw_bitmap_mut();
+    let bitmap = game.screen.draw_bitmap_mut();
 
     for p in 0..PLANE_COUNT {
         let plane = bitmap.plane_mut(p);

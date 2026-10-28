@@ -7,9 +7,10 @@
 //! stands, which csrc/fmain.c uses to decide whether the beam hits the hero.
 
 use crate::game::data::object_tables::witchpoints;
+use crate::game::data::state::Game;
 use crate::game::data::state::{the_hero, the_world};
 use crate::game::data::types::FPage;
-use crate::game::render::screen::{PortId, screen};
+use crate::game::render::screen::PortId;
 use crate::gfx::bitmap::Rect;
 use crate::gfx::draw::COMPLEMENT;
 
@@ -62,9 +63,9 @@ fn side(p1: (i16, i16), p2: (i16, i16), xh: i16, yh: i16) -> (i16, i16) {
 
 /// Draws the witch's beam on page `page` and records on which side of its edges the hero is.
 /// The drawing is clipped to the map area.
-pub fn witch_fx(page: usize) {
+pub fn witch_fx(game: &mut Game, page: usize) {
     unsafe {
-        let fp = &screen().pages[page];
+        let fp = &game.screen.pages[page];
 
         // Masks with TILE_X_MASK, keeping only the bits that matter here.
         let xh = the_hero.x.wrapping_sub(the_world.map_x & TILE_X_MASK) as i16;
@@ -77,13 +78,13 @@ pub fn witch_fx(page: usize) {
         (SIDE_1, SIDE_FLAG_1) = side(p1, p2, xh, yh);
         (SIDE_2, SIDE_FLAG_2) = side(p3, p4, xh, yh);
 
-        paint_beam([p1, p2, p4, p3]);
+        paint_beam(game, [p1, p2, p4, p3]);
     }
 }
 
 /// Fills the beam's quadrilateral with corners `p` (in drawing order) in complement mode, so
 /// drawing it a second time erases it.
-fn paint_beam(p: [(i16, i16); BEAM_CORNERS]) {
+fn paint_beam(game: &mut Game, p: [(i16, i16); BEAM_CORNERS]) {
     let points = p.map(|(x, y)| (x as i32, y as i32));
     let clip = Rect {
         x: 0,
@@ -92,9 +93,8 @@ fn paint_beam(p: [(i16, i16); BEAM_CORNERS]) {
         height: CLIP_HEIGHT + 1,
     };
 
-    let screen = screen();
-    screen.set_draw_mode(PortId::Map, COMPLEMENT);
-    screen.fill_polygon(PortId::Map, &points, clip);
+    game.screen.set_draw_mode(PortId::Map, COMPLEMENT);
+    game.screen.fill_polygon(PortId::Map, &points, clip);
 }
 
 #[cfg(test)]

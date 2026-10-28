@@ -8,7 +8,7 @@ use crate::game::data::state::Game;
 use crate::game::data::state::the_hero;
 use crate::game::data::tables::{key_colors, label1, menus};
 use crate::game::input::handler::forget_last_menu;
-use crate::game::render::screen::{PortId, screen};
+use crate::game::render::screen::PortId;
 use crate::game::ui::text::item_menu_state;
 
 // Menu numbers (`enum cmodes` in csrc/fmain.c).
@@ -127,7 +127,7 @@ pub fn print_options(game: &mut Game) {
 
 /// Blanks the slots from `first` to the last one: nothing is shown there.
 fn blank_slots_from(game: &mut Game, first: usize) {
-    screen().set_b_pen(PortId::Text2, 0);
+    game.screen.set_b_pen(PortId::Text2, 0);
 
     for slot in first..SLOTS {
         // Masks off the low bits (a cheap remainder or a flag test).
@@ -138,8 +138,9 @@ fn blank_slots_from(game: &mut Game, first: usize) {
         };
 
         let y = (slot / 2) as i32 * ROW_HEIGHT + FIRST_ROW_Y;
-        screen().move_to(PortId::Text2, x, y);
-        screen().text(PortId::Text2, &BOX[..ENTRY_WIDTH as usize]);
+        game.screen.move_to(PortId::Text2, x, y);
+        game.screen
+            .text(PortId::Text2, &BOX[..ENTRY_WIDTH as usize]);
 
         game.ui.slot_entries[slot] = -1;
     }
@@ -183,8 +184,9 @@ const MAIN_PEN: u32 = 4;
 pub fn print_menu_entry(game: &mut Game, j: i16, pena: i16) {
     unsafe {
         let entry = game.ui.slot_entries[j as usize] as i32;
-        screen().set_a_pen(PortId::Text2, pena as u8);
-        screen().set_b_pen(PortId::Text2, entry_box_pen(game, entry) as u8);
+        game.screen.set_a_pen(PortId::Text2, pena as u8);
+        let box_pen = entry_box_pen(game, entry) as u8;
+        game.screen.set_b_pen(PortId::Text2, box_pen);
 
         let offset = entry * LABEL_LEN;
 
@@ -197,11 +199,10 @@ pub fn print_menu_entry(game: &mut Game, j: i16, pena: i16) {
 
         let y = (j as i32 / 2) * ROW_HEIGHT + FIRST_ROW_Y;
         let label = entry_label(game, offset);
-        let screen = screen();
-        screen.move_to(PortId::Text2, x, y);
-        screen.text(PortId::Text2, BOX);
-        screen.move_to(PortId::Text2, x + TEXT_INSET, y);
-        screen.text(PortId::Text2, label);
+        game.screen.move_to(PortId::Text2, x, y);
+        game.screen.text(PortId::Text2, BOX);
+        game.screen.move_to(PortId::Text2, x + TEXT_INSET, y);
+        game.screen.text(PortId::Text2, label);
     }
 }
 

@@ -5,7 +5,6 @@
 //! which tiles to swap in and which key is needed.
 
 use crate::game::data::state::Game;
-use crate::game::data::state::{memory, the_screen};
 use crate::game::data::tables::loaded_blocks;
 use crate::game::ui::messages::print;
 use crate::game::world::map::{terrain_at, tile_index};
@@ -92,13 +91,13 @@ const OPEN_LIST: [DoorOpen; 17] = [
 ];
 
 /// The tile number at tile position (x, y) of the map.
-fn tile(x: i32, y: i32) -> u8 {
-    memory().sector_byte(tile_index(x, y))
+fn tile(game: &mut Game, x: i32, y: i32) -> u8 {
+    game.memory.sector_byte(tile_index(game, x, y))
 }
 
 /// Changes the tile number at tile position (x, y) of the map.
-fn set_tile(x: i32, y: i32, value: u8) {
-    memory().set_sector_byte(tile_index(x, y), value);
+fn set_tile(game: &mut Game, x: i32, y: i32, value: u8) {
+    game.memory.set_sector_byte(tile_index(game, x, y), value);
 }
 
 /// Tries to open a door near the pixel (x, y) with a key of type `keytype` (0 when walking into it
@@ -107,27 +106,27 @@ fn set_tile(x: i32, y: i32, value: u8) {
 /// first time).
 pub fn open_door_near(game: &mut Game, x: u16, y: u16, keytype: u32) -> i32 {
     unsafe {
-        let Some((x, y)) = find_door_corner(x, y) else {
+        let Some((x, y)) = find_door_corner(game, x, y) else {
             return 0;
         };
 
         // we know where the door starts; now which type is it?
-        let sector_id = tile(x, y);
+        let sector_id = tile(game, x, y);
 
         // Shifts by MAP_SET_SHIFT, converting between pixels, tiles, sectors or bytes.
         let map_id = loaded_blocks.image[(sector_id >> MAP_SET_SHIFT) as usize];
 
         if let Some(open) = find_open(sector_id, map_id, keytype) {
-            swap_in_open_door_tiles(open, x, y);
-            the_screen.view_status = REDRAW_MAP;
+            swap_in_open_door_tiles(game, open, x, y);
+            game.screen.view_status = REDRAW_MAP;
             game.ui.held_direction = 0;
-            print("It opened.");
+            print(game, "It opened.");
 
             return 1;
         }
 
         if bumped_locked_door == 0 && keytype == 0 {
-            print("It's locked.");
+            print(game, "It's locked.");
         }
 
         bumped_locked_door = 1;
@@ -138,19 +137,19 @@ pub fn open_door_near(game: &mut Game, x: u16, y: u16, keytype: u32) -> i32 {
 
 /// Looks for a door tile at the point, 4 pixels right of it, or 4 pixels left of it, then moves to
 /// the door's top-left tile. Returns that tile's column and row, or `None` if there is no door.
-fn find_door_corner(x: u16, y: u16) -> Option<(i32, i32)> {
+fn find_door_corner(game: &mut Game, x: u16, y: u16) -> Option<(i32, i32)> {
     let mut x = x;
     let mut y = y;
-    let mut found = terrain_at(x as i32, y as i32) == DOOR_TERRAIN;
+    let mut found = terrain_at(game, x as i32, y as i32) == DOOR_TERRAIN;
 
     if !found {
         x = x.wrapping_add(DOOR_SEARCH_SIDE);
-        found = terrain_at(x as i32, y as i32) == DOOR_TERRAIN;
+        found = terrain_at(game, x as i32, y as i32) == DOOR_TERRAIN;
     }
 
     if !found {
         x = x.wrapping_sub(2 * DOOR_SEARCH_SIDE);
-        found = terrain_at(x as i32, y as i32) == DOOR_TERRAIN;
+        found = terrain_at(game, x as i32, y as i32) == DOOR_TERRAIN;
     }
 
     if !found {
@@ -159,12 +158,12 @@ fn find_door_corner(x: u16, y: u16) -> Option<(i32, i32)> {
 
     // A door can be up to three tiles wide; step to its left edge.
     for _ in 0..DOOR_MAX_LEFT_STEPS {
-        if terrain_at(x as i32 - TILE_WIDTH as i32, y as i32) == DOOR_TERRAIN {
+        if terrain_at(game, x as i32 - TILE_WIDTH as i32, y as i32) == DOOR_TERRAIN {
             x = x.wrapping_sub(TILE_WIDTH);
         }
     }
 
-    if terrain_at(x as i32, y as i32 + TILE_HEIGHT as i32) == DOOR_TERRAIN {
+    if terrain_at(game, x as i32, y as i32 + TILE_HEIGHT as i32) == DOOR_TERRAIN {
         y = y.wrapping_add(TILE_HEIGHT);
     }
 
@@ -178,11 +177,11 @@ fn find_door_corner(x: u16, y: u16) -> Option<(i32, i32)> {
 
 /// Replaces the closed door tile at (`x`, `y`) with its open version, and the neighbouring tiles
 /// the door covers (which ones depends on the door's layout).
-fn swap_in_open_door_tiles(open: &DoorOpen, x: i32, y: i32) {
+fn swap_in_open_door_tiles(game: &mut Game, open: &DoorOpen, x: i32, y: i32) {
     let (changes, count) = open_changes(open, x, y);
 
     for &(tx, ty, value) in &changes[..count] {
-        set_tile(tx, ty, value);
+        set_tile(game, tx, ty, value);
     }
 }
 

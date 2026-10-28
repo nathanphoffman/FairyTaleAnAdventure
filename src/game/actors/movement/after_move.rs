@@ -93,9 +93,9 @@ impl Ctx {
     }
 
     /// Works out the terrain under the actor, and carries on sliding if it is on ice.
-    pub(super) fn cpx(&mut self) -> Pc {
+    pub(super) fn cpx(&mut self, game: &mut Game) -> Pc {
         let mut actor = self.actor;
-        self.terrain = terrain(actor.abs_x, actor.abs_y);
+        self.terrain = terrain(game, actor.abs_x, actor.abs_y);
 
         if self.environ == ENVIRON_ICE {
             actor.abs_x = (actor.abs_x as i32 + actor.vel_x as i32 / VELOCITY_QUARTER) as u16;
@@ -188,7 +188,7 @@ impl Ctx {
 
     /// Stores the environ, adjusts the sprite for some enemies, keeps the hero inside the world and
     /// scrolls the map to it, and applies lava and drowning damage.
-    pub(super) unsafe fn raise(&mut self) -> Pc {
+    pub(super) unsafe fn raise(&mut self, game: &mut Game) -> Pc {
         unsafe {
             let mut actor = self.actor;
             let i = self.slot;
@@ -217,8 +217,8 @@ impl Ctx {
                 return Pc::Statc;
             }
 
-            self.take_lava_damage();
-            self.take_drowning_damage();
+            self.take_lava_damage(game);
+            self.take_drowning_damage(game);
 
             Pc::Statc
         }
@@ -226,7 +226,7 @@ impl Ctx {
 
     /// While lava is flowing the actor in deep lava dies and one wading in it is hurt, unless the
     /// hero carries the fireproof item.
-    unsafe fn take_lava_damage(&mut self) {
+    unsafe fn take_lava_damage(&mut self, game: &mut Game) {
         unsafe {
             let mut actor = self.actor;
             let i = self.slot;
@@ -240,14 +240,14 @@ impl Ctx {
                     actor.vitality = actor.vitality.wrapping_sub(1);
                 }
 
-                check_death(i, DEATH_LAVA);
+                check_death(game, i, DEATH_LAVA);
             }
         }
     }
 
     /// A drowning actor loses a point of vitality every eighth frame (wraiths and snakes are
     /// immune).
-    fn take_drowning_damage(&mut self) {
+    fn take_drowning_damage(&mut self, game: &mut Game) {
         let mut actor = self.actor;
         let i = self.slot;
         let cycle = self.cycle as i32;
@@ -259,7 +259,7 @@ impl Ctx {
                 && !DROWN_IMMUNE_RACES.contains(&race)
         {
             actor.vitality = actor.vitality.wrapping_sub(1);
-            check_death(i, DEATH_DROWN);
+            check_death(game, i, DEATH_DROWN);
         }
     }
 

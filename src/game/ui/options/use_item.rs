@@ -43,7 +43,7 @@ pub(super) unsafe fn use_option(game: &mut Game, chosen_entry: i16) -> bool {
             if game.ui.menu_hit_enabled != 0 {
                 go_to_menu(game, KEYS as i16);
             } else {
-                print_wrapped("% has no keys!");
+                print_wrapped(game, "% has no keys!");
             }
 
             return false;
@@ -53,7 +53,7 @@ pub(super) unsafe fn use_option(game: &mut Game, chosen_entry: i16) -> bool {
             if game.ui.menu_hit_enabled != 0 {
                 the_actors.list[0].weapon = (chosen_entry + 1) as i8;
             } else {
-                print_wrapped("% doesn't have one.");
+                print_wrapped(game, "% doesn't have one.");
             }
         }
 
@@ -66,7 +66,7 @@ pub(super) unsafe fn use_option(game: &mut Game, chosen_entry: i16) -> bool {
         }
 
         if chosen_entry == SUNSTONE_ENTRY && game.witch.on_screen != 0 {
-            speak(SUNSTONE_SPEECH);
+            speak(game, SUNSTONE_SPEECH);
         }
 
         go_to_menu(game, ITEMS as i16);
@@ -97,10 +97,10 @@ pub(super) unsafe fn keys_option(game: &mut Game, chosen_entry: i16) -> bool {
             }
 
             if direction >= DIRECTIONS {
-                print_wrapped("% tried a ");
-                print_cont(item_name(KEYBASE + key));
-                print_cont(" but it didn't");
-                print("fit.");
+                print_wrapped(game, "% tried a ");
+                print_cont(game, item_name(KEYBASE + key));
+                print_cont(game, " but it didn't");
+                print(game, "fit.");
             }
         }
 

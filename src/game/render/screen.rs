@@ -544,12 +544,6 @@ impl Screen {
     }
 }
 
-/// The screen, which the whole game shares. (The game runs on one thread, and no call holds on to
-/// the screen while it calls another that uses it.)
-pub fn screen() -> &'static mut Screen {
-    unsafe { &mut *(&raw mut crate::game::data::state::the_screen) }
-}
-
 impl Default for Screen {
     fn default() -> Screen {
         Screen::new()

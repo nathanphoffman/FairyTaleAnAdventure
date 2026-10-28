@@ -59,13 +59,13 @@ pub(super) fn actor_at(i: i32) -> ActorRef {
 /// kind 9) cannot be hurt by weak weapons (weapon below 4); the witch can be hurt anyway if the hero
 /// holds the item in inventory slot 7 (the sun stone). Races 0x8a and 0x8b (the spectre and the
 /// ghost brothers) are never hurt. Dragons and people are not pushed back.
-pub fn hit_actor(i: i32, j: i32, fc: i32, wt: i16) {
+pub fn hit_actor(game: &mut Game, i: i32, j: i32, fc: i32, wt: i16) {
     let mut target = actor_at(j);
     let hero_weapon = actor_at(HERO as i32).weapon;
     let has_spirit_item = player().stuff()[SPIRIT_HURT_ITEM] != 0;
 
     if too_weak_to_hurt(target.race, hero_weapon, has_spirit_item) {
-        speak(MESSAGE_NEEDS_WEAPON);
+        speak(game, MESSAGE_NEEDS_WEAPON);
 
         return;
     }
@@ -87,11 +87,14 @@ pub fn hit_actor(i: i32, j: i32, fc: i32, wt: i16) {
     }
 
     // push back the foe
-    if can_be_pushed(target.kind) && step_figure(j as i16, fc as i16, KNOCKBACK) != 0 && i >= 0 {
-        step_figure(i as i16, fc as i16, KNOCKBACK);
+    if can_be_pushed(target.kind)
+        && step_figure(game, j as i16, fc as i16, KNOCKBACK) != 0
+        && i >= 0
+    {
+        step_figure(game, i as i16, fc as i16, KNOCKBACK);
     }
 
-    check_death(j, WORLD_DEAD_CHECK);
+    check_death(game, j, WORLD_DEAD_CHECK);
 }
 
 /// Which sound a hit makes: `i` is the attacker (-1 an arrow, -2 a fireball), `j` the target.
@@ -165,18 +168,18 @@ pub fn report_battle_result(game: &mut Game) {
 
         match battle_report(vitality, dead, fled, the_world.extent_type) {
             BattleReport::Silent => {}
-            BattleReport::Bravely => print("Bravely done!"),
+            BattleReport::Bravely => print(game, "Bravely done!"),
             BattleReport::Foes { dead, fled } => {
                 if dead != 0 {
-                    print("");
-                    print_number(dead, 1);
-                    print_cont("foes were defeated in battle.");
+                    print(game, "");
+                    print_number(game, dead, 1);
+                    print_cont(game, "foes were defeated in battle.");
                 }
 
                 if fled != 0 {
-                    print("");
-                    print_number(fled, 1);
-                    print_cont("foes fled in retreat.");
+                    print(game, "");
+                    print_number(game, fled, 1);
+                    print_cont(game, "foes fled in retreat.");
                 }
             }
         }

@@ -64,9 +64,9 @@ pub unsafe fn items_option(game: &mut Game, chosen_entry: i16) {
     unsafe {
         match chosen_entry {
             USE_ENTRY => go_to_menu(game, USE),
-            LIST => show_item_list(),
+            LIST => show_item_list(game),
             TAKE => take_nearest(game),
-            LOOK => look_around(),
+            LOOK => look_around(game),
             GIVE_ENTRY => go_to_menu(game, GIVE),
             _ => {}
         }

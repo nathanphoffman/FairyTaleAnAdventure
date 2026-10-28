@@ -43,15 +43,15 @@ pub(super) unsafe fn give_option(game: &mut Game, chosen_entry: i16) -> bool {
             queue_print(PRQ_VITALITY);
 
             if race == BEGGAR_RACE {
-                speak(BEGGAR_SPEECH + person.goal as i32);
+                speak(game, BEGGAR_SPEECH + person.goal as i32);
             } else {
-                speak(BEGGAR_THANKS);
+                speak(game, BEGGAR_THANKS);
             }
         } else if chosen_entry == GIVE_BONE && player().stuff()[BONE] != 0 {
             if race != SPECTRE_RACE {
-                speak(SPECTRE_NOT_HERE);
+                speak(game, SPECTRE_NOT_HERE);
             } else {
-                speak(SPECTRE_THANKS);
+                speak(game, SPECTRE_THANKS);
                 player().stuff_mut()[BONE] = 0;
                 leave_item(the_actors.nearest_person, SPECTRE_BONE_DROP);
             }

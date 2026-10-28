@@ -6,6 +6,7 @@ use super::{
     pos_x, pos_y, terrain,
 };
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Game;
 use crate::game::data::state::player;
 
 use crate::game::actors::interaction::center_extent_on;
@@ -24,7 +25,7 @@ fn turtle_carries(nearness: i16, carrier_slot: i16) -> bool {
 /// The turtle's direction of swimming: straight on while there is deep water ahead, otherwise one
 /// step right, then two to the left of that, then one more to the left; the last is used whether
 /// or not it is water. `water_ahead(dir)` says if the turtle could swim that way.
-fn turtle_heading(dir: i16, water_ahead: impl Fn(i16) -> bool) -> i16 {
+fn turtle_heading(dir: i16, mut water_ahead: impl FnMut(i16) -> bool) -> i16 {
     if water_ahead(dir) {
         return dir;
     }
@@ -49,7 +50,7 @@ fn turtle_heading(dir: i16, water_ahead: impl Fn(i16) -> bool) -> i16 {
 
 impl Ctx {
     /// The swan (sprite file 11) or the turtle: carries the hero when the hero is close enough.
-    pub(super) unsafe fn carrier(&mut self) -> Pc {
+    pub(super) unsafe fn carrier(&mut self, game: &mut Game) -> Pc {
         unsafe {
             self.environ = 0;
             self.terrain = 0;
@@ -57,7 +58,7 @@ impl Ctx {
             if the_actors.loaded_actor_file == SWAN_FILE {
                 self.swan_moves();
             } else {
-                self.turtle_moves();
+                self.turtle_moves(game);
             }
 
             center_extent_on(self.step, XTEST as i16, YTEST as i16);
@@ -94,7 +95,7 @@ impl Ctx {
     }
 
     /// The turtle carries the hero when he is near, otherwise it swims on its own.
-    unsafe fn turtle_moves(&mut self) {
+    unsafe fn turtle_moves(&mut self, game: &mut Game) {
         unsafe {
             let mut actor = self.actor;
             let hero = ActorRef::new(0);
@@ -111,10 +112,10 @@ impl Ctx {
                     self.image += self.cycle & 1;
                 }
             } else {
-                self.turtle_swims();
+                self.turtle_swims(game);
             }
 
-            self.terrain = terrain(XTEST, YTEST);
+            self.terrain = terrain(game, XTEST, YTEST);
 
             if self.terrain == TURTLE_WATER {
                 actor.abs_x = XTEST;
@@ -127,12 +128,16 @@ impl Ctx {
 
     /// The turtle on its own: keeps going the same way while there is deep water ahead, otherwise
     /// tries turning right, then left, then back to straight on the left again.
-    unsafe fn turtle_swims(&mut self) {
+    unsafe fn turtle_swims(&mut self, game: &mut Game) {
         unsafe {
             let actor = self.actor;
             let (ax, ay) = (actor.abs_x as i32, actor.abs_y as i32);
             self.facing = turtle_heading(self.facing, |dir| {
-                terrain(pos_x(ax, dir, TURTLE_STEP), pos_y(ay, dir, TURTLE_STEP)) == TURTLE_WATER
+                terrain(
+                    game,
+                    pos_x(ax, dir, TURTLE_STEP),
+                    pos_y(ay, dir, TURTLE_STEP),
+                ) == TURTLE_WATER
             });
 
             XTEST = pos_x(ax, self.facing, TURTLE_STEP);
@@ -145,7 +150,7 @@ impl Ctx {
     }
 
     /// The raft: follows the hero when the hero is very near and the terrain is water.
-    pub(super) unsafe fn raft(&mut self) -> Pc {
+    pub(super) unsafe fn raft(&mut self, game: &mut Game) -> Pc {
         unsafe {
             let mut actor = self.actor;
             the_hero.riding = 0;
@@ -156,7 +161,7 @@ impl Ctx {
 
             XTEST = the_actors.list[0].abs_x;
             YTEST = the_actors.list[0].abs_y;
-            self.terrain = terrain(XTEST, YTEST);
+            self.terrain = terrain(game, XTEST, YTEST);
 
             if !(TERRAIN_WADE..=TERRAIN_DEEP_WATER).contains(&self.terrain) {
                 return Pc::Statc;

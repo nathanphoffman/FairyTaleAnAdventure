@@ -6,24 +6,23 @@ use super::{
     ALL_BITS, Area, D_EQUALS_A_AND_NOT_C, D_EQUALS_A_THEN_B_ELSE_C, D_EQUALS_B, Loc, MASK_START,
     PLANE_COUNT, SHIFT_MASK, TILE_LINES, TILE_MASK_BYTES, USE_A, USE_B, USE_C, USE_D,
 };
+use crate::game::data::state::Game;
+use crate::game::render::screen::Screen;
 
 use crate::game::data::globals::{
     current_sshape, last_word_mask, shadow_mask_offset, sprite_mask_modulo, sprite_mask_offset,
     sprite_x_shift,
 };
 
-use crate::game::data::state::memory;
-use crate::game::render::screen::screen;
-
 /// Runs `job` on the memory a blit can reach.
-fn with_mem<R>(job: impl FnOnce(&mut BlitMem) -> R) -> R {
-    let (bitmap, queue, mask) = screen().blitter_memory();
+fn with_mem<R>(screen: &mut Screen, shapes: &mut [u8], job: impl FnOnce(&mut BlitMem) -> R) -> R {
+    let (bitmap, queue, mask) = screen.blitter_memory();
 
     job(&mut BlitMem {
         bitmap,
         queue,
         mask,
-        shapes: &mut memory().shape,
+        shapes,
     })
 }
 
@@ -41,10 +40,10 @@ fn scenery_mask_at() -> Loc {
 }
 
 /// Zeroes the start of the scenery mask, a rectangle sized like a BLTSIZE value.
-pub fn clear_memory(size: i32) {
+pub fn clear_memory(game: &mut Game, size: i32) {
     let bytes = (blit_height(size as i16) * blit_width(size as i16) * 2) as usize;
 
-    with_mem(|mem| {
+    with_mem(&mut game.screen, &mut game.memory.shape, |mem| {
         for i in 0..bytes {
             mem.set_byte(Loc::new(Area::Mask, i), 0);
         }
@@ -52,10 +51,10 @@ pub fn clear_memory(size: i32) {
 }
 
 /// Copies the background under the sprite (all planes) to `savemem`.
-pub fn save_background(savemem: Loc) {
+pub fn save_background(game: &mut Game, savemem: Loc) {
     let sshape = unsafe { current_sshape };
 
-    with_mem(|mem| {
+    with_mem(&mut game.screen, &mut game.memory.shape, |mem| {
         for p in (0..PLANE_COUNT).rev() {
             let mut t = Blit::new(USE_B | USE_D, D_EQUALS_B, sshape.blitsize);
             t.b = plane_at_sprite(p);
@@ -67,10 +66,10 @@ pub fn save_background(savemem: Loc) {
 }
 
 /// Puts the saved background back (this erases the sprite).
-pub fn restore_background(savemem: Loc) {
+pub fn restore_background(game: &mut Game, savemem: Loc) {
     let sshape = unsafe { current_sshape };
 
-    with_mem(|mem| {
+    with_mem(&mut game.screen, &mut game.memory.shape, |mem| {
         for p in (0..PLANE_COUNT).rev() {
             let mut t = Blit::new(USE_B | USE_D, D_EQUALS_B, sshape.blitsize);
             t.b = savemem.add(sshape.savesize as isize * p as isize);
@@ -83,7 +82,7 @@ pub fn restore_background(savemem: Loc) {
 
 /// Combines the sprite's own mask with the scenery mask built by `add_scenery_mask`. The result goes in
 /// the scenery mask: the sprite is opaque here and nothing is in front of it (D = A and not C).
-pub fn combine_masks() {
+pub fn combine_masks(game: &mut Game) {
     let (sshape, mask_offset, mask_modulo, x_shift) = unsafe {
         (
             current_sshape,
@@ -94,19 +93,21 @@ pub fn combine_masks() {
     };
     let mut t = Blit::new(USE_A | USE_C | USE_D, D_EQUALS_A_AND_NOT_C, sshape.blitsize);
 
-    t.a = Loc::new(Area::Shapes, memory().mask_buffer).add(mask_offset as isize);
+    t.a = Loc::new(Area::Shapes, game.memory.mask_buffer).add(mask_offset as isize);
     t.amod = mask_modulo as i32;
 
     // Masks with SHIFT_MASK, keeping only the bits that matter here.
     t.ashift = (x_shift & SHIFT_MASK) as u32;
     t.c = scenery_mask_at();
     t.d = t.c;
-    with_mem(|mem| blit(&mut t, mem));
+    with_mem(&mut game.screen, &mut game.memory.shape, |mem| {
+        blit(&mut t, mem)
+    });
 }
 
 /// Draws the sprite into the planes through the mask: D = mask ? shape : screen.
 /// The first and last word masks stop the sprite's shifted edges leaking into neighbouring pixels.
-pub fn draw_shape() {
+pub fn draw_shape(game: &mut Game) {
     // Masks with SHIFT_MASK, keeping only the bits that matter here.
     let bit_shift = (unsafe { sprite_x_shift } & SHIFT_MASK) as u32;
 
@@ -120,16 +121,26 @@ pub fn draw_shape() {
         last = ALL_BITS;
     }
 
-    with_mem(|mem| {
+    let shapedata = game.memory.shapedata;
+    let planesize = game.screen.planesize as usize;
+
+    with_mem(&mut game.screen, &mut game.memory.shape, |mem| {
         for p in (0..PLANE_COUNT).rev() {
-            draw_shape_plane(mem, p, bit_shift, (first, last));
+            draw_shape_plane(planesize, shapedata, mem, p, bit_shift, (first, last));
         }
     });
 }
 
 /// Draws one bit plane of the sprite: the mask picks, bit by bit, the sprite's pixel or the screen's.
 /// `(first, last)` are the masks for the first and last word of each row.
-fn draw_shape_plane(mem: &mut BlitMem, p: i32, bit_shift: u32, (first, last): (u32, u32)) {
+fn draw_shape_plane(
+    planesize: usize,
+    shapedata: usize,
+    mem: &mut BlitMem,
+    p: i32,
+    bit_shift: u32,
+    (first, last): (u32, u32),
+) {
     let (sshape, mask_offset, mask_modulo, word_mask) = unsafe {
         (
             current_sshape,
@@ -148,8 +159,8 @@ fn draw_shape_plane(mem: &mut BlitMem, p: i32, bit_shift: u32, (first, last): (u
     t.afwm = first & word_mask as u16 as u32;
     t.alwm = last;
     t.a = scenery_mask_at();
-    t.b = Loc::new(Area::Shapes, memory().shapedata)
-        .add(mask_offset as isize + screen().planesize as isize * p as isize);
+    t.b = Loc::new(Area::Shapes, shapedata)
+        .add(mask_offset as isize + planesize as isize * p as isize);
     t.bmod = mask_modulo as i32;
     t.c = plane_at_sprite(p);
     t.d = t.c;
@@ -160,14 +171,15 @@ fn draw_shape_plane(mem: &mut BlitMem, p: i32, bit_shift: u32, (first, last): (u
 
 /// Copies the 32 line mask of scenery tile `tile` (from the shadow masks) into the scenery mask at
 /// word column `x`, tile row `y`; `mod_words` is the mask width in words.
-pub fn add_scenery_mask(x: i32, y: i32, mod_words: i32, tile: i32) {
+pub fn add_scenery_mask(game: &mut Game, x: i32, y: i32, mod_words: i32, tile: i32) {
     let row_bytes = mod_words as isize * 2;
     let mut dst = Loc::new(Area::Mask, MASK_START)
         .add(y as isize * row_bytes * TILE_LINES as isize + x as isize * 2);
-    let shadow = &memory().shadow;
+    let memory = &mut game.memory;
+    let shadow = &memory.shadow;
     let mut src = tile as usize * TILE_MASK_BYTES;
 
-    with_mem(|mem| {
+    with_mem(&mut game.screen, &mut memory.shape, |mem| {
         for _ in 0..TILE_LINES {
             mem.set_byte(dst, shadow[src]);
             mem.set_byte(dst.add(1), shadow[src + 1]);
@@ -180,9 +192,16 @@ pub fn add_scenery_mask(x: i32, y: i32, mod_words: i32, tile: i32) {
 /// For every sprite frame builds a one plane mask: all 5 planes ANDed then inverted, so colour
 /// 31 (all bits set) is transparent. The frames start at `src` in the sprite memory and the masks
 /// are stored from `dest` on.
-pub fn make_sprite_masks(src: usize, dest: usize, words: i32, scans: i32, chars: i32) {
+pub fn make_sprite_masks(
+    game: &mut Game,
+    src: usize,
+    dest: usize,
+    words: i32,
+    scans: i32,
+    chars: i32,
+) {
     let plane_bytes = (words * scans) as u16 as usize * 2;
-    let shapes = &mut memory().shape;
+    let shapes = &mut game.memory.shape;
     let (mut src, mut dest) = (src, dest);
 
     for _ in 0..chars {

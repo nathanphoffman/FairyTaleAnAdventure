@@ -2,25 +2,25 @@
 //! page (from the main loop in csrc/fmain.c).
 
 use crate::game::data::globals::current_sshape;
+use crate::game::data::state::Game;
 use crate::game::render::blit::restore_background;
-use crate::game::render::screen::{PortId, screen};
+use crate::game::render::screen::PortId;
 use crate::game::render::witch::witch_fx;
 
 /// Puts back the background under last frame's sprites, then undoes the witch effect on that page.
-pub fn undo_sprites() {
+pub fn undo_sprites(game: &mut Game) {
     unsafe {
-        let screen = screen();
-        screen.draw_target = screen.drawing_bitmap_id();
+        game.screen.draw_target = game.screen.drawing_bitmap_id();
 
-        for i in (1..=screen.drawing_page().obcount as usize).rev() {
-            current_sshape = screen.drawing_page().shape_queue[i - 1];
-            restore_background(current_sshape.backsave);
+        for i in (1..=game.screen.drawing_page().obcount as usize).rev() {
+            current_sshape = game.screen.drawing_page().shape_queue[i - 1];
+            restore_background(game, current_sshape.backsave);
         }
 
-        screen.port_mut(PortId::Map).target = Some(screen.drawing_bitmap_id());
+        game.screen.port_mut(PortId::Map).target = Some(game.screen.drawing_bitmap_id());
 
-        if screen.drawing_page().wflag != 0 {
-            witch_fx(screen.drawing);
+        if game.screen.drawing_page().wflag != 0 {
+            witch_fx(game, game.screen.drawing);
         }
     }
 }

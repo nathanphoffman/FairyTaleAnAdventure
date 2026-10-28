@@ -3,6 +3,7 @@
 use super::OBJECTS;
 use crate::game::actors::interaction::actor_distance;
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Game;
 use crate::game::data::state::the_actors;
 use crate::game::ui::text::show_event;
 use crate::game::world::objects::change_object;
@@ -13,7 +14,7 @@ const EVENT_NOTHING_HIDDEN: i32 = 20;
 const EVENT_FOUND_HIDDEN: i32 = 38;
 
 /// Reveals hidden objects within reach.
-pub(super) unsafe fn look_around() {
+pub(super) unsafe fn look_around(game: &mut Game) {
     unsafe {
         let mut found = false;
 
@@ -26,10 +27,13 @@ pub(super) unsafe fn look_around() {
             }
         }
 
-        show_event(if found {
-            EVENT_FOUND_HIDDEN
-        } else {
-            EVENT_NOTHING_HIDDEN
-        });
+        show_event(
+            game,
+            if found {
+                EVENT_FOUND_HIDDEN
+            } else {
+                EVENT_NOTHING_HIDDEN
+            },
+        );
     }
 }

@@ -6,9 +6,9 @@
 //! line that is already there. `print_wrapped` is the general routine: it takes a message string from the
 //! story tables, breaks it into lines that fit the panel and prints each one.
 
+use crate::game::data::state::Game;
 use crate::game::data::state::the_hero;
 use crate::game::data::tables::brother_names;
-use crate::game::render::screen::screen;
 use crate::game::ui::text::{draw_text, move_to};
 use crate::gfx::bitmap::Rect;
 
@@ -45,12 +45,11 @@ fn brother_name() -> &'static str {
 
 /// Starts a new line in the panel and prints `s` on it.
 /// The old lines scroll up by one text line (10 pixels) inside the message area.
-pub fn print(s: &str) {
-    print_bytes(s.as_bytes());
+pub fn print(game: &mut Game, s: &str) {
+    print_bytes(game, s.as_bytes());
 }
 
-fn print_bytes(s: &[u8]) {
-    let screen = screen();
+fn print_bytes(game: &mut Game, s: &[u8]) {
     let area = Rect {
         x: TEXT_X_MIN,
         y: TEXT_Y_MIN,
@@ -58,15 +57,16 @@ fn print_bytes(s: &[u8]) {
         height: TEXT_Y_MAX - TEXT_Y_MIN + 1,
     };
 
-    screen.scroll(screen.current_port, area, (0, LINE_HEIGHT));
+    game.screen
+        .scroll(game.screen.current_port, area, (0, LINE_HEIGHT));
 
-    move_to(TEXT_X_MIN, NEW_LINE_Y);
-    draw_text(s);
+    move_to(game, TEXT_X_MIN, NEW_LINE_Y);
+    draw_text(game, s);
 }
 
 /// Continues the current line with `s`.
-pub fn print_cont(s: &str) {
-    draw_text(s.as_bytes());
+pub fn print_cont(game: &mut Game, s: &str) {
+    draw_text(game, s.as_bytes());
 }
 
 /// The line buffer of `print_wrapped`: message characters are collected here, and `end` is where the
@@ -119,7 +119,7 @@ impl LineBuffer {
 /// a line reaches 37 characters it is cut at that space (the space becomes the end of the string)
 /// and printed, and the leftover characters start the next line. The message ends at a zero byte
 /// (or the end of `message`).
-pub fn print_wrapped(message: impl AsRef<[u8]>) {
+pub fn print_wrapped(game: &mut Game, message: impl AsRef<[u8]>) {
     let message = message.as_ref();
     let mut buffer = LineBuffer {
         bytes: [0; LINE_BUFFER],
@@ -135,7 +135,7 @@ pub fn print_wrapped(message: impl AsRef<[u8]>) {
         if let Some(line_break) = line_break {
             // found a wrap point: end the line and print it
             buffer.terminate(line_break);
-            print_bytes(buffer.line(line_start));
+            print_bytes(game, buffer.line(line_start));
 
             if i > END_COLUMN {
                 break;
@@ -151,7 +151,7 @@ pub fn print_wrapped(message: impl AsRef<[u8]>) {
                 break;
             }
 
-            print_bytes(buffer.line(line_start));
+            print_bytes(game, buffer.line(line_start));
             i = 0;
             line_start = buffer.end;
         }
@@ -199,21 +199,21 @@ fn copy_up_to_a_line(
 }
 
 /// Prints "<Brother> found <container> containing ", ready for the contents to be added.
-pub fn announce_container(s: &str) {
-    print(brother_name());
-    print_cont(" found ");
-    print_cont(s);
-    print_cont(" containing ");
+pub fn announce_container(game: &mut Game, s: &str) {
+    print(game, brother_name());
+    print_cont(game, " found ");
+    print_cont(game, s);
+    print_cont(game, " containing ");
 }
 
 /// Prints "<Brother> found <treasure>".
-pub fn announce_treasure(s: &str) {
-    print(brother_name());
-    print_cont(" found ");
-    print_cont(s);
+pub fn announce_treasure(game: &mut Game, s: &str) {
+    print(game, brother_name());
+    print_cont(game, " found ");
+    print_cont(game, s);
 }
 
 /// Adds the current brother's name to the line being printed.
-pub fn name() {
-    print_cont(brother_name());
+pub fn name(game: &mut Game) {
+    print_cont(game, brother_name());
 }

@@ -16,7 +16,7 @@ use crate::game::data::state::Game;
 
 use self::safe_spot::{put_hero_at_safe_spot, restore_hero};
 
-use crate::game::data::state::{ActorRef, the_actors, the_hero, the_screen, the_world};
+use crate::game::data::state::{ActorRef, the_actors, the_hero, the_world};
 use crate::game::render::display::reset_input;
 use crate::game::render::screen_fx::fade_down;
 use crate::game::ui::music::set_mood;
@@ -54,20 +54,20 @@ pub fn revive(game: &mut Game, new: i16) {
         if new != 0 {
             stopscore();
             leave_fallen_brother();
-            take_over_next_brother(hero);
+            take_over_next_brother(game, hero);
             show_brother_placards(game);
-            announce_brother();
+            announce_brother(game);
         } else {
-            fade_down();
+            fade_down(game);
         }
 
-        put_hero_at_safe_spot(hero);
+        put_hero_at_safe_spot(game, hero);
         restore_hero(hero);
 
         if the_hero.brother > LAST_BROTHER {
-            the_screen.view_status = VIEW_GAME_OVER;
+            game.screen.view_status = VIEW_GAME_OVER;
         } else {
-            the_screen.view_status = VIEW_FADE_IN;
+            game.screen.view_status = VIEW_FADE_IN;
             set_mood(1);
         }
 
@@ -171,7 +171,7 @@ mod tests {
 
         let mut body: Shape = unsafe { std::mem::zeroed() };
 
-        unsafe { start_next_brother(&mut hero, &mut body, &next) };
+        start_next_brother(&mut hero, &mut body, &next);
         assert_eq!(
             (hero.brave, hero.luck, hero.kindness, hero.wealth),
             (20, 35, 15, 15)

@@ -16,6 +16,7 @@ mod weapons;
 use self::blit_setup::set_up_blit;
 use self::scenery::mask_against_scenery;
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Game;
 
 pub use self::map_edge::repair_edges;
 
@@ -31,7 +32,6 @@ use crate::game::render::blit::{Loc, SShape};
 
 use crate::game::data::state::{the_actors, the_world};
 use crate::game::render::blit::{combine_masks, draw_shape, save_background};
-use crate::game::render::screen::screen;
 
 // Actor kinds and states (csrc/ftale.h).
 const PHIL: i16 = 0;
@@ -63,9 +63,9 @@ enum Drawn {
 
 /// Draws every actor, and its weapon, into the page being drawn, and saves the background under each
 /// (`backsave`) so it can be undone next frame. `cycle` is the frame counter.
-pub fn draw_sprites(cycle: i16) {
+pub fn draw_sprites(game: &mut Game, cycle: i16) {
     unsafe {
-        let page = screen().drawing_page_mut();
+        let page = game.screen.drawing_page_mut();
         page.obcount = 0;
         page.saveused = 0;
         let mut frame = Frame {
@@ -82,7 +82,7 @@ pub fn draw_sprites(cycle: i16) {
             loop {
                 let passmode = weapon_passmode(actor, &mut pass);
 
-                if let Drawn::OutOfRoom = draw_one(&mut frame, actor, i, cycle, passmode) {
+                if let Drawn::OutOfRoom = draw_one(game, &mut frame, actor, i, cycle, passmode) {
                     return;
                 }
 
@@ -110,6 +110,7 @@ struct Sprite {
 
 /// Draws one actor (or its weapon) for the current pass.
 unsafe fn draw_one(
+    game: &mut Game,
     frame: &mut Frame,
     actor: ActorRef,
     i: i32,
@@ -117,13 +118,13 @@ unsafe fn draw_one(
     passmode: bool,
 ) -> Drawn {
     unsafe {
-        clear_scenery_mask();
+        clear_scenery_mask(game);
 
         let Some(mut sprite) = choose_image(actor, i, passmode) else {
             return Drawn::Done;
         };
 
-        let bytes_wide = place_on_screen(&mut sprite);
+        let bytes_wide = place_on_screen(game, &mut sprite);
 
         if !adjust_for_depth(actor, i, cycle, passmode, &mut sprite) {
             return Drawn::Done;
@@ -135,7 +136,7 @@ unsafe fn draw_one(
 
         let clip = clip_to_screen(&mut sprite);
 
-        blit_sprite(frame, actor, i, &sprite, &clip, bytes_wide)
+        blit_sprite(game, frame, actor, i, &sprite, &clip, bytes_wide)
     }
 }
 
@@ -150,7 +151,7 @@ const WORD_SHIFT: u32 = 4;
 const PIXELS_PER_BYTE: i8 = 8;
 const WORD_PIXELS_MASK: i16 = 15;
 
-unsafe fn place_on_screen(sprite: &mut Sprite) -> i8 {
+unsafe fn place_on_screen(game: &mut Game, sprite: &mut Sprite) -> i8 {
     unsafe {
         // Masks with TILE_X_MASK, keeping only the bits that matter here.
         sprite.xstart += (the_world.map_x as i32 & TILE_X_MASK) as i16;
@@ -161,7 +162,7 @@ unsafe fn place_on_screen(sprite: &mut Sprite) -> i8 {
         // Masks with TILE_Y_MASK, keeping only the bits that matter here.
         sprite.ground += (the_world.map_y as i32 & TILE_Y_MASK) as i16;
 
-        let seq = sprite_sheet(sprite.atype);
+        let seq = sprite_sheet(game, sprite.atype);
 
         // Sprite width in pixels: 16 pixels to each word.
         let xsize = (seq.width << WORD_SHIFT) as i8;
@@ -201,7 +202,9 @@ fn blit_extent(clip: &Clip) -> (i8, i8, i8) {
 }
 
 /// Saves the background under the sprite and draws it through its masks into the page.
+#[allow(clippy::too_many_arguments)] // the sprite and its clip, plus the game state
 unsafe fn blit_sprite(
+    game: &mut Game,
     frame: &mut Frame,
     mut actor: ActorRef,
     i: i32,
@@ -212,13 +215,16 @@ unsafe fn blit_sprite(
     unsafe {
         let (xbw, blitwide, blithigh) = blit_extent(clip);
 
-        if !set_up_blit(frame, sprite, clip, bytes_wide, xbw, blitwide, blithigh) {
+        if !set_up_blit(
+            game, frame, sprite, clip, bytes_wide, xbw, blitwide, blithigh,
+        ) {
             return Drawn::OutOfRoom; // no more blits if no room
         }
-        save_background(current_sshape.backsave);
+        save_background(game, current_sshape.backsave);
 
         if !drawn_in_front(actor, i, sprite.atype, sprite.inum) {
             mask_against_scenery(
+                game,
                 actor,
                 i,
                 sprite.ground,
@@ -229,18 +235,18 @@ unsafe fn blit_sprite(
             );
         }
 
-        combine_masks();
-        draw_shape();
+        combine_masks(game);
+        draw_shape(game);
         actor.visible = 1;
-        queue_shape(current_sshape);
+        queue_shape(game, current_sshape);
 
         Drawn::Done
     }
 }
 
 /// Notes how the sprite just drawn was drawn, so it can be undone next frame.
-fn queue_shape(shape: SShape) {
-    let page = screen().drawing_page_mut();
+fn queue_shape(game: &mut Game, shape: SShape) {
+    let page = game.screen.drawing_page_mut();
     let index = page.obcount as usize;
 
     if index < page.shape_queue.len() {

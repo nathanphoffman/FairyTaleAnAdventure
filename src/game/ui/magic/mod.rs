@@ -75,13 +75,13 @@ unsafe fn refuse_spell(game: &mut Game, chosen_entry: i16) -> Option<bool> {
 
         match gate {
             SpellGate::NoSpell => {
-                show_event(NO_SPELL_EVENT);
+                show_event(game, NO_SPELL_EVENT);
 
                 Some(true)
             }
 
             SpellGate::QuietZone => {
-                speak(NO_MAGIC_SPEECH);
+                speak(game, NO_MAGIC_SPEECH);
 
                 Some(true)
             }
@@ -99,17 +99,17 @@ unsafe fn cast_spell(game: &mut Game, chosen_entry: i16) -> bool {
             SPELL_LIGHT => the_world.light_timer += LIGHT_TIME,
             SPELL_SECRET => the_world.secret_timer += SECRET_TIME,
             SPELL_FREEZE => the_world.freeze_timer += FREEZE_TIME,
-            SPELL_MAP => show_map(),
+            SPELL_MAP => show_map(game),
             SPELL_STONE => {
                 if !stone_jump(game) {
                     return false;
                 }
 
-                heal();
+                heal(game);
             }
 
-            SPELL_HEAL => heal(),
-            SPELL_FEAR => scare_enemies(),
+            SPELL_HEAL => heal(game),
+            SPELL_FEAR => scare_enemies(game),
             _ => {}
         }
 

@@ -205,8 +205,6 @@ impl std::ops::DerefMut for MissileRef {
 }
 
 /// The screen: bitmaps, display pages, pens and view ports, and what is shown.
-pub static mut the_screen: Screen = Screen::new();
-
 /// The big memory areas the game loads its data into.
 pub struct Memory {
     /// The tile pictures: five planes of 256 tiles for each of the four image banks.
@@ -225,12 +223,6 @@ pub struct Memory {
     /// Where the next sprite sheet loads in `shape`.
     pub nextshape: usize,
     pub seq_list: [SeqInfo; SPRITE_SHEETS],
-}
-
-/// The memory areas, which the whole game shares (single threaded; no caller holds on to them across
-/// a call that uses them again).
-pub fn memory() -> &'static mut Memory {
-    unsafe { &mut *(&raw mut the_memory) }
 }
 
 /// Where the region map starts in `Memory::sector`.
@@ -281,8 +273,6 @@ impl Memory {
     }
 }
 
-pub static mut the_memory: Memory = Memory::new();
-
 /// The menus, the keyboard and mouse state, and test and debug switches.
 pub struct Ui {
     pub current_menu: i16,
@@ -311,6 +301,8 @@ pub struct Game {
     pub witch: Witch,
     pub ui: Ui,
     pub encounter: Encounters,
+    pub memory: Memory,
+    pub screen: Screen,
 }
 
 impl Game {
@@ -323,6 +315,8 @@ impl Game {
             },
             ui: unsafe { std::mem::zeroed() },
             encounter: unsafe { std::mem::zeroed() },
+            screen: Screen::new(),
+            memory: Memory::new(),
         }
     }
 }

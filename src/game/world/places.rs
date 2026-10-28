@@ -11,7 +11,7 @@ use crate::game::actors::interaction::{blocked_at, rescue_princess};
 use crate::game::data::object_tables::ob_list8;
 use crate::game::data::state::Game;
 use crate::game::data::state::current_extent;
-use crate::game::data::state::{the_actors, the_hero, the_screen, the_world};
+use crate::game::data::state::{the_actors, the_hero, the_world};
 
 use crate::game::data::story_text::{INSIDE_MSG, INSIDE_TBL, PLACE_MSG, PLACE_TBL};
 use crate::game::files::disk::motor_off;
@@ -110,12 +110,12 @@ pub fn transfer_hero(game: &mut Game, xtest: u16, ytest: u16, flag: u16) -> i32 
         }
 
         game.ui.held_direction = 0;
-        load_region_now();
-        refresh_minimap(); // to set region_origin_x and region_origin_y
-        the_screen.view_status = VIEW_REBUILD_ALL;
+        load_region_now(game);
+        refresh_minimap(game); // to set region_origin_x and region_origin_y
+        game.screen.view_status = VIEW_REBUILD_ALL;
         set_mood(1);
 
-        while blocked_at(the_hero.x as i16, the_hero.y as i16, 0) != 0 {
+        while blocked_at(game, the_hero.x as i16, the_hero.y as i16, 0) != 0 {
             the_hero.y = the_hero.y.wrapping_add(1);
         }
 
@@ -131,7 +131,7 @@ unsafe fn start_forced_encounter(game: &mut Game) {
         game.encounter.mix_flag = 0;
         game.encounter.weapon_type = 0;
         load_enemy_sprites(game);
-        finish_sprite_load(ENEMY_SLOT);
+        finish_sprite_load(game, ENEMY_SLOT);
         motor_off();
         the_actors.loading = 0;
         game.encounter.number = current_extent().v1;
@@ -156,7 +156,7 @@ pub fn find_place(game: &mut Game, flag: i16) -> i32 {
         let mut flag = flag;
 
         loop {
-            announce_place(flag);
+            announce_place(game, flag);
             locate_extent();
 
             if !enter_extent(game, flag) {
@@ -166,7 +166,7 @@ pub fn find_place(game: &mut Game, flag: i16) -> i32 {
                 continue;
             }
 
-            update_carrier();
+            update_carrier(game);
 
             return 0;
         }
@@ -238,7 +238,7 @@ unsafe fn hero_on_loaded_edge() -> bool {
 }
 
 /// Remembers the place the hero is in, and says its name when it changes (if `flag` is set).
-unsafe fn announce_place(flag: i16) {
+unsafe fn announce_place(game: &mut Game, flag: i16) {
     unsafe {
         let message = place_message_number();
 
@@ -252,7 +252,7 @@ unsafe fn announce_place(flag: i16) {
                     PLACE_MSG
                 };
 
-                show_message(messages, message as i32);
+                show_message(game, messages, message as i32);
             }
         }
     }
@@ -324,7 +324,7 @@ unsafe fn load_spiders(game: &mut Game) {
     unsafe {
         game.encounter.kind = SPIDER_ENCOUNTER;
         load_enemy_sprites(game);
-        finish_sprite_load(ENEMY_SLOT);
+        finish_sprite_load(game, ENEMY_SLOT);
         motor_off();
         the_actors.loading = 0;
     }
@@ -342,7 +342,7 @@ unsafe fn boss_is_missing() -> bool {
 
 /// Drops the carrier when the hero is outside the carrier extents, and loads the swan, turtle or
 /// dragon inside them.
-unsafe fn update_carrier() {
+unsafe fn update_carrier(game: &mut Game) {
     unsafe {
         if the_world.extent_type < XT_CARRIER_MIN {
             the_actors.active_carrier = 0;
@@ -351,7 +351,7 @@ unsafe fn update_carrier() {
                 || (the_hero.riding == 0
                     && the_actors.loaded_actor_file != current_extent().v3 as i16))
         {
-            load_carrier(current_extent().v3 as i16);
+            load_carrier(game, current_extent().v3 as i16);
         }
     }
 }

@@ -18,7 +18,7 @@ use crate::game::data::object_tables::{
 use crate::game::data::state::Game;
 
 use crate::game::data::random::bitrand;
-use crate::game::data::state::{memory, the_actors, the_memory, the_world};
+use crate::game::data::state::{the_actors, the_world};
 use crate::game::data::tables::setfig_table;
 use crate::game::data::types::{Shape, WorldObject};
 use crate::game::files::disk::motor_off;
@@ -169,7 +169,7 @@ pub fn change_object(id: i32, flag: i32) {
 /// Scatters random treasure over a region the first time it is visited: 10 items at random
 /// spots, retrying until the spot is not blocked (terrain type 0 means clear), with the item picked
 /// from `rand_treasure`. `dstobs` remembers that it has been done.
-unsafe fn distribute_treasure() {
+unsafe fn distribute_treasure(game: &mut Game) {
     unsafe {
         let region = the_world.region as usize;
         let objects = region_objects(region);
@@ -186,7 +186,7 @@ unsafe fn distribute_treasure() {
                 y = (bitrand(REGION_HEIGHT - 1) + ((the_world.region & 6) as i32 * REGION_ROW_STEP))
                     as i16;
 
-                if terrain_at(x as i32, y as i32) == 0 {
+                if terrain_at(game, x as i32, y as i32) == 0 {
                     break;
                 }
             }
@@ -206,7 +206,7 @@ unsafe fn distribute_treasure() {
 
 /// Makes sure the sprite file for the kind of person `id` is loaded. Several kinds share one
 /// file, so it is only reloaded when the needed file differs from the loaded one.
-unsafe fn load_set_figure(id: i8) {
+unsafe fn load_set_figure(game: &mut Game, id: i8) {
     unsafe {
         let entry = (*(&raw const setfig_table)
             .cast::<SetFigEntry>()
@@ -217,9 +217,9 @@ unsafe fn load_set_figure(id: i8) {
             != sprite_files[the_actors.loaded_setfig_file as usize].file_id
         {
             the_actors.loaded_setfig_file = entry as i16;
-            the_memory.nextshape = memory().seq_list[SETFIG as usize].location;
-            load_sprite_file(entry as i32);
-            finish_sprite_load(SETFIG as i16);
+            game.memory.nextshape = game.memory.seq_list[SETFIG as usize].location;
+            load_sprite_file(game, entry as i32);
+            finish_sprite_load(game, SETFIG as i16);
             motor_off();
         }
     }
@@ -238,7 +238,7 @@ pub fn add_objects_near(game: &mut Game, list: &mut [WorldObject], mut length: i
         game.witch.on_screen = 0;
 
         if dstobs[the_world.region as usize] == 0 && the_world.new_region >= NO_REGION {
-            distribute_treasure();
+            distribute_treasure(game);
         }
 
         let mut index: i16 = 0;
@@ -308,7 +308,7 @@ unsafe fn load_person_if_near(
             return false;
         }
 
-        load_set_figure(object.ob_id);
+        load_set_figure(game, object.ob_id);
 
         if object.ob_id == WITCH && object.ob_stat == STAT_PERSON {
             game.witch.on_screen = 1;

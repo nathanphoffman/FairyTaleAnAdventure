@@ -11,7 +11,7 @@ use super::{
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
 use crate::game::data::state::player;
-use crate::game::render::screen::{FontKind, screen};
+use crate::game::render::screen::FontKind;
 
 use crate::game::actors::interaction::{eat_food, find_nearest_figure};
 use crate::game::data::object_tables::{itrans, ob_listg};
@@ -70,15 +70,15 @@ pub(super) unsafe fn take_nearest(game: &mut Game) {
         let actor = ActorRef::new(the_actors.nearest_object as usize);
 
         if actor.kind == OBJECTS {
-            if take_object() {
+            if take_object(game) {
                 finish_pickup(game);
             }
         } else if actor.weapon < 0 {
             // already searched
         } else if actor.vitality == 0 || the_world.freeze_timer != 0 {
-            search_body();
+            search_body(game);
         } else {
-            show_event(EVENT_ALIVE);
+            show_event(game, EVENT_ALIVE);
         }
     }
 }
@@ -95,17 +95,17 @@ unsafe fn finish_pickup(game: &mut Game) {
 
         if player().stuff()[TALISMAN] != 0 {
             game.ui.quit_requested = 1;
-            screen().view_status = VIEW_GAME_OVER;
-            map_message();
-            let current = screen().current_port;
-            screen().set_font_kind(current, FontKind::Story);
-            win_colors();
+            game.screen.view_status = VIEW_GAME_OVER;
+            map_message(game);
+            let current = game.screen.current_port;
+            game.screen.set_font_kind(current, FontKind::Story);
+            win_colors(game);
         }
     }
 }
 
 /// Handles taking the object `nearest_object`. Returns true if it was taken (so it must be removed).
-unsafe fn take_object() -> bool {
+unsafe fn take_object(game: &mut Game) -> bool {
     unsafe {
         let actor = ActorRef::new(the_actors.nearest_object as usize);
         let id = actor.index as u8 as u32;
@@ -115,48 +115,51 @@ unsafe fn take_object() -> bool {
 
         match classify_take(id, the_hero.hunger, the_world.region) {
             Take::Gold => {
-                announce_treasure("50 gold pieces");
+                announce_treasure(game, "50 gold pieces");
                 the_hero.wealth += GOLD_FOUND;
 
                 true
             }
 
-            Take::Paper { indoors } => read_paper(indoors),
-            Take::Fruit { keep } => take_fruit(keep),
+            Take::Paper { indoors } => read_paper(game, indoors),
+            Take::Fruit { keep } => take_fruit(game, keep),
             Take::Eggs => false, // not taken
-            Take::Bones => take_brothers_goods(owner),
+            Take::Bones => take_brothers_goods(game, owner),
 
             Take::Container(name) => {
-                announce_container(name);
+                announce_container(game, name);
 
-                container_contents()
+                container_contents(game)
             }
 
             Take::Left => false,
-            Take::Plain => take_plain_item(id),
+            Take::Plain => take_plain_item(game, id),
         }
     }
 }
 
 /// Reads the scrap of paper; what it says depends on being indoors.
-fn read_paper(indoors: bool) -> bool {
-    show_event(EVENT_PAPER);
-    show_event(if indoors {
-        EVENT_PAPER_INDOORS
-    } else {
-        EVENT_PAPER_OUTDOORS
-    });
+fn read_paper(game: &mut Game, indoors: bool) -> bool {
+    show_event(game, EVENT_PAPER);
+    show_event(
+        game,
+        if indoors {
+            EVENT_PAPER_INDOORS
+        } else {
+            EVENT_PAPER_OUTDOORS
+        },
+    );
 
     true
 }
 
 /// Fruit is kept in the pack when the hero is not hungry, and eaten otherwise.
-fn take_fruit(keep: bool) -> bool {
+fn take_fruit(game: &mut Game, keep: bool) -> bool {
     if keep {
         add_stuff(FRUIT_SLOT, 1);
-        show_event(EVENT_FRUIT_KEPT);
+        show_event(game, EVENT_FRUIT_KEPT);
     } else {
-        eat_food(FRUIT_HUNGER);
+        eat_food(game, FRUIT_HUNGER);
     }
 
     true
@@ -164,9 +167,9 @@ fn take_fruit(keep: bool) -> bool {
 
 /// Picks up a fallen brother's bones and everything he carried (`owner` 1 is Julian, otherwise
 /// Phillip).
-unsafe fn take_brothers_goods(owner: u32) -> bool {
+unsafe fn take_brothers_goods(game: &mut Game, owner: u32) -> bool {
     unsafe {
-        announce_treasure("his brother's bones.");
+        announce_treasure(game, "his brother's bones.");
         ob_listg[BONES.0].ob_stat = 0;
         ob_listg[BONES.1].ob_stat = 0;
 
@@ -244,13 +247,13 @@ fn item_slot(id: u32, table: &[u8]) -> Option<usize> {
 }
 
 /// A single item lying about: the slot is found in the `itrans` table. Unknown objects are left.
-fn take_plain_item(id: u32) -> bool {
+fn take_plain_item(game: &mut Game, id: u32) -> bool {
     match item_slot(id, &itrans) {
         Some(slot) => {
             add_stuff(slot, 1);
-            announce_treasure("a ");
-            print_cont(item_name(slot));
-            print_cont(".");
+            announce_treasure(game, "a ");
+            print_cont(game, item_name(slot));
+            print_cont(game, ".");
 
             true
         }

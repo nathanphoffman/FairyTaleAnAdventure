@@ -3,6 +3,7 @@
 use super::{CARRIER, DEAD, MISSILES, RAFT, distance_to_point};
 use crate::game::actors::interaction::hit_actor;
 use crate::game::data::random::{bitrand, rand8};
+use crate::game::data::state::Game;
 use crate::game::data::state::{ActorRef, MissileRef};
 use crate::game::data::state::{the_actors, the_hero, the_world};
 use crate::game::data::types::Missile;
@@ -46,7 +47,7 @@ pub(super) const BY_FIREBALL: i32 = -2;
 
 /// Moves the six arrows and fireballs; they hit actors in the way and stop at walls. Nothing
 /// moves while time is frozen.
-pub fn advance_missiles() {
+pub fn advance_missiles(game: &mut Game) {
     unsafe {
         if the_world.freeze_timer != 0 {
             return;
@@ -54,13 +55,13 @@ pub fn advance_missiles() {
 
         for i in 0..MISSILES {
             let ms = MissileRef::new(i);
-            fly(i, ms);
+            fly(game, i, ms);
         }
     }
 }
 
 /// One missile's flight for this frame.
-pub(super) unsafe fn fly(i: usize, mut ms: MissileRef) {
+pub(super) unsafe fn fly(game: &mut Game, i: usize, mut ms: MissileRef) {
     unsafe {
         let mut s = ms.speed as i16 * 2;
 
@@ -73,13 +74,13 @@ pub(super) unsafe fn fly(i: usize, mut ms: MissileRef) {
         let xs = ms.abs_x as i16;
         let ys = ms.abs_y as i16;
 
-        if WALL_TERRAIN.contains(&terrain_at(xs as i32, ys as i32)) {
+        if WALL_TERRAIN.contains(&terrain_at(game, xs as i32, ys as i32)) {
             ms.missile_type = MISSILE_NONE;
             s = 0;
         }
 
         let fc = ms.direction as i32;
-        hit_first_actor_in_path(i, ms, xs, ys);
+        hit_first_actor_in_path(game, i, ms, xs, ys);
         ms.abs_x = step_x(ms.abs_x as i32, fc, s as i32) as u16;
         ms.abs_y = step_y(ms.abs_y as i32, fc, s as i32) as u16;
     }
@@ -102,7 +103,13 @@ pub(super) fn missile_expired(ms: &mut Missile, s: i16) -> bool {
 /// Hits the first actor close enough to the missile at (`xs`, `ys`) and stops the missile.
 /// `i` is the missile's own index; the hero (actor 0) gets a dodge chance from `brave`, others a
 /// fixed one.
-pub(super) unsafe fn hit_first_actor_in_path(i: usize, mut ms: MissileRef, xs: i16, ys: i16) {
+pub(super) unsafe fn hit_first_actor_in_path(
+    game: &mut Game,
+    i: usize,
+    mut ms: MissileRef,
+    xs: i16,
+    ys: i16,
+) {
     unsafe {
         let fc = ms.direction as i32;
         let is_rock = ms.missile_type == MISSILE_ROCK;
@@ -129,6 +136,7 @@ pub(super) unsafe fn hit_first_actor_in_path(i: usize, mut ms: MissileRef, xs: i
             if missile_connects(i, dist, range, dodge, || bitrand(DODGE_RANGE)) {
                 let by = if is_rock { BY_FIREBALL } else { BY_ARROW };
                 hit_actor(
+                    game,
                     by,
                     target as i32,
                     fc,

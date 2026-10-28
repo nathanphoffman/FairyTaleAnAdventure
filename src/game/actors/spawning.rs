@@ -57,7 +57,7 @@ pub fn spawn_encounters(game: &mut Game) {
         find_place(game, 2);
 
         if the_actors.loading == 1 && read_finished(DISK_REQUEST_ACTORS) != 0 {
-            finish_sprite_load(ENEMY_SLOT);
+            finish_sprite_load(game, ENEMY_SLOT);
             motor_off();
             the_actors.loading = 0;
             the_actors.active = FIRST_ENEMY_ACTOR;
@@ -142,7 +142,7 @@ unsafe fn place_waiting_encounters(game: &mut Game) {
         for _ in 1..PLACE_TRIES {
             pick_encounter_spot(game);
 
-            if terrain_at(game.encounter.x as i32, game.encounter.y as i32) != PLAIN_TERRAIN {
+            if terrain_at(game, game.encounter.x as i32, game.encounter.y as i32) != PLAIN_TERRAIN {
                 continue;
             }
 
