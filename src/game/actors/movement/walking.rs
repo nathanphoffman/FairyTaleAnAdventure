@@ -7,6 +7,7 @@ use super::{
     RACE_WRAITH, RIDING_SWAN, RIDING_TURTLE, STUFF_GOLD_KEY_SLOT, XTEST, YTEST, diroff, pos_x,
     pos_y, terrain,
 };
+use crate::game::data::state::player;
 
 use crate::game::actors::interaction::blocked_at;
 use crate::game::actors::steering::{STEER_OFFSET, steer_actor};
@@ -138,7 +139,7 @@ impl Ctx {
                 bumped_locked_door = 0;
             }
 
-            *the_hero.stuff.add(STUFF_GOLD_KEY_SLOT) != 0 && self.terrain == BLOCK_PASSABLE_WITH_KEY
+            player().stuff()[STUFF_GOLD_KEY_SLOT] != 0 && self.terrain == BLOCK_PASSABLE_WITH_KEY
         }
     }
 

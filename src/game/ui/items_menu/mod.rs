@@ -14,8 +14,8 @@ mod take;
 use self::item_list::show_item_list;
 use self::look::look_around;
 use self::take::take_nearest;
+use crate::game::data::state::player;
 
-use crate::game::data::state::the_hero;
 use crate::game::data::tables::item_list;
 use crate::game::data::types::InvItem;
 use crate::game::ui::menus::go_to_menu;
@@ -54,8 +54,8 @@ fn item(i: usize) -> &'static InvItem {
 }
 
 /// Adds `amount` to the hero's count of inventory slot `slot`.
-pub(in crate::game::ui) unsafe fn add_stuff(slot: usize, amount: u8) {
-    unsafe { *the_hero.stuff.add(slot) = (*the_hero.stuff.add(slot)).wrapping_add(amount) };
+pub(in crate::game::ui) fn add_stuff(slot: usize, amount: u8) {
+    player().stuff_mut()[slot] = (player().stuff()[slot]).wrapping_add(amount);
 }
 
 /// Handles an entry of the Items menu.

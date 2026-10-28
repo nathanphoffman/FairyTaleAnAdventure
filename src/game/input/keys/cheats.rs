@@ -6,6 +6,7 @@ use super::{
     CHEAT_TIME_STEP, CHEAT_WEST, GOLDBASE, RAFT_STONE_SLOT, VIAL_SLOT,
 };
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::player;
 
 use crate::game::actors::encounters::load_carrier;
 use crate::game::actors::interaction::{center_extent_on, rescue_princess};
@@ -23,7 +24,7 @@ pub(super) unsafe fn cheat_items(key: i8) -> bool {
 
         if key == CHEAT_CARRIER {
             if the_actors.active_carrier == CARRIER_BIRD {
-                *the_hero.stuff.add(RAFT_STONE_SLOT) = 1;
+                player().stuff_mut()[RAFT_STONE_SLOT] = 1;
             }
 
             center_extent_on(
@@ -37,10 +38,10 @@ pub(super) unsafe fn cheat_items(key: i8) -> bool {
             true
         } else if key == CHEAT_STUFF {
             let slot = rnd(GOLDBASE) as usize;
-            *the_hero.stuff.add(slot) = (*the_hero.stuff.add(slot)).wrapping_add(CHEAT_STUFF_COUNT);
+            player().stuff_mut()[slot] = (player().stuff()[slot]).wrapping_add(CHEAT_STUFF_COUNT);
             update_menu_availability();
 
-            *the_hero.stuff.add(VIAL_SLOT) = 0;
+            player().stuff_mut()[VIAL_SLOT] = 0;
             true
         } else {
             false

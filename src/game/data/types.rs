@@ -163,7 +163,6 @@ pub struct Bro {
     pub luck: i8,
     pub kind: i8,
     pub wealth: i8,
-    pub stuff: *mut u8,
 }
 
 /// One kind of item the hero can carry (`struct inv_item`): where its picture is, how it is

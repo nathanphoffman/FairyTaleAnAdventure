@@ -10,7 +10,7 @@
 //! skipping `n` zero bytes.
 
 use crate::game::data::object_tables::{pplay, prec, print_que};
-use crate::game::data::state::the_hero;
+use crate::game::data::state::player;
 use crate::game::data::story_text::{EVENT_MSG, PLACARD_MSGS, SPEECHES};
 use crate::game::render::screen::{PortId, screen};
 use crate::game::ui::messages::print_wrapped;
@@ -238,7 +238,7 @@ const MENU_STATE_LACKING: i32 = 8;
 
 /// Menu state for an item: 10 if the player has item `n`, otherwise 8 (a menu item state).
 pub fn item_menu_state(n: i32) -> i32 {
-    if unsafe { *the_hero.stuff.offset(n as isize) } != 0 {
+    if player().stuff()[n as usize] != 0 {
         MENU_STATE_HAVE
     } else {
         MENU_STATE_LACKING

@@ -4,6 +4,8 @@
 mod effects;
 
 use self::effects::{heal, scare_enemies, show_map, stone_jump};
+use crate::game::data::state::current_extent;
+use crate::game::data::state::player;
 
 use crate::game::data::state::{the_hero, the_ui, the_world};
 use crate::game::ui::menus::update_menu_availability;
@@ -58,13 +60,13 @@ unsafe fn refuse_spell(chosen_entry: i16) -> Option<bool> {
         let count = if chosen_entry < FIRST_SPELL {
             0
         } else {
-            *the_hero.stuff.add(SPELL_SLOT_BASE + chosen_entry as usize)
+            player().stuff()[SPELL_SLOT_BASE + chosen_entry as usize]
         };
 
         let gate = spell_gate(
             chosen_entry,
             count,
-            (*the_world.extent).v3,
+            current_extent().v3,
             the_hero.riding,
             the_ui.cheat_enabled,
             the_world.region,
@@ -115,15 +117,13 @@ unsafe fn cast_spell(chosen_entry: i16) -> bool {
 }
 
 /// Takes one of the spell's stones from the stack, and updates the menu when the last is gone.
-unsafe fn use_up_one(chosen_entry: i16) {
-    unsafe {
-        let slot = SPELL_SLOT_BASE + chosen_entry as usize;
+fn use_up_one(chosen_entry: i16) {
+    let slot = SPELL_SLOT_BASE + chosen_entry as usize;
 
-        *the_hero.stuff.add(slot) = (*the_hero.stuff.add(slot)).wrapping_sub(1);
+    player().stuff_mut()[slot] = (player().stuff()[slot]).wrapping_sub(1);
 
-        if *the_hero.stuff.add(slot) == 0 {
-            update_menu_availability();
-        }
+    if player().stuff()[slot] == 0 {
+        update_menu_availability();
     }
 }
 

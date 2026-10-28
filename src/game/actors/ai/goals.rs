@@ -6,6 +6,7 @@ use crate::game::actors::interaction::{report_battle_result, run_tactic};
 use crate::game::actors::steering::steer_actor;
 use crate::game::data::random::{bitrand, rand2, rand4};
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::current_extent;
 use crate::game::data::state::{the_actors, the_hero, the_world};
 use crate::game::ui::music::set_mood;
 use crate::game::ui::text::queue_print;
@@ -225,7 +226,7 @@ unsafe fn adjust_mode_for_situation(actor: ActorRef, mode: i16) -> i16 {
             actor.vitality,
             the_world.extent_type,
             actor.race,
-            (*the_world.extent).v3,
+            current_extent().v3,
         )
     }
 }

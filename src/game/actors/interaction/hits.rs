@@ -5,7 +5,8 @@ use super::extents::summon_turtle;
 use super::{DEAD, DRAGON, ENEMY, FLEE, HERO, SETFIG, turtle_eggs};
 use crate::game::actors::encounters::check_death;
 use crate::game::data::random::{bitrand, rand64, rand256};
-use crate::game::data::state::{ActorRef, the_actors, the_hero, the_world};
+use crate::game::data::state::player;
+use crate::game::data::state::{ActorRef, the_actors, the_world};
 use crate::game::files::loading::play_effect;
 use crate::game::ui::messages::{print, print_cont};
 use crate::game::ui::text::{print_number, speak};
@@ -58,41 +59,38 @@ pub(super) fn actor_at(i: i32) -> ActorRef {
 /// holds the item in inventory slot 7 (the sun stone). Races 0x8a and 0x8b (the spectre and the
 /// ghost brothers) are never hurt. Dragons and people are not pushed back.
 pub fn hit_actor(i: i32, j: i32, fc: i32, wt: i16) {
-    unsafe {
-        let mut target = actor_at(j);
-        let hero_weapon = actor_at(HERO as i32).weapon;
-        let has_spirit_item = *the_hero.stuff.add(SPIRIT_HURT_ITEM) != 0;
+    let mut target = actor_at(j);
+    let hero_weapon = actor_at(HERO as i32).weapon;
+    let has_spirit_item = player().stuff()[SPIRIT_HURT_ITEM] != 0;
 
-        if too_weak_to_hurt(target.race, hero_weapon, has_spirit_item) {
-            speak(MESSAGE_NEEDS_WEAPON);
+    if too_weak_to_hurt(target.race, hero_weapon, has_spirit_item) {
+        speak(MESSAGE_NEEDS_WEAPON);
 
-            return;
-        }
-
-        if RACE_UNHITTABLE.contains(&target.race) {
-            return;
-        }
-
-        target.vitality = vitality_after_hit(target.vitality, wt);
-
-        match hit_sound(i, j) {
-            HitSound::Arrow => play_effect(EFFECT_ARROW_HIT, PITCH_ARROW + rand64()),
-            HitSound::Rock => play_effect(EFFECT_ROCK_HIT, PITCH_ROCK + bitrand(PITCH_SPREAD)),
-            HitSound::HeroHurt => {
-                play_effect(EFFECT_HERO_HURT, PITCH_HERO_HURT + bitrand(PITCH_SPREAD))
-            }
-
-            HitSound::FoeHurt => play_effect(EFFECT_FOE_HURT, PITCH_FOE_HURT + rand256()),
-        }
-
-        // push back the foe
-        if can_be_pushed(target.kind) && step_figure(j as i16, fc as i16, KNOCKBACK) != 0 && i >= 0
-        {
-            step_figure(i as i16, fc as i16, KNOCKBACK);
-        }
-
-        check_death(j, WORLD_DEAD_CHECK);
+        return;
     }
+
+    if RACE_UNHITTABLE.contains(&target.race) {
+        return;
+    }
+
+    target.vitality = vitality_after_hit(target.vitality, wt);
+
+    match hit_sound(i, j) {
+        HitSound::Arrow => play_effect(EFFECT_ARROW_HIT, PITCH_ARROW + rand64()),
+        HitSound::Rock => play_effect(EFFECT_ROCK_HIT, PITCH_ROCK + bitrand(PITCH_SPREAD)),
+        HitSound::HeroHurt => {
+            play_effect(EFFECT_HERO_HURT, PITCH_HERO_HURT + bitrand(PITCH_SPREAD))
+        }
+
+        HitSound::FoeHurt => play_effect(EFFECT_FOE_HURT, PITCH_FOE_HURT + rand256()),
+    }
+
+    // push back the foe
+    if can_be_pushed(target.kind) && step_figure(j as i16, fc as i16, KNOCKBACK) != 0 && i >= 0 {
+        step_figure(i as i16, fc as i16, KNOCKBACK);
+    }
+
+    check_death(j, WORLD_DEAD_CHECK);
 }
 
 /// Which sound a hit makes: `i` is the attacker (-1 an arrow, -2 a fireball), `j` the target.

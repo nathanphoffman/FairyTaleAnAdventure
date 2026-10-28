@@ -10,9 +10,8 @@ use super::{
 
 use crate::game::actors::interaction::blocked_at;
 use crate::game::data::random::{fta_rand, rand4};
-use crate::game::data::state::{the_actors, the_hero, the_ui, the_world};
+use crate::game::data::state::{ActorRef, the_actors, the_hero, the_ui, the_world};
 use crate::game::data::tables::compass_lit_direction;
-use crate::game::data::types::Shape;
 use crate::game::input::handler::{joystick_fire, mouse_buttons};
 use crate::game::ui::text::show_event;
 
@@ -20,9 +19,9 @@ use crate::game::ui::text::show_event;
 /// or falling, shooting, riding, fighting or walking. `cycle` is the main loop's frame counter.
 pub fn update_hero(cycle: i16) {
     unsafe {
-        count_down(&raw mut the_world.light_timer);
-        count_down(&raw mut the_world.secret_timer);
-        count_down(&raw mut the_world.freeze_timer);
+        the_world.light_timer = timer_step(the_world.light_timer);
+        the_world.secret_timer = timer_step(the_world.secret_timer);
+        the_world.freeze_timer = timer_step(the_world.freeze_timer);
 
         the_actors.fiery_death = (the_world.map_x > LAVA_X.0
             && the_world.map_x < LAVA_X.1
@@ -52,12 +51,6 @@ pub fn update_hero(cycle: i16) {
     }
 }
 
-pub(super) unsafe fn count_down(timer: *mut i16) {
-    unsafe {
-        *timer = timer_step(*timer);
-    }
-}
-
 /// A light, secret or freeze timer after one frame: it counts down to 0 and stays there.
 pub(super) fn timer_step(timer: i16) -> i16 {
     if timer != 0 { timer - 1 } else { timer }
@@ -66,7 +59,7 @@ pub(super) fn timer_step(timer: i16) -> i16 {
 /// The fight button is down: shoot in a shooting zone, dismount, or fight with the weapon held.
 pub(super) unsafe fn fighting_state(state: i8) -> i8 {
     unsafe {
-        let hero = &raw mut the_actors.list[0];
+        let mut hero = ActorRef::new(0);
 
         if the_world.extent_type > SHOOTING_ZONE {
             return enter_shooting_zone(state);
@@ -79,11 +72,11 @@ pub(super) unsafe fn fighting_state(state: i8) -> i8 {
         }
 
         if compass_lit_direction < NOT_WALKING {
-            (*hero).facing = compass_lit_direction as i8;
+            hero.facing = compass_lit_direction as i8;
         }
 
         if state >= WALKING {
-            return fighting_state_for(state, (*hero).weapon);
+            return fighting_state_for(state, hero.weapon);
         }
 
         state
@@ -107,9 +100,9 @@ unsafe fn enter_shooting_zone(state: i8) -> i8 {
 
 /// On the bird, the fight button tries to land: not over lava, not when moving too fast, and only
 /// where there is room to stand.
-unsafe fn try_to_dismount(hero: *mut Shape) {
+fn try_to_dismount(mut hero: ActorRef) {
     unsafe {
-        let (dif_x, dif_y) = ((*hero).vel_x, (*hero).vel_y);
+        let (dif_x, dif_y) = (hero.vel_x, hero.vel_y);
 
         if the_actors.fiery_death != 0 {
             show_event(EVENT_LAVA);
@@ -118,17 +111,17 @@ unsafe fn try_to_dismount(hero: *mut Shape) {
             && dif_y > -DISMOUNT_SPEED
             && dif_y < DISMOUNT_SPEED
         {
-            let ytest = (*hero).abs_y.wrapping_sub(DISMOUNT_STEP);
+            let ytest = hero.abs_y.wrapping_sub(DISMOUNT_STEP);
 
-            if blocked_at((*hero).abs_x as i16, ytest as i16, 0) == 0
+            if blocked_at(hero.abs_x as i16, ytest as i16, 0) == 0
                 && blocked_at(
-                    (*hero).abs_x as i16,
+                    hero.abs_x as i16,
                     ytest.wrapping_add(DISMOUNT_CHECK) as i16,
                     0,
                 ) == 0
             {
                 the_hero.riding = 0;
-                (*hero).abs_y = ytest;
+                hero.abs_y = ytest;
             }
         } else {
             show_event(EVENT_TOO_FAST);

@@ -1,7 +1,7 @@
 //! Items lying in the world and the people standing around (from csrc/fmain2.c): turning the
 //! object lists of the current region into actors, and changing them.
 //!
-//! How the world's objects work: each region has a list of objects (`ob_table`) and there is one
+//! How the world's objects work: each region has a list of objects (`region_objects`) and there is one
 //! global list (`ob_listg`) for things that follow the story, like the dead brothers' bags and the
 //! spectre. Each entry has a position, an id and a state. Only the entries near the screen become
 //! actors in `actor_list`, so the game never handles more than 20 actors at once:
@@ -13,7 +13,7 @@
 
 use crate::game::actors::interaction::turtle_eggs;
 use crate::game::data::object_tables::{
-    CHEST, TURTLE, dstobs, glbobs, mapobs, ob_listg, ob_table, rand_treasure,
+    CHEST, TURTLE, dstobs, glbobs, global_objects, mapobs, rand_treasure, region_objects,
 };
 
 use crate::game::data::random::bitrand;
@@ -98,9 +98,9 @@ fn inside(value: i16, (low, high): (i16, i16)) -> bool {
 pub fn spawn_object_actors() {
     unsafe {
         J1 = FIRST_OBJECT_ACTOR;
-        add_objects_near((&raw mut ob_listg).cast(), glbobs, GLOBAL_LIST_BIT as i32);
+        add_objects_near(global_objects(), glbobs, GLOBAL_LIST_BIT as i32);
         add_objects_near(
-            ob_table[the_world.region as usize],
+            region_objects(the_world.region as usize),
             mapobs[the_world.region as usize],
             0,
         );
@@ -131,7 +131,7 @@ const TREASURE_KINDS: i32 = 16;
 /// That slot is reused for each item the hero or a monster leaves behind.
 pub fn leave_item(i: i16, object: i16) {
     unsafe {
-        let drop = &mut *(&raw mut ob_listg).cast::<WorldObject>();
+        let drop = &mut global_objects()[0];
         let actor = &(*(&raw const the_actors.list))[i as usize];
         drop.xc = actor.abs_x;
         drop.yc = actor.abs_y.wrapping_add(DROP_OFFSET_Y);
@@ -151,15 +151,15 @@ pub fn change_object(id: i32, flag: i32) {
 
         // Masks with GLOBAL_LIST_BIT, keeping only the bits that matter here.
         let object = if vitality & GLOBAL_LIST_BIT != 0 {
-            (&raw mut ob_listg).cast::<WorldObject>().add(index)
+            &mut global_objects()[index]
         } else {
-            ob_table[the_world.region as usize].add(index)
+            &mut region_objects(the_world.region as usize)[index]
         };
 
-        if (*object).ob_id == CHEST as i8 {
-            (*object).ob_id = OPENED_CHEST;
+        if object.ob_id == CHEST as i8 {
+            object.ob_id = OPENED_CHEST;
         } else {
-            (*object).ob_stat = flag as i8;
+            object.ob_stat = flag as i8;
         }
     }
 }
@@ -170,7 +170,7 @@ pub fn change_object(id: i32, flag: i32) {
 unsafe fn distribute_treasure() {
     unsafe {
         let region = the_world.region as usize;
-        let objects = ob_table[region];
+        let objects = region_objects(region);
 
         for _ in 0..RANDOM_TREASURES {
             let (mut x, mut y);
@@ -191,7 +191,7 @@ unsafe fn distribute_treasure() {
 
             let k = mapobs[region] as usize;
             mapobs[region] += 1;
-            let object = &mut *objects.add(k);
+            let object = &mut objects[k];
             object.xc = x as u16;
             object.yc = y as u16;
             object.ob_id = rand_treasure[bitrand(TREASURE_KINDS - 1) as usize] as i8;
@@ -230,7 +230,7 @@ unsafe fn load_set_figure(id: i8) {
 /// centre it); people are only loaded if within about 100-400 pixels, and shown if within the
 /// screen; items that are hidden or taken are skipped. A person already in the actor list at the
 /// same place is not added twice (and is marked dead if its actor died).
-pub fn add_objects_near(mut list: *mut WorldObject, mut length: i16, f: i32) {
+pub fn add_objects_near(list: &mut [WorldObject], mut length: i16, f: i32) {
     unsafe {
         turtle_eggs = 0;
         the_witch.on_screen = 0;
@@ -248,8 +248,7 @@ pub fn add_objects_near(mut list: *mut WorldObject, mut length: i16, f: i32) {
                 return;
             }
 
-            add_object(&mut *list, index, f);
-            list = list.add(1); // next object
+            add_object(&mut list[index as usize], index, f);
             index += 1;
         }
     }

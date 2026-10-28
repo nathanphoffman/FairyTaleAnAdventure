@@ -8,7 +8,6 @@
 use crate::game::actors::encounters::Encounter;
 use crate::game::world::objects::SetFigEntry;
 use crate::game::data::types::{Bro, Door, Extent, InvItem, Letter, Menu, Need, StateEntry};
-use crate::game::data::state::{the_hero};
 
 /// The kinds of people (setfigs): which sprite file, the first image, and whether they can talk.
 pub static mut setfig_table: [SetFigEntry; 14] = [
@@ -337,6 +336,11 @@ pub static labelB: &[u8] = b"  A    B    C    D    E    F    G    H  \0";
 pub static mut key_colors: [i8; 6] = [8, 6, 4, 2, 14, 1];
 
 /// The ten menus: labels, entry count, colour, and each entry's state (see `Menu`).
+/// The `enabled` flags of entry `entry` of menu `menu`.
+pub fn menu_entry(menu: usize, entry: usize) -> &'static mut i8 {
+    unsafe { &mut (*(&raw mut menus))[menu].enabled[entry] }
+}
+
 pub static mut menus: [Menu; 10] = [
     Menu { label_list: label2, num: 10, color: 6, enabled: [3, 2, 2, 2, 2, 10, 10, 10, 10, 10, 0, 0] },
     Menu { label_list: label6, num: 12, color: 5, enabled: [2, 3, 2, 2, 2, 8, 8, 8, 8, 8, 8, 8] },
@@ -426,11 +430,11 @@ pub static mut compass_lit_direction: i16 = 9;
 pub static mut facing_frame_offsets: [i8; 16] = [16, 16, 24, 24, 0, 0, 8, 8, 56, 56, 68, 68, 32, 32, 44, 44];
 
 /// The brothers' starting stats and their item lists.
-pub static mut brother_stats: [Bro; 3] = unsafe {
+pub static mut brother_stats: [Bro; 3] = {
     [
-    Bro { brave: 35, luck: 20, kind: 15, wealth: 20, stuff: &raw mut the_hero.julstuff as *mut u8 },
-    Bro { brave: 20, luck: 35, kind: 15, wealth: 15, stuff: &raw mut the_hero.philstuff as *mut u8 },
-    Bro { brave: 15, luck: 20, kind: 35, wealth: 10, stuff: &raw mut the_hero.kevstuff as *mut u8 },
+    Bro { brave: 35, luck: 20, kind: 15, wealth: 20 },
+    Bro { brave: 20, luck: 35, kind: 15, wealth: 15 },
+    Bro { brave: 15, luck: 20, kind: 35, wealth: 10 },
     ]
 };
 
@@ -514,11 +518,7 @@ mod tests {
     }
 
     #[test]
-    fn the_brothers_have_their_own_item_lists() {
-        let brothers = unsafe { &*(&raw const brother_stats) };
-        let lists: HashSet<_> = brothers.iter().map(|b| b.stuff as usize).collect();
-        assert_eq!(lists.len(), 3);
-
+    fn the_brothers_have_names() {
         assert_eq!(brother_names[0], "Julian");
     }
 

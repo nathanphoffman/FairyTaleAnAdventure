@@ -9,6 +9,7 @@ use super::{
     add_stuff, item_name,
 };
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::player;
 use crate::game::render::screen::{FontKind, screen};
 
 use crate::game::actors::interaction::{eat_food, find_nearest_figure};
@@ -58,7 +59,7 @@ pub(super) unsafe fn take_nearest() {
         queue_print(PRQ_VITALITY);
         find_nearest_figure(0, TAKE_RANGE);
 
-        *the_hero.stuff.add(ARROWBASE) = 0;
+        player().stuff_mut()[ARROWBASE] = 0;
         if the_actors.nearest_object == 0 {
             queue_print(PRQ_NOTHING_NEAR);
 
@@ -88,10 +89,10 @@ unsafe fn finish_pickup() {
         change_object(the_actors.nearest_object as i32, 2);
         add_stuff(
             ARROWS,
-            (*the_hero.stuff.add(ARROWBASE) as u32 * ARROWS_PER_QUIVER) as u8,
+            (player().stuff()[ARROWBASE] as u32 * ARROWS_PER_QUIVER) as u8,
         );
 
-        if *the_hero.stuff.add(TALISMAN) != 0 {
+        if player().stuff()[TALISMAN] != 0 {
             the_ui.quit_requested = 1;
             screen().view_status = VIEW_GAME_OVER;
             map_message();
@@ -149,17 +150,15 @@ fn read_paper(indoors: bool) -> bool {
 }
 
 /// Fruit is kept in the pack when the hero is not hungry, and eaten otherwise.
-unsafe fn take_fruit(keep: bool) -> bool {
-    unsafe {
-        if keep {
-            add_stuff(FRUIT_SLOT, 1);
-            show_event(EVENT_FRUIT_KEPT);
-        } else {
-            eat_food(FRUIT_HUNGER);
-        }
-
-        true
+fn take_fruit(keep: bool) -> bool {
+    if keep {
+        add_stuff(FRUIT_SLOT, 1);
+        show_event(EVENT_FRUIT_KEPT);
+    } else {
+        eat_food(FRUIT_HUNGER);
     }
+
+    true
 }
 
 /// Picks up a fallen brother's bones and everything he carried (`owner` 1 is Julian, otherwise
@@ -244,20 +243,18 @@ fn item_slot(id: u32, table: &[u8]) -> Option<usize> {
 }
 
 /// A single item lying about: the slot is found in the `itrans` table. Unknown objects are left.
-unsafe fn take_plain_item(id: u32) -> bool {
-    unsafe {
-        match item_slot(id, &itrans) {
-            Some(slot) => {
-                add_stuff(slot, 1);
-                announce_treasure("a ");
-                print_cont(item_name(slot));
-                print_cont(".");
+fn take_plain_item(id: u32) -> bool {
+    match item_slot(id, &itrans) {
+        Some(slot) => {
+            add_stuff(slot, 1);
+            announce_treasure("a ");
+            print_cont(item_name(slot));
+            print_cont(".");
 
-                true
-            }
-
-            None => false,
+            true
         }
+
+        None => false,
     }
 }
 

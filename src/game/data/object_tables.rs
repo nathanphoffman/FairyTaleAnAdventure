@@ -431,19 +431,30 @@ pub static mut ob_list9: [WorldObject; 9] = [
     obj(3723, 39340, 128+10, 1), // king's bone
 ];
 
-/// The object list of each region (the global list is separate).
-pub static mut ob_table: [*mut WorldObject; 10] = [
-    (&raw mut ob_list0).cast(),
-    (&raw mut ob_list1).cast(),
-    (&raw mut ob_list2).cast(),
-    (&raw mut ob_list3).cast(),
-    (&raw mut ob_list4).cast(),
-    (&raw mut ob_list5).cast(),
-    (&raw mut ob_list6).cast(),
-    (&raw mut ob_list7).cast(),
-    (&raw mut ob_list8).cast(),
-    (&raw mut ob_list9).cast(),
-];
+/// The object list of region `region` (the global list is separate). The lists have room to grow:
+/// random treasure is added after the objects in use.
+pub fn region_objects(region: usize) -> &'static mut [WorldObject] {
+    unsafe {
+        match region {
+            0 => &mut *(&raw mut ob_list0),
+            1 => &mut *(&raw mut ob_list1),
+            2 => &mut *(&raw mut ob_list2),
+            3 => &mut *(&raw mut ob_list3),
+            4 => &mut *(&raw mut ob_list4),
+            5 => &mut *(&raw mut ob_list5),
+            6 => &mut *(&raw mut ob_list6),
+            7 => &mut *(&raw mut ob_list7),
+            8 => &mut *(&raw mut ob_list8),
+            9 => &mut *(&raw mut ob_list9),
+            _ => &mut [],
+        }
+    }
+}
+
+/// The global object list.
+pub fn global_objects() -> &'static mut [WorldObject] {
+    unsafe { &mut *(&raw mut ob_listg) }
+}
 
 /// How many entries of each region's list are in use.
 pub static mut mapobs: [i16; 10] = [3, 1, 5, 12, 3, 5, 1, 1, 61 + 16, 9];

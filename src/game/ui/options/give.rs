@@ -3,6 +3,7 @@
 use super::{BONE, ITEMS, PRQ_STATS, PRQ_VITALITY};
 use crate::game::data::random::rand64;
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::player;
 use crate::game::data::state::{the_actors, the_hero};
 use crate::game::ui::menus::go_to_menu;
 use crate::game::ui::text::{queue_print, speak};
@@ -45,12 +46,12 @@ pub(super) unsafe fn give_option(chosen_entry: i16) -> bool {
             } else {
                 speak(BEGGAR_THANKS);
             }
-        } else if chosen_entry == GIVE_BONE && *the_hero.stuff.add(BONE) != 0 {
+        } else if chosen_entry == GIVE_BONE && player().stuff()[BONE] != 0 {
             if race != SPECTRE_RACE {
                 speak(SPECTRE_NOT_HERE);
             } else {
                 speak(SPECTRE_THANKS);
-                *the_hero.stuff.add(BONE) = 0;
+                player().stuff_mut()[BONE] = 0;
                 leave_item(the_actors.nearest_person, SPECTRE_BONE_DROP);
             }
         }

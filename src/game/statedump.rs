@@ -6,6 +6,7 @@
 
 use crate::game::actors::encounters::check_death;
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::player;
 use crate::game::data::state::{the_actors, the_hero, the_world};
 use crate::game::data::tables::{seed1, seed2};
 use crate::game::data::types::Shape;
@@ -68,7 +69,7 @@ pub fn run_pending_command() {
                 transfer_hero(x as u16, y as u16, 1);
             }
 
-            Command::Give { slot, count } => *the_hero.stuff.add(slot as usize) = count as u8,
+            Command::Give { slot, count } => player().stuff_mut()[slot as usize] = count as u8,
             Command::SetStat { stat: 0, value } => the_hero.hunger = value as i16,
             Command::SetStat { stat: 1, value } => the_hero.fatigue = value as i16,
             Command::SetStat { value, .. } => the_hero.wealth = value as i16,
@@ -108,7 +109,7 @@ pub fn state_text() -> String {
         out.push_str("stuff");
 
         for slot in 0..DUMPED_STUFF_SLOTS {
-            out.push_str(&format!(" {}", *the_hero.stuff.add(slot)));
+            out.push_str(&format!(" {}", player().stuff()[slot]));
         }
 
         out.push('\n');

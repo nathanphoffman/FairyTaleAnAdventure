@@ -103,10 +103,8 @@ fn note_safe_spot(facts: &SurvivalFacts, hero: &mut Hero, steps: &mut Vec<Surviv
     hero.safe_x = hero.x;
     hero.safe_y = hero.y;
 
-    let fruit = unsafe { hero.stuff.add(FRUIT_SLOT) };
-
-    if eats_fruit(hero.hunger, unsafe { *fruit }) {
-        unsafe { *fruit -= 1 };
+    if eats_fruit(hero.hunger, hero.stuff()[FRUIT_SLOT]) {
+        hero.stuff_mut()[FRUIT_SLOT] -= 1;
         hero.hunger -= FRUIT_FOOD;
         steps.push(SurvivalStep::Event(EVENT_ATE_FRUIT));
     }
@@ -138,12 +136,12 @@ mod tests {
 
     const STILL: i8 = 13;
 
-    /// A hero with a pack the test controls, standing in a calm place on a safe-check frame.
-    fn calm_hero(pack: &mut [u8; 40]) -> (SurvivalFacts, Hero, Shape) {
+    /// A hero with an empty pack, standing in a calm place on a safe-check frame.
+    fn calm_hero() -> (SurvivalFacts, Hero, Shape) {
         let mut hero: Hero = unsafe { std::mem::zeroed() };
 
         let mut body: Shape = unsafe { std::mem::zeroed() };
-        hero.stuff = pack.as_mut_ptr();
+        hero.brother = 1;
         hero.x = 1234;
         hero.y = 5678;
         body.vitality = 50;
@@ -162,8 +160,7 @@ mod tests {
 
     #[test]
     fn a_calm_frame_notes_the_safe_spot_and_adds_hunger() {
-        let mut pack = [0u8; 40];
-        let (facts, mut hero, mut body) = calm_hero(&mut pack);
+        let (facts, mut hero, mut body) = calm_hero();
         let steps = survival_step(&facts, &mut hero, &mut body);
         assert_eq!((hero.safe_r, hero.safe_x, hero.safe_y), (3, 1234, 5678));
         assert_eq!((hero.hunger, hero.fatigue), (1, 1));
@@ -172,10 +169,8 @@ mod tests {
 
     #[test]
     fn danger_stops_the_safe_spot_but_not_the_hunger() {
-        let mut pack = [0u8; 40];
-
         for danger in 0..4 {
-            let (mut facts, mut hero, mut body) = calm_hero(&mut pack);
+            let (mut facts, mut hero, mut body) = calm_hero();
 
             match danger {
                 0 => facts.actors_on_screen = true,
@@ -192,20 +187,18 @@ mod tests {
 
     #[test]
     fn a_hungry_hero_eats_fruit_at_the_safe_spot() {
-        let mut pack = [0u8; 40];
-        pack[FRUIT_SLOT] = 2;
-        let (facts, mut hero, mut body) = calm_hero(&mut pack);
+        let (facts, mut hero, mut body) = calm_hero();
+        hero.stuff_mut()[FRUIT_SLOT] = 2;
         hero.hunger = 40;
         let steps = survival_step(&facts, &mut hero, &mut body);
         assert_eq!(steps, vec![SurvivalStep::Event(EVENT_ATE_FRUIT)]);
         assert_eq!(hero.hunger, 40 - FRUIT_FOOD + 1);
-        assert_eq!(pack[FRUIT_SLOT], 1);
+        assert_eq!(hero.stuff()[FRUIT_SLOT], 1);
     }
 
     #[test]
     fn music_is_picked_every_eighth_frame_outside_battle() {
-        let mut pack = [0u8; 40];
-        let (mut facts, mut hero, mut body) = calm_hero(&mut pack);
+        let (mut facts, mut hero, mut body) = calm_hero();
         facts.clock = 8;
         facts.battle = false;
         assert_eq!(
@@ -219,8 +212,7 @@ mod tests {
 
     #[test]
     fn hunger_messages_come_in_the_original_order() {
-        let mut pack = [0u8; 40];
-        let (mut facts, mut hero, mut body) = calm_hero(&mut pack);
+        let (mut facts, mut hero, mut body) = calm_hero();
         facts.clock = 0; // also a music frame; battle suppresses it
         hero.hunger = HUNGRY - 1;
         assert_eq!(
@@ -246,8 +238,7 @@ mod tests {
 
     #[test]
     fn no_hunger_while_asleep_or_dead() {
-        let mut pack = [0u8; 40];
-        let (facts, mut hero, mut body) = calm_hero(&mut pack);
+        let (facts, mut hero, mut body) = calm_hero();
         body.state = SLEEP;
         survival_step(&facts, &mut hero, &mut body);
         assert_eq!(hero.hunger, 0);

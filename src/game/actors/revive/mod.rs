@@ -86,7 +86,7 @@ mod tests {
         CAMERA_OFFSET, START_DAYNIGHT, START_LIGHT, STILL, move_to_safe_spot, restore_stats,
     };
 
-    use crate::game::data::state::{Hero, World};
+    use crate::game::data::state::{Hero, STUFF_SLOTS, World};
     use crate::game::data::types::Bro;
 
     fn zeroed<T>() -> T {
@@ -157,17 +157,16 @@ mod tests {
 
     #[test]
     fn next_brother_starts_with_his_own_stats_and_only_a_dirk() {
-        let mut pack = [7u8; 64];
         let next = Bro {
             brave: 20,
             luck: 35,
             kind: 15,
             wealth: 15,
-            stuff: pack.as_mut_ptr(),
         };
 
         let mut hero: Hero = unsafe { std::mem::zeroed() };
         hero.brother = 1;
+        hero.philstuff = [7; STUFF_SLOTS];
 
         let mut body: Shape = unsafe { std::mem::zeroed() };
 
@@ -179,8 +178,8 @@ mod tests {
 
         assert_eq!(hero.brother, 2);
         assert_eq!(body.weapon, 1);
-        assert_eq!(pack[0], 1);
-        assert!(pack[1..GOLDBASE].iter().all(|&n| n == 0));
-        assert_eq!(pack[GOLDBASE], 7); // what is past the item slots is left alone
+        assert_eq!(hero.philstuff[0], 1);
+        assert!(hero.philstuff[1..GOLDBASE].iter().all(|&n| n == 0));
+        assert_eq!(hero.philstuff[GOLDBASE], 7); // what is past the item slots is left alone
     }
 }

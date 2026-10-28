@@ -7,9 +7,11 @@
 use crate::game::data::globals::{
     princesses_rescued, save_padding_1, save_padding_2, save_padding_3,
 };
-use crate::game::data::object_tables::{dstobs, glbobs, mapobs, ob_listg, ob_table};
-use crate::game::data::state::{the_actors, the_encounter, the_hero, the_ui, the_world};
-use crate::game::data::tables::{brother_stats, extent_list};
+use crate::game::data::object_tables::{dstobs, glbobs, mapobs, ob_listg, region_objects};
+use crate::game::data::state::{
+    SAVED_STUFF_SLOTS, player, the_actors, the_encounter, the_hero, the_ui, the_world,
+};
+use crate::game::data::tables::extent_list;
 use crate::game::data::types::{Extent, Missile, Shape, WorldObject};
 
 /// Entries of `extent_list` that are saved, and entries in the per-region object tables.
@@ -227,13 +229,12 @@ fn transfer_missile(t: &mut Transfer, m: &mut Missile) {
 }
 
 /// Saves or loads the three brothers' item lists and the missiles (the count `next_missile` is saved
-/// elsewhere). After loading, `stuff` points at the current brother's list.
+/// elsewhere).
 fn transfer_party(t: &mut Transfer) {
     unsafe {
-        t.bytes(&mut *(&raw mut the_hero.julstuff));
-        t.bytes(&mut *(&raw mut the_hero.philstuff));
-        t.bytes(&mut *(&raw mut the_hero.kevstuff));
-        the_hero.stuff = brother_stats[the_hero.brother as usize - 1].stuff;
+        t.bytes(&mut player().julstuff[..SAVED_STUFF_SLOTS]);
+        t.bytes(&mut player().philstuff[..SAVED_STUFF_SLOTS]);
+        t.bytes(&mut player().kevstuff[..SAVED_STUFF_SLOTS]);
 
         for missile in (*(&raw mut the_actors.missiles)).iter_mut() {
             transfer_missile(t, missile);
@@ -274,9 +275,13 @@ pub fn transfer_all(t: &mut Transfer) {
             t.u16(count);
         }
 
-        for i in 0..OBJECT_REGIONS {
-            for k in 0..mapobs[i] as usize {
-                transfer_object(t, &mut *ob_table[i].add(k));
+        for (i, &count) in (*(&raw const mapobs))
+            .iter()
+            .enumerate()
+            .take(OBJECT_REGIONS)
+        {
+            for object in region_objects(i).iter_mut().take(count as usize) {
+                transfer_object(t, object);
             }
         }
     }

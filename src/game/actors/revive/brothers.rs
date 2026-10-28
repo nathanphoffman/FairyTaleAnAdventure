@@ -137,22 +137,19 @@ pub(super) fn reset_for_next_brother(hero: &mut Hero, world: &mut World) {
 
 /// The next brother takes over: his starting stats, an empty pack except for a dirk (inventory
 /// slot 0, which he also holds), and he counts as the next brother.
-pub(super) unsafe fn start_next_brother(hero: &mut Hero, body: &mut Shape, next: &Bro) {
-    unsafe {
-        hero.brave = next.brave as i16;
-        hero.luck = next.luck as i16;
-        hero.kindness = next.kind as i16;
-        hero.wealth = next.wealth as i16;
-        hero.stuff = next.stuff;
-        hero.brother += 1;
+pub(super) fn start_next_brother(hero: &mut Hero, body: &mut Shape, next: &Bro) {
+    hero.brave = next.brave as i16;
+    hero.luck = next.luck as i16;
+    hero.kindness = next.kind as i16;
+    hero.wealth = next.wealth as i16;
+    hero.brother += 1;
 
-        for slot in 0..GOLDBASE {
-            *hero.stuff.add(slot) = 0; // has no stuff
-        }
+    let stuff = hero.stuff_mut();
 
-        *hero.stuff = 1; // okay, a dirk, then
-        body.weapon = 1;
-    }
+    stuff[..GOLDBASE].fill(0); // has no stuff
+
+    stuff[0] = 1; // okay, a dirk, then
+    body.weapon = 1;
 }
 
 /// The story pages between brothers (and the game over page after the last).

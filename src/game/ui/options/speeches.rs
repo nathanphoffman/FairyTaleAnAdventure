@@ -5,6 +5,7 @@ use super::{PRQ_STATS, PRQ_VITALITY};
 use crate::game::data::object_tables::{ob_list8, ob_listg};
 use crate::game::data::random::rand64;
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::player;
 use crate::game::data::state::{the_actors, the_hero, the_world};
 use crate::game::ui::text::{queue_print, speak};
 
@@ -176,7 +177,7 @@ fn sorceress_action(freed: bool, luck: i16, roll: impl FnOnce() -> i16) -> Sorce
 /// The priest gives the writ's reward, scolds the unkind, or heals.
 unsafe fn priest_speaks() {
     unsafe {
-        let has_writ = *the_hero.stuff.add(WRIT) != 0;
+        let has_writ = player().stuff()[WRIT] != 0;
 
         match priest_action(
             has_writ,

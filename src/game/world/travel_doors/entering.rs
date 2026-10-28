@@ -2,6 +2,7 @@
 
 use super::{CAVE, DOORCOUNT, LOWER_HALF_BIT, TILE_COLUMN_MASK, TILE_WIDTH};
 use crate::game::data::object_tables::page_colors;
+use crate::game::data::state::player;
 use crate::game::data::state::{the_hero, the_world};
 use crate::game::data::tables::door_list;
 use crate::game::data::types::Door;
@@ -77,7 +78,7 @@ pub(super) unsafe fn enter_door(xtest: u16, ytest: u16) {
         };
 
         let d = door_at(index);
-        let statues = *the_hero.stuff.add(STATBASE);
+        let statues = player().stuff()[STATBASE];
 
         if may_enter(d, the_hero.x, the_hero.y, statues) {
             let (x, y) = inside_spot(d);

@@ -3,6 +3,7 @@
 use super::shop::FIRST_MENU_ENTRY;
 use super::{ITEMS, KEYBASE, KEYS};
 use crate::game::actors::interaction::summon_turtle;
+use crate::game::data::state::player;
 use crate::game::data::state::{the_actors, the_hero, the_ui, the_witch};
 use crate::game::ui::items_menu::item_name;
 use crate::game::ui::menus::go_to_menu;
@@ -79,7 +80,7 @@ pub(super) unsafe fn keys_option(chosen_entry: i16) -> bool {
         let key = (chosen_entry - FIRST_MENU_ENTRY) as usize;
         bumped_locked_door = 0;
 
-        if *the_hero.stuff.add(key + KEYBASE) != 0 {
+        if player().stuff()[key + KEYBASE] != 0 {
             let mut direction = 0;
 
             while direction < DIRECTIONS {
@@ -87,7 +88,7 @@ pub(super) unsafe fn keys_option(chosen_entry: i16) -> bool {
                 let y = step_y(the_hero.y as i32, direction, DOOR_REACH) as u16;
 
                 if open_door_near(x, y, key as u32 + 1) != 0 {
-                    *the_hero.stuff.add(key + KEYBASE) -= 1;
+                    player().stuff_mut()[key + KEYBASE] -= 1;
                     break;
                 }
 

@@ -14,6 +14,7 @@ use super::{
     TERRAIN_ICE, TERRAIN_PIT, TERRAIN_SHALLOW, TERRAIN_SLOW, TERRAIN_SLOW_SINK, TERRAIN_WADE,
     VELOCITY_QUARTER, WALKING, WITCH_BODY_VITALITY, WORLD_MAX, WORLD_MIN, diroff, terrain,
 };
+use crate::game::data::state::player;
 
 use crate::game::actors::encounters::check_death;
 use crate::game::data::object_tables::fallstates;
@@ -230,7 +231,7 @@ impl Ctx {
             let i = self.slot;
 
             if the_actors.fiery_death != 0 {
-                if i == 0 && *the_hero.stuff.add(STUFF_FIREPROOF) != 0 {
+                if i == 0 && player().stuff()[STUFF_FIREPROOF] != 0 {
                     actor.environ = 0;
                 } else if actor.environ > ENVIRON_SINKING {
                     actor.vitality = 0;

@@ -6,7 +6,7 @@ use super::{
 };
 
 use crate::game::data::state::the_ui;
-use crate::game::data::tables::{menu_shortcuts, menus};
+use crate::game::data::tables::{menu_entry, menu_shortcuts, menus};
 use crate::game::data::types::Letter;
 use crate::game::input::handler::forget_last_menu;
 use crate::game::ui::menus::{print_menu_entry, print_options};
@@ -19,12 +19,10 @@ pub(super) unsafe fn menu_click(key: i8, notpause: bool) {
     unsafe {
         // Masks with CODE_MASK, keeping only the bits that matter here.
         let slot = ((key & CODE_MASK) - FIRST_MENU_CLICK) as i16;
-        the_ui.chosen_entry = *(&raw const the_ui.slot_entries)
-            .cast::<i8>()
-            .offset(slot as isize);
+        the_ui.chosen_entry = the_ui.slot_entries[slot as usize];
         let chosen_entry = the_ui.chosen_entry as i16;
-        let menu = &raw mut menus[the_ui.current_menu as usize];
-        let valid = chosen_entry >= 0 && chosen_entry < (*menu).num as i16;
+        let menu = the_ui.current_menu as usize;
+        let valid = chosen_entry >= 0 && chosen_entry < menus[menu].num as i16;
 
         // Masks with RELEASED, keeping only the bits that matter here.
         if key & RELEASED != 0 {
@@ -41,15 +39,18 @@ pub(super) unsafe fn menu_click(key: i8, notpause: bool) {
             return;
         }
 
-        let entry = &raw mut (*menu).enabled[chosen_entry as usize];
-
-        press_entry(slot, chosen_entry, entry, notpause);
+        press_entry(
+            slot,
+            chosen_entry,
+            menu_entry(menu, chosen_entry as usize),
+            notpause,
+        );
     }
 }
 
 /// Presses a valid menu entry according to its type: toggles, immediate actions and radio buttons
 /// work even when paused; the rest (menu names) only when not.
-unsafe fn press_entry(slot: i16, chosen_entry: i16, entry: *mut i8, notpause: bool) {
+unsafe fn press_entry(slot: i16, chosen_entry: i16, entry: &mut i8, notpause: bool) {
     unsafe {
         // Masks with TYPE_MASK, keeping only the bits that matter here.
         let kind = *entry as i32 & TYPE_MASK;

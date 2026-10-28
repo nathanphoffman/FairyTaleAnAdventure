@@ -260,7 +260,7 @@ struct Ctx {
 
 fn diroff(d: i16) -> i16 {
     // Like the C this does not check the range; facings are 0-7 (+8 for shooting).
-    unsafe { *(&raw const facing_frame_offsets as *const i8).offset(d as isize) as i16 }
+    unsafe { facing_frame_offsets[d as usize] as i16 }
 }
 
 fn pos_x(x: i32, dir: i16, speed: i16) -> u16 {
@@ -278,7 +278,7 @@ fn terrain(x: u16, y: u16) -> i16 {
 /// Moves and animates actor `i`; `cycle` is the frame counter. `*jp` is the main loop's `j`, which
 /// carries the last terrain value from one actor to the next (a dead actor reads it without setting
 /// it), so it is passed in and written back.
-pub fn move_actor(i: i32, cycle: i16, jp: *mut i16) {
+pub fn move_actor(i: i32, cycle: i16, jp: &mut i16) {
     unsafe {
         let (mut c, mut pc) = Ctx::start(i, cycle, *jp);
 

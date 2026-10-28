@@ -6,6 +6,7 @@ use super::{
     pos_x, pos_y, terrain,
 };
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::player;
 
 use crate::game::actors::interaction::center_extent_on;
 use crate::game::data::state::{the_actors, the_hero};
@@ -74,7 +75,7 @@ impl Ctx {
             if swan_carries(
                 the_actors.raft_nearness,
                 the_actors.carrier_slot,
-                *the_hero.stuff.add(STUFF_SWAN_ITEM) != 0,
+                player().stuff()[STUFF_SWAN_ITEM] != 0,
             ) {
                 self.facing = hero.facing as i16;
                 actor.abs_x = hero.abs_x;

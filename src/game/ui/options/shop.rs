@@ -117,25 +117,23 @@ pub(super) unsafe fn buy_option(chosen_entry: i16) -> bool {
 
 /// Hands over what was bought: food is eaten at once, arrows come in a bundle, anything else is
 /// added to the pack with a message.
-unsafe fn receive_purchase(item: usize, what: Bought) {
-    unsafe {
-        match what {
-            Bought::Food => {
-                show_event(BOUGHT_FOOD_EVENT);
-                eat_food(FOOD_HUNGER);
-            }
+fn receive_purchase(item: usize, what: Bought) {
+    match what {
+        Bought::Food => {
+            show_event(BOUGHT_FOOD_EVENT);
+            eat_food(FOOD_HUNGER);
+        }
 
-            Bought::Arrows => {
-                add_stuff(item, ARROWS_BOUGHT);
-                show_event(BOUGHT_ARROWS_EVENT);
-            }
+        Bought::Arrows => {
+            add_stuff(item, ARROWS_BOUGHT);
+            show_event(BOUGHT_ARROWS_EVENT);
+        }
 
-            Bought::Item => {
-                add_stuff(item, 1);
-                print_wrapped("% bought a ");
-                print_cont(item_name(item));
-                print_cont(".");
-            }
+        Bought::Item => {
+            add_stuff(item, 1);
+            print_wrapped("% bought a ");
+            print_cont(item_name(item));
+            print_cont(".");
         }
     }
 }

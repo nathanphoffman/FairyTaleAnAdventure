@@ -5,7 +5,7 @@ use crate::game::data::object_tables::weapon_probs;
 use crate::game::data::random::{bitrand, rand2, rand4, rnd};
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::{
-    Hero, memory, the_actors, the_encounter, the_hero, the_memory, the_world,
+    Hero, current_extent, memory, the_actors, the_encounter, the_hero, the_memory, the_world,
 };
 use crate::game::data::tables::{encounter_chart, extent_list};
 use crate::game::data::types::{Extent, Shape};
@@ -158,7 +158,7 @@ unsafe fn arm_enemy(mut actor: ActorRef, race: i32) {
 /// spot was blocked.
 unsafe fn find_open_spot(i: u16, spread: u16) -> Option<(u16, u16)> {
     unsafe {
-        if (*the_world.extent).v3 == FIXED_PLACE_ENCOUNTER {
+        if current_extent().v3 == FIXED_PLACE_ENCOUNTER {
             return Some(FIXED_PLACE);
         }
 
@@ -304,8 +304,7 @@ pub fn load_carrier(n: i16) {
 pub fn load_enemy_sprites() {
     const FIRST_ENEMY_SLOT: i16 = 3;
     unsafe {
-        the_encounter.number =
-            ((*the_world.extent).v1 as i32 + rnd((*the_world.extent).v2 as i32)) as u8;
+        the_encounter.number = (current_extent().v1 as i32 + rnd(current_extent().v2 as i32)) as u8;
         let file = encounter_chart[the_encounter.kind as usize].file_id as i16;
 
         if the_actors.loaded_actor_file != file {

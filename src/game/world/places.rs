@@ -9,13 +9,12 @@ use crate::game::actors::encounters::load_enemy_sprites;
 use crate::game::actors::encounters::{load_carrier, place_encounter};
 use crate::game::actors::interaction::{blocked_at, rescue_princess};
 use crate::game::data::object_tables::ob_list8;
+use crate::game::data::state::current_extent;
 use crate::game::data::state::{
     the_actors, the_encounter, the_hero, the_screen, the_ui, the_world,
 };
 
 use crate::game::data::story_text::{INSIDE_MSG, INSIDE_TBL, PLACE_MSG, PLACE_TBL};
-use crate::game::data::tables::extent_list;
-use crate::game::data::types::Extent;
 use crate::game::files::disk::motor_off;
 use crate::game::files::loading::finish_sprite_load;
 use crate::game::ui::music::set_mood;
@@ -129,14 +128,14 @@ pub fn transfer_hero(xtest: u16, ytest: u16, flag: u16) -> i32 {
 /// of them (there must be room before the carrier slots).
 unsafe fn start_forced_encounter() {
     unsafe {
-        the_encounter.kind = (*the_world.extent).v3 as u16;
+        the_encounter.kind = current_extent().v3 as u16;
         the_encounter.mix_flag = 0;
         the_encounter.weapon_type = 0;
         load_enemy_sprites();
         finish_sprite_load(ENEMY_SLOT);
         motor_off();
         the_actors.loading = 0;
-        the_encounter.number = (*the_world.extent).v1;
+        the_encounter.number = current_extent().v1;
         the_actors.active = FIRST_MONSTER;
 
         while the_encounter.number != 0 && the_actors.active < MONSTER_SLOTS_END {
@@ -185,9 +184,9 @@ unsafe fn place_message_number() -> u8 {
         let table = if the_world.region >= FIRST_INDOOR_REGION {
             the_hero.sector += INSIDE_SECTOR_OFFSET;
 
-            INSIDE_TBL.as_ptr()
+            &INSIDE_TBL[..]
         } else {
-            PLACE_TBL.as_ptr()
+            &PLACE_TBL[..]
         };
 
         let message = mountain_name(find_table_message(table, sector));
@@ -198,20 +197,12 @@ unsafe fn place_message_number() -> u8 {
 
 /// The message of the table row (three bytes: first sector, last sector, message) that holds
 /// `sector`.
-unsafe fn find_table_message(table: *const u8, sector: u8) -> u8 {
-    unsafe {
-        let mut row = table;
-
-        for _ in 0..PLACE_TABLE_ROWS {
-            if sector >= *row && sector <= *row.add(1) {
-                break;
-            }
-
-            row = row.add(PLACE_ROW_BYTES);
-        }
-
-        *row.add(2)
-    }
+fn find_table_message(table: &[u8], sector: u8) -> u8 {
+    table
+        .chunks_exact(PLACE_ROW_BYTES)
+        .take(PLACE_TABLE_ROWS)
+        .find(|row| sector >= row[0] && sector <= row[1])
+        .map_or(0, |row| row[2])
 }
 
 /// Mountains are named after the part of the map they are in (outdoors only).
@@ -271,16 +262,16 @@ unsafe fn announce_place(flag: i16) {
 /// Finds the first extent (special rectangle of the world) the hero is in.
 unsafe fn locate_extent() {
     unsafe {
-        the_world.extent = (&raw mut extent_list).cast::<Extent>();
+        the_world.extent = 0;
 
         for _ in 0..EXTENT_COUNT {
-            let e = &*the_world.extent;
+            let e = current_extent();
 
             if the_hero.x > e.x1 && the_hero.x < e.x2 && the_hero.y > e.y1 && the_hero.y < e.y2 {
                 break;
             }
 
-            the_world.extent = the_world.extent.add(1);
+            the_world.extent += 1;
         }
     }
 }
@@ -290,11 +281,11 @@ unsafe fn locate_extent() {
 /// zones may send a fight. Returns false if the princess was rescued (the caller starts over).
 unsafe fn enter_extent(flag: i16) -> bool {
     unsafe {
-        if the_world.extent_type == (*the_world.extent).etype as u16 {
+        if the_world.extent_type == current_extent().etype as u16 {
             return true;
         }
 
-        the_world.extent_type = (*the_world.extent).etype as u16;
+        the_world.extent_type = current_extent().etype as u16;
         let mut force = false;
 
         if the_world.extent_type == XT_PRINCESS && ob_list8[PRINCESS_OBJECT].ob_stat != 0 {
@@ -326,10 +317,8 @@ unsafe fn enter_extent(flag: i16) -> bool {
 /// The forced encounter appears in the middle of the extent.
 unsafe fn aim_encounter_at_extent_middle() {
     unsafe {
-        the_encounter.x =
-            (((*the_world.extent).x1 as u32 + (*the_world.extent).x2 as u32) / 2) as u16;
-        the_encounter.y =
-            (((*the_world.extent).y1 as u32 + (*the_world.extent).y2 as u32) / 2) as u16;
+        the_encounter.x = ((current_extent().x1 as u32 + current_extent().x2 as u32) / 2) as u16;
+        the_encounter.y = ((current_extent().y1 as u32 + current_extent().y2 as u32) / 2) as u16;
     }
 }
 
@@ -349,7 +338,7 @@ unsafe fn load_spiders() {
 unsafe fn boss_is_missing() -> bool {
     unsafe {
         (the_world.extent_type == XT_NECROMANCER || the_world.extent_type == XT_TURTLE_EGGS)
-            && (the_actors.list[FIRST_MONSTER as usize].race != (*the_world.extent).v3
+            && (the_actors.list[FIRST_MONSTER as usize].race != current_extent().v3
                 || the_actors.active < MIN_BOSS_ACTORS)
     }
 }
@@ -363,9 +352,9 @@ unsafe fn update_carrier() {
         } else if the_world.extent_type == XT_CARRIER
             && (the_actors.active_carrier == 0
                 || (the_hero.riding == 0
-                    && the_actors.loaded_actor_file != (*the_world.extent).v3 as i16))
+                    && the_actors.loaded_actor_file != current_extent().v3 as i16))
         {
-            load_carrier((*the_world.extent).v3 as i16);
+            load_carrier(current_extent().v3 as i16);
         }
     }
 }

@@ -2,11 +2,18 @@
 //!
 //! Each struct has one `static mut` instance (`the_hero`, `the_world`, ...).
 //! They start out zero apart from the few values listed below.
+use crate::game::data::tables::extent_list;
 use crate::game::data::types::{Extent, Missile, SeqInfo, Shape};
 use crate::game::render::screen::Screen;
 
 /// How many items a brother can carry (the size of the `stuff` list).
-pub const STUFF_SLOTS: usize = 35;
+/// A brother's item counts: 35 slots that are saved, and one more (the last) that the pick-up code
+/// uses to count the arrows in a quiver. (In the C original that last one was the first slot of the
+/// next brother's list.)
+pub const STUFF_SLOTS: usize = 36;
+
+/// The slots of the item counts that are saved.
+pub const SAVED_STUFF_SLOTS: usize = 35;
 
 /// The actors on the map (the hero, the raft, the first person, the carrier, then monsters), and
 /// the missiles in flight.
@@ -34,7 +41,6 @@ pub struct Hero {
     pub riding: i16,
     pub flying: i16,
     pub brother: i16,
-    pub stuff: *mut u8,
     pub julstuff: [u8; STUFF_SLOTS],
     pub kevstuff: [u8; STUFF_SLOTS],
     pub philstuff: [u8; STUFF_SLOTS],
@@ -46,6 +52,31 @@ pub struct Hero {
 }
 
 pub static mut the_hero: Hero = unsafe { std::mem::zeroed() };
+
+impl Hero {
+    /// The item counts of the brother who is playing (brothers are numbered from 1).
+    pub fn stuff(&self) -> &[u8; STUFF_SLOTS] {
+        match self.brother {
+            2 => &self.philstuff,
+            3 => &self.kevstuff,
+            _ => &self.julstuff,
+        }
+    }
+
+    pub fn stuff_mut(&mut self) -> &mut [u8; STUFF_SLOTS] {
+        match self.brother {
+            2 => &mut self.philstuff,
+            3 => &mut self.kevstuff,
+            _ => &mut self.julstuff,
+        }
+    }
+}
+
+/// The hero, which the whole game shares (single threaded; no caller holds on to it across a call
+/// that uses it again).
+pub fn player() -> &'static mut Hero {
+    unsafe { &mut *(&raw mut the_hero) }
+}
 
 /// The world around the hero: the map position, region, clock, light and magic timers.
 pub struct World {
@@ -64,13 +95,19 @@ pub struct World {
     pub light_timer: i16,
     pub freeze_timer: i16,
     pub secret_timer: i16,
-    pub extent: *mut Extent,
+    /// The number of the extent the hero is in (see `current_extent`).
+    pub extent: usize,
     pub extent_type: u16,
     /// The map sector at the top left of the view (set when the map is drawn).
     pub sector_x: i32,
     pub sector_y: i32,
     /// How many frames the hero has stood on a bed.
     pub bed_wait: i16,
+}
+
+/// The extent (special rectangle of the world) the hero is in.
+pub fn current_extent() -> &'static mut Extent {
+    unsafe { &mut (*(&raw mut extent_list))[the_world.extent] }
 }
 
 pub static mut the_world: World = World {

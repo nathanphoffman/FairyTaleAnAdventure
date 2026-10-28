@@ -1,13 +1,13 @@
 //! Rescuing the princess: the story page, the reward and the keys.
 
 use super::extents::center_extent_on;
+use crate::game::data::state::player;
 use crate::game::render::display::delay;
 use crate::game::render::screen::{FontKind, screen};
 
 use crate::game::data::globals::princesses_rescued;
-use crate::game::data::object_tables::ob_list8;
+use crate::game::data::object_tables::region_objects;
 use crate::game::data::state::the_hero;
-use crate::game::data::types::WorldObject;
 use crate::game::render::screen_fx::{map_message, message_off};
 use crate::game::ui::messages::name;
 use crate::game::ui::text::{draw_placard_border, placard_text, speak};
@@ -25,6 +25,9 @@ const CLEAR_PAUSE: i32 = 10;
 const PLACARD_AREA: (i32, i32, i32, i32) = (13, 13, 271, 107);
 const PRINCESS_HOME: (u16, u16) = (5511, 33780);
 const PRINCESS_EXTENT: (i16, i16) = (22205, 21231);
+
+/// The object list of the interior regions.
+const INSIDE_OBJECTS: usize = 8;
 
 /// Entries of the interior object list (`ob_list8`) that change when the princess is rescued.
 const PRINCESS_OBJECT: usize = 2;
@@ -70,15 +73,15 @@ pub fn rescue_princess() {
         princesses_rescued += 1;
         transfer_hero(PRINCESS_HOME.0, PRINCESS_HOME.1, 0); // do princess transfer
         center_extent_on(0, PRINCESS_EXTENT.0, PRINCESS_EXTENT.1);
-        let objects = (&raw mut ob_list8).cast::<WorldObject>();
-        (*objects.add(PRINCESS_OBJECT)).ob_id = PRINCESS_OBJECT_ID;
-        *the_hero.stuff.add(PRINCESS_STUFF) = 1;
+        let objects = region_objects(INSIDE_OBJECTS);
+        objects[PRINCESS_OBJECT].ob_id = PRINCESS_OBJECT_ID;
+        player().stuff_mut()[PRINCESS_STUFF] = 1;
         speak(REWARD_MESSAGE);
         the_hero.wealth = the_hero.wealth.wrapping_add(REWARD_GOLD);
-        (*objects.add(CAPTIVE_OBJECT)).ob_stat = 0;
+        objects[CAPTIVE_OBJECT].ob_stat = 0;
 
         for item in KEY_ITEMS {
-            *the_hero.stuff.add(item) = (*the_hero.stuff.add(item)).wrapping_add(KEYS_REWARD);
+            player().stuff_mut()[item] = (player().stuff()[item]).wrapping_add(KEYS_REWARD);
         }
     }
 }

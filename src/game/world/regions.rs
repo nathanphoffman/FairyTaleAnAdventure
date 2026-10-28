@@ -5,7 +5,8 @@
 //! indoor ones (8: buildings, 9: dungeons and caves). `region_num` is the region now loaded;
 //! `new_region` is the one being loaded, or `NO_REGION` when nothing is waiting to load.
 
-use crate::game::data::state::{MAP_OFFSET, memory, the_hero, the_world};
+use crate::game::data::state::player;
+use crate::game::data::state::{MAP_OFFSET, memory, the_world};
 use crate::game::data::tables::{loaded_blocks, region_disk_blocks};
 use crate::game::data::types::Need;
 use crate::game::files::disk::{
@@ -287,9 +288,7 @@ unsafe fn load_next_image_bank(need: &Need) -> bool {
 /// Until the hero has enough statues, the desert fort door is covered with blocked tiles.
 unsafe fn block_desert_door_without_statues() {
     unsafe {
-        if the_world.new_region == DESERT_REGION
-            && *the_hero.stuff.add(STATUE_SLOT) < STATUES_NEEDED
-        {
+        if the_world.new_region == DESERT_REGION && player().stuff()[STATUE_SLOT] < STATUES_NEEDED {
             for offset in [0, 1, MAP_ROW_BYTES, MAP_ROW_BYTES + 1] {
                 memory().set_map_byte(DESERT_DOOR_TILE + offset, BLOCKED_TILE);
             }

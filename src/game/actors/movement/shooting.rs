@@ -5,9 +5,10 @@ use super::{
     MISSILE_SPEED_FIREBALL, NO_SHOOT_XTYPE, Pc, SHOOT1, SHOOT3, STILL, STUFF_ARROWS,
     WEAPON_FIREBALL, diroff,
 };
+use crate::game::data::state::player;
 
 use crate::game::data::random::rand256;
-use crate::game::data::state::{the_actors, the_hero, the_world};
+use crate::game::data::state::{the_actors, the_world};
 use crate::game::files::loading::play_effect;
 use crate::game::ui::messages::print;
 
@@ -68,11 +69,11 @@ impl Ctx {
             actor.state = STILL;
 
             if self.slot == 0 {
-                if *the_hero.stuff.add(STUFF_ARROWS) == 0 {
+                if player().stuff()[STUFF_ARROWS] == 0 {
                     return Some(Pc::Cpx);
                 }
 
-                *the_hero.stuff.add(STUFF_ARROWS) -= 1;
+                player().stuff_mut()[STUFF_ARROWS] -= 1;
             }
 
             self.missile.speed = MISSILE_SPEED_ARROW;
@@ -103,7 +104,7 @@ impl Ctx {
                 actor.state = SHOOT3 as i8;
                 self.image = diroff(d8);
                 play_effect(EFFECT_FIREBALL, EFFECT_FIREBALL_PITCH + rand256());
-            } else if self.slot == 0 && *the_hero.stuff.add(STUFF_ARROWS) == 0 {
+            } else if self.slot == 0 && player().stuff()[STUFF_ARROWS] == 0 {
                 print("No Arrows!");
 
                 return Some(Pc::Cpx);
