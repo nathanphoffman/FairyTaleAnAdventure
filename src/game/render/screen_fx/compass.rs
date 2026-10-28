@@ -1,7 +1,7 @@
 //! The compass on the text panel: which direction is lit.
 
 use crate::game::data::object_tables::comptable;
-use crate::game::data::state::Game;
+use crate::game::render::screen::Screen;
 use crate::gfx::bitmap::Rect;
 
 /// The compass is drawn in the third plane of the text panel.
@@ -20,7 +20,7 @@ const COMPASS_DIRECTIONS: i16 = 9;
 
 /// Redraws the compass with direction `dir` lit. First the unlit compass is copied, then the lit
 /// part for that direction (if any) is copied on top from a second image.
-pub fn draw_compass(game: &mut Game, dir: i16) {
+pub fn draw_compass(screen: &mut Screen, dir: i16) {
     let part = &comptable[dir as usize];
     let (xr, yr) = (part.xrect as i32, part.yrect as i32);
     let whole = Rect {
@@ -30,8 +30,7 @@ pub fn draw_compass(game: &mut Game, dir: i16) {
         height: COMPASS_HEIGHT,
     };
 
-    game.screen
-        .copy_compass(PLAIN, whole, (COMPASS_X, COMPASS_Y), COMPASS_PLANE);
+    screen.copy_compass(PLAIN, whole, (COMPASS_X, COMPASS_Y), COMPASS_PLANE);
 
     if dir < COMPASS_DIRECTIONS {
         let lit = Rect {
@@ -41,8 +40,7 @@ pub fn draw_compass(game: &mut Game, dir: i16) {
             height: part.ysize as i32,
         };
 
-        game.screen
-            .copy_compass(LIT, lit, (COMPASS_X + xr, COMPASS_Y + yr), COMPASS_PLANE);
+        screen.copy_compass(LIT, lit, (COMPASS_X + xr, COMPASS_Y + yr), COMPASS_PLANE);
     }
 }
 

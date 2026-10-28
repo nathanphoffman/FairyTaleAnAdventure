@@ -238,7 +238,7 @@ pub fn read_walk_direction(game: &mut Game) {
 
     if dir != game.ui.compass_lit_direction {
         game.ui.compass_lit_direction = dir;
-        draw_compass(game, dir);
+        draw_compass(&mut game.screen, dir);
     }
 }
 

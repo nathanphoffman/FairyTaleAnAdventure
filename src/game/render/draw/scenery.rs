@@ -2,7 +2,10 @@
 
 use super::{CARRIER, FALL, OBJECTS, RAFT_SLOT};
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
+use crate::game::data::state::Hero;
+use crate::game::data::state::World;
 use crate::game::render::blit::{add_scenery_mask, clear_memory};
 
 /// The mask buffer (the mask region) is cleared before each sprite: 96 lines of 64 words, plus 5.
@@ -60,8 +63,11 @@ pub(super) fn clear_scenery_mask(game: &mut Game) {
 
 /// True for sprites drawn in front of everything: carriers, the hero when riding the swan or in
 /// certain places, arrows and some special races.
+#[allow(clippy::too_many_arguments)] // the sprite being drawn, plus the actors, world and hero
 pub(super) fn drawn_in_front(
-    game: &mut Game,
+    actors: &Actors,
+    world: &World,
+    hero: &mut Hero,
     actor: ActorRef,
     i: i32,
     atype: i16,
@@ -69,12 +75,12 @@ pub(super) fn drawn_in_front(
 ) -> bool {
     if atype == CARRIER
         || (i == 0
-            && (game.hero.riding == RIDING_SWAN
-                || game.world.extent_type == NO_MASK_XTYPE
-                || (game.hero.x > FRONT_AREA_X.0
-                    && game.hero.x < FRONT_AREA_X.1
-                    && game.hero.y > FRONT_AREA_Y.0
-                    && game.hero.y < FRONT_AREA_Y.1)))
+            && (hero.riding == RIDING_SWAN
+                || world.extent_type == NO_MASK_XTYPE
+                || (hero.x > FRONT_AREA_X.0
+                    && hero.x < FRONT_AREA_X.1
+                    && hero.y > FRONT_AREA_Y.0
+                    && hero.y < FRONT_AREA_Y.1)))
     {
         return true;
     }
@@ -83,7 +89,7 @@ pub(super) fn drawn_in_front(
         return true;
     }
 
-    game.actor(actor).race == RACE_NO_MASK_A || game.actor(actor).race == RACE_NO_MASK_B
+    actors.actor(actor).race == RACE_NO_MASK_A || actors.actor(actor).race == RACE_NO_MASK_B
 }
 
 /// What a terrain tile does to a sprite drawn behind it.

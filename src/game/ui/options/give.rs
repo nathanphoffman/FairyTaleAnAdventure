@@ -36,8 +36,8 @@ pub(super) fn give_option(game: &mut Game, chosen_entry: i16) -> bool {
             game.hero.kindness += 1;
         }
 
-        queue_print(game, PRQ_STATS);
-        queue_print(game, PRQ_VITALITY);
+        queue_print(&mut game.ui, PRQ_STATS);
+        queue_print(&mut game.ui, PRQ_VITALITY);
 
         if race == BEGGAR_RACE {
             speak(game, BEGGAR_SPEECH + game.actor(person).goal as i32);
@@ -50,7 +50,12 @@ pub(super) fn give_option(game: &mut Game, chosen_entry: i16) -> bool {
         } else {
             speak(game, SPECTRE_THANKS);
             game.hero.stuff_mut()[BONE] = 0;
-            leave_item(game, game.actors.nearest_person, SPECTRE_BONE_DROP);
+            leave_item(
+                &mut game.objects,
+                &game.actors,
+                game.actors.nearest_person,
+                SPECTRE_BONE_DROP,
+            );
         }
     }
 

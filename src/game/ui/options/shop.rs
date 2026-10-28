@@ -105,7 +105,7 @@ pub(super) fn buy_option(game: &mut Game, chosen_entry: i16) -> bool {
         Purchase::TooPoor => print(game, "Not enough money!"),
         Purchase::Bought { wealth_left, what } => {
             game.hero.wealth = wealth_left;
-            queue_print(game, PRQ_VITALITY);
+            queue_print(&mut game.ui, PRQ_VITALITY);
             receive_purchase(game, item, what);
         }
     }

@@ -3,7 +3,9 @@
 use super::weapons::weapon_image;
 use super::{CARRIER, DEAD, DYING, ENEMY, FALL, OBJECTS, PHIL, RAFT, Sprite};
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
+use crate::game::data::state::Hero;
 use crate::game::data::tables::{animation_frames, entry};
 use crate::game::data::types::{SeqInfo, StateEntry};
 
@@ -67,14 +69,15 @@ pub(super) fn sprite_sheet(game: &Game, atype: i16) -> &SeqInfo {
 /// Picks the image for this pass: the weapon's (`passmode`) or the actor's own, and where its top
 /// left corner is on the screen. `None` means nothing is drawn.
 pub(super) fn choose_image(
-    game: &mut Game,
+    actors: &Actors,
+    hero: &Hero,
     actor: ActorRef,
     i: i32,
     passmode: bool,
 ) -> Option<Sprite> {
-    let inum = game.actor(actor).index as i16;
-    let xstart = game.actor(actor).rel_x as i16;
-    let ystart = game.actor(actor).rel_y as i16;
+    let inum = actors.actor(actor).index as i16;
+    let xstart = actors.actor(actor).rel_x as i16;
+    let ystart = actors.actor(actor).rel_y as i16;
     let ground = ystart.wrapping_add(SPRITE_GROUND_OFFSET);
     let blank = Sprite {
         atype: OBJECTS,
@@ -87,10 +90,10 @@ pub(super) fn choose_image(
     };
 
     if passmode {
-        return Some(weapon_image(game, actor, blank));
+        return Some(weapon_image(actors, actor, blank));
     }
 
-    let (atype, inum) = body_image(game, actor, i, inum)?;
+    let (atype, inum) = body_image(actors, hero, actor, i, inum)?;
 
     Some(Sprite {
         atype,
@@ -101,19 +104,25 @@ pub(super) fn choose_image(
 
 /// The actor's own sprite sheet and image for this animation frame. `None` means nothing is drawn
 /// (a burnt body, or an object with no image).
-fn body_image(game: &mut Game, actor: ActorRef, i: i32, mut inum: i16) -> Option<(i16, i16)> {
-    let mut atype = game.actor(actor).kind as i16;
+fn body_image(
+    actors: &Actors,
+    hero: &Hero,
+    actor: ActorRef,
+    i: i32,
+    mut inum: i16,
+) -> Option<(i16, i16)> {
+    let mut atype = actors.actor(actor).kind as i16;
 
-    if (atype == ENEMY && game.actor(actor).race != RACE_SPECTRE) || atype == PHIL {
-        if game.actors.fiery_death != 0 && game.actor(actor).environ > 0 {
-            if game.actor(actor).state == DEAD {
+    if (atype == ENEMY && actors.actor(actor).race != RACE_SPECTRE) || atype == PHIL {
+        if actors.fiery_death != 0 && actors.actor(actor).environ > 0 {
+            if actors.actor(actor).state == DEAD {
                 return None;
-            } else if game.actor(actor).state == DYING {
+            } else if actors.actor(actor).state == DYING {
                 // a body burning in the lava: nothing more to work out
                 return Some((OBJECTS, OBJ_BURNING));
             }
-        } else if game.actor(actor).state == FALL {
-            atype = if game.actor(actor).tactic < FALL_AS_ENEMY_STEPS {
+        } else if actors.actor(actor).state == FALL {
+            atype = if actors.actor(actor).tactic < FALL_AS_ENEMY_STEPS {
                 ENEMY
             } else {
                 OBJECTS
@@ -122,14 +131,14 @@ fn body_image(game: &mut Game, actor: ActorRef, i: i32, mut inum: i16) -> Option
             inum = state_entry(inum).figure as i16;
         }
 
-        inum = pick_of_pair(game, actor, i, inum);
+        inum = pick_of_pair(actors, actor, i, inum);
     }
 
-    if atype == OBJECTS && game.actor(actor).race == 0 {
+    if atype == OBJECTS && actors.actor(actor).race == 0 {
         return None;
     }
 
-    if atype == CARRIER && game.hero.riding == 0 && game.actors.loaded_actor_file == SWAN_FILE {
+    if atype == CARRIER && hero.riding == 0 && actors.loaded_actor_file == SWAN_FILE {
         atype = RAFT;
         inum = RAFT_IMAGE;
     }
@@ -139,13 +148,13 @@ fn body_image(game: &mut Game, actor: ActorRef, i: i32, mut inum: i16) -> Option
 
 /// Snakes use their own pictures; other enemies have two pictures per figure, picked by the race
 /// (the hero, actor 0, has just the one).
-fn pick_of_pair(game: &mut Game, actor: ActorRef, i: i32, inum: i16) -> i16 {
-    if game.actor(actor).race == RACE_SNAKE {
-        if game.actor(actor).state < DYING {
+fn pick_of_pair(actors: &Actors, actor: ActorRef, i: i32, inum: i16) -> i16 {
+    if actors.actor(actor).race == RACE_SNAKE {
+        if actors.actor(actor).state < DYING {
             return inum + SNAKE_FIRST_IMAGE;
         }
     } else if i > 0 {
-        if game.actor(actor).race & 1 != 0 {
+        if actors.actor(actor).race & 1 != 0 {
             return inum | IMAGE_PAIR_BIT;
         }
 
@@ -172,18 +181,20 @@ pub(super) fn image_height(atype: i16, inum: i16, sheet_height: i8) -> i8 {
 
 /// Sinks the sprite into water, shortens it when the hero rides the swan, and so on. Returns false
 /// if nothing is left to draw.
+#[allow(clippy::too_many_arguments)] // the sprite being drawn, plus the actors and the hero
 pub(super) fn adjust_for_depth(
-    game: &mut Game,
+    actors: &Actors,
+    hero: &Hero,
     actor: ActorRef,
     i: i32,
     cycle: i16,
     passmode: bool,
     sprite: &mut Sprite,
 ) -> bool {
-    let depth = game.actor(actor).environ as i16;
+    let depth = actors.actor(actor).environ as i16;
 
     if !passmode && sprite.atype != OBJECTS {
-        sink_body(game, actor, i, cycle, depth, sprite)
+        sink_body(actors, hero, actor, i, cycle, depth, sprite)
     } else {
         sink_item(depth, sprite)
     }
@@ -191,20 +202,22 @@ pub(super) fn adjust_for_depth(
 
 /// A body standing in water: the raft and the swan lift it, shallow water hides the legs, and deep
 /// water shows only bubbles. Returns false if there is nothing to draw (a dead body under water).
+#[allow(clippy::too_many_arguments)] // the sprite being drawn, plus the actors and the hero
 fn sink_body(
-    game: &mut Game,
+    actors: &Actors,
+    hero: &Hero,
     actor: ActorRef,
     i: i32,
     cycle: i16,
     depth: i16,
     sprite: &mut Sprite,
 ) -> bool {
-    if i == 0 && game.hero.riding == RIDING_SWAN {
+    if i == 0 && hero.riding == RIDING_SWAN {
         sprite.ystop -= SWAN_LIFT;
     } else if depth == SHALLOW_DEPTH {
         sprite.ystop -= SHALLOW_HIDDEN_LINES;
     } else if depth > UNDER_SURFACE_DEPTH {
-        if game.actor(actor).state == DEAD {
+        if actors.actor(actor).state == DEAD {
             return false;
         }
 

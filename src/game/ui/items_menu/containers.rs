@@ -1,7 +1,7 @@
 //! What is inside a chest, urn or sacks: nothing, an item, two things, three keys or three of one item.
 
 use super::{ARROWBASE, GOLDBASE, KEYBASE, add_stuff, item_name};
-use crate::game::data::random::{rand4, rand8};
+use crate::game::data::random::fta_rand;
 use crate::game::data::state::Game;
 use crate::game::ui::messages::{print, print_cont};
 
@@ -43,11 +43,8 @@ fn container_key(roll: i32) -> i32 {
 
 /// What was inside a container. Returns true (the container is always used up).
 pub(super) fn container_contents(game: &mut Game) -> bool {
-    let rng = std::cell::RefCell::new(&mut game.rng);
-    let contents = roll_contents(
-        || rand4(&mut rng.borrow_mut()),
-        || rand8(&mut rng.borrow_mut()),
-    );
+    let rng = &mut game.rng;
+    let contents = roll_contents(|n| fta_rand(rng) & (n - 1));
 
     match contents {
         Contents::Nothing => print(game, "nothing."),
@@ -110,8 +107,8 @@ enum Contents {
 
 /// Two different things: the first may be 100 gold pieces (a roll of 0), the second is rolled again
 /// until it differs and may be arrows (a roll of 0).
-fn roll_two_things(pick8: &mut impl FnMut() -> i32) -> Contents {
-    let mut first = pick8() + FIRST_CONTAINER_ITEM;
+fn roll_two_things(pick: &mut impl FnMut(i32) -> i32) -> Contents {
+    let mut first = pick(8) + FIRST_CONTAINER_ITEM;
 
     if first == ROLL_ARROWS_OR_GOLD {
         first = HUNDRED_GOLD;
@@ -120,7 +117,7 @@ fn roll_two_things(pick8: &mut impl FnMut() -> i32) -> Contents {
     let mut second;
 
     loop {
-        second = pick8() + FIRST_CONTAINER_ITEM;
+        second = pick(8) + FIRST_CONTAINER_ITEM;
 
         if second != first {
             break;
@@ -137,18 +134,18 @@ fn roll_two_things(pick8: &mut impl FnMut() -> i32) -> Contents {
     }
 }
 
-/// Rolls the contents with the game's random draws (`pick4` 0-3, `pick8` 0-7), in the same order
-/// as the original: the kind first, then the item rolls.
-fn roll_contents(mut pick4: impl FnMut() -> i32, mut pick8: impl FnMut() -> i32) -> Contents {
-    match pick4() {
+/// Rolls the contents with the game's random draws (`pick(n)` is 0 to n - 1), in the same order as
+/// the original: the kind (a draw of 4) first, then the item rolls (draws of 8).
+fn roll_contents(mut pick: impl FnMut(i32) -> i32) -> Contents {
+    match pick(4) {
         0 => Contents::Nothing,
-        1 => Contents::One(container_item(pick8())),
-        2 => roll_two_things(&mut pick8),
+        1 => Contents::One(container_item(pick(8))),
+        2 => roll_two_things(&mut pick),
         _ => {
-            let i = pick8() + FIRST_CONTAINER_ITEM;
+            let i = pick(8) + FIRST_CONTAINER_ITEM;
 
             if i == ROLL_ARROWS_OR_GOLD {
-                Contents::ThreeKeys([0; MANY].map(|_| container_key(pick8())))
+                Contents::ThreeKeys([0; MANY].map(|_| container_key(pick(8))))
             } else {
                 Contents::ThreeOf(i as usize)
             }
@@ -166,7 +163,7 @@ mod tests {
         let rolls = |kind: i32, items: &[i32]| {
             let mut next = items.iter().copied();
 
-            roll_contents(|| kind, || next.next().unwrap())
+            roll_contents(|n| if n == 4 { kind } else { next.next().unwrap() })
         };
 
         assert_eq!(rolls(0, &[]), Contents::Nothing);
@@ -179,7 +176,7 @@ mod tests {
         let rolls = |kind: i32, items: &[i32]| {
             let mut next = items.iter().copied();
 
-            roll_contents(|| kind, || next.next().unwrap())
+            roll_contents(|n| if n == 4 { kind } else { next.next().unwrap() })
         };
 
         // a first item and a different second one
@@ -222,7 +219,7 @@ mod tests {
         let rolls = |kind: i32, items: &[i32]| {
             let mut next = items.iter().copied();
 
-            roll_contents(|| kind, || next.next().unwrap())
+            roll_contents(|n| if n == 4 { kind } else { next.next().unwrap() })
         };
 
         assert_eq!(rolls(3, &[4]), Contents::ThreeOf(12));

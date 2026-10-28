@@ -7,6 +7,7 @@ use super::{
     PLANE_COUNT, SHIFT_MASK, TILE_LINES, TILE_MASK_BYTES, USE_A, USE_B, USE_C, USE_D,
 };
 use crate::game::data::state::Game;
+use crate::game::data::state::Memory;
 use crate::game::render::blit::SShape;
 use crate::game::render::screen::Screen;
 
@@ -214,7 +215,7 @@ pub fn add_scenery_mask(game: &mut Game, x: i32, y: i32, mod_words: i32, tile: i
 /// 31 (all bits set) is transparent. The frames start at `src` in the sprite memory and the masks
 /// are stored from `dest` on.
 pub fn make_sprite_masks(
-    game: &mut Game,
+    memory: &mut Memory,
     src: usize,
     dest: usize,
     words: i32,
@@ -222,7 +223,7 @@ pub fn make_sprite_masks(
     chars: i32,
 ) {
     let plane_bytes = (words * scans) as u16 as usize * 2;
-    let shapes = &mut game.memory.shape;
+    let shapes = &mut memory.shape;
     let (mut src, mut dest) = (src, dest);
 
     for _ in 0..chars {

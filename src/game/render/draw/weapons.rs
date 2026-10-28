@@ -4,7 +4,8 @@ use super::images::{byte_of, state_entry};
 use super::{DEAD, OBJECTS, SHOOT1, Sprite};
 use crate::game::data::object_tables::{bow_x, bow_y};
 use crate::game::data::state::ActorRef;
-use crate::game::data::state::Game;
+use crate::game::data::state::Actors;
+use crate::game::data::state::World;
 
 const OBJ_BOW_UP: i16 = 30;
 const OBJ_BOW_MID: i16 = 0x53;
@@ -37,15 +38,20 @@ const WEAPON_SPRITE_BASE: [(i8, i16); 4] = [(2, 32), (3, 48), (1, 64), (4, 0)];
 
 /// Says whether this pass draws the weapon (`true`) or the body. An actor with a weapon is drawn in
 /// two passes, the weapon first or second depending on which way it faces.
-pub(super) fn weapon_passmode(game: &mut Game, actor: ActorRef, pass: &mut u8) -> bool {
+pub(super) fn weapon_passmode(
+    actors: &Actors,
+    world: &World,
+    actor: ActorRef,
+    pass: &mut u8,
+) -> bool {
     let mut passmode = false;
-    let state = game.actor(actor).state;
+    let state = actors.actor(actor).state;
 
-    if game.actor(actor).weapon > 0
-        && game.actor(actor).weapon <= LAST_HELD_WEAPON
-        && (!(DEAD..SHOOT1).contains(&state) || game.world.extent_type > PEACEFUL_XTYPE)
+    if actors.actor(actor).weapon > 0
+        && actors.actor(actor).weapon <= LAST_HELD_WEAPON
+        && (!(DEAD..SHOOT1).contains(&state) || world.extent_type > PEACEFUL_XTYPE)
     {
-        let facing = game.actor(actor).facing as i32;
+        let facing = actors.actor(actor).facing as i32;
 
         // The other of the two passes (0 becomes 1, 1 becomes 0).
         let flipped = *pass ^ 1;
@@ -56,7 +62,7 @@ pub(super) fn weapon_passmode(game: &mut Game, actor: ActorRef, pass: &mut u8) -
             *pass
         };
 
-        if game.actor(actor).weapon == WEAPON_BOW && state < SHOOT1 {
+        if actors.actor(actor).weapon == WEAPON_BOW && state < SHOOT1 {
             pick = if (facing & FACING_LEFT_BIT) == 0 {
                 flipped
             } else {
@@ -85,8 +91,8 @@ fn bow_image(frame_number: i16) -> i16 {
 }
 
 /// The weapon's sprite: where it is held for this animation frame, and which image it is.
-pub(super) fn weapon_image(game: &mut Game, actor: ActorRef, mut sprite: Sprite) -> Sprite {
-    let kind = game.actor(actor).weapon as i16;
+pub(super) fn weapon_image(actors: &Actors, actor: ActorRef, mut sprite: Sprite) -> Sprite {
+    let kind = actors.actor(actor).weapon as i16;
     let frame_number = sprite.inum;
 
     if kind == WEAPON_BOW as i16 && frame_number < BOW_FRAMES {
@@ -99,9 +105,9 @@ pub(super) fn weapon_image(game: &mut Game, actor: ActorRef, mut sprite: Sprite)
         sprite.ystart += entry.wpn_y as i16;
 
         if kind == WEAPON_FIREBALL as i16 {
-            sprite.inum = game.actor(actor).facing as i16 + OBJ_ARROW_BASE;
+            sprite.inum = actors.actor(actor).facing as i16 + OBJ_ARROW_BASE;
 
-            if game.actor(actor).facing == FIREBALL_FACING_EAST {
+            if actors.actor(actor).facing == FIREBALL_FACING_EAST {
                 sprite.ystart -= FIREBALL_EAST_LIFT;
             }
         } else {

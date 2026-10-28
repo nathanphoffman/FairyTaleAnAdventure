@@ -10,7 +10,7 @@ use super::{
 use crate::game::data::state::Game;
 
 use crate::game::actors::interaction::blocked_at;
-use crate::game::data::random::{fta_rand, rand4};
+use crate::game::data::random::fta_rand;
 use crate::game::data::state::ActorRef;
 use crate::game::input::handler::{joystick_fire, mouse_buttons};
 use crate::game::ui::text::show_event;
@@ -134,13 +134,10 @@ pub(super) fn walking_state(game: &mut Game, state: i8) -> i8 {
         return STILL;
     }
 
-    let rng = std::cell::RefCell::new(&mut game.rng);
-    game.ui.compass_lit_direction = stumble(
-        game.ui.compass_lit_direction,
-        game.hero.hunger,
-        || rand4(&mut rng.borrow_mut()) == 0,
-        || fta_rand(&mut rng.borrow_mut()) & 1 != 0,
-    );
+    let rng = &mut game.rng;
+    game.ui.compass_lit_direction = stumble(game.ui.compass_lit_direction, game.hero.hunger, |n| {
+        fta_rand(rng) & (n - 1)
+    });
 
     game.actors.list[0].facing = game.ui.compass_lit_direction as i8;
 
@@ -151,16 +148,12 @@ pub(super) fn walking_state(game: &mut Game, state: i8) -> i8 {
     state
 }
 
-/// A starving hero sometimes stumbles one step off the direction walked. `trips` and `turns_right`
-/// are random draws, taken in that order and only when needed.
-pub(super) fn stumble(
-    direction: i16,
-    hunger: i16,
-    trips: impl FnOnce() -> bool,
-    turns_right: impl FnOnce() -> bool,
-) -> i16 {
-    if hunger > STUMBLE_HUNGER && trips() {
-        if turns_right() {
+/// A starving hero sometimes stumbles one step off the direction walked. `dice(n)` is a random number
+/// from 0 to n - 1: one draw of 4 says whether the hero trips (0), and only then a draw of 2 says
+/// which way (1 is right).
+pub(super) fn stumble(direction: i16, hunger: i16, mut dice: impl FnMut(i32) -> i32) -> i16 {
+    if hunger > STUMBLE_HUNGER && dice(4) == 0 {
+        if dice(2) != 0 {
             (direction + 1) & FACING_MASK
         } else {
             (direction - 1) & FACING_MASK
@@ -175,45 +168,45 @@ mod tests {
     use super::super::{FIGHTING, SHOOT1, STUMBLE_HUNGER, WALKING, WEAPON_BOW, WEAPON_WAND};
     use super::*;
 
+    /// Dice that give a trip (or not) and then a turn to the right (or not).
+    fn dice(trips: bool, right: bool) -> impl FnMut(i32) -> i32 {
+        move |n| match n {
+            4 => !trips as i32,
+            _ => right as i32,
+        }
+    }
+
     #[test]
     fn only_a_starving_hero_stumbles() {
         let mut drawn = 0;
-        let dir = stumble(
-            3,
-            STUMBLE_HUNGER,
-            || {
-                drawn += 1;
+        let dir = stumble(3, STUMBLE_HUNGER, |_| {
+            drawn += 1;
 
-                true
-            },
-            || true,
-        );
+            0
+        });
 
         assert_eq!((dir, drawn), (3, 0));
-        assert_eq!(stumble(3, STUMBLE_HUNGER + 1, || false, || true), 3);
-        assert_eq!(stumble(3, STUMBLE_HUNGER + 1, || true, || true), 4);
-        assert_eq!(stumble(3, STUMBLE_HUNGER + 1, || true, || false), 2);
+        assert_eq!(stumble(3, STUMBLE_HUNGER + 1, dice(false, true)), 3);
+        assert_eq!(stumble(3, STUMBLE_HUNGER + 1, dice(true, true)), 4);
+        assert_eq!(stumble(3, STUMBLE_HUNGER + 1, dice(true, false)), 2);
 
         // the compass wraps around
-        assert_eq!(stumble(7, STUMBLE_HUNGER + 1, || true, || true), 0);
-        assert_eq!(stumble(0, STUMBLE_HUNGER + 1, || true, || false), 7);
+        assert_eq!(stumble(7, STUMBLE_HUNGER + 1, dice(true, true)), 0);
+        assert_eq!(stumble(0, STUMBLE_HUNGER + 1, dice(true, false)), 7);
     }
 
     #[test]
     fn the_turn_is_only_drawn_after_a_trip() {
-        let mut drawn = 0;
-        stumble(
-            3,
-            STUMBLE_HUNGER + 1,
-            || false,
-            || {
-                drawn += 1;
+        let mut turns = 0;
+        stumble(3, STUMBLE_HUNGER + 1, |n| {
+            if n == 2 {
+                turns += 1;
+            }
 
-                true
-            },
-        );
+            1
+        });
 
-        assert_eq!(drawn, 0);
+        assert_eq!(turns, 0);
     }
 
     #[test]

@@ -5,7 +5,9 @@
 //! stored big-endian (as the Amiga's 68000 kept them).
 
 use crate::game::data::object_tables::glbobs;
+use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
+use crate::game::data::state::Hero;
 use crate::game::data::state::SAVED_STUFF_SLOTS;
 use crate::game::data::types::{Extent, Missile, Shape, WorldObject};
 
@@ -223,12 +225,12 @@ fn transfer_missile(t: &mut Transfer, m: &mut Missile) {
 
 /// Saves or loads the three brothers' item lists and the missiles (the count `next_missile` is saved
 /// elsewhere).
-fn transfer_party(game: &mut Game, t: &mut Transfer) {
-    t.bytes(&mut game.hero.julstuff[..SAVED_STUFF_SLOTS]);
-    t.bytes(&mut game.hero.philstuff[..SAVED_STUFF_SLOTS]);
-    t.bytes(&mut game.hero.kevstuff[..SAVED_STUFF_SLOTS]);
+fn transfer_party(actors: &mut Actors, hero: &mut Hero, t: &mut Transfer) {
+    t.bytes(&mut hero.julstuff[..SAVED_STUFF_SLOTS]);
+    t.bytes(&mut hero.philstuff[..SAVED_STUFF_SLOTS]);
+    t.bytes(&mut hero.kevstuff[..SAVED_STUFF_SLOTS]);
 
-    for missile in game.actors.missiles.iter_mut() {
+    for missile in actors.missiles.iter_mut() {
         transfer_missile(t, missile);
     }
 }
@@ -247,7 +249,7 @@ pub fn transfer_all(game: &mut Game, t: &mut Transfer) {
         transfer_actor(t, &mut game.actors.list[i]);
     }
 
-    transfer_party(game, t);
+    transfer_party(&mut game.actors, &mut game.hero, t);
 
     for extent in game.extents.iter_mut().take(SAVED_EXTENTS) {
         transfer_extent(t, extent);

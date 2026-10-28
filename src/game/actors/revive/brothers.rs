@@ -1,6 +1,8 @@
 //! Handing over from a fallen brother to the next: his body, the placards and the new stats.
 
+use crate::game::data::object_tables::ObjectLists;
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
 use crate::game::data::state::{Hero, World};
 use crate::game::data::tables::brother_stats;
@@ -75,33 +77,33 @@ const HERO_SPRITE_FILE: i16 = 6;
 const HERO_SET_FILE: i16 = 13;
 
 /// Puts the raft and the first person back where they start.
-pub(super) fn reset_raft_setfig(game: &mut Game) {
+pub(super) fn reset_raft_setfig(actors: &mut Actors) {
     let raft = ActorRef::new(1);
-    game.actor_mut(raft).kind = RAFT;
-    game.actor_mut(raft).abs_x = RAFT_START.0;
-    game.actor_mut(raft).abs_y = RAFT_START.1;
-    game.actor_mut(raft).index = 0;
-    game.actor_mut(raft).weapon = 0;
-    game.actor_mut(raft).environ = 0;
+    actors.actor_mut(raft).kind = RAFT;
+    actors.actor_mut(raft).abs_x = RAFT_START.0;
+    actors.actor_mut(raft).abs_y = RAFT_START.1;
+    actors.actor_mut(raft).index = 0;
+    actors.actor_mut(raft).weapon = 0;
+    actors.actor_mut(raft).environ = 0;
 
     let setfig = ActorRef::new(2);
-    game.actor_mut(setfig).kind = SETFIG;
-    game.actor_mut(setfig).abs_x = SETFIG_START.0;
-    game.actor_mut(setfig).abs_y = SETFIG_START.1;
-    game.actor_mut(setfig).index = 0;
-    game.actor_mut(setfig).weapon = 0;
+    actors.actor_mut(setfig).kind = SETFIG;
+    actors.actor_mut(setfig).abs_x = SETFIG_START.0;
+    actors.actor_mut(setfig).abs_y = SETFIG_START.1;
+    actors.actor_mut(setfig).index = 0;
+    actors.actor_mut(setfig).weapon = 0;
 }
 
 /// The fallen brother's body is left where he died, and his ghost appears.
-pub(super) fn leave_fallen_brother(game: &mut Game) {
-    if game.hero.brother > 0 && game.hero.brother < KEVIN {
-        game.objects.global[game.hero.brother as usize].xc = game.hero.x;
-        game.objects.global[game.hero.brother as usize].yc = game.hero.y;
-        game.objects.global[game.hero.brother as usize].ob_stat = ON_GROUND;
-        game.objects.global[game.hero.brother as usize + DEAD_BROTHER_PERSON].ob_stat = PERSON;
+pub(super) fn leave_fallen_brother(objects: &mut ObjectLists, hero: &Hero) {
+    if hero.brother > 0 && hero.brother < KEVIN {
+        objects.global[hero.brother as usize].xc = hero.x;
+        objects.global[hero.brother as usize].yc = hero.y;
+        objects.global[hero.brother as usize].ob_stat = ON_GROUND;
+        objects.global[hero.brother as usize + DEAD_BROTHER_PERSON].ob_stat = PERSON;
     }
 
-    game.objects.region[8][SPECTRE_SLOT].ob_stat = PERSON;
+    objects.region[8][SPECTRE_SLOT].ob_stat = PERSON;
 }
 
 /// The next brother takes over: his stats and item list, nothing in the timers, and the first
@@ -111,7 +113,11 @@ pub(super) fn take_over_next_brother(game: &mut Game, hero: ActorRef) {
     start_next_brother(&mut game.hero, &mut game.actors.list[hero.slot()], stats);
 
     reset_for_next_brother(&mut game.hero, &mut game.world);
-    move_camera_to(game, game.hero.safe_x as i32, game.hero.safe_y as i32);
+    move_camera_to(
+        &mut game.world,
+        game.hero.safe_x as i32,
+        game.hero.safe_y as i32,
+    );
     game.screen.view_status = VIEW_REDRAW;
     game.actors.on_screen = 1;
     game.actors.loading = 0;

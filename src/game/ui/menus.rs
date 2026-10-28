@@ -5,9 +5,11 @@
 //! has the matching item (`item_menu_state`).
 
 use crate::game::data::state::Game;
+use crate::game::data::state::Ui;
 use crate::game::data::tables::{key_colors, label1};
 use crate::game::input::handler::forget_last_menu;
 use crate::game::render::screen::PortId;
+use crate::game::render::screen::Screen;
 use crate::game::ui::text::item_menu_state;
 
 // Menu numbers (`enum cmodes` in csrc/fmain.c).
@@ -57,15 +59,15 @@ const GIVE_GOLD_MIN: i16 = 2;
 pub fn update_menu_availability(game: &mut Game) {
     for i in 0..MAGIC_ITEMS {
         game.menus[MAGIC].enabled[i + ITEM_ENTRIES_START] =
-            item_menu_state(game, i as i32 + MAGIC_ITEM_BASE) as i8;
-        game.menus[USE].enabled[i] = item_menu_state(game, i as i32) as i8;
+            item_menu_state(&game.hero, i as i32 + MAGIC_ITEM_BASE) as i8;
+        game.menus[USE].enabled[i] = item_menu_state(&game.hero, i as i32) as i8;
     }
 
     // "use a key" is available if any key slot reports available
     let mut keys = GREYED;
 
     for i in 0..KEY_ITEMS {
-        let flag = item_menu_state(game, i as i32 + KEY_ITEM_BASE) as i8;
+        let flag = item_menu_state(&game.hero, i as i32 + KEY_ITEM_BASE) as i8;
         game.menus[KEYS].enabled[i + ITEM_ENTRIES_START] = flag;
 
         if flag == AVAILABLE {
@@ -74,7 +76,7 @@ pub fn update_menu_availability(game: &mut Game) {
     }
 
     game.menus[USE].enabled[USE_KEY_ENTRY] = keys;
-    game.menus[USE].enabled[USE_SUNSTONE_ENTRY] = item_menu_state(game, SUNSTONE) as i8;
+    game.menus[USE].enabled[USE_SUNSTONE_ENTRY] = item_menu_state(&game.hero, SUNSTONE) as i8;
     game.menus[GIVE].enabled[GIVE_GOLD_ENTRY] = if game.hero.wealth > GIVE_GOLD_MIN {
         AVAILABLE
     } else {
@@ -82,8 +84,8 @@ pub fn update_menu_availability(game: &mut Game) {
     }; // gold
 
     game.menus[GIVE].enabled[GIVE_BOOK_ENTRY] = GREYED;
-    game.menus[GIVE].enabled[GIVE_WRIT_ENTRY] = item_menu_state(game, WRIT) as i8;
-    game.menus[GIVE].enabled[GIVE_BONE_ENTRY] = item_menu_state(game, BONE) as i8;
+    game.menus[GIVE].enabled[GIVE_WRIT_ENTRY] = item_menu_state(&game.hero, WRIT) as i8;
+    game.menus[GIVE].enabled[GIVE_BONE_ENTRY] = item_menu_state(&game.hero, BONE) as i8;
 }
 
 /// Most entries a menu shows at once (two columns of six).
@@ -115,12 +117,12 @@ pub fn print_options(game: &mut Game) {
         }
     }
 
-    blank_slots_from(game, slot);
+    blank_slots_from(&mut game.ui, &mut game.screen, slot);
 }
 
 /// Blanks the slots from `first` to the last one: nothing is shown there.
-fn blank_slots_from(game: &mut Game, first: usize) {
-    game.screen.set_b_pen(PortId::Text2, 0);
+fn blank_slots_from(ui: &mut Ui, screen: &mut Screen, first: usize) {
+    screen.set_b_pen(PortId::Text2, 0);
 
     for slot in first..SLOTS {
         let x = if slot & 1 != 0 {
@@ -130,11 +132,10 @@ fn blank_slots_from(game: &mut Game, first: usize) {
         };
 
         let y = (slot / 2) as i32 * ROW_HEIGHT + FIRST_ROW_Y;
-        game.screen.move_to(PortId::Text2, x, y);
-        game.screen
-            .text(PortId::Text2, &BOX[..ENTRY_WIDTH as usize]);
+        screen.move_to(PortId::Text2, x, y);
+        screen.text(PortId::Text2, &BOX[..ENTRY_WIDTH as usize]);
 
-        game.ui.slot_entries[slot] = -1;
+        ui.slot_entries[slot] = -1;
     }
 }
 

@@ -2,6 +2,7 @@
 
 use super::{CARRIER, CFileInfo, DRAGON, cfile};
 use crate::game::data::state::Game;
+use crate::game::data::state::Memory;
 use crate::game::data::types::SeqInfo;
 use crate::game::files::disk::{
     is_last_read_pending, last_read_finished, load_track_range, mark_read_unused, motor_off,
@@ -72,7 +73,7 @@ pub fn load_start_sprites(game: &mut Game) {
     finish_sprite_load(game, PHIL as i16);
     load_sprite_file(game, RAFT_FILE);
     finish_sprite_load(game, RAFT as i16);
-    sequence(game, ENEMY).location = game.memory.nextshape;
+    sequence(&mut game.memory, ENEMY).location = game.memory.nextshape;
     load_sprite_file(game, game.actors.loaded_actor_file as i32);
     finish_sprite_load(
         game,
@@ -86,8 +87,8 @@ pub fn load_start_sprites(game: &mut Game) {
 }
 
 /// The `seq_list` entry for a sprite slot (PHIL, OBJECTS, ENEMY ...).
-pub(super) fn sequence(game: &mut Game, slot: u8) -> &mut SeqInfo {
-    &mut game.memory.seq_list[slot as usize]
+pub(super) fn sequence(memory: &mut Memory, slot: u8) -> &mut SeqInfo {
+    &mut memory.seq_list[slot as usize]
 }
 
 /// Starts loading sprite file `num` into the next free shape memory, if it fits.
@@ -97,7 +98,7 @@ pub(super) fn sequence(game: &mut Game, slot: u8) -> &mut SeqInfo {
 pub fn load_sprite_file(game: &mut Game, num: i32) {
     let file = &SPRITE_FILES[num as usize];
     let next = game.memory.nextshape;
-    let slot = sequence(game, file.seq_num);
+    let slot = sequence(&mut game.memory, file.seq_num);
     slot.bytes = file.height as i16 * file.width as i16 * 2;
     let size = slot.bytes as usize * file.count as usize;
     slot.location = next;
@@ -116,7 +117,7 @@ pub fn load_sprite_file(game: &mut Game, num: i32) {
         );
 
         let mask = next + size * SIZE_WITHOUT_MASK;
-        sequence(game, file.seq_num).maskloc = mask;
+        sequence(&mut game.memory, file.seq_num).maskloc = mask;
         game.memory.nextshape = mask + size;
     }
 }
@@ -126,9 +127,9 @@ pub fn finish_sprite_load(game: &mut Game, slot: i16) {
     wait_for_read(SPRITE_REQUEST as i32);
     mark_read_unused(SPRITE_REQUEST as i32);
     {
-        let s = *sequence(game, slot as u8);
+        let s = *sequence(&mut game.memory, slot as u8);
         make_sprite_masks(
-            game,
+            &mut game.memory,
             s.location,
             s.maskloc,
             s.width as i32,

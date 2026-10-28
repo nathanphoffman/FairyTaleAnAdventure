@@ -203,11 +203,11 @@ pub fn check_death(game: &mut Game, i: i32, dtype: i32) {
             set_mood(game, 1);
         }
 
-        queue_print(game, PRQ_VITALITY);
+        queue_print(&mut game.ui, PRQ_VITALITY);
     }
 
     if i == 0 {
-        queue_print(game, PRQ_STATS);
+        queue_print(&mut game.ui, PRQ_STATS);
     }
 }
 

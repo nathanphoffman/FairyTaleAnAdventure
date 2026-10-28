@@ -2,6 +2,7 @@
 
 use super::hits::{RACE_WRAITH, actor_at};
 use super::{DEAD, ENEMY, RAFT_SLOT, RAFT_TYPE};
+use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
 use crate::game::world::map::{probe_collision, step_x, step_y};
 
@@ -36,7 +37,7 @@ pub fn blocked_at(game: &mut Game, x: i16, y: i16, i: i16) -> i32 {
         }
     }
 
-    if (0..game.actors.active as i32).any(|j| blocked_by_actor(game, x, y, i, j)) {
+    if (0..game.actors.active as i32).any(|j| blocked_by_actor(&game.actors, x, y, i, j)) {
         return BLOCKED_BY_ACTOR;
     }
 
@@ -45,19 +46,19 @@ pub fn blocked_at(game: &mut Game, x: i16, y: i16, i: i16) -> i32 {
 
 /// Whether actor `j` stands in the way of actor `i` at (`x`, `y`). Dead actors and rafts can be
 /// walked over.
-fn blocked_by_actor(game: &mut Game, x: i16, y: i16, i: i16, j: i32) -> bool {
+fn blocked_by_actor(actors: &Actors, x: i16, y: i16, i: i16, j: i32) -> bool {
     let other = actor_at(j);
 
     if i as i32 == j
         || j == RAFT_SLOT as i32
-        || game.actor(other).kind == RAFT_TYPE
-        || game.actor(other).state == DEAD
+        || actors.actor(other).kind == RAFT_TYPE
+        || actors.actor(other).state == DEAD
     {
         return false;
     }
 
-    let dx = x as i32 - game.actor(other).abs_x as i32;
-    let dy = y as i32 - game.actor(other).abs_y as i32;
+    let dx = x as i32 - actors.actor(other).abs_x as i32;
+    let dy = y as i32 - actors.actor(other).abs_y as i32;
 
     dx < BLOCK_HALF_WIDTH
         && dx > -BLOCK_HALF_WIDTH

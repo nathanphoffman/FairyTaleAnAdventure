@@ -4,6 +4,7 @@ use super::shop::FIRST_MENU_ENTRY;
 use super::{ITEMS, KEYBASE, KEYS};
 use crate::game::actors::interaction::summon_turtle;
 use crate::game::data::state::Game;
+use crate::game::data::state::Hero;
 use crate::game::ui::items_menu::item_name;
 use crate::game::ui::menus::go_to_menu;
 use crate::game::ui::messages::{print, print_cont, print_wrapped};
@@ -26,10 +27,10 @@ const DIRECTIONS: i32 = 9;
 const DOOR_REACH: i32 = 16;
 
 /// Whether the hero is in the box where the turtle cannot be called.
-fn in_no_turtle_area(game: &mut Game) -> bool {
+fn in_no_turtle_area(hero: &Hero) -> bool {
     let (x_low, x_high, y_low, y_high) = NO_TURTLE_AREA;
 
-    game.hero.x < x_high && game.hero.x > x_low && game.hero.y < y_high && game.hero.y > y_low
+    hero.x < x_high && hero.x > x_low && hero.y < y_high && hero.y > y_low
 }
 
 /// Picks a weapon, the key menu, the turtle shell, or the sunstone.
@@ -53,7 +54,7 @@ pub(super) fn use_option(game: &mut Game, chosen_entry: i16) -> bool {
     }
 
     if chosen_entry == SHELL_ENTRY && game.ui.menu_hit_enabled != 0 {
-        if in_no_turtle_area(game) {
+        if in_no_turtle_area(&game.hero) {
             return true;
         }
 

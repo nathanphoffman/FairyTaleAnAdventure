@@ -3,7 +3,10 @@
 //! The music depends on what the hero is doing: dying, in the astral plane, fighting, indoors,
 //! or just walking by day or night. `track` holds the four voices of each tune in order.
 
+use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
+use crate::game::data::state::Hero;
+use crate::game::data::state::World;
 use crate::game::files::loading::tune_tracks;
 use crate::platform::audio::{Track, playscore, set_instrument, setscore, stopscore};
 
@@ -61,7 +64,7 @@ pub fn export_tunes(dir: &std::path::Path) {
 /// Picks the tune for the situation and plays it right away if `now` is set, otherwise changes
 /// to it at the end of the current one. If music is switched off, stops the music.
 pub fn set_mood(game: &mut Game, now: i8) {
-    let tune = pick_tune(game);
+    let tune = pick_tune(&game.actors, &game.world, &game.hero);
 
     if { game.menus[GAME_MENU].enabled[MUSIC_ENTRY] } & 1 != 0 {
         if now != 0 {
@@ -76,21 +79,21 @@ pub fn set_mood(game: &mut Game, now: i8) {
 
 /// The tune for what the hero is doing: dying, in the astral plane, fighting, indoors (which also
 /// picks the instrument for houses or caves), or walking by day or by night.
-fn pick_tune(game: &mut Game) -> usize {
-    if game.actors.list[0].vitality == 0 {
+fn pick_tune(actors: &Actors, world: &World, hero: &Hero) -> usize {
+    if actors.list[0].vitality == 0 {
         TUNE_DEATH
-    } else if game.hero.x > ASTRAL_X.0
-        && game.hero.x < ASTRAL_X.1
-        && game.hero.y > ASTRAL_Y.0
-        && game.hero.y < ASTRAL_Y.1
+    } else if hero.x > ASTRAL_X.0
+        && hero.x < ASTRAL_X.1
+        && hero.y > ASTRAL_Y.0
+        && hero.y < ASTRAL_Y.1
     {
         TUNE_ASTRAL
-    } else if game.actors.battle_flag != 0 {
+    } else if actors.battle_flag != 0 {
         TUNE_BATTLE
-    } else if game.world.region > INDOOR_REGION {
+    } else if world.region > INDOOR_REGION {
         set_instrument(
             WAVE_SLOT,
-            if game.world.region == CAVE_REGION {
+            if world.region == CAVE_REGION {
                 WAVE_CAVE
             } else {
                 WAVE_INDOORS
@@ -98,7 +101,7 @@ fn pick_tune(game: &mut Game) -> usize {
         );
 
         TUNE_INDOORS
-    } else if game.world.light_level > NIGHT_LIGHT {
+    } else if world.light_level > NIGHT_LIGHT {
         TUNE_DAY
     } else {
         TUNE_NIGHT

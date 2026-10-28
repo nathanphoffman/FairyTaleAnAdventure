@@ -11,7 +11,10 @@
 //! The actor's `vitality` field is borrowed to remember which list entry it came from (the entry
 //! number, plus 0x80 for the global list), so `change_object` can find the entry again later.
 
+use crate::game::data::object_tables::ObjectLists;
 use crate::game::data::object_tables::{CHEST, ObjectList, TURTLE, glbobs, rand_treasure};
+use crate::game::data::state::Actors;
+use crate::game::data::state::World;
 use crate::game::data::state::{ActorRef, Game};
 
 use crate::game::data::random::bitrand;
@@ -123,9 +126,9 @@ const TREASURE_KINDS: i32 = 16;
 
 /// Drops `object` where actor `i` stands (slot 0 of the global list is used for this).
 /// That slot is reused for each item the hero or a monster leaves behind.
-pub fn leave_item(game: &mut Game, i: i16, object: i16) {
-    let drop = &mut game.objects.global[0];
-    let actor = &game.actors.list[i as usize];
+pub fn leave_item(objects: &mut ObjectLists, actors: &Actors, i: i16, object: i16) {
+    let drop = &mut objects.global[0];
+    let actor = &actors.list[i as usize];
     drop.xc = actor.abs_x;
     drop.yc = actor.abs_y.wrapping_add(DROP_OFFSET_Y);
     drop.ob_id = object as i8;
@@ -134,15 +137,21 @@ pub fn leave_item(game: &mut Game, i: i16, object: i16) {
 
 /// Changes the object that actor `id` stands for: `flag` 1 = show, 2 = take. A chest opens
 /// instead (its id changes to the opened chest, rather than its state).
-pub fn change_object(game: &mut Game, id: i32, flag: i32) {
-    let vitality = game.actors.list[id as usize].vitality;
+pub fn change_object(
+    objects: &mut ObjectLists,
+    actors: &Actors,
+    world: &mut World,
+    id: i32,
+    flag: i32,
+) {
+    let vitality = actors.list[id as usize].vitality;
 
     let index = (vitality & OBJECT_INDEX_MASK) as usize;
 
     let object = if vitality & GLOBAL_LIST_BIT != 0 {
-        &mut game.objects.global[index]
+        &mut objects.global[index]
     } else {
-        &mut game.objects.region(game.world.region as usize)[index]
+        &mut objects.region(world.region as usize)[index]
     };
 
     if object.ob_id == CHEST as i8 {
@@ -255,12 +264,12 @@ fn add_object(game: &mut Game, object: &mut WorldObject, index: i16, f: i32) {
     }
 
     let (actor, ystart) = if is_person {
-        match add_person_actor(game, object, index, ystart) {
+        match add_person_actor(&mut game.actors, object, index, ystart) {
             Some(placed) => placed,
             None => return,
         }
     } else {
-        (add_item_actor(game, object, index, f), ystart)
+        (add_item_actor(&mut game.actors, object, index, f), ystart)
     };
 
     let actor = &mut game.actor_mut(actor);
@@ -290,15 +299,15 @@ fn load_person_if_near(game: &mut Game, object: &WorldObject, xstart: i16, ystar
 /// (people stand a little higher than the object's spot), or `None` if the person is already
 /// there as an actor (the object is then marked dead if the actor died).
 fn add_person_actor(
-    game: &mut Game,
+    actors: &mut Actors,
     object: &mut WorldObject,
     index: i16,
     ystart: i16,
 ) -> Option<(ActorRef, i16)> {
     let id = object.ob_id;
-    let slot = game.actors.free_slot as usize;
-    let actor = &mut game.actors.list[slot];
-    game.actors.free_slot += 1;
+    let slot = actors.free_slot as usize;
+    let actor = &mut actors.list[slot];
+    actors.free_slot += 1;
 
     if actor.abs_x == object.xc && actor.abs_y == object.yc {
         if actor.state == DEAD {
@@ -323,22 +332,22 @@ fn add_person_actor(
     // A person's race is 0x80 plus their kind, so they can be told from monsters.
     actor.race = (id as i32 + PERSON_RACE_BASE) as u8;
 
-    if game.actors.free_slot > game.actors.drawn {
-        game.actors.drawn = game.actors.free_slot;
+    if actors.free_slot > actors.drawn {
+        actors.drawn = actors.free_slot;
     }
 
     Some((ActorRef::new(slot), ystart - PERSON_RAISE))
 }
 
 /// Makes an item lying about (or the turtle's eggs, a raft...) out of a world object.
-fn add_item_actor(game: &mut Game, object: &WorldObject, index: i16, f: i32) -> ActorRef {
+fn add_item_actor(actors: &mut Actors, object: &WorldObject, index: i16, f: i32) -> ActorRef {
     if object.ob_id == TURTLE as i8 {
-        game.actors.turtle_eggs = game.actors.drawn as i8;
+        actors.turtle_eggs = actors.drawn as i8;
     }
 
-    let slot = game.actors.drawn as usize;
-    let actor = &mut game.actors.list[slot];
-    game.actors.drawn += 1;
+    let slot = actors.drawn as usize;
+    let actor = &mut actors.list[slot];
+    actors.drawn += 1;
     actor.kind = OBJECTS;
     actor.index = object.ob_id;
     actor.weapon = 0;

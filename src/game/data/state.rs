@@ -179,8 +179,29 @@ pub struct Actors {
     pub turtle_eggs: i8,
 }
 
+impl Actors {
+    /// The actor `r` names.
+    pub fn actor(&self, r: ActorRef) -> &Shape {
+        &self.list[r.0]
+    }
+
+    pub fn actor_mut(&mut self, r: ActorRef) -> &mut Shape {
+        &mut self.list[r.0]
+    }
+
+    /// The missile `r` names.
+    pub fn missile(&self, r: MissileRef) -> &Missile {
+        &self.missiles[r.0]
+    }
+
+    pub fn missile_mut(&mut self, r: MissileRef) -> &mut Missile {
+        &mut self.missiles[r.0]
+    }
+}
+
 /// A way to name one actor of `Game::actors.list` by its number, so that code can hold on to "that
-/// actor" while it calls others that change the list. Read it with `game.actor(r)` or `game.actor_mut(r)`.
+/// actor" while it calls others that change the list. Read it with `game.actor(r)` or `game.actor_mut(r)`
+/// (or `actors.actor(r)` where only the actors are passed in).
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct ActorRef(usize);
 
@@ -369,20 +390,20 @@ pub struct Game {
 impl Game {
     /// The actor `r` names.
     pub fn actor(&self, r: ActorRef) -> &Shape {
-        &self.actors.list[r.0]
+        self.actors.actor(r)
     }
 
     pub fn actor_mut(&mut self, r: ActorRef) -> &mut Shape {
-        &mut self.actors.list[r.0]
+        self.actors.actor_mut(r)
     }
 
     /// The missile `r` names.
     pub fn missile(&self, r: MissileRef) -> &Missile {
-        &self.actors.missiles[r.0]
+        self.actors.missile(r)
     }
 
     pub fn missile_mut(&mut self, r: MissileRef) -> &mut Missile {
-        &mut self.actors.missiles[r.0]
+        self.actors.missile_mut(r)
     }
 
     pub fn new() -> Game {

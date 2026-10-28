@@ -3,6 +3,7 @@
 use super::COLOR_COUNT;
 use crate::game::data::random::bitrand;
 use crate::game::data::state::Game;
+use crate::game::data::state::World;
 use crate::game::render::display::delay;
 use crate::game::render::screen::ViewPortId;
 
@@ -46,7 +47,7 @@ const RANDOM_COLOR_MASK: i32 = 0xfff;
 /// the bluish moonlight. The light spell (`light_timer`) makes reds as bright as greens.
 /// Colour 31 is changed first because it depends on where the hero is (swamp, secret room).
 pub fn fade_page(game: &mut Game, r: i16, g: i16, b: i16, limit: i16, colors: &[u16]) {
-    game.page_colors[COLOR_31] = color_31_here(game);
+    game.page_colors[COLOR_31] = color_31_here(&game.world);
 
     let ((r, g, b), g2) = clamp_levels((r as i32, g as i32, b as i32), limit != 0);
 
@@ -67,10 +68,10 @@ pub fn fade_page(game: &mut Game, r: i16, g: i16, b: i16, limit: i16, colors: &[
 }
 
 /// Colour 31 depends on where the hero is: the swamp, the secret room (open or shut), or neither.
-fn color_31_here(game: &mut Game) -> u16 {
-    match game.world.region {
+fn color_31_here(world: &World) -> u16 {
+    match world.region {
         REGION_SWAMP => SWAMP_COLOR,
-        REGION_SECRET if game.world.secret_timer != 0 => SECRET_OPEN_COLOR,
+        REGION_SECRET if world.secret_timer != 0 => SECRET_OPEN_COLOR,
         REGION_SECRET => SECRET_SHUT_COLOR,
         _ => DEFAULT_COLOR_31,
     }

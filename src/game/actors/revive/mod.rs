@@ -39,7 +39,7 @@ const VIEW_GAME_OVER: i8 = 2;
 /// Either way the hero gets full health for the bravery, the clock is set to the morning
 /// (8000), and hunger and fatigue are cleared.
 pub fn revive(game: &mut Game, new: i16) {
-    reset_raft_setfig(game);
+    reset_raft_setfig(&mut game.actors);
 
     let hero = ActorRef::new(0);
     game.actor_mut(hero).kind = PHIL;
@@ -52,7 +52,7 @@ pub fn revive(game: &mut Game, new: i16) {
 
     if new != 0 {
         stopscore();
-        leave_fallen_brother(game);
+        leave_fallen_brother(&mut game.objects, &game.hero);
         take_over_next_brother(game, hero);
         show_brother_placards(game);
         announce_brother(game);

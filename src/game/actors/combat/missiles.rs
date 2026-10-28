@@ -3,6 +3,7 @@
 use super::{CARRIER, DEAD, MISSILES, RAFT, distance_to_point};
 use crate::game::actors::interaction::hit_actor;
 use crate::game::data::random::{bitrand, rand8};
+use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
 use crate::game::data::state::{ActorRef, MissileRef};
 use crate::game::data::types::Missile;
@@ -109,16 +110,16 @@ pub(super) fn hit_first_actor_in_path(game: &mut Game, i: usize, ms: MissileRef,
 
     let mut j = 0;
 
-    while j < actor_count(game) {
+    while j < actor_count(&game.actors) {
         let dodge = if j == 0 { game.hero.brave } else { OTHER_DODGE };
         let target = j;
         j += 1;
 
-        if !missile_can_hit(game, ms, target) {
+        if !missile_can_hit(&game.actors, ms, target) {
             continue;
         }
 
-        let dist = distance_to_point(game, ActorRef::new(target), xs, ys);
+        let dist = distance_to_point(&game.actors, ActorRef::new(target), xs, ys);
 
         // the original tests the missile's own index here, not the target's
         if missile_connects(i, dist, range, dodge, || {
@@ -140,18 +141,18 @@ pub(super) fn hit_first_actor_in_path(game: &mut Game, i: usize, ms: MissileRef,
 }
 
 /// A missile cannot hit the raft, its own archer, the dead or a carrier.
-fn missile_can_hit(game: &mut Game, ms: MissileRef, target: usize) -> bool {
+fn missile_can_hit(actors: &Actors, ms: MissileRef, target: usize) -> bool {
     let actor = ActorRef::new(target);
 
     !(target == RAFT
-        || game.missile(ms).archer as i16 == target as i16
-        || game.actor(actor).state == DEAD
-        || game.actor(actor).kind == CARRIER)
+        || actors.missile(ms).archer as i16 == target as i16
+        || actors.actor(actor).state == DEAD
+        || actors.actor(actor).kind == CARRIER)
 }
 
 /// The current number of actors (the loop bound is read again each time, as in the original).
-pub fn actor_count(game: &mut Game) -> usize {
-    game.actors.active as usize
+pub fn actor_count(actors: &Actors) -> usize {
+    actors.active as usize
 }
 
 #[cfg(test)]

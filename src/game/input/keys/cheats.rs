@@ -62,8 +62,8 @@ pub(super) fn cheat_move(game: &mut Game, key: i8) -> bool {
 
     match key {
         CHEAT_RESCUE => rescue_princess(game),
-        CHEAT_PRQ_2 => queue_print(game, PRQ_DEBUG_COORDS),
-        CHEAT_PRQ_3 => queue_print(game, PRQ_DEBUG_SECTOR),
+        CHEAT_PRQ_2 => queue_print(&mut game.ui, PRQ_DEBUG_COORDS),
+        CHEAT_PRQ_3 => queue_print(&mut game.ui, PRQ_DEBUG_SECTOR),
         CHEAT_TIME => game.world.day_clock = game.world.day_clock.wrapping_add(CHEAT_TIME_STEP),
         CHEAT_NORTH => {
             game.actor_mut(hero).abs_y = game.actor(hero).abs_y.wrapping_sub(CHEAT_STEP_Y);

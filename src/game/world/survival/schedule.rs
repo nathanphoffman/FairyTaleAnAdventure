@@ -40,7 +40,7 @@ pub fn survival_tick(game: &mut Game) {
     for step in steps {
         match step {
             SurvivalStep::Event(e) => show_event(game, e),
-            SurvivalStep::RedrawStats => queue_print(game, PRQ_STATS),
+            SurvivalStep::RedrawStats => queue_print(&mut game.ui, PRQ_STATS),
             SurvivalStep::PickMusic => set_mood(game, 0),
         }
     }

@@ -134,11 +134,11 @@ impl Ctx {
                 game.actor_mut(actor).vitality = WITCH_BODY_VITALITY;
                 game.actor_mut(actor).state = STILL;
                 game.actor_mut(actor).weapon = 0;
-                leave_item(game, i as i16, TALISMAN);
+                leave_item(&mut game.objects, &game.actors, i as i16, TALISMAN);
             }
 
             if game.actor(actor).race == RACE_LASSO_CARRIER {
-                leave_item(game, i as i16, LASSO);
+                leave_item(&mut game.objects, &game.actors, i as i16, LASSO);
             }
         }
     }
@@ -201,7 +201,7 @@ impl Ctx {
             self.hero_wrap(game);
             game.hero.x = game.actor(actor).abs_x;
             game.hero.y = game.actor(actor).abs_y;
-            move_camera_to(game, game.hero.x as i32, game.hero.y as i32);
+            move_camera_to(&mut game.world, game.hero.x as i32, game.hero.y as i32);
             game.hero.safe_flag = self.terrain as i8;
         }
 

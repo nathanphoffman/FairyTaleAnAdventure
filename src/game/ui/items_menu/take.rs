@@ -54,12 +54,12 @@ const FIRST_INDOOR_REGION: u16 = 7;
 
 /// Takes the nearest object, or searches the nearest dead body.
 pub(super) fn take_nearest(game: &mut Game) {
-    queue_print(game, PRQ_VITALITY);
+    queue_print(&mut game.ui, PRQ_VITALITY);
     find_nearest_figure(game, 0, TAKE_RANGE);
 
     game.hero.stuff_mut()[ARROWBASE] = 0;
     if game.actors.nearest_object == 0 {
-        queue_print(game, PRQ_NOTHING_NEAR);
+        queue_print(&mut game.ui, PRQ_NOTHING_NEAR);
 
         return;
     }
@@ -82,7 +82,13 @@ pub(super) fn take_nearest(game: &mut Game) {
 /// Removes the picked-up object from the world, turns any arrows picked up into the arrow
 /// count, and ends the game if the talisman was found.
 fn finish_pickup(game: &mut Game) {
-    change_object(game, game.actors.nearest_object as i32, 2);
+    change_object(
+        &mut game.objects,
+        &game.actors,
+        &mut game.world,
+        game.actors.nearest_object as i32,
+        2,
+    );
     add_stuff(
         game,
         ARROWS,

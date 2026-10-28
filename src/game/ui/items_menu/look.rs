@@ -24,7 +24,7 @@ pub(super) fn look_around(game: &mut Game) {
             && actor_distance(game, i, 0) < LOOK_RANGE
         {
             found = true;
-            change_object(game, i, 1);
+            change_object(&mut game.objects, &game.actors, &mut game.world, i, 1);
         }
     }
 

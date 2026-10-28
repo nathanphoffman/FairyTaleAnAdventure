@@ -17,6 +17,7 @@ use self::blit_setup::set_up_blit;
 use self::scenery::mask_against_scenery;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
+use crate::game::render::screen::Screen;
 
 pub use self::map_edge::repair_edges;
 
@@ -77,7 +78,7 @@ pub fn draw_sprites(game: &mut Game, cycle: i16) {
         let mut pass: u8 = 0;
 
         loop {
-            let passmode = weapon_passmode(game, actor, &mut pass);
+            let passmode = weapon_passmode(&game.actors, &game.world, actor, &mut pass);
 
             if let Drawn::OutOfRoom = draw_one(game, &mut frame, actor, i, cycle, passmode) {
                 return;
@@ -115,13 +116,21 @@ fn draw_one(
 ) -> Drawn {
     clear_scenery_mask(game);
 
-    let Some(mut sprite) = choose_image(game, actor, i, passmode) else {
+    let Some(mut sprite) = choose_image(&game.actors, &game.hero, actor, i, passmode) else {
         return Drawn::Done;
     };
 
     let bytes_wide = place_on_screen(game, &mut sprite);
 
-    if !adjust_for_depth(game, actor, i, cycle, passmode, &mut sprite) {
+    if !adjust_for_depth(
+        &game.actors,
+        &game.hero,
+        actor,
+        i,
+        cycle,
+        passmode,
+        &mut sprite,
+    ) {
         return Drawn::Done;
     }
 
@@ -208,7 +217,15 @@ fn blit_sprite(
     }
     save_background(game, game.blitter.sshape.backsave);
 
-    if !drawn_in_front(game, actor, i, sprite.atype, sprite.inum) {
+    if !drawn_in_front(
+        &game.actors,
+        &game.world,
+        &mut game.hero,
+        actor,
+        i,
+        sprite.atype,
+        sprite.inum,
+    ) {
         mask_against_scenery(
             game,
             actor,
@@ -224,14 +241,14 @@ fn blit_sprite(
     combine_masks(game);
     draw_shape(game);
     game.actor_mut(actor).visible = 1;
-    queue_shape(game, game.blitter.sshape);
+    queue_shape(&mut game.screen, game.blitter.sshape);
 
     Drawn::Done
 }
 
 /// Notes how the sprite just drawn was drawn, so it can be undone next frame.
-fn queue_shape(game: &mut Game, shape: SShape) {
-    let page = game.screen.drawing_page_mut();
+fn queue_shape(screen: &mut Screen, shape: SShape) {
+    let page = screen.drawing_page_mut();
     let index = page.obcount as usize;
 
     if index < page.shape_queue.len() {

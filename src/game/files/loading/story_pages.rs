@@ -1,6 +1,7 @@
 //! The story pages of the intro: showing them and the page-turn animation between them.
 
 use crate::game::data::state::Game;
+use crate::game::data::state::Ui;
 use crate::game::files::iff_picture::load_picture;
 use crate::game::input::handler::next_key;
 use crate::game::render::display::delay;
@@ -12,12 +13,12 @@ const ALL_PLANES: u32 = 0x1f;
 
 /// Whether the intro is being skipped. Once Space has been seen the skip sticks (the original
 /// reset it on every poll without a key).
-pub fn intro_skipped(game: &mut Game) -> i32 {
+pub fn intro_skipped(ui: &mut Ui) -> i32 {
     if next_key() == b' ' as i32 {
-        game.ui.intro_skip_requested = 1;
+        ui.intro_skip_requested = 1;
     }
 
-    game.ui.intro_skip_requested as i32
+    ui.intro_skip_requested as i32
 }
 
 const SCREEN_WIDTH: i32 = 320;
@@ -53,12 +54,12 @@ pub fn show_story_page(game: &mut Game, br1: &str, br2: &str, x: i16, y: i16) {
     load_picture(br1, new_page, PICTURE_X, PICTURE_Y);
     load_picture(br2, new_page, x as usize, y as usize);
 
-    if intro_skipped(game) != 0 {
+    if intro_skipped(&mut game.ui) != 0 {
         return;
     }
 
     turn_page(game);
-    intro_skipped(game);
+    intro_skipped(&mut game.ui);
 }
 
 // The page-turn animation, 22 frames: strip step, strip width and delay for each.

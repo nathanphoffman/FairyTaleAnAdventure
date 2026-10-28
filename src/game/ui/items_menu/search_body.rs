@@ -2,7 +2,7 @@
 
 use super::{ARROWS, GOLDBASE, add_stuff, item, item_name};
 use crate::game::data::object_tables::treasure_probs;
-use crate::game::data::random::rand8;
+use crate::game::data::random::{Rng, rand8};
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
 use crate::game::data::tables::{encounter_chart, entry};
@@ -15,13 +15,12 @@ pub(super) fn search_body(game: &mut Game) {
     print_wrapped(game, "% searched the body and found");
     print(game, "");
     let (body_weapon, hero_weapon) = (game.actor(actor).weapon, game.actors.list[0].weapon);
-    let game_cell = std::cell::RefCell::new(&mut *game);
-    let loot = body_loot(
-        body_weapon,
-        hero_weapon,
-        || rand8(&mut game_cell.borrow_mut().rng) + EXTRA_ARROWS_MIN,
-        || roll_body_treasure(&mut game_cell.borrow_mut(), actor),
-    );
+    let race = game.actor(actor).race;
+    let rng = &mut game.rng;
+    let loot = body_loot(body_weapon, hero_weapon, |roll| match roll {
+        LootRoll::Arrows => rand8(rng) + EXTRA_ARROWS_MIN,
+        LootRoll::Treasure => roll_body_treasure(race, rng) as i32,
+    });
 
     game.actor_mut(actor).weapon = -1;
 
@@ -90,13 +89,17 @@ struct BodyLoot {
     pub(super) treasure: u32,
 }
 
-/// `arrow_roll` and `treasure_roll` are the random draws: the arrows only for an archer, the
-/// treasure only when there are no arrows.
+/// The random draws a search can ask for: the arrows only for an archer, the treasure only when
+/// there are no arrows.
+enum LootRoll {
+    Arrows,
+    Treasure,
+}
+
 fn body_loot(
     body_weapon_raw: i8,
     hero_weapon: i8,
-    arrow_roll: impl FnOnce() -> i32,
-    treasure_roll: impl FnOnce() -> u32,
+    mut roll: impl FnMut(LootRoll) -> i32,
 ) -> BodyLoot {
     let weapon = body_weapon(body_weapon_raw);
     let hero_weapon = if weapon != 0 {
@@ -109,7 +112,7 @@ fn body_loot(
         return BodyLoot {
             weapon,
             hero_weapon,
-            arrows: Some(arrow_roll()),
+            arrows: Some(roll(LootRoll::Arrows)),
             treasure: 0,
         };
     }
@@ -118,7 +121,7 @@ fn body_loot(
         weapon,
         hero_weapon,
         arrows: None,
-        treasure: treasure_roll(),
+        treasure: roll(LootRoll::Treasure) as u32,
     }
 }
 
@@ -145,48 +148,57 @@ fn better_weapon(current: i8, found: u32) -> i8 {
 
 /// Picks what a dead enemy carries besides its weapon, from the treasure table for its race.
 /// Returns an item number (0 for nothing); characters like shopkeepers (a set figure) carry none.
-fn roll_body_treasure(game: &mut Game, actor: ActorRef) -> u32 {
+fn roll_body_treasure(race: u8, rng: &mut Rng) -> u32 {
     const SETFIG_RACE_BIT: u8 = 0x80;
     const TREASURE_CLASS_SIZE: i32 = 8;
-    if game.actor(actor).race & SETFIG_RACE_BIT != 0 {
+    if race & SETFIG_RACE_BIT != 0 {
         return 0;
     }
 
-    let class = entry(&encounter_chart, game.actor(actor).race as usize).treasure;
+    let class = entry(&encounter_chart, race as usize).treasure;
 
-    treasure_probs[(class as i32 * TREASURE_CLASS_SIZE + rand8(&mut game.rng)) as usize] as i32
-        as u32
+    treasure_probs[(class as i32 * TREASURE_CLASS_SIZE + rand8(rng)) as usize] as i32 as u32
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// Rolls that give the treasure `treasure` and never ask for arrows.
+    fn treasure_only(treasure: i32) -> impl FnMut(LootRoll) -> i32 {
+        move |roll| match roll {
+            LootRoll::Treasure => treasure,
+            LootRoll::Arrows => unreachable!(),
+        }
+    }
+
     #[test]
     fn body_loot_rules() {
-        let none = || -> u32 { 0 };
-        let l = body_loot(2, 1, || unreachable!(), || 7);
+        let l = body_loot(2, 1, treasure_only(7));
         assert_eq!(
             (l.weapon, l.hero_weapon, l.arrows, l.treasure),
             (2, 2, None, 7)
         );
 
         // a weaker weapon does not replace the one in hand
-        assert_eq!(body_loot(2, 3, || unreachable!(), none).hero_weapon, 3);
+        assert_eq!(body_loot(2, 3, treasure_only(0)).hero_weapon, 3);
 
         // an archer gives arrows and nothing else
-        let l = body_loot(4, 1, || 5, || unreachable!());
+        let l = body_loot(4, 1, |roll| match roll {
+            LootRoll::Arrows => 5,
+            LootRoll::Treasure => unreachable!(),
+        });
         assert_eq!(
             (l.weapon, l.arrows, l.treasure, l.hero_weapon),
             (4, Some(5), 0, 4)
         );
 
         // no weapon at all
-        let l = body_loot(0, 2, || unreachable!(), none);
+        let l = body_loot(0, 2, treasure_only(0));
         assert_eq!((l.weapon, l.hero_weapon, l.treasure), (0, 2, 0));
 
         // an already searched body (-1) has no weapon
-        assert_eq!(body_loot(-1, 2, || unreachable!(), none).weapon, 0);
+        assert_eq!(body_loot(-1, 2, treasure_only(0)).weapon, 0);
     }
 
     #[test]

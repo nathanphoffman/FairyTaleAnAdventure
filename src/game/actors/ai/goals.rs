@@ -6,7 +6,9 @@ use crate::game::actors::interaction::{report_battle_result, run_tactic};
 use crate::game::actors::steering::steer_actor;
 use crate::game::data::random::{bitrand, rand2, rand4};
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
+use crate::game::data::state::Hero;
 use crate::game::ui::music::set_mood;
 use crate::game::ui::text::queue_print;
 
@@ -76,8 +78,8 @@ pub fn update_enemy_goals(game: &mut Game) {
     }
 
     if game.actors.battle_flag == 0 && battle2 != 0 {
-        queue_print(game, PRQ_VITALITY);
-        queue_print(game, PRQ_STATS);
+        queue_print(&mut game.ui, PRQ_VITALITY);
+        queue_print(&mut game.ui, PRQ_STATS);
         report_battle_result(game);
     }
 }
@@ -95,9 +97,9 @@ fn think(game: &mut Game, i: usize, battle2: i8) {
         return;
     }
 
-    let (xd, yd) = distance_from_hero(game, actor);
+    let (xd, yd) = distance_from_hero(&game.actors, &game.hero, actor);
 
-    if !notice_actor(game, actor, xd, yd, battle2) {
+    if !notice_actor(&mut game.actors, actor, xd, yd, battle2) {
         return;
     }
 
@@ -127,25 +129,25 @@ fn aim_carrier(game: &mut Game, i: usize) {
 }
 
 /// How far the actor is from the hero along each axis, never negative.
-fn distance_from_hero(game: &mut Game, actor: ActorRef) -> (i16, i16) {
-    let xd = (game.actor(actor).abs_x as i32 - game.hero.x as i32) as i16;
-    let yd = (game.actor(actor).abs_y as i32 - game.hero.y as i32) as i16;
+fn distance_from_hero(actors: &Actors, hero: &Hero, actor: ActorRef) -> (i16, i16) {
+    let xd = (actors.actor(actor).abs_x as i32 - hero.x as i32) as i16;
+    let yd = (actors.actor(actor).abs_y as i32 - hero.y as i32) as i16;
 
     (xd.wrapping_abs(), yd.wrapping_abs())
 }
 
 /// Notes that an actor is on screen, and that a battle is on if it is awake and in view. Returns
 /// false for an actor that is on screen but out of hit points (it does nothing more).
-fn notice_actor(game: &mut Game, actor: ActorRef, xd: i16, yd: i16, battle2: i8) -> bool {
+fn notice_actor(actors: &mut Actors, actor: ActorRef, xd: i16, yd: i16, battle2: i8) -> bool {
     if on_screen(xd, yd) {
-        game.actors.on_screen = 1;
+        actors.on_screen = 1;
 
-        if game.actor(actor).vitality < 1 {
+        if actors.actor(actor).vitality < 1 {
             return false;
         }
 
-        if game.actor(actor).visible != 0 || battle2 != 0 {
-            game.actors.battle_flag = 1;
+        if actors.actor(actor).visible != 0 || battle2 != 0 {
+            actors.battle_flag = 1;
         }
     }
 

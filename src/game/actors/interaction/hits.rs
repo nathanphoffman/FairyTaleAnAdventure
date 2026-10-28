@@ -6,6 +6,7 @@ use super::{DEAD, DRAGON, ENEMY, FLEE, HERO, SETFIG};
 use crate::game::actors::encounters::check_death;
 use crate::game::data::random::{bitrand, rand64, rand256};
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
 use crate::game::files::loading::play_effect;
 use crate::game::ui::messages::{print, print_cont};
@@ -171,7 +172,7 @@ fn vitality_after_hit(vitality: i16, wt: i16) -> i16 {
 /// After a fight: reports how many foes were defeated or fled, or "Bravely done!" if the hero is
 /// nearly dead. Then, if turtle eggs are around, the turtle story event is checked.
 pub fn report_battle_result(game: &mut Game) {
-    let (dead, fled) = count_casualties(game);
+    let (dead, fled) = count_casualties(&game.actors);
     let vitality = game.actors.list[actor_at(HERO as i32).slot()].vitality;
 
     match battle_report(vitality, dead, fled, game.world.extent_type) {
@@ -199,19 +200,19 @@ pub fn report_battle_result(game: &mut Game) {
 }
 
 /// How many of the enemies are dead and how many have fled.
-fn count_casualties(game: &mut Game) -> (i32, i32) {
+fn count_casualties(actors: &Actors) -> (i32, i32) {
     let (mut dead, mut fled) = (0, 0);
 
-    for i in FIRST_MONSTER_SLOT..game.actors.active as i32 {
+    for i in FIRST_MONSTER_SLOT..actors.active as i32 {
         let a = actor_at(i);
 
-        if game.actor(a).kind != ENEMY {
+        if actors.actor(a).kind != ENEMY {
             continue;
         }
 
-        if game.actor(a).state == DEAD {
+        if actors.actor(a).state == DEAD {
             dead += 1;
-        } else if game.actor(a).goal == FLEE {
+        } else if actors.actor(a).goal == FLEE {
             fled += 1;
         }
     }

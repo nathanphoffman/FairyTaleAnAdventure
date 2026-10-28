@@ -72,7 +72,7 @@ pub(super) fn show_map(game: &mut Game) {
 
     game.screen.view_status = VIEW_MAP;
     show_still_screen(game);
-    queue_print(game, PRQ_MAP);
+    queue_print(&mut game.ui, PRQ_MAP);
 }
 
 /// The stone ring spell: only works standing in the middle of a stone circle. Takes the hero to
@@ -163,7 +163,7 @@ pub(super) fn heal(game: &mut Game) {
         print(game, "That feels a lot better!");
     }
 
-    queue_print(game, PRQ_STATS);
+    queue_print(&mut game.ui, PRQ_STATS);
 }
 
 /// Vitality after the heal spell: it adds 4 plus a roll (`roll`, 0-7), up to a limit that grows with

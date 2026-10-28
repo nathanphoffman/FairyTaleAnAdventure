@@ -2,7 +2,9 @@
 //! the world and drawing.
 
 use crate::game::data::state::Game;
+use crate::game::data::state::World;
 use crate::game::render::draw::{draw_sprites, repair_edges};
+use crate::game::render::screen::Screen;
 
 use crate::game::actors::ai::update_enemy_goals;
 use crate::game::actors::carriers::raft_proximity;
@@ -78,13 +80,13 @@ const FLASH_BIT: i8 = 16;
 const STATUS_COLOR: usize = 31;
 
 /// How the map moved since the last frame, in sectors (x wraps at 10 bits).
-fn scroll_step(game: &mut Game) -> (i16, i16) {
-    game.world.tile_x = game.world.map_x >> TILE_WIDTH_SHIFT;
+fn scroll_step(screen: &Screen, world: &mut World) -> (i16, i16) {
+    world.tile_x = world.map_x >> TILE_WIDTH_SHIFT;
 
-    game.world.tile_y = game.world.map_y >> TILE_HEIGHT_SHIFT;
-    let page = game.screen.drawing_page();
-    let dif_x = (game.world.tile_x as i32 - page.isv_x) as i16;
-    let dif_y = (game.world.tile_y as i32 - page.isv_y) as i16;
+    world.tile_y = world.map_y >> TILE_HEIGHT_SHIFT;
+    let page = screen.drawing_page();
+    let dif_x = (world.tile_x as i32 - page.isv_x) as i16;
+    let dif_y = (world.tile_y as i32 - page.isv_y) as i16;
 
     (wrap_scroll_difference(dif_x), dif_y)
 }
@@ -250,7 +252,7 @@ fn redraw_whole_map(game: &mut Game) -> bool {
 /// scrolls it by one tile. Returns the scroll step used and whether the world gets its turn this
 /// frame (it does when the map is redrawn from scratch, or did not move at all).
 fn update_map_view(game: &mut Game) -> (i16, i16, bool) {
-    let (mut scroll_x, mut scroll_y) = scroll_step(game);
+    let (mut scroll_x, mut scroll_y) = scroll_step(&game.screen, &mut game.world);
 
     if game.world.new_region < NO_REGION {
         load_pending_region(game);
@@ -265,7 +267,7 @@ fn update_map_view(game: &mut Game) -> (i16, i16, bool) {
     }
 
     if let Some(direction) = scroll_direction(scroll_x, scroll_y) {
-        scroll_map(game, direction);
+        scroll_map(&mut game.screen, direction);
 
         return (scroll_x, scroll_y, false);
     }

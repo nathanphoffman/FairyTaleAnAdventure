@@ -9,6 +9,7 @@ use crate::game::actors::encounters::load_enemy_sprites;
 use crate::game::actors::encounters::{load_carrier, place_encounter};
 use crate::game::actors::interaction::{blocked_at, rescue_princess};
 use crate::game::data::state::Game;
+use crate::game::data::state::World;
 
 use crate::game::data::story_text::{INSIDE_MSG, INSIDE_TBL, PLACE_MSG, PLACE_TBL};
 use crate::game::files::disk::motor_off;
@@ -101,7 +102,7 @@ pub fn transfer_hero(game: &mut Game, xtest: u16, ytest: u16, flag: u16) -> i32 
     game.encounter.number = 0;
 
     if flag != 0 {
-        let (sector_x, sector_y) = center_sector(game);
+        let (sector_x, sector_y) = center_sector(&mut game.world);
 
         let column = (sector_x >> REGION_WIDTH_SHIFT) & 1;
 
@@ -182,7 +183,7 @@ fn place_message_number(game: &mut Game) -> u8 {
         &PLACE_TBL[..]
     };
 
-    let message = mountain_name(game, find_table_message(table, sector));
+    let message = mountain_name(&game.world, find_table_message(table, sector));
 
     if hero_on_loaded_edge(game) {
         0
@@ -202,12 +203,12 @@ fn find_table_message(table: &[u8], sector: u8) -> u8 {
 }
 
 /// Mountains are named after the part of the map they are in (outdoors only).
-fn mountain_name(game: &mut Game, message: u8) -> u8 {
-    if message != MOUNTAINS_MESSAGE || game.world.region >= FIRST_INDOOR_REGION {
+fn mountain_name(world: &World, message: u8) -> u8 {
+    if message != MOUNTAINS_MESSAGE || world.region >= FIRST_INDOOR_REGION {
         message
-    } else if game.world.region & 1 != 0 {
+    } else if world.region & 1 != 0 {
         NORTHERN_MOUNTAINS_MESSAGE
-    } else if game.world.region > LAST_NORTHERN_REGION {
+    } else if world.region > LAST_NORTHERN_REGION {
         SOUTHERN_MOUNTAINS_MESSAGE
     } else {
         message

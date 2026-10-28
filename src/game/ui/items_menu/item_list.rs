@@ -2,6 +2,8 @@
 
 use super::{GOLDBASE, OBJECTS, item};
 use crate::game::data::state::Game;
+use crate::game::data::state::Hero;
+use crate::game::render::screen::Screen;
 use crate::game::render::screen::{BitmapId, PortId, ViewPortId};
 use crate::game::render::screen_fx::show_still_screen;
 use crate::game::ui::text::queue_print;
@@ -36,7 +38,7 @@ pub(super) fn show_item_list(game: &mut Game) {
     let pictures = item_pictures(game);
     game.screen.set_bitmap(BitmapId::Items, pictures);
 
-    draw_item_icons(game, page);
+    draw_item_icons(&mut game.screen, &mut game.hero, page);
 
     game.screen
         .set_color(ViewPortId::Page, BACKGROUND_PEN, (0, 0, 0));
@@ -44,7 +46,7 @@ pub(super) fn show_item_list(game: &mut Game) {
     game.screen.load_colors(ViewPortId::Page, &game.page_colors);
 
     game.screen.view_status = VIEW_ITEMS;
-    queue_print(game, PRQ_LIST);
+    queue_print(&mut game.ui, PRQ_LIST);
 }
 
 /// The pictures of the objects as one long bitmap: the object sprite sheet holds each plane of an
@@ -72,10 +74,10 @@ fn item_pictures(game: &Game) -> Bitmap {
 
 /// Draws one small picture for each item the hero holds (up to the most the screen shows),
 /// stacked down the item's column. The pictures are read from `Items`.
-fn draw_item_icons(game: &mut Game, page: BitmapId) {
+fn draw_item_icons(screen: &mut Screen, hero: &mut Hero, page: BitmapId) {
     for slot in 0..GOLDBASE {
         let it = item(slot);
-        let shown = (game.hero.stuff()[slot]).min(it.maxshown);
+        let shown = (hero.stuff()[slot]).min(it.maxshown);
         let x = it.xoff as i32 + ITEM_X_MARGIN;
         let mut y = it.yoff as u16;
         let source_row = it.image_number as i32 * ITEM_ROW_HEIGHT + it.img_off as i32;
@@ -87,8 +89,7 @@ fn draw_item_icons(game: &mut Game, page: BitmapId) {
         };
 
         for _ in 0..shown {
-            game.screen
-                .copy(BitmapId::Items, picture, page, (x, y as i32), ALL_PLANES);
+            screen.copy(BitmapId::Items, picture, page, (x, y as i32), ALL_PLANES);
 
             y = y.wrapping_add(it.ydelta as u16);
         }

@@ -60,12 +60,12 @@ fn print_bytes(game: &mut Game, s: &[u8]) {
         .scroll(game.screen.current_port, area, (0, LINE_HEIGHT));
 
     move_to(game, TEXT_X_MIN, NEW_LINE_Y);
-    draw_text(game, s);
+    draw_text(&mut game.screen, s);
 }
 
 /// Continues the current line with `s`.
 pub fn print_cont(game: &mut Game, s: &str) {
-    draw_text(game, s.as_bytes());
+    draw_text(&mut game.screen, s.as_bytes());
 }
 
 /// The line buffer of `print_wrapped`: message characters are collected here, and `end` is where the

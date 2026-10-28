@@ -134,7 +134,7 @@ fn swing_at(game: &mut Game, swing: &Swing, j: usize) -> bool {
 
     match swing_result(
         swing.attacker == 0,
-        distance_to_point(game, target, swing.tip.0, swing.tip.1),
+        distance_to_point(&game.actors, target, swing.tip.0, swing.tip.1),
         swing.reach,
         game.world.freeze_timer != 0,
         swing.strength,

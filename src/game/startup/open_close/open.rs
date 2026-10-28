@@ -4,11 +4,13 @@ use super::{
     BACKSAVE_OFFSET, IMAGE_SZ, S_VOLBUF, S_WAVBUF, SECTOR_SZ, SHADOW_SZ, SHAPE_SZ, TERRA_SZ,
 };
 use crate::game::data::state::Game;
+use crate::game::data::state::Memory;
 use crate::game::data::story_text::{HINOR, HIVAR};
 use crate::game::data::tables::{instrument_waves, pointer_sprite_data};
 use crate::game::files::disk::open_disk;
 use crate::game::render::blit::{Area, Loc};
 use crate::game::render::screen::FontKind;
+use crate::game::render::screen::Screen;
 use crate::gfx::Font;
 use crate::platform::audio::init_music;
 use crate::platform::paths::resolve;
@@ -43,9 +45,9 @@ fn open_everything(game: &mut Game) -> Result<(), i32> {
         error => return Err(error),
     }
 
-    open_fonts(game)?;
-    set_up_blitter_memory(game);
-    allocate_game_memory(game);
+    open_fonts(&mut game.screen)?;
+    set_up_blitter_memory(&mut game.screen);
+    allocate_game_memory(&mut game.memory);
 
     load_music_waveforms();
     game.screen.pointer = Some(&pointer_sprite_data);
@@ -54,12 +56,12 @@ fn open_everything(game: &mut Game) -> Result<(), i32> {
 }
 
 /// Loads the story font; the panel uses the built-in one.
-fn open_fonts(game: &mut Game) -> Result<(), i32> {
+fn open_fonts(screen: &mut Screen) -> Result<(), i32> {
     let story = resolve(STORY_FONT_FILE, false).ok_or(ERROR_NO_FONT)?;
     let story = Font::load(&story).unwrap_or(Font::Builtin);
 
-    game.screen.set_font(FontKind::Panel, Font::Builtin);
-    game.screen.set_font(FontKind::Story, story);
+    screen.set_font(FontKind::Panel, Font::Builtin);
+    screen.set_font(FontKind::Story, story);
 
     Ok(())
 }
@@ -70,18 +72,18 @@ fn area(size: usize) -> Vec<u8> {
 }
 
 /// Points the saved backgrounds of the two pages into the blitter's work memory.
-fn set_up_blitter_memory(game: &mut Game) {
-    game.screen.pages[0].backsave = Loc::new(Area::Queue, BACKSAVE_OFFSET);
-    game.screen.pages[1].backsave = Loc::new(Area::Mask, BACKSAVE_OFFSET);
+fn set_up_blitter_memory(screen: &mut Screen) {
+    screen.pages[0].backsave = Loc::new(Area::Queue, BACKSAVE_OFFSET);
+    screen.pages[1].backsave = Loc::new(Area::Mask, BACKSAVE_OFFSET);
 }
 
 /// Makes the picture, sector, shape, shadow-mask and terrain areas.
-fn allocate_game_memory(game: &mut Game) {
-    game.memory.image = area(IMAGE_SZ);
-    game.memory.sector = area(SECTOR_SZ);
-    game.memory.shape = area(SHAPE_SZ);
-    game.memory.shadow = area(SHADOW_SZ);
-    game.memory.terrain = area(TERRA_SZ);
+fn allocate_game_memory(memory: &mut Memory) {
+    memory.image = area(IMAGE_SZ);
+    memory.sector = area(SECTOR_SZ);
+    memory.shape = area(SHAPE_SZ);
+    memory.shadow = area(SHADOW_SZ);
+    memory.terrain = area(TERRA_SZ);
 }
 
 /// Reads the waveforms and volume envelopes for the music from the file `v6` (the waveforms, then as

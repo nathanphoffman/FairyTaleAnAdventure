@@ -3,7 +3,9 @@
 
 use crate::game::actors::interaction::actor_distance;
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
+use crate::game::data::state::Hero;
 
 // Actor kinds and states (csrc/ftale.h).
 const OBJECTS: i8 = 1;
@@ -45,38 +47,38 @@ pub fn sort_actors(game: &mut Game) {
         }
 
         for j in 1..game.actors.drawn as usize {
-            bubble_step(game, j);
+            bubble_step(&mut game.actors, &game.hero, j);
         }
     }
 }
 
 /// One compare-and-swap of neighbours `j - 1` and `j` in the draw order.
-fn bubble_step(game: &mut Game, j: usize) {
-    let k1 = game.actors.draw_order[j - 1];
-    let k2 = game.actors.draw_order[j];
+fn bubble_step(actors: &mut Actors, hero: &Hero, j: usize) {
+    let k1 = actors.draw_order[j - 1];
+    let k2 = actors.draw_order[j];
     let a = ActorRef::new(k1 as usize);
     let b = ActorRef::new(k2 as usize);
-    let mut y1 = game.actor(a).abs_y as i16;
-    let mut y2 = game.actor(b).abs_y as i16;
+    let mut y1 = actors.actor(a).abs_y as i16;
+    let mut y2 = actors.actor(b).abs_y as i16;
 
-    if game.actor(a).state == DEAD || (k2 == 0 && game.hero.riding != 0) || k1 == RAFT_ACTOR {
+    if actors.actor(a).state == DEAD || (k2 == 0 && hero.riding != 0) || k1 == RAFT_ACTOR {
         y1 = y1.wrapping_sub(DRAW_LOWER);
     }
 
-    if game.actor(b).state == DEAD || (k1 == 0 && game.hero.riding != 0) || k2 == RAFT_ACTOR {
+    if actors.actor(b).state == DEAD || (k1 == 0 && hero.riding != 0) || k2 == RAFT_ACTOR {
         y2 = y2.wrapping_sub(DRAW_LOWER);
     }
 
-    if game.actor(a).environ > WADING {
+    if actors.actor(a).environ > WADING {
         y1 = y1.wrapping_add(DRAW_LOWER);
     }
 
-    if game.actor(b).environ > WADING {
+    if actors.actor(b).environ > WADING {
         y2 = y2.wrapping_add(DRAW_LOWER);
     }
 
     if y2 < y1 {
-        game.actors.draw_order[j - 1] = k2;
-        game.actors.draw_order[j] = k1;
+        actors.draw_order[j - 1] = k2;
+        actors.draw_order[j] = k1;
     }
 }

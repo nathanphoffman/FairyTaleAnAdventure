@@ -68,7 +68,7 @@ fn press_entry(game: &mut Game, slot: i16, chosen_entry: i16, notpause: bool) {
         // paused: only the menu types above work
     } else if kind == 0 && chosen_entry < FIRST_ACTION_MENU {
         game.ui.current_menu = chosen_entry;
-        queue_print(game, PRQ_OPTIONS);
+        queue_print(&mut game.ui, PRQ_OPTIONS);
     } else {
         print_menu_entry(
             game,

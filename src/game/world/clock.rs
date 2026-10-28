@@ -122,7 +122,7 @@ pub fn day_night_tick(game: &mut Game) {
 
     if tick.heal {
         game.actor_mut(hero).vitality += 1;
-        queue_print(game, PRQ_STATS);
+        queue_print(&mut game.ui, PRQ_STATS);
     }
 }
 

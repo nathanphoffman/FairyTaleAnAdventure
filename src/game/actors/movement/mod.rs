@@ -20,7 +20,9 @@ mod walking;
 
 mod water;
 
+use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
+use crate::game::data::state::World;
 use crate::game::data::state::{ActorRef, MissileRef};
 use crate::game::data::tables::{entry, facing_frame_offsets};
 use crate::game::world::map::{step_x, step_y, terrain_at};
@@ -274,7 +276,7 @@ fn terrain(game: &Game, x: u16, y: u16) -> i16 {
 /// carries the last terrain value from one actor to the next (a dead actor reads it without setting
 /// it), so it is passed in and written back.
 pub fn move_actor(game: &mut Game, i: i32, cycle: i16, jp: &mut i16) {
-    let (mut c, mut pc) = Ctx::start(game, i, cycle, *jp);
+    let (mut c, mut pc) = Ctx::start(&mut game.actors, &game.world, i, cycle, *jp);
 
     loop {
         pc = match pc {
@@ -300,7 +302,7 @@ impl Ctx {
     /// Sets up the working variables for actor `i`, and where to start: frozen enemies skip straight
     /// to the end, everyone else is dispatched on their kind and state. `terrain` is what the last
     /// actor left in the main loop's `j`.
-    fn start(game: &mut Game, i: i32, cycle: i16, terrain: i16) -> (Ctx, Pc) {
+    fn start(actors: &mut Actors, world: &World, i: i32, cycle: i16, terrain: i16) -> (Ctx, Pc) {
         let actor = ActorRef::new(i as usize);
         let mut c = Ctx {
             actor,
@@ -316,16 +318,16 @@ impl Ctx {
             step: 0,
         };
 
-        if game.world.freeze_timer != 0 && i > 0 {
+        if world.freeze_timer != 0 && i > 0 {
             return (c, Pc::Statc);
         }
 
-        c.environ = game.actor(actor).environ;
-        c.facing = game.actor(actor).facing as i16;
-        c.state = game.actor(actor).state as i16;
-        c.image = game.actor(actor).index as i16;
+        c.environ = actors.actor(actor).environ;
+        c.facing = actors.actor(actor).facing as i16;
+        c.state = actors.actor(actor).state as i16;
+        c.image = actors.actor(actor).index as i16;
         c.frame_base = diroff(c.facing);
-        c.missile = MissileRef::new(game.actors.next_missile as usize);
+        c.missile = MissileRef::new(actors.next_missile as usize);
 
         (c, Pc::Dispatch)
     }

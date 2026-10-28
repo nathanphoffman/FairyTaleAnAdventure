@@ -3,8 +3,11 @@
 
 use super::images::sprite_sheet;
 use super::{Frame, OBJECTS, Sprite};
+use crate::game::data::state::Blitter;
 use crate::game::data::state::Game;
+use crate::game::data::state::Memory;
 use crate::game::data::types::SeqInfo;
+use crate::game::render::screen::Screen;
 
 use crate::game::render::blit::{Area, Loc, SShape};
 
@@ -76,18 +79,22 @@ pub(super) fn clip_to_screen(sprite: &mut Sprite) -> Clip {
 
 /// Reserves room to save the background under the sprite: a spare bit plane while they last (for
 /// small sprites), otherwise the page's save buffer. Returns false when the buffer is full.
-pub(super) fn assign_background_save(game: &mut Game, frame: &mut Frame) -> bool {
-    let page = game.screen.drawing_page_mut();
+pub(super) fn assign_background_save(
+    screen: &mut Screen,
+    blitter: &mut Blitter,
+    frame: &mut Frame,
+) -> bool {
+    let page = screen.drawing_page_mut();
 
-    if game.blitter.sshape.savesize < SMALL_SAVE && frame.crack < SPARE_SAVES {
-        game.blitter.sshape.backsave = Loc::new(Area::Plane(frame.crack), SPARE_PLANE_OFFSET);
+    if blitter.sshape.savesize < SMALL_SAVE && frame.crack < SPARE_SAVES {
+        blitter.sshape.backsave = Loc::new(Area::Plane(frame.crack), SPARE_PLANE_OFFSET);
         frame.crack += 1;
 
         return true;
     }
 
-    game.blitter.sshape.backsave = frame.backalloc;
-    let bytes = PLANES * game.blitter.sshape.savesize as i32;
+    blitter.sshape.backsave = frame.backalloc;
+    let bytes = PLANES * blitter.sshape.savesize as i32;
     frame.backalloc = frame.backalloc.add(bytes as isize);
     page.saveused += bytes;
 
@@ -119,54 +126,53 @@ pub(super) fn set_up_blit(
     game.blitter.sshape.blitsize =
         (((blithigh as i32) << BLIT_HEIGHT_SHIFT) + blitwide as i32) as i16;
 
-    locate_sprite_data(game, &seq, sprite.inum);
+    locate_sprite_data(&mut game.memory, &game.screen, &seq, sprite.inum);
 
-    if !assign_background_save(game, frame) {
+    if !assign_background_save(&mut game.screen, &mut game.blitter, frame) {
         return false;
     }
 
-    set_blitter_registers(game, sprite, clip, cwide, xbw, blitwide);
+    set_blitter_registers(&mut game.blitter, sprite, clip, cwide, xbw, blitwide);
 
     true
 }
 
 /// Points the blitter at the picture and the mask of image `inum` in its sprite sheet.
-fn locate_sprite_data(game: &mut Game, seq: &SeqInfo, inum: i16) {
-    let planesize = game.screen.planesize as usize;
-    game.memory.shapedata = seq.location + planesize * PLANES as usize * inum as usize;
-    game.memory.mask_buffer = seq.maskloc + planesize * inum as usize;
+fn locate_sprite_data(memory: &mut Memory, screen: &Screen, seq: &SeqInfo, inum: i16) {
+    let planesize = screen.planesize as usize;
+    memory.shapedata = seq.location + planesize * PLANES as usize * inum as usize;
+    memory.mask_buffer = seq.maskloc + planesize * inum as usize;
 }
 
 /// Sets the blitter's mask offsets, shift and modulo for the clipped sprite, and where in the page
 /// it goes.
 fn set_blitter_registers(
-    game: &mut Game,
+    blitter: &mut Blitter,
     sprite: &Sprite,
     clip: &Clip,
     cwide: i8,
     xbw: i8,
     blitwide: i8,
 ) {
-    game.blitter.shadow_mask_offset =
+    blitter.shadow_mask_offset =
         ((clip.ystart & SHADOW_LINES_MASK) as i32 * blitwide as i32 * WORD_BYTES) as i16;
 
     // Where the visible part starts in the mask: whole words (2 bytes per 16 pixels) in, and whole rows down.
-    game.blitter.sprite_mask_offset = ((clip.xoff >> WORD_PIXELS_SHIFT) as i32 * WORD_BYTES
+    blitter.sprite_mask_offset = ((clip.xoff >> WORD_PIXELS_SHIFT) as i32 * WORD_BYTES
         + cwide as i32 * clip.yoff as i32) as i16;
-    game.blitter.sshape.coff =
-        (xbw as i32 * WORD_BYTES + clip.ystart as i32 * PAGE_ROW_BYTES) as i16;
+    blitter.sshape.coff = (xbw as i32 * WORD_BYTES + clip.ystart as i32 * PAGE_ROW_BYTES) as i16;
 
-    game.blitter.sprite_x_shift = sprite.xstart & WORD_PIXELS_MASK;
+    blitter.sprite_x_shift = sprite.xstart & WORD_PIXELS_MASK;
 
     if clip.xoff & WORD_PIXELS_MASK as i8 != 0 {
-        game.blitter.sshape.coff -= WORD_BYTES as i16;
-        game.blitter.last_word_mask = 0;
+        blitter.sshape.coff -= WORD_BYTES as i16;
+        blitter.last_word_mask = 0;
     } else {
-        game.blitter.last_word_mask = -1;
+        blitter.last_word_mask = -1;
     }
 
-    game.blitter.sprite_mask_modulo = (cwide as i32 - blitwide as i32 * WORD_BYTES) as i16;
-    game.blitter.sshape.cmod = (PAGE_ROW_BYTES - blitwide as i32 * WORD_BYTES) as i16;
+    blitter.sprite_mask_modulo = (cwide as i32 - blitwide as i32 * WORD_BYTES) as i16;
+    blitter.sshape.cmod = (PAGE_ROW_BYTES - blitwide as i32 * WORD_BYTES) as i16;
 }
 
 #[cfg(test)]

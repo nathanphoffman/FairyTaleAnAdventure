@@ -64,8 +64,8 @@ pub(super) fn restore_hero(game: &mut Game, hero: ActorRef) {
 
     game.actors.active = START_ACTORS;
     update_menu_availability(game);
-    queue_print(game, PRQ_VITALITY);
-    queue_print(game, PRQ_STATS);
+    queue_print(&mut game.ui, PRQ_VITALITY);
+    queue_print(&mut game.ui, PRQ_STATS);
 }
 
 /// Full health for the bravery, standing still on dry land, the morning clock, and no hunger or

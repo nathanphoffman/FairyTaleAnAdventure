@@ -72,14 +72,14 @@ fn show_debug_sector(game: &mut Game) {
     print_number(game, game.hero.y as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
     print(game, "H/Sector = ");
     print_number(game, game.hero.sector as i32, SECTOR_DIGITS);
-    draw_text(game, b" Extent = ");
+    draw_text(&mut game.screen, b" Extent = ");
     print_number(game, game.world.extent_type as i32, EXTENT_DIGITS);
 }
 
 /// The hero's vitality on the stats line.
 fn draw_vitality(game: &mut Game) {
     move_to(game, VITALITY_POSITION.0, VITALITY_POSITION.1);
-    draw_text(game, b"Vit:");
+    draw_text(&mut game.screen, b"Vit:");
     print_number(game, game.actors.list[0].vitality as i32, VITALITY_DIGITS);
 }
 
@@ -96,7 +96,7 @@ fn draw_stats(game: &mut Game) {
         (WEALTH_X, b"Wlth:", game.hero.wealth),
     ] {
         move_to(game, x, STATS_Y);
-        draw_text(game, label);
+        draw_text(&mut game.screen, label);
         print_number(game, value as i32, STAT_DIGITS);
     }
 }

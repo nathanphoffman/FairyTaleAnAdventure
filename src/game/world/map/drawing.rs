@@ -1,6 +1,8 @@
 //! Drawing the map into the play field: single tiles, whole screens, new edges and scrolling.
 
 use crate::game::data::state::Game;
+use crate::game::data::state::Memory;
+use crate::game::render::screen::Screen;
 
 /// One bitplane of 256 tiles, 64 bytes per tile.
 pub(super) const IMAGE_PLANE_SIZE: usize = 16384;
@@ -16,11 +18,11 @@ pub(super) const SCREEN_COLUMNS: usize = 19;
 pub(super) const SCREEN_ROWS: usize = 6;
 
 /// Draws one tile at byte offset `dst` in each of the five planes (2 bytes wide, 32 lines).
-pub(super) fn draw_tile(game: &mut Game, tile: i32, dst: usize) {
+pub(super) fn draw_tile(memory: &Memory, screen: &mut Screen, tile: i32, dst: usize) {
     for p in 0..PLANE_COUNT {
         let mut src = p * IMAGE_PLANE_SIZE + tile as usize * TILE_BYTES;
-        let image = &game.memory.image;
-        let plane = game.screen.draw_bitmap_mut().plane_mut(p);
+        let image = &memory.image;
+        let plane = screen.draw_bitmap_mut().plane_mut(p);
         let mut d = dst;
 
         for _ in 0..TILE_LINES {
@@ -35,7 +37,8 @@ pub(super) fn draw_tile(game: &mut Game, tile: i32, dst: usize) {
 /// Draws the tile at minimap position (col, row) to its place on screen.
 pub(super) fn draw_minimap_tile(game: &mut Game, col: usize, row: usize) {
     draw_tile(
-        game,
+        &game.memory,
+        &mut game.screen,
         game.memory.minimap[col * SCREEN_ROWS + row] as i32,
         row * TILE_LINES * ROW_BYTES + col * 2,
     )
@@ -112,9 +115,9 @@ const DIRECTION_MASK: usize = 7;
 
 /// Shifts the map one tile in one of 8 directions (the blitter did this on the Amiga).
 /// Moving down copies from the bottom up, so lines are not overwritten before they are read.
-pub fn scroll_map(game: &mut Game, dir: i32) {
+pub fn scroll_map(screen: &mut Screen, dir: i32) {
     let m = &SCROLL_MODES[dir as usize & DIRECTION_MASK];
-    let bitmap = game.screen.draw_bitmap_mut();
+    let bitmap = screen.draw_bitmap_mut();
 
     for p in 0..PLANE_COUNT {
         let plane = bitmap.plane_mut(p);

@@ -9,6 +9,7 @@ use self::transfer::{Transfer, transfer_all};
 use crate::game::data::state::Game;
 use crate::game::files::loading::load_start_sprites;
 use crate::game::render::screen::FontKind;
+use crate::game::render::screen::Screen;
 use crate::game::ui::menus::update_menu_availability;
 use crate::game::ui::messages::print;
 use crate::game::ui::text::queue_print;
@@ -26,7 +27,7 @@ const PRINT_STATS: i32 = 7;
 
 /// Saves the game into slot `slot` (0 = A ...) when `saving`, or loads it from there.
 pub fn savegame(game: &mut Game, slot: i16, saving: bool) {
-    set_current_font(game, FontKind::Panel);
+    set_current_font(&mut game.screen, FontKind::Panel);
 
     let name = format!(
         "{}.faery",
@@ -45,7 +46,7 @@ pub fn savegame(game: &mut Game, slot: i16, saving: bool) {
         reset_after_load(game);
     }
 
-    set_current_font(game, FontKind::Story);
+    set_current_font(&mut game.screen, FontKind::Story);
 }
 
 /// Writes the game to the save file `name`.
@@ -68,9 +69,9 @@ fn read_game(game: &mut Game, name: &str) -> std::io::Result<()> {
 }
 
 /// Writes in the given font from now on.
-fn set_current_font(game: &mut Game, kind: FontKind) {
-    let current = game.screen.current_port;
-    game.screen.set_font_kind(current, kind);
+fn set_current_font(screen: &mut Screen, kind: FontKind) {
+    let current = screen.current_port;
+    screen.set_font_kind(current, kind);
 }
 
 /// After loading a game: clears the encounter state and redraws the status panel for the new hero.
@@ -80,8 +81,8 @@ fn reset_after_load(game: &mut Game) {
     load_start_sprites(game);
     update_menu_availability(game);
     game.screen.view_status = VIEW_CORRUPT;
-    queue_print(game, PRINT_VITALITY);
-    queue_print(game, PRINT_STATS);
+    queue_print(&mut game.ui, PRINT_VITALITY);
+    queue_print(&mut game.ui, PRINT_STATS);
     print(game, "");
     print(game, "");
     print(game, "");

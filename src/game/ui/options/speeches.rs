@@ -144,7 +144,7 @@ fn sorceress_speaks(game: &mut Game) {
         }
     }
 
-    queue_print(game, PRQ_VITALITY);
+    queue_print(&mut game.ui, PRQ_VITALITY);
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -188,7 +188,7 @@ fn priest_speaks(game: &mut Game) {
         PriestAction::Bless { speech } => {
             speak(game, speech);
             game.actors.list[0].vitality = FULL_VITALITY_BASE + game.hero.brave / BRAVERY_DIVISOR;
-            queue_print(game, PRQ_STATS);
+            queue_print(&mut game.ui, PRQ_STATS);
         }
     }
 }

@@ -10,8 +10,11 @@
 //! skipping `n` zero bytes.
 
 use crate::game::data::state::Game;
+use crate::game::data::state::Hero;
+use crate::game::data::state::Ui;
 use crate::game::data::story_text::{EVENT_MSG, PLACARD_MSGS, SPEECHES};
 use crate::game::render::screen::PortId;
+use crate::game::render::screen::Screen;
 use crate::game::ui::messages::print_wrapped;
 
 /// In a string: followed by x/2 and y, moves the text position.
@@ -53,7 +56,7 @@ pub fn print_number(game: &mut Game, value: i32, len: i32) {
     let text = format_number(value as u32);
     let from = (NUMBER_DIGITS as i32 - len).max(0) as usize;
 
-    draw_text(game, &text[from..]);
+    draw_text(&mut game.screen, &text[from..]);
 }
 
 // `move` is a Rust keyword, so this one is exported under the C name.
@@ -63,8 +66,8 @@ pub fn move_to(game: &mut Game, x: i32, y: i32) {
 }
 
 /// Prints the characters at the text position.
-pub fn draw_text(game: &mut Game, bytes: &[u8]) {
-    game.screen.text(game.screen.current_port, bytes);
+pub fn draw_text(screen: &mut Screen, bytes: &[u8]) {
+    screen.text(screen.current_port, bytes);
 }
 
 /// Prints a string that may hold XY escapes (128, x/2, y) to move the text position. A string
@@ -86,7 +89,7 @@ pub fn print_positioned(game: &mut Game, s: &[u8]) {
                 n += 1;
             }
 
-            draw_text(game, &s[at..at + n]);
+            draw_text(&mut game.screen, &s[at..at + n]);
             at += n;
 
             if n == 0 {
@@ -131,15 +134,15 @@ pub fn speak(game: &mut Game, n: i32) {
 
 /// Adds a request to the print queue (ignored if the queue is full). `handle_print_request` handles them one
 /// per tick, which spreads the redrawing work over several frames.
-pub fn queue_print(game: &mut Game, x: i32) {
-    let next = (game.ui.print_queue.write + 1) & PRINT_QUEUE_MASK;
+pub fn queue_print(ui: &mut Ui, x: i32) {
+    let next = (ui.print_queue.write + 1) & PRINT_QUEUE_MASK;
 
-    if next == game.ui.print_queue.read {
+    if next == ui.print_queue.read {
         return;
     }
 
-    game.ui.print_queue.items[game.ui.print_queue.write as usize] = x as i8;
-    game.ui.print_queue.write = next;
+    ui.print_queue.items[ui.print_queue.write as usize] = x as i8;
+    ui.print_queue.write = next;
 }
 
 // The decorative border drawn on story pages.
@@ -238,8 +241,8 @@ const MENU_STATE_HAVE: i32 = 10;
 const MENU_STATE_LACKING: i32 = 8;
 
 /// Menu state for an item: 10 if the player has item `n`, otherwise 8 (a menu item state).
-pub fn item_menu_state(game: &mut Game, n: i32) -> i32 {
-    if game.hero.stuff()[n as usize] != 0 {
+pub fn item_menu_state(hero: &Hero, n: i32) -> i32 {
+    if hero.stuff()[n as usize] != 0 {
         MENU_STATE_HAVE
     } else {
         MENU_STATE_LACKING
@@ -259,6 +262,6 @@ pub fn show_error(game: &mut Game, n: i32) {
     }
 
     move_to(game, ERROR_SCREEN_X, ERROR_SCREEN_Y);
-    draw_text(game, b"ERROR ");
+    draw_text(&mut game.screen, b"ERROR ");
     print_number(game, n, 2);
 }

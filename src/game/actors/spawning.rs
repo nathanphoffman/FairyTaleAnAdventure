@@ -5,7 +5,9 @@ use crate::game::actors::encounters::place_encounter;
 use crate::game::actors::interaction::pick_encounter_spot;
 use crate::game::data::random::{fta_rand, rand4, rand64};
 use crate::game::data::state::ActorRef;
+use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
+use crate::game::data::state::World;
 use crate::game::files::disk::{motor_off, read_finished};
 use crate::game::files::loading::finish_sprite_load;
 use crate::game::world::map::terrain_at;
@@ -68,18 +70,18 @@ pub fn spawn_encounters(game: &mut Game) {
         place_waiting_encounters(game);
     }
 
-    if random_encounter_due(game) {
+    if random_encounter_due(&game.actors, &game.world) {
         roll_random_encounter(game);
     }
 }
 
 /// A new random encounter is rolled now and then, when nothing else is going on.
-fn random_encounter_due(game: &mut Game) -> bool {
-    game.world.day_clock & ROLL_PERIOD_MASK == 0
-        && game.actors.on_screen == 0
-        && game.actors.loading == 0
-        && game.actors.active_carrier == 0
-        && game.world.extent_type < NO_RANDOM_XTYPE
+fn random_encounter_due(actors: &Actors, world: &World) -> bool {
+    world.day_clock & ROLL_PERIOD_MASK == 0
+        && actors.on_screen == 0
+        && actors.loading == 0
+        && actors.active_carrier == 0
+        && world.extent_type < NO_RANDOM_XTYPE
 }
 
 /// Rolls the danger of the area against a random number; if it is beaten, picks the kind of the

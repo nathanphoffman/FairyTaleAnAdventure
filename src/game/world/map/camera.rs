@@ -1,6 +1,6 @@
 //! The camera: where the map is shown so the hero stays near the middle, and when the page turns.
 
-use crate::game::data::state::Game;
+use crate::game::data::state::World;
 
 // The hero may wander this far from the camera centre before it moves.
 pub(super) const CAMERA_CENTER_X: i32 = 144;
@@ -54,8 +54,8 @@ pub(super) fn camera_after(cam_x: u16, cam_y: u16, x: i32, y: i32) -> (u16, u16)
 }
 
 /// Moves the camera (`map_x`, `map_y`) after the hero.
-pub fn move_camera_to(game: &mut Game, x: i32, y: i32) {
-    (game.world.map_x, game.world.map_y) = camera_after(game.world.map_x, game.world.map_y, x, y)
+pub fn move_camera_to(world: &mut World, x: i32, y: i32) {
+    (world.map_x, world.map_y) = camera_after(world.map_x, world.map_y, x, y)
 }
 
 /// Small lookup used by the page-turn animation: how far in from the top and bottom a strip of

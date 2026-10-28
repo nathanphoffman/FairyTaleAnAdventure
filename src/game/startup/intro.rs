@@ -13,6 +13,7 @@ use crate::game::files::loading::{
 };
 use crate::game::input::handler::reset_key_buffer;
 use crate::game::render::display::{delay, flip_pages};
+use crate::game::render::screen::Screen;
 use crate::game::render::screen::{BitmapId, FontKind, PortId, ViewPortId};
 use crate::game::render::screen_fx::{set_intro_zoom, show_still_screen};
 use crate::game::ui::menus::print_options;
@@ -87,7 +88,7 @@ pub(super) fn start_up(game: &mut Game) -> bool {
         return false;
     }
 
-    if intro_skipped(game) == 0 {
+    if intro_skipped(&mut game.ui) == 0 {
         play_intro(game);
     }
 
@@ -105,30 +106,27 @@ pub(super) fn start_up(game: &mut Game) -> bool {
 }
 
 /// Blanks both pages.
-fn clear_both_pages(game: &mut Game) {
-    for page in [
-        game.screen.viewing_bitmap_id(),
-        game.screen.drawing_bitmap_id(),
-    ] {
-        game.screen.port_mut(PortId::Map).target = Some(page);
-        game.screen.clear(PortId::Map, 0);
+fn clear_both_pages(screen: &mut Screen) {
+    for page in [screen.viewing_bitmap_id(), screen.drawing_bitmap_id()] {
+        screen.port_mut(PortId::Map).target = Some(page);
+        screen.clear(PortId::Map, 0);
     }
 }
 
 /// Sets a colour of the page palette from 4-bit red, green and blue.
-fn set_page_color(game: &mut Game, color: usize, rgb: (u32, u32, u32)) {
-    game.screen.set_color(ViewPortId::Page, color, rgb);
+fn set_page_color(screen: &mut Screen, color: usize, rgb: (u32, u32, u32)) {
+    screen.set_color(ViewPortId::Page, color, rgb);
 }
 
 /// The legal title text on a blue page, then the music and the sound effects are read in.
 fn show_title_screen(game: &mut Game) {
     game.screen.vp_page.ras = Some(0);
     game.screen.pages[1].ras = 1;
-    clear_both_pages(game);
+    clear_both_pages(&mut game.screen);
     game.screen.current_port = PortId::Map;
     set_intro_zoom(game, ZOOM_NORMAL);
-    set_page_color(game, BACKGROUND_COLOR, TITLE_BLUE);
-    set_page_color(game, TEXT_COLOR, WHITE_RGB);
+    set_page_color(&mut game.screen, BACKGROUND_COLOR, TITLE_BLUE);
+    set_page_color(&mut game.screen, TEXT_COLOR, WHITE_RGB);
 
     let pen = game.screen.port(PortId::Map).pen.fg;
     game.screen.set_a_pen(PortId::Map, TITLE_PEN);
@@ -167,19 +165,19 @@ fn prepare_intro(game: &mut Game) {
 /// the copyright placard.
 fn show_play_screen_background(game: &mut Game) {
     game.screen.pages[1].ras = 1;
-    clear_both_pages(game);
+    clear_both_pages(&mut game.screen);
 
     game.screen.load_colors(ViewPortId::Text, &black_colors);
 
     set_intro_zoom(game, ZOOM_NORMAL);
-    set_page_color(game, BACKGROUND_COLOR, LOADING_BLUE);
+    set_page_color(&mut game.screen, BACKGROUND_COLOR, LOADING_BLUE);
 
     load_track_range(SHADOW_BLOCK.0, SHADOW_BLOCK.1, &mut game.memory.shadow, 0);
 
-    set_page_color(game, BACKGROUND_COLOR, TITLE_BLUE);
+    set_page_color(&mut game.screen, BACKGROUND_COLOR, TITLE_BLUE);
     load_picture("hiscreen", game.screen.bitmap_mut(BitmapId::Text), 0, 0);
 
-    set_page_color(game, TEXT_COLOR, WHITE_RGB);
+    set_page_color(&mut game.screen, TEXT_COLOR, WHITE_RGB);
 
     game.screen.current_port = PortId::Map;
     game.screen.port_mut(PortId::Map).target = Some(game.screen.drawing_bitmap_id());
@@ -224,8 +222,8 @@ fn start_first_brother(game: &mut Game) {
 /// The story pictures with the zoom in and out (skipped if the player presses Space).
 fn play_intro(game: &mut Game) {
     load_picture("page0", game.screen.bitmap_mut(BitmapId::PageB), 0, 0);
-    copy_title_picture_to(game, BitmapId::Page1);
-    copy_title_picture_to(game, BitmapId::Page2);
+    copy_title_picture_to(&mut game.screen, BitmapId::Page1);
+    copy_title_picture_to(&mut game.screen, BitmapId::Page2);
 
     game.screen.pages[1].ras = 0;
 
@@ -235,7 +233,7 @@ fn play_intro(game: &mut Game) {
 
     game.screen.pages[1].ras = 1;
 
-    if intro_skipped(game) == 0 {
+    if intro_skipped(&mut game.ui) == 0 {
         for (first, second, first_wait, second_wait) in STORY_PAGES {
             show_story_page(game, first, second, first_wait, second_wait);
         }
@@ -253,7 +251,7 @@ fn play_intro(game: &mut Game) {
 }
 
 /// Copies the whole title picture (loaded into `PageB`) onto the bitmap of a display page.
-fn copy_title_picture_to(game: &mut Game, page: BitmapId) {
+fn copy_title_picture_to(screen: &mut Screen, page: BitmapId) {
     let whole = Rect {
         x: 0,
         y: 0,
@@ -261,6 +259,5 @@ fn copy_title_picture_to(game: &mut Game, page: BitmapId) {
         height: PAGE_SIZE.1,
     };
 
-    game.screen
-        .copy(BitmapId::PageB, whole, page, (0, 0), ALL_FIVE_PLANES);
+    screen.copy(BitmapId::PageB, whole, page, (0, 0), ALL_FIVE_PLANES);
 }
