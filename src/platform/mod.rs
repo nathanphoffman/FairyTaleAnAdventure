@@ -5,6 +5,8 @@ pub mod audio;
 
 pub mod display;
 
+pub mod host;
+
 pub mod paths;
 
 pub mod input;

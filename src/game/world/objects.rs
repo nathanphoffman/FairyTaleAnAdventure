@@ -203,13 +203,13 @@ fn distribute_treasure(game: &mut Game) {
 
 /// Makes sure the sprite file for the kind of person `id` is loaded. Several kinds share one
 /// file, so it is only reloaded when the needed file differs from the loaded one.
-fn load_set_figure(game: &mut Game, out: &mut dyn Output, id: i8) {
+fn load_set_figure(actors: &mut Actors, out: &mut dyn Output, id: i8) {
     let entry = entry(&setfig_table, id as usize).cfile_entry;
 
     if SPRITE_FILES[entry as usize].file_id
-        != SPRITE_FILES[game.actors.loaded_setfig_file as usize].file_id
+        != SPRITE_FILES[actors.loaded_setfig_file as usize].file_id
     {
-        game.actors.loaded_setfig_file = entry as i16;
+        actors.loaded_setfig_file = entry as i16;
         out.rewind_sprites_to(SETFIG as u8);
         out.load_sprite_file(entry as i32);
         out.finish_sprite_load(SETFIG as i16);
@@ -305,7 +305,7 @@ fn load_person_if_near(
         return false;
     }
 
-    load_set_figure(game, out, object.ob_id);
+    load_set_figure(&mut game.actors, out, object.ob_id);
 
     if object.ob_id == WITCH && object.ob_stat == STAT_PERSON {
         game.witch.on_screen = 1;

@@ -69,8 +69,10 @@ fn read_game(game: &mut Game, name: &str) -> std::io::Result<()> {
 
 /// Writes in the given font from now on.
 fn set_current_font(out: &mut dyn Output, kind: FontKind) {
-    let current = out.current_port();
-    out.set_font_kind(current, kind);
+    match kind {
+        FontKind::Story => out.use_story_font(),
+        FontKind::Panel => out.use_panel_font(),
+    }
 }
 
 /// After loading a game: clears the encounter state and redraws the status panel for the new hero.

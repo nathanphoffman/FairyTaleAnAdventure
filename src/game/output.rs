@@ -3,7 +3,6 @@
 //! bitmaps, a test can just record it, and a new renderer could draw it in a different way.
 
 use crate::game::data::state::{Hero, MapData, World};
-use crate::game::render::screen::{FontKind, PortId};
 
 /// The things the rules can ask for.
 pub trait Output {
@@ -59,38 +58,33 @@ pub trait Output {
     /// Loads image bank `bank` (a quarter of the tile images, 5 planes) from disk block `first_block`.
     fn load_image_bank(&mut self, bank: usize, first_block: i16);
 
-    // ---- drawing on the play field (`PortId::Map`), the message area (`Text`) and the menu area
-    // (`Text2`). Each has its own font, pens and position. ----
+    // ---- the text cursor and the story pages ----
 
-    /// The port that print and print_cont draw on.
-    fn current_port(&self) -> PortId;
+    /// Moves the text position of the area being written to.
+    fn set_text_position(&mut self, x: i32, y: i32);
 
-    /// Makes `port` the one print and print_cont draw on.
-    fn select_port(&mut self, port: PortId);
+    /// Writes in the story font from now on.
+    fn use_story_font(&mut self);
 
-    /// Sets the font of `port`.
-    fn set_font_kind(&mut self, port: PortId, kind: FontKind);
+    /// Writes in the font of the text panel from now on.
+    fn use_panel_font(&mut self);
 
-    /// Sets the colour text and lines are drawn in.
-    fn set_a_pen(&mut self, port: PortId, pen: u8);
+    /// Makes the message area of the text panel the place print and print_cont write to.
+    fn select_message_area(&mut self);
 
-    /// Sets the colour behind text.
-    fn set_b_pen(&mut self, port: PortId, pen: u8);
+    /// Clears the area of a story page to black and goes back to the story text colour.
+    fn clear_placard(&mut self);
 
-    /// Sets how drawing combines with what is there (JAM1, JAM2, ...).
-    fn set_draw_mode(&mut self, port: PortId, mode: u8);
+    /// Draws the decorative border around a story page.
+    fn draw_placard_border(&mut self);
 
-    /// Moves the drawing position of `port`.
-    fn move_to(&mut self, port: PortId, x: i32, y: i32);
+    // ---- the menu in the text panel ----
 
-    /// Draws text at the position of `port`.
-    fn text(&mut self, port: PortId, bytes: &[u8]);
+    /// Draws menu entry `slot` (0-11, two columns) with `label` in `text_pen` on a box of `box_pen`.
+    fn draw_menu_entry(&mut self, slot: usize, label: &[u8], text_pen: u8, box_pen: u8);
 
-    /// Draws a line from the position of `port` to (x, y).
-    fn line_to(&mut self, port: PortId, x: i32, y: i32);
-
-    /// Fills a rectangle with the pen colour.
-    fn rect_fill(&mut self, port: PortId, from: (i32, i32), to: (i32, i32));
+    /// Blanks menu entry `slot`: nothing is shown there.
+    fn blank_menu_entry(&mut self, slot: usize);
 
     // ---- whole screens and pictures ----
 

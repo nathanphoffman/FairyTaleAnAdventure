@@ -24,9 +24,11 @@ pub fn set_intro_zoom(game: &mut Game, out: &mut dyn Output, x: i32) {
     fade_page(
         game,
         out,
-        (y * 2 - ZOOM_FADE_OFFSETS.0) as i16,
-        (y * 2 - ZOOM_FADE_OFFSETS.1) as i16,
-        (y * 2 - ZOOM_FADE_OFFSETS.2) as i16,
+        (
+            (y * 2 - ZOOM_FADE_OFFSETS.0) as i16,
+            (y * 2 - ZOOM_FADE_OFFSETS.1) as i16,
+            (y * 2 - ZOOM_FADE_OFFSETS.2) as i16,
+        ),
         0,
         &intro_colors,
     );

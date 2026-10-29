@@ -134,11 +134,13 @@ fn swing_at(game: &mut Game, out: &mut dyn Output, swing: &Swing, j: usize) -> b
     }
 
     match swing_result(
-        swing.attacker == 0,
-        distance_to_point(&game.actors, target, swing.tip.0, swing.tip.1),
-        swing.reach,
-        game.world.freeze_timer != 0,
-        swing.strength,
+        &SwingFacts {
+            by_hero: swing.attacker == 0,
+            dist: distance_to_point(&game.actors, target, swing.tip.0, swing.tip.1),
+            reach: swing.reach,
+            frozen: game.world.freeze_timer != 0,
+            strength: swing.strength,
+        },
         game.hero.brave,
         || rand256(&mut game.rng),
     ) {
@@ -178,6 +180,18 @@ fn weapon_tip(game: &mut Game, attacker: ActorRef, facing: i32, strength: i16) -
     (xs, ys)
 }
 
+/// What decides how a swing at one target turns out.
+#[derive(Clone, Copy)]
+struct SwingFacts {
+    by_hero: bool,
+    /// How far the tip of the weapon is from the target.
+    dist: i16,
+    reach: i16,
+    /// Time is frozen, so nothing hits.
+    frozen: bool,
+    strength: i16,
+}
+
 /// How a swing at one target turned out.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum SwingResult {
@@ -191,16 +205,19 @@ pub(super) enum SwingResult {
 /// within reach; an enemy also has to get past the hero's bravery (`dodge_roll` is a 0-255 draw,
 /// taken before anything else is checked, only for enemies). Nothing hits while time is frozen,
 /// and touch attacks make no sound.
-#[allow(clippy::too_many_arguments)] // the whole situation of one swing, from plain values
 fn swing_result(
-    by_hero: bool,
-    dist: i16,
-    reach: i16,
-    frozen: bool,
-    strength: i16,
+    facts: &SwingFacts,
     hero_bravery: i16,
     dodge_roll: impl FnOnce() -> i32,
 ) -> SwingResult {
+    let SwingFacts {
+        by_hero,
+        dist,
+        reach,
+        frozen,
+        strength,
+    } = *facts;
+
     if (by_hero || dodge_roll() > hero_bravery as i32) && dist < reach && !frozen {
         SwingResult::Hit
     } else if dist < reach + WHOOSH_MARGIN && strength != TOUCH_WEAPON {
@@ -242,17 +259,47 @@ mod tests {
     fn the_hero_always_hits_within_reach() {
         let never = || -> i32 { unreachable!("the hero does not roll") };
         assert_eq!(
-            swing_result(true, 4, 5, false, 3, 100, never),
+            swing_result(
+                &SwingFacts {
+                    by_hero: true,
+                    dist: 4,
+                    reach: 5,
+                    frozen: false,
+                    strength: 3
+                },
+                100,
+                never
+            ),
             SwingResult::Hit
         );
 
         assert_eq!(
-            swing_result(true, 5, 5, false, 3, 100, never),
+            swing_result(
+                &SwingFacts {
+                    by_hero: true,
+                    dist: 5,
+                    reach: 5,
+                    frozen: false,
+                    strength: 3
+                },
+                100,
+                never
+            ),
             SwingResult::Whoosh
         );
 
         assert_eq!(
-            swing_result(true, 7, 5, false, 3, 100, never),
+            swing_result(
+                &SwingFacts {
+                    by_hero: true,
+                    dist: 7,
+                    reach: 5,
+                    frozen: false,
+                    strength: 3
+                },
+                100,
+                never
+            ),
             SwingResult::Miss
         );
     }
@@ -260,17 +307,47 @@ mod tests {
     #[test]
     fn an_enemy_must_beat_the_heros_bravery() {
         assert_eq!(
-            swing_result(false, 1, 5, false, 3, 100, || 101),
+            swing_result(
+                &SwingFacts {
+                    by_hero: false,
+                    dist: 1,
+                    reach: 5,
+                    frozen: false,
+                    strength: 3
+                },
+                100,
+                || 101
+            ),
             SwingResult::Hit
         );
 
         assert_eq!(
-            swing_result(false, 1, 5, false, 3, 100, || 100),
+            swing_result(
+                &SwingFacts {
+                    by_hero: false,
+                    dist: 1,
+                    reach: 5,
+                    frozen: false,
+                    strength: 3
+                },
+                100,
+                || 100
+            ),
             SwingResult::Whoosh
         );
 
         assert_eq!(
-            swing_result(false, 1, 5, false, 3, 100, || 0),
+            swing_result(
+                &SwingFacts {
+                    by_hero: false,
+                    dist: 1,
+                    reach: 5,
+                    frozen: false,
+                    strength: 3
+                },
+                100,
+                || 0
+            ),
             SwingResult::Whoosh
         );
     }
@@ -278,11 +355,21 @@ mod tests {
     #[test]
     fn the_enemy_rolls_even_when_out_of_reach() {
         let mut drawn = 0;
-        swing_result(false, 50, 5, false, 3, 100, || {
-            drawn += 1;
+        swing_result(
+            &SwingFacts {
+                by_hero: false,
+                dist: 50,
+                reach: 5,
+                frozen: false,
+                strength: 3,
+            },
+            100,
+            || {
+                drawn += 1;
 
-            0
-        });
+                0
+            },
+        );
 
         assert_eq!(drawn, 1);
     }
@@ -290,17 +377,47 @@ mod tests {
     #[test]
     fn nothing_hits_while_time_is_frozen_and_touches_are_silent() {
         assert_eq!(
-            swing_result(true, 1, 5, true, 3, 0, || 0),
+            swing_result(
+                &SwingFacts {
+                    by_hero: true,
+                    dist: 1,
+                    reach: 5,
+                    frozen: true,
+                    strength: 3
+                },
+                0,
+                || 0
+            ),
             SwingResult::Whoosh
         );
 
         assert_eq!(
-            swing_result(true, 1, 5, true, TOUCH_WEAPON, 0, || 0),
+            swing_result(
+                &SwingFacts {
+                    by_hero: true,
+                    dist: 1,
+                    reach: 5,
+                    frozen: true,
+                    strength: TOUCH_WEAPON
+                },
+                0,
+                || 0
+            ),
             SwingResult::Miss
         );
 
         assert_eq!(
-            swing_result(true, 5, 5, false, TOUCH_WEAPON, 0, || 0),
+            swing_result(
+                &SwingFacts {
+                    by_hero: true,
+                    dist: 5,
+                    reach: 5,
+                    frozen: false,
+                    strength: TOUCH_WEAPON
+                },
+                0,
+                || 0
+            ),
             SwingResult::Miss
         );
     }

@@ -11,7 +11,6 @@ use super::{
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
 use crate::game::output::Output;
-use crate::game::render::screen::FontKind;
 
 use crate::game::actors::interaction::{eat_food, find_nearest_figure};
 use crate::game::data::object_tables::itrans;
@@ -100,8 +99,7 @@ fn finish_pickup(game: &mut Game, out: &mut dyn Output) {
         game.ui.quit_requested = 1;
         game.ui.view_status = VIEW_GAME_OVER;
         map_message(game, out);
-        let current = out.current_port();
-        out.set_font_kind(current, FontKind::Story);
+        out.use_story_font();
         win_colors(game, out);
     }
 }

@@ -58,7 +58,13 @@ pub fn repair_edges(game: &mut Game, video: &mut Video, dif_x: i16, dif_y: i16) 
     page.wflag = game.witch.on_screen as i16;
 
     if game.witch.on_screen != 0 {
-        witch_fx(game, video, video.screen.drawing);
+        witch_fx(
+            &mut game.witch,
+            &mut game.world,
+            &game.hero,
+            video,
+            video.screen.drawing,
+        );
 
         if game.witch.side_1 > 0
             && game.witch.side_2 < 0

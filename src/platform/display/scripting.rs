@@ -6,7 +6,7 @@ use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
 use std::cell::RefCell;
 
-use crate::game::statedump::{Command, queue_command};
+use crate::platform::host::{Command, host};
 
 /// A key press stays down this many ticks unless the script says otherwise.
 const DEFAULT_HOLD_TICKS: u32 = 4;
@@ -153,13 +153,17 @@ fn run_cmds(tick: u32) {
         let a: i32 = p[2].parse().unwrap_or(0);
         let b: i32 = p.get(3).and_then(|v| v.parse().ok()).unwrap_or(0);
 
-        match p[1] {
-            "tp" => queue_command(Command::Teleport { x: a, y: b }),
-            "kill" => queue_command(Command::KillHero { luck: a }),
-            "give" => queue_command(Command::Give { slot: a, count: b }),
-            "slay" => queue_command(Command::SlayEnemies),
-            "stat" => queue_command(Command::SetStat { stat: a, value: b }),
-            _ => {}
+        let command = match p[1] {
+            "tp" => Command::Teleport { x: a, y: b },
+            "kill" => Command::KillHero { luck: a },
+            "give" => Command::Give { slot: a, count: b },
+            "slay" => Command::SlayEnemies,
+            "stat" => Command::SetStat { stat: a, value: b },
+            _ => continue,
+        };
+
+        if let Some(host) = host() {
+            host.queue_command(command);
         }
     }
 }

@@ -23,9 +23,7 @@ use sdl2::mouse::MouseButton;
 use std::cell::Cell;
 use std::os::raw::c_int;
 
-use crate::game::input::handler::{
-    key_event as game_key, mouse_buttons_changed, mouse_moved, set_joystick_fire,
-};
+use crate::platform::host::host;
 
 /// Added to a key code to say the key was released.
 const RELEASED: c_int = 0x80;
@@ -57,12 +55,16 @@ thread_local! {
 fn send_key(code: u8, down: bool) {
     let flag = if down { 0 } else { RELEASED };
 
-    game_key(code as c_int | flag);
+    if let Some(host) = host() {
+        host.key_event(code as c_int | flag);
+    }
 }
 
 /// Presses or releases the joystick fire button.
 fn set_fire(down: bool) {
-    set_joystick_fire(down);
+    if let Some(host) = host() {
+        host.set_joystick_fire(down);
+    }
 }
 
 /// Sets one direction input (0-3 keyboard up/down/left/right, 4-7 the same on the gamepad) and
@@ -127,7 +129,9 @@ pub fn mouse_move(frame_x: i32, frame_y: i32) {
     record::record(format_args!("move {frame_x} {frame_y}"));
     let (x, y) = (frame_x / FRAME_TO_LORES, frame_y);
 
-    mouse_moved(x, y);
+    if let Some(host) = host() {
+        host.mouse_moved(x, y);
+    }
     let clamped = (
         x.clamp(POINTER_X_RANGE.0, POINTER_X_RANGE.1),
         y.clamp(POINTER_Y_RANGE.0, POINTER_Y_RANGE.1),
@@ -155,7 +159,9 @@ pub fn mouse_button(button: MouseButton, down: bool) {
     record::record(format_args!("button {name} {}", down as u8));
     BUTTONS.with(|b| b.set((l, r)));
 
-    mouse_buttons_changed(l, r);
+    if let Some(host) = host() {
+        host.mouse_buttons_changed(l, r);
+    }
 }
 
 /// Pointer position for drawing the cursor.

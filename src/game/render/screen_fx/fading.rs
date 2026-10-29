@@ -46,13 +46,10 @@ const RANDOM_COLOR_MASK: i32 = 0xfff;
 /// apply (red never below 10%, green 25%, blue 60%) and some blue is mixed in from green, which gives
 /// the bluish moonlight. The light spell (`light_timer`) makes reds as bright as greens.
 /// Colour 31 is changed first because it depends on where the hero is (swamp, secret room).
-#[allow(clippy::too_many_arguments)] // the three colour levels and the palette, plus the game and video state
 pub fn fade_page(
     game: &mut Game,
     out: &mut dyn Output,
-    r: i16,
-    g: i16,
-    b: i16,
+    (r, g, b): (i16, i16, i16),
     limit: i16,
     colors: &[u16],
 ) {
@@ -169,9 +166,7 @@ pub fn fade_down(game: &mut Game, out: &mut dyn Output) {
         fade_page(
             game,
             out,
-            level as i16,
-            level as i16,
-            level as i16,
+            (level as i16, level as i16, level as i16),
             0,
             &colors,
         );
@@ -187,9 +182,7 @@ pub fn fade_normal(game: &mut Game, out: &mut dyn Output) {
         fade_page(
             game,
             out,
-            level as i16,
-            level as i16,
-            level as i16,
+            (level as i16, level as i16, level as i16),
             0,
             &colors,
         );
@@ -228,9 +221,11 @@ pub fn day_fade(game: &mut Game, out: &mut dyn Output) {
             fade_page(
                 game,
                 out,
-                (level - DAY_DARKEN.0 + bonus) as i16,
-                (level - DAY_DARKEN.1) as i16,
-                (level - DAY_DARKEN.2) as i16,
+                (
+                    (level - DAY_DARKEN.0 + bonus) as i16,
+                    (level - DAY_DARKEN.1) as i16,
+                    (level - DAY_DARKEN.2) as i16,
+                ),
                 1,
                 &colors,
             );
@@ -238,9 +233,7 @@ pub fn day_fade(game: &mut Game, out: &mut dyn Output) {
             fade_page(
                 game,
                 out,
-                FULL_LEVEL as i16,
-                FULL_LEVEL as i16,
-                FULL_LEVEL as i16,
+                (FULL_LEVEL as i16, FULL_LEVEL as i16, FULL_LEVEL as i16),
                 1,
                 &colors,
             );

@@ -1,6 +1,9 @@
 //! The print queue: requests for the text panel (stats, vitality, menu, debug information).
 
+use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
+use crate::game::data::state::Hero;
+use crate::game::data::state::World;
 use crate::game::output::Output;
 use crate::game::render::display::delay;
 use crate::game::ui::menus::print_options;
@@ -46,54 +49,54 @@ pub fn handle_print_request(game: &mut Game, out: &mut dyn Output) {
     game.ui.print_queue.read = (game.ui.print_queue.read + 1) & QUEUE_MASK;
 
     match request {
-        REQUEST_DEBUG_COORDS => show_debug_coords(game, out),
-        REQUEST_DEBUG_SECTOR => show_debug_sector(game, out),
-        REQUEST_VITALITY => draw_vitality(game, out),
+        REQUEST_DEBUG_COORDS => show_debug_coords(&mut game.hero, out),
+        REQUEST_DEBUG_SECTOR => show_debug_sector(&mut game.world, &mut game.hero, out),
+        REQUEST_VITALITY => draw_vitality(&mut game.actors, out),
         REQUEST_OPTIONS => print_options(game, out),
-        REQUEST_STATS => draw_stats(game, out),
+        REQUEST_STATS => draw_stats(&mut game.hero, out),
         REQUEST_TAKE_WHAT => out.print("Take What?"),
         _ => {}
     }
 }
 
 /// Debug information: the hero's map position and the memory left.
-fn show_debug_coords(game: &mut Game, out: &mut dyn Output) {
+fn show_debug_coords(hero: &mut Hero, out: &mut dyn Output) {
     out.print("Coords = ");
-    out.print_number(game.hero.x as i32, COORD_DIGITS);
-    out.print_number(game.hero.y as i32, COORD_DIGITS);
+    out.print_number(hero.x as i32, COORD_DIGITS);
+    out.print_number(hero.y as i32, COORD_DIGITS);
     out.print("Memory Available: ");
     out.print_number(FAKE_FREE_BYTES, COORD_DIGITS);
 }
 
 /// Debug information: the hero's sector and the type of the extent the hero is in.
-fn show_debug_sector(game: &mut Game, out: &mut dyn Output) {
+fn show_debug_sector(world: &mut World, hero: &mut Hero, out: &mut dyn Output) {
     out.print("You are at: ");
-    out.print_number(game.hero.x as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
-    out.print_number(game.hero.y as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
+    out.print_number(hero.x as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
+    out.print_number(hero.y as i32 / SECTOR_PIXELS, SECTOR_DIGITS);
     out.print("H/Sector = ");
-    out.print_number(game.hero.sector as i32, SECTOR_DIGITS);
+    out.print_number(hero.sector as i32, SECTOR_DIGITS);
     out.print_cont_bytes(b" Extent = ");
-    out.print_number(game.world.extent_type as i32, EXTENT_DIGITS);
+    out.print_number(world.extent_type as i32, EXTENT_DIGITS);
 }
 
 /// The hero's vitality on the stats line.
-fn draw_vitality(game: &mut Game, out: &mut dyn Output) {
+fn draw_vitality(actors: &mut Actors, out: &mut dyn Output) {
     move_to(out, VITALITY_POSITION.0, VITALITY_POSITION.1);
     out.print_cont_bytes(b"Vit:");
-    out.print_number(game.actors.list[0].vitality as i32, VITALITY_DIGITS);
+    out.print_number(actors.list[0].vitality as i32, VITALITY_DIGITS);
 }
 
 /// Draws the hero's four stats (bravery, luck, kindness, wealth) along the stats line.
-fn draw_stats(game: &mut Game, out: &mut dyn Output) {
-    if game.hero.luck < 0 {
-        game.hero.luck = 0;
+fn draw_stats(hero: &mut Hero, out: &mut dyn Output) {
+    if hero.luck < 0 {
+        hero.luck = 0;
     }
 
     for (x, label, value) in [
-        (BRAVERY_X, b"Brv:".as_slice(), game.hero.brave),
-        (LUCK_X, b"Lck:", game.hero.luck),
-        (KINDNESS_X, b"Knd:", game.hero.kindness),
-        (WEALTH_X, b"Wlth:", game.hero.wealth),
+        (BRAVERY_X, b"Brv:".as_slice(), hero.brave),
+        (LUCK_X, b"Lck:", hero.luck),
+        (KINDNESS_X, b"Knd:", hero.kindness),
+        (WEALTH_X, b"Wlth:", hero.wealth),
     ] {
         move_to(out, x, STATS_Y);
         out.print_cont_bytes(label);

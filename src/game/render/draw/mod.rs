@@ -18,6 +18,7 @@ use self::scenery::mask_against_scenery;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
 use crate::game::data::state::Video;
+use crate::game::data::state::World;
 use crate::game::render::screen::Screen;
 
 pub use self::map_edge::repair_edges;
@@ -73,15 +74,14 @@ pub fn draw_sprites(game: &mut Game, video: &mut Video, cycle: i16) {
     };
 
     for j in 0..game.actors.drawn {
-        let i = game.actors.draw_order[j as usize] as i32;
-        let actor = ActorRef::new(i as usize);
+        let actor = ActorRef::new(game.actors.draw_order[j as usize] as usize);
         game.actor_mut(actor).visible = 0;
         let mut pass: u8 = 0;
 
         loop {
             let passmode = weapon_passmode(&game.actors, &game.world, actor, &mut pass);
 
-            if let Drawn::OutOfRoom = draw_one(game, video, &mut frame, actor, i, cycle, passmode) {
+            if let Drawn::OutOfRoom = draw_one(game, video, &mut frame, actor, cycle, passmode) {
                 return;
             }
 
@@ -106,30 +106,35 @@ struct Sprite {
     ground: i16,
 }
 
+/// A sprite cut to the screen, ready to blit.
+struct Placed {
+    sprite: Sprite,
+    clip: Clip,
+    /// The width of the image in bytes.
+    bytes_wide: i8,
+}
+
 /// Draws one actor (or its weapon) for the current pass.
-#[allow(clippy::too_many_arguments)] // the sprite and its clip, plus the game and video state
 fn draw_one(
     game: &mut Game,
     video: &mut Video,
     frame: &mut Frame,
     actor: ActorRef,
-    i: i32,
     cycle: i16,
     passmode: bool,
 ) -> Drawn {
     clear_scenery_mask(video);
 
-    let Some(mut sprite) = choose_image(&game.actors, &game.hero, actor, i, passmode) else {
+    let Some(mut sprite) = choose_image(&game.actors, &game.hero, actor, passmode) else {
         return Drawn::Done;
     };
 
-    let bytes_wide = place_on_screen(game, video, &mut sprite);
+    let bytes_wide = place_on_screen(&mut game.world, video, &mut sprite);
 
     if !adjust_for_depth(
         &game.actors,
         &game.hero,
         actor,
-        i,
         cycle,
         passmode,
         &mut sprite,
@@ -142,8 +147,13 @@ fn draw_one(
     }
 
     let clip = clip_to_screen(&mut sprite);
+    let placed = Placed {
+        sprite,
+        clip,
+        bytes_wide,
+    };
 
-    blit_sprite(game, video, frame, actor, i, &sprite, &clip, bytes_wide)
+    blit_sprite(game, video, frame, actor, &placed)
 }
 
 /// Moves the sprite from map to screen coordinates and works out its size and bottom right corner.
@@ -157,12 +167,12 @@ const WORD_SHIFT: u32 = 4;
 const PIXELS_PER_BYTE: i8 = 8;
 const WORD_PIXELS_MASK: i16 = 15;
 
-fn place_on_screen(game: &mut Game, video: &mut Video, sprite: &mut Sprite) -> i8 {
-    sprite.xstart += (game.world.map_x as i32 & TILE_X_MASK) as i16;
+fn place_on_screen(world: &mut World, video: &mut Video, sprite: &mut Sprite) -> i8 {
+    sprite.xstart += (world.map_x as i32 & TILE_X_MASK) as i16;
 
-    sprite.ystart += (game.world.map_y as i32 & TILE_Y_MASK) as i16;
+    sprite.ystart += (world.map_y as i32 & TILE_Y_MASK) as i16;
 
-    sprite.ground += (game.world.map_y as i32 & TILE_Y_MASK) as i16;
+    sprite.ground += (world.map_y as i32 & TILE_Y_MASK) as i16;
 
     let seq = sprite_sheet(video, sprite.atype);
 
@@ -183,9 +193,18 @@ fn is_off_screen(sprite: &Sprite) -> bool {
         || sprite.ystop < 0
 }
 
-/// Where the clipped sprite starts and how big it is, in words and lines: the first word column, the
-/// width in words (one more when the sprite is shifted into the next word) and the height.
-fn blit_extent(clip: &Clip) -> (i8, i8, i8) {
+/// Where the clipped sprite starts and how big it is, in words and lines.
+pub(super) struct Extent {
+    /// The first word column.
+    pub(super) xbw: i8,
+    /// The width in words (one more when the sprite is shifted into the next word).
+    pub(super) blitwide: i8,
+    /// The height in lines.
+    pub(super) blithigh: i8,
+}
+
+/// Works out the extent of the clipped sprite.
+fn blit_extent(clip: &Clip) -> Extent {
     // Pixel columns to word columns (16 pixels to a word).
     let xbw = (clip.xstart >> WORD_SHIFT) as i8;
 
@@ -197,26 +216,24 @@ fn blit_extent(clip: &Clip) -> (i8, i8, i8) {
         blitwide = blitwide.wrapping_add(1);
     }
 
-    (xbw, blitwide, blithigh)
+    Extent {
+        xbw,
+        blitwide,
+        blithigh,
+    }
 }
 
 /// Saves the background under the sprite and draws it through its masks into the page.
-#[allow(clippy::too_many_arguments)] // the sprite and its clip, plus the game state
 fn blit_sprite(
     game: &mut Game,
     video: &mut Video,
     frame: &mut Frame,
     actor: ActorRef,
-    i: i32,
-    sprite: &Sprite,
-    clip: &Clip,
-    bytes_wide: i8,
+    placed: &Placed,
 ) -> Drawn {
-    let (xbw, blitwide, blithigh) = blit_extent(clip);
+    let extent = blit_extent(&placed.clip);
 
-    if !set_up_blit(
-        video, frame, sprite, clip, bytes_wide, xbw, blitwide, blithigh,
-    ) {
+    if !set_up_blit(video, frame, placed, &extent) {
         return Drawn::OutOfRoom; // no more blits if no room
     }
     save_background(video, video.blitter.sshape.backsave);
@@ -226,21 +243,9 @@ fn blit_sprite(
         &game.world,
         &mut game.hero,
         actor,
-        i,
-        sprite.atype,
-        sprite.inum,
+        &placed.sprite,
     ) {
-        mask_against_scenery(
-            game,
-            video,
-            actor,
-            i,
-            sprite.ground,
-            xbw,
-            clip.ystart,
-            clip.ystop,
-            blitwide,
-        );
+        mask_against_scenery(game, video, actor, placed, &extent);
     }
 
     combine_masks(video);

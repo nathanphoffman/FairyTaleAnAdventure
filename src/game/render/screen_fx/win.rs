@@ -8,7 +8,7 @@ use crate::game::data::tables::black_colors;
 use crate::game::output::Output;
 use crate::game::render::display::delay;
 use crate::game::ui::messages::name;
-use crate::game::ui::text::{draw_placard_border, placard_text};
+use crate::game::ui::text::placard_text;
 
 // The win sequence: a sunrise over the winning picture.
 const WIN_MESSAGE_FIRST: i32 = 6;
@@ -40,7 +40,7 @@ pub fn win_colors(game: &mut Game, out: &mut dyn Output) {
     placard_text(out, WIN_MESSAGE_FIRST);
     name(game, out);
     placard_text(out, WIN_MESSAGE_SECOND);
-    draw_placard_border(out);
+    out.draw_placard_border();
     delay(game, out, WIN_MESSAGE_PAUSE);
     show_win_picture_in_black(game, out);
     rise_sun(game, out);

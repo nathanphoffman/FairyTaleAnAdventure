@@ -138,7 +138,7 @@ fn run_frame(game: &mut Game, video: &mut Video, state: &mut FrameState) {
         return;
     }
 
-    read_walk_direction(game, video);
+    read_walk_direction(&mut game.ui, video);
 
     if game.menus[GAME_MENU].enabled[PAUSE_ENTRY] & 1 != 0 {
         delay(game, video, 1);
@@ -315,7 +315,7 @@ fn draw_frame(
     page.isv_x = game.world.tile_x as i32;
     page.isv_y = game.world.tile_y as i32;
 
-    video.set_a_pen(PortId::Map, SPRITE_PEN);
+    video.screen.set_a_pen(PortId::Map, SPRITE_PEN);
 
     resolve_melee(game, video);
     advance_missiles(game, video);

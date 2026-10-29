@@ -21,9 +21,14 @@ pub mod data;
 
 pub mod files;
 
+pub mod host;
+
 pub mod input;
 
 pub mod output;
+
+#[cfg(test)]
+pub mod recorder;
 
 pub mod render;
 

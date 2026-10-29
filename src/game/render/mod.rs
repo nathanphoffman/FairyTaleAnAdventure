@@ -12,6 +12,8 @@ pub mod output;
 
 pub mod overview_map;
 
+pub mod placard_border;
+
 pub mod restore;
 
 pub mod screen;

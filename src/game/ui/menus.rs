@@ -9,7 +9,6 @@ use crate::game::data::state::Ui;
 use crate::game::data::tables::{key_colors, label1};
 use crate::game::input::handler::forget_last_menu;
 use crate::game::output::Output;
-use crate::game::render::screen::PortId;
 use crate::game::ui::text::item_menu_state;
 
 // Menu numbers (`enum cmodes` in csrc/fmain.c).
@@ -48,9 +47,6 @@ const GIVE_GOLD_ENTRY: usize = 5;
 const GIVE_BOOK_ENTRY: usize = 6;
 const GIVE_WRIT_ENTRY: usize = 7;
 const GIVE_BONE_ENTRY: usize = 8;
-
-/// The width of a menu entry in characters (blanks over an unused slot).
-const ENTRY_WIDTH: i32 = 6;
 
 /// The hero must have more than this much gold to be able to give some away.
 const GIVE_GOLD_MIN: i16 = 2;
@@ -122,18 +118,8 @@ pub fn print_options(game: &mut Game, out: &mut dyn Output) {
 
 /// Blanks the slots from `first` to the last one: nothing is shown there.
 fn blank_slots_from(ui: &mut Ui, out: &mut dyn Output, first: usize) {
-    out.set_b_pen(PortId::Text2, 0);
-
     for slot in first..SLOTS {
-        let x = if slot & 1 != 0 {
-            RIGHT_COLUMN_X
-        } else {
-            LEFT_COLUMN_X
-        };
-
-        let y = (slot / 2) as i32 * ROW_HEIGHT + FIRST_ROW_Y;
-        out.move_to(PortId::Text2, x, y);
-        out.text(PortId::Text2, &BOX[..ENTRY_WIDTH as usize]);
+        out.blank_menu_entry(slot);
 
         ui.slot_entries[slot] = -1;
     }
@@ -150,18 +136,8 @@ pub fn go_to_menu(game: &mut Game, out: &mut dyn Output, mode: i16) {
     print_options(game, out);
 }
 
-// Where the menu entries are drawn in the text panel: two columns, a row every 9 pixels.
-const LEFT_COLUMN_X: i32 = 430;
-const RIGHT_COLUMN_X: i32 = 482;
-const FIRST_ROW_Y: i32 = 8;
-const ROW_HEIGHT: i32 = 9;
-
-/// The entry's text is inset from the edge of its coloured box by this much.
-const TEXT_INSET: i32 = 4;
-
-/// Each label is 5 characters; the box behind it is 6 wide.
+/// Each label is 5 characters.
 const LABEL_LEN: i32 = 5;
-const BOX: &[u8; 6] = b"      ";
 
 /// The first 5 entries of every menu are the main menu names, taken from `label1`.
 const MAIN_ENTRIES: i32 = 5;
@@ -173,24 +149,10 @@ const MAIN_PEN: u32 = 4;
 /// 1 for a selected entry, 0 for a plain one. The box colour depends on the menu.
 pub fn print_menu_entry(game: &mut Game, out: &mut dyn Output, j: i16, pena: i16) {
     let entry = game.ui.slot_entries[j as usize] as i32;
-    out.set_a_pen(PortId::Text2, pena as u8);
     let box_pen = entry_box_pen(game, entry) as u8;
-    out.set_b_pen(PortId::Text2, box_pen);
+    let label = entry_label(game, entry * LABEL_LEN);
 
-    let offset = entry * LABEL_LEN;
-
-    let x = if j & 1 != 0 {
-        RIGHT_COLUMN_X
-    } else {
-        LEFT_COLUMN_X
-    };
-
-    let y = (j as i32 / 2) * ROW_HEIGHT + FIRST_ROW_Y;
-    let label = entry_label(game, offset);
-    out.move_to(PortId::Text2, x, y);
-    out.text(PortId::Text2, BOX);
-    out.move_to(PortId::Text2, x + TEXT_INSET, y);
-    out.text(PortId::Text2, label);
+    out.draw_menu_entry(j as usize, label, pena as u8, box_pen);
 }
 
 /// The colour of the box behind an entry of the current menu: fixed for the use and file menus and

@@ -10,9 +10,8 @@ use crate::game::data::types::{Bro, Shape};
 use crate::game::files::loading::load_start_sprites;
 use crate::game::output::Output;
 use crate::game::render::display::delay;
-use crate::game::render::screen::{FontKind, PortId};
 use crate::game::render::screen_fx::{map_message, message_off};
-use crate::game::ui::text::{draw_placard_border, placard_text, show_event};
+use crate::game::ui::text::{placard_text, show_event};
 use crate::game::world::map::move_camera_to;
 
 const RAFT: i8 = 3;
@@ -62,8 +61,6 @@ const START_PLACE: u16 = 2;
 
 /// Sound/graphics: pen colours and the panel area that is cleared between messages.
 const PEN_BLACK: u8 = 0;
-const PEN_TEXT: u8 = 24;
-const PANEL: (i32, i32, i32, i32) = (13, 13, 271, 107);
 
 /// Delays, in 50ths of a second.
 const SHOW_PLACARD: i32 = 120;
@@ -108,7 +105,7 @@ pub(super) fn leave_fallen_brother(objects: &mut ObjectLists, hero: &Hero) {
 
 /// The next brother takes over: his stats and item list, nothing in the timers, and the first
 /// safe spot.
-pub(super) fn take_over_next_brother(game: &mut Game, _out: &mut dyn Output, hero: ActorRef) {
+pub(super) fn take_over_next_brother(game: &mut Game, hero: ActorRef) {
     let stats = &brother_stats[game.hero.brother as usize];
     start_next_brother(&mut game.hero, &mut game.actors.list[hero.slot()], stats);
 
@@ -154,8 +151,7 @@ pub(super) fn start_next_brother(hero: &mut Hero, body: &mut Shape, next: &Bro) 
 /// The story pages between brothers (and the game over page after the last).
 pub(super) fn show_brother_placards(game: &mut Game, out: &mut dyn Output) {
     map_message(game, out);
-    let current = out.current_port();
-    out.set_font_kind(current, FontKind::Story);
+    out.use_story_font();
 
     if game.hero.brother == JULIAN {
         placard_text(out, PLACARD_JULIAN);
@@ -168,7 +164,7 @@ pub(super) fn show_brother_placards(game: &mut Game, out: &mut dyn Output) {
         placard_text(out, PLACARD_GAME_OVER);
     }
 
-    draw_placard_border(out);
+    out.draw_placard_border();
     delay(game, out, SHOW_PLACARD);
 
     if game.hero.brother > LAST_BROTHER {
@@ -182,12 +178,9 @@ pub(super) fn show_brother_placards(game: &mut Game, out: &mut dyn Output) {
 /// After the first story page the panel is cleared and the follow-up page for this brother is shown.
 fn show_follow_up_placard(game: &mut Game, out: &mut dyn Output) {
     delay(game, out, SHORT_PAUSE);
-    let current = out.current_port();
-    out.set_a_pen(current, PEN_BLACK);
-    out.rect_fill(current, (PANEL.0, PANEL.1), (PANEL.2, PANEL.3));
+    out.clear_placard();
 
     delay(game, out, TINY_PAUSE);
-    out.set_a_pen(current, PEN_TEXT);
 
     placard_text(
         out,
@@ -203,9 +196,8 @@ fn show_follow_up_placard(game: &mut Game, out: &mut dyn Output) {
 
 /// Loads the brother's sprites and tells where the story starts.
 pub(super) fn announce_brother(game: &mut Game, out: &mut dyn Output) {
-    let current = out.current_port();
-    out.set_font_kind(current, FontKind::Panel);
-    out.select_port(PortId::Text);
+    out.use_panel_font();
+    out.select_message_area();
 
     game.actors.loaded_actor_file = HERO_SPRITE_FILE;
     game.actors.loaded_setfig_file = HERO_SET_FILE;

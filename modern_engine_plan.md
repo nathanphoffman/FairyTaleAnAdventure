@@ -52,33 +52,34 @@ Both engines share the rules. They differ only in how they draw and read input.
    test hook lives in `game/render/display.rs`.
 
 11. The rules talk to the screen through `Output` (`src/game/output.rs`), and `Video` implements it
-   (`src/game/render/output.rs`). It covers printing into the text panel, drawing text and lines on
-   the three ports (play field, message area, menu area), loading the page and panel colours,
-   swapping and showing pages, waiting a frame, loading sprite sheets and image banks, and a few
-   whole screens (compass, item list, overview map, message page, intro zoom). The folders `actors`,
-   `world`, `ui`, `input` and `files` no longer name `Video` at all; they take `out: &mut dyn Output`.
-   The drawing code that used to sit in those folders moved to `render/` (`map_tiles.rs`,
-   `overview_map.rs`, `sprite_loading.rs`, `screen_fx/item_screen.rs`) and `startup/story_pages.rs`.
-   `view_status` (which screen is showing) moved from `Screen` to `Game.ui`, and the page colours
-   from `Video` to `Game`.
+   (`src/game/render/output.rs`). It covers printing into the text panel, the text position and font,
+   story pages (`clear_placard`, `draw_placard_border`), the menu entries, loading the page and panel
+   colours, swapping and showing pages, waiting a frame, loading sprite sheets and image banks, and a
+   few whole screens (compass, item list, overview map, message page, intro zoom). The rules no
+   longer see ports, pens or rectangles; the Amiga layout (menu columns, placard area, border
+   strokes) lives in `render/`. The folders `actors`, `world`, `ui`, `input` and `files` no longer
+   name `Video` at all; they take `out: &mut dyn Output`. The drawing code that used to sit in those
+   folders moved to `render/` (`map_tiles.rs`, `overview_map.rs`, `sprite_loading.rs`,
+   `placard_border.rs`, `screen_fx/item_screen.rs`) and `startup/story_pages.rs`. `view_status` (which
+   screen is showing) moved from `Screen` to `Game.ui`, and the page colours from `Video` to `Game`.
+
+12. `game/recorder.rs` has a second `Output`, `Recorder`, which draws nothing and writes down every
+   call (`Call`), so rules can be run and checked without a screen (used by tests).
+
+13. The platform no longer depends on the game: `platform/host.rs` is the interface (`Host`: key and
+   mouse input, joystick fire, and the test `Command`s), `game/host.rs` implements it, and `main`
+   installs it. No function has more than seven parameters and no `allow(clippy::too_many_arguments)`
+   is left; unused `out` parameters are gone.
 
 **Not done.**
-- `Output` is still a thin layer over the Amiga drawing: it takes `PortId` and `FontKind` and has pen
-  and cursor calls, so a different renderer would have to imitate those or the story and menu code
-  would need higher-level calls (show this placard, draw this menu).
-- Unused `out` parameters are left in a few functions; they can be removed.
-- `Game` can now be built and driven with any `Output`, but there is no second one yet (for example
-  a recording one for tests).
-- About 270 functions still take the whole `&mut Game`; 10 have more than six parameters (marked
-  `allow(clippy::too_many_arguments)`).
-- `platform/display/scripting.rs` still calls `game::statedump::queue_command` for the test commands,
-  and `platform/input` feeds keys to `game::input::handler`.
+- `Output` still has pens (`clear_drawing_page(pen)`, `prepare_message_page(pen)`, colour numbers) and
+  `FontKind`; the ports are hidden, but a renderer with real colours would want colour names.
+- Many functions still take the whole `&mut Game` because they pass it on to others.
 - Steps 5 to 7 below (classic/modern engines, remastered, reimagined) have not been started.
 
 **Plan for what comes next, in order.**
-1. *Use the output interface*: add a second `Output` that records what the rules ask for (so rules
-   can be tested without a screen), replace the pen and cursor calls with higher-level ones, and
-   drop the unused `out` parameters. Then the modern renderer can read `Game` directly.
+1. *Use the output interface*: replace the remaining pen and colour-number calls with higher-level
+   ones. Then the modern renderer can read `Game` directly.
 2. Step 5 (classic engine, improved options), step 6 (modern renderer: RGBA tiles, zoom, bigger view),
    step 7 (data files for items, enemies, spells and text).
 

@@ -1,6 +1,6 @@
 //! Hiding the part of a sprite that scenery (trees, walls, roofs) is in front of.
 
-use super::{CARRIER, FALL, OBJECTS, RAFT_SLOT};
+use super::{CARRIER, Extent, FALL, OBJECTS, Placed, RAFT_SLOT, Sprite};
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
@@ -64,16 +64,16 @@ pub(super) fn clear_scenery_mask(video: &mut Video) {
 
 /// True for sprites drawn in front of everything: carriers, the hero when riding the swan or in
 /// certain places, arrows and some special races.
-#[allow(clippy::too_many_arguments)] // the sprite being drawn, plus the actors, world and hero
 pub(super) fn drawn_in_front(
     actors: &Actors,
     world: &World,
     hero: &mut Hero,
     actor: ActorRef,
-    i: i32,
-    atype: i16,
-    inum: i16,
+    sprite: &Sprite,
 ) -> bool {
+    let (atype, inum) = (sprite.atype, sprite.inum);
+    let i = actor.slot();
+
     if atype == CARRIER
         || (i == 0
             && (hero.riding == RIDING_SWAN
@@ -132,7 +132,6 @@ pub(super) fn scenery_rule(k: i16, xm: i32, ym: i32, ystop: i16, on_bridge: bool
 /// tiles it covers.
 struct SpriteTiles {
     actor: ActorRef,
-    i: i32,
     ground: i16,
     xbw: i8,
     ym1: u8,
@@ -140,26 +139,21 @@ struct SpriteTiles {
 
 /// Cuts out the parts of the sprite that scenery (trees, walls, roofs) should hide, one map tile at a
 /// time, by marking them in the mask buffer.
-#[allow(clippy::too_many_arguments)] // the tile loop of the original, kept as one call
 pub(super) fn mask_against_scenery(
     game: &mut Game,
     video: &mut Video,
     actor: ActorRef,
-    i: i32,
-    ground: i16,
-    xbw: i8,
-    ystart1: i16,
-    ystop1: i16,
-    blitwide: i8,
+    placed: &Placed,
+    extent: &Extent,
 ) {
-    let ym1 = (ystart1 >> TILE_ROW_SHIFT) as u8;
+    let blitwide = extent.blitwide;
+    let ym1 = (placed.clip.ystart >> TILE_ROW_SHIFT) as u8;
 
-    let ym2 = ((ystop1 >> TILE_ROW_SHIFT) as u8).wrapping_sub(ym1);
+    let ym2 = ((placed.clip.ystop >> TILE_ROW_SHIFT) as u8).wrapping_sub(ym1);
     let tiles = SpriteTiles {
         actor,
-        i,
-        ground,
-        xbw,
+        ground: placed.sprite.ground,
+        xbw: extent.xbw,
         ym1,
     };
 
@@ -190,7 +184,7 @@ impl SpriteTiles {
             k = TYPE_BRIDGE;
         }
 
-        let on_bridge = game.hero.sector == BRIDGE_SECTOR && self.i != RAFT_SLOT;
+        let on_bridge = game.hero.sector == BRIDGE_SECTOR && self.actor.slot() as i32 != RAFT_SLOT;
 
         match scenery_rule(k, xm, ym, ystop, on_bridge) {
             SceneryRule::Skip => return None,

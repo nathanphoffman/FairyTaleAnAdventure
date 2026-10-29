@@ -5,6 +5,7 @@ use crate::game::files::disk::load_track_range;
 use crate::game::files::iff_picture::load_picture;
 use crate::game::output::Output;
 use crate::game::render::overview_map::draw_overview_map;
+use crate::game::render::placard_border::draw_placard_border;
 use crate::game::render::screen::{FontKind, HIRES, PortId, SPRITES, VP_HIDE, ViewPortId};
 use crate::game::render::screen_fx::{draw_compass, draw_item_list};
 use crate::game::render::sprite_loading::{finish_sprite_load, load_sprite_file};
@@ -38,6 +39,35 @@ const MAP_MARK_PEN: u8 = 31;
 const SCREEN_CENTER_X: i32 = 160;
 const SCREEN_CENTER_Y: i32 = 100;
 const ZOOM_TEXT_HEIGHT: i32 = 95;
+
+/// A story page's text area (top left and bottom right corners), and its colours.
+const PLACARD_AREA: ((i32, i32), (i32, i32)) = ((13, 13), (271, 107));
+const PEN_BLACK: u8 = 0;
+const PLACARD_TEXT_PEN: u8 = 24;
+
+// Where the menu entries are drawn in the text panel: two columns, a row every 9 pixels.
+const MENU_LEFT_COLUMN_X: i32 = 430;
+const MENU_RIGHT_COLUMN_X: i32 = 482;
+const MENU_FIRST_ROW_Y: i32 = 8;
+const MENU_ROW_HEIGHT: i32 = 9;
+
+/// The entry's text is inset from the edge of its coloured box by this much.
+const MENU_TEXT_INSET: i32 = 4;
+
+/// Each label is 5 characters; the box behind it is 6 wide.
+const MENU_ENTRY_WIDTH: usize = 6;
+const MENU_BOX: &[u8; MENU_ENTRY_WIDTH] = b"      ";
+
+/// The top left corner of menu entry `slot`: even slots on the left, odd on the right.
+fn menu_slot_position(slot: usize) -> (i32, i32) {
+    let x = if slot & 1 != 0 {
+        MENU_RIGHT_COLUMN_X
+    } else {
+        MENU_LEFT_COLUMN_X
+    };
+
+    (x, (slot / 2) as i32 * MENU_ROW_HEIGHT + MENU_FIRST_ROW_Y)
+}
 
 /// Characters in a formatted number (the last one is the trailing space).
 const NUMBER_FIELD: i32 = 10;
@@ -126,44 +156,51 @@ impl Output for Video {
         }
     }
 
-    fn current_port(&self) -> PortId {
-        self.screen.current_port
+    fn set_text_position(&mut self, x: i32, y: i32) {
+        self.screen.move_to(self.screen.current_port, x, y);
     }
 
-    fn select_port(&mut self, port: PortId) {
-        self.screen.current_port = port;
+    fn use_story_font(&mut self) {
+        self.screen
+            .set_font_kind(self.screen.current_port, FontKind::Story);
     }
 
-    fn set_font_kind(&mut self, port: PortId, kind: FontKind) {
-        self.screen.set_font_kind(port, kind);
+    fn use_panel_font(&mut self) {
+        self.screen
+            .set_font_kind(self.screen.current_port, FontKind::Panel);
     }
 
-    fn set_a_pen(&mut self, port: PortId, pen: u8) {
-        self.screen.set_a_pen(port, pen);
+    fn select_message_area(&mut self) {
+        self.screen.current_port = PortId::Text;
     }
 
-    fn set_b_pen(&mut self, port: PortId, pen: u8) {
-        self.screen.set_b_pen(port, pen);
+    fn clear_placard(&mut self) {
+        let port = self.screen.current_port;
+        self.screen.set_a_pen(port, PEN_BLACK);
+        self.screen.rect_fill(port, PLACARD_AREA.0, PLACARD_AREA.1);
+        self.screen.set_a_pen(port, PLACARD_TEXT_PEN);
     }
 
-    fn set_draw_mode(&mut self, port: PortId, mode: u8) {
-        self.screen.set_draw_mode(port, mode);
+    fn draw_placard_border(&mut self) {
+        draw_placard_border(&mut self.screen);
     }
 
-    fn move_to(&mut self, port: PortId, x: i32, y: i32) {
-        self.screen.move_to(port, x, y);
+    fn draw_menu_entry(&mut self, slot: usize, label: &[u8], text_pen: u8, box_pen: u8) {
+        let (x, y) = menu_slot_position(slot);
+        self.screen.set_a_pen(PortId::Text2, text_pen);
+        self.screen.set_b_pen(PortId::Text2, box_pen);
+        self.screen.move_to(PortId::Text2, x, y);
+        self.screen.text(PortId::Text2, MENU_BOX);
+        self.screen.move_to(PortId::Text2, x + MENU_TEXT_INSET, y);
+        self.screen.text(PortId::Text2, label);
     }
 
-    fn text(&mut self, port: PortId, bytes: &[u8]) {
-        self.screen.text(port, bytes);
-    }
-
-    fn line_to(&mut self, port: PortId, x: i32, y: i32) {
-        self.screen.line_to(port, x, y);
-    }
-
-    fn rect_fill(&mut self, port: PortId, from: (i32, i32), to: (i32, i32)) {
-        self.screen.rect_fill(port, from, to);
+    fn blank_menu_entry(&mut self, slot: usize) {
+        let (x, y) = menu_slot_position(slot);
+        self.screen.set_b_pen(PortId::Text2, PEN_BLACK);
+        self.screen.move_to(PortId::Text2, x, y);
+        self.screen
+            .text(PortId::Text2, &MENU_BOX[..MENU_ENTRY_WIDTH]);
     }
 
     fn draw_compass(&mut self, dir: i16) {

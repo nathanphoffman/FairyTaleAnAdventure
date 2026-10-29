@@ -107,7 +107,7 @@ fn think(game: &mut Game, i: usize, battle2: i8) {
     let tactic = game.actor(actor).tactic as i16;
     let new_tactic_roll = bitrand(&mut game.rng, NEW_TACTIC_ODDS - 1) == 0;
     let mode = adjust_mode_for_situation(game, actor, game.actor(actor).goal as i16);
-    let mode = act_on_goal(game, i, actor, mode, tactic, (xd, yd), new_tactic_roll);
+    let mode = act_on_goal(game, actor, mode, tactic, (xd, yd), new_tactic_roll);
 
     game.actor_mut(actor).goal = mode as i8;
 
@@ -156,7 +156,9 @@ fn notice_actor(actors: &mut Actors, actor: ActorRef, xd: i16, yd: i16, battle2:
 }
 
 /// A stuck actor picks a new tactic: archers one of the ranged ones, the others a melee one.
-fn try_something_else(game: &mut Game, i: usize, actor: ActorRef) {
+fn try_something_else(game: &mut Game, actor: ActorRef) {
+    let i = actor.slot();
+
     if game.actor(actor).weapon & BOW_BIT != 0 {
         let tactic = rand4(&mut game.rng) + ARCHER_FRUSTRATION_TACTIC;
         run_tactic(game, i as i32, tactic);
@@ -169,18 +171,18 @@ fn try_something_else(game: &mut Game, i: usize, actor: ActorRef) {
 /// Carries out the actor's goal for this frame: a stuck actor tries something else, a hostile one
 /// picks a tactic now and then and acts on it, the others flee, follow, stand or wait. Returns the
 /// goal for next frame, which a hostile actor may change.
-#[allow(clippy::too_many_arguments)] // the whole situation of one actor, plus the game state
 fn act_on_goal(
     game: &mut Game,
-    i: usize,
     actor: ActorRef,
     mut mode: i16,
     mut tactic: i16,
     (xd, yd): (i16, i16),
     mut new_tactic_roll: bool,
 ) -> i16 {
+    let i = actor.slot();
+
     if tactic == FRUST || tactic == SHOOTFRUST {
-        try_something_else(game, i, actor);
+        try_something_else(game, actor);
     } else if game.actor(actor).state == SHOOT1 {
         game.actor_mut(actor).state = SHOOT3;
     } else if mode <= ARCHER2 {
@@ -192,7 +194,7 @@ fn act_on_goal(
             (mode, tactic) = choose_tactic(game, actor, mode, xd, yd);
         }
 
-        hostile_action(game, i, actor, mode, tactic, xd, yd);
+        hostile_action(game, actor, mode, tactic, (xd, yd));
     } else if mode == FLEE {
         run_tactic(game, i as i32, BACKUP);
     } else if mode == FOLLOWER {
@@ -212,12 +214,14 @@ fn act_on_goal(
 fn adjust_mode_for_situation(game: &mut Game, actor: ActorRef, mode: i16) -> i16 {
     adjusted_mode(
         mode,
-        game.actors.list[0].state,
-        game.actors.leader,
-        game.actor(actor).vitality,
-        game.world.extent_type,
-        game.actor(actor).race,
-        game.extents[game.world.extent].v3,
+        &Situation {
+            hero_state: game.actors.list[0].state,
+            leader_slot: game.actors.leader,
+            vitality: game.actor(actor).vitality,
+            extent_type: game.world.extent_type,
+            race: game.actor(actor).race,
+            zone_race: game.extents[game.world.extent].v3,
+        },
     )
 }
 
@@ -226,19 +230,31 @@ fn on_screen(xd: i16, yd: i16) -> bool {
     xd < SCREEN_RANGE && yd < SCREEN_RANGE
 }
 
-/// The mode after the hero's state and the actor's own health are taken into account: everyone
-/// flees (or follows the leader) when the hero is dead or falling, the nearly dead flee, and so do
-/// actors of a special encounter that are not the zone's own race in the 60+ zones.
-#[allow(clippy::too_many_arguments)] // the whole situation of one actor, from plain values
-fn adjusted_mode(
-    mode: i16,
+/// What decides an actor's mode, from plain values.
+#[derive(Clone, Copy)]
+struct Situation {
     hero_state: i8,
     leader_slot: i16,
     vitality: i16,
     extent_type: u16,
     race: u8,
+    /// The race the zone's own actors have.
     zone_race: u8,
-) -> i16 {
+}
+
+/// The mode after the hero's state and the actor's own health are taken into account: everyone
+/// flees (or follows the leader) when the hero is dead or falling, the nearly dead flee, and so do
+/// actors of a special encounter that are not the zone's own race in the 60+ zones.
+fn adjusted_mode(mode: i16, situation: &Situation) -> i16 {
+    let Situation {
+        hero_state,
+        leader_slot,
+        vitality,
+        extent_type,
+        race,
+        zone_race,
+    } = *situation;
+
     if hero_state == DEAD || hero_state == FALL {
         if leader_slot == 0 { FLEE } else { FOLLOWER }
     } else if vitality < NEARLY_DEAD || (extent_type > SPECIAL_XTYPE && race != zone_race) {
@@ -254,17 +270,105 @@ mod tests {
 
     #[test]
     fn mode_adjustments() {
-        assert_eq!(adjusted_mode(1, DEAD, 0, 10, 0, 0, 0), FLEE);
-        assert_eq!(adjusted_mode(1, FALL, 3, 10, 0, 0, 0), FOLLOWER);
-        assert_eq!(adjusted_mode(1, STILL, 0, NEARLY_DEAD - 1, 0, 0, 0), FLEE);
-        assert_eq!(adjusted_mode(1, STILL, 0, NEARLY_DEAD, 0, 0, 0), 1);
         assert_eq!(
-            adjusted_mode(1, STILL, 0, 10, SPECIAL_XTYPE + 1, 5, 6),
+            adjusted_mode(
+                1,
+                &Situation {
+                    hero_state: DEAD,
+                    leader_slot: 0,
+                    vitality: 10,
+                    extent_type: 0,
+                    race: 0,
+                    zone_race: 0
+                }
+            ),
+            FLEE
+        );
+        assert_eq!(
+            adjusted_mode(
+                1,
+                &Situation {
+                    hero_state: FALL,
+                    leader_slot: 3,
+                    vitality: 10,
+                    extent_type: 0,
+                    race: 0,
+                    zone_race: 0
+                }
+            ),
+            FOLLOWER
+        );
+        assert_eq!(
+            adjusted_mode(
+                1,
+                &Situation {
+                    hero_state: STILL,
+                    leader_slot: 0,
+                    vitality: NEARLY_DEAD - 1,
+                    extent_type: 0,
+                    race: 0,
+                    zone_race: 0
+                }
+            ),
+            FLEE
+        );
+        assert_eq!(
+            adjusted_mode(
+                1,
+                &Situation {
+                    hero_state: STILL,
+                    leader_slot: 0,
+                    vitality: NEARLY_DEAD,
+                    extent_type: 0,
+                    race: 0,
+                    zone_race: 0
+                }
+            ),
+            1
+        );
+        assert_eq!(
+            adjusted_mode(
+                1,
+                &Situation {
+                    hero_state: STILL,
+                    leader_slot: 0,
+                    vitality: 10,
+                    extent_type: SPECIAL_XTYPE + 1,
+                    race: 5,
+                    zone_race: 6
+                }
+            ),
             FLEE
         );
 
-        assert_eq!(adjusted_mode(1, STILL, 0, 10, SPECIAL_XTYPE + 1, 6, 6), 1);
-        assert_eq!(adjusted_mode(1, STILL, 0, 10, SPECIAL_XTYPE, 5, 6), 1);
+        assert_eq!(
+            adjusted_mode(
+                1,
+                &Situation {
+                    hero_state: STILL,
+                    leader_slot: 0,
+                    vitality: 10,
+                    extent_type: SPECIAL_XTYPE + 1,
+                    race: 6,
+                    zone_race: 6
+                }
+            ),
+            1
+        );
+        assert_eq!(
+            adjusted_mode(
+                1,
+                &Situation {
+                    hero_state: STILL,
+                    leader_slot: 0,
+                    vitality: 10,
+                    extent_type: SPECIAL_XTYPE,
+                    race: 5,
+                    zone_race: 6
+                }
+            ),
+            1
+        );
     }
 
     #[test]

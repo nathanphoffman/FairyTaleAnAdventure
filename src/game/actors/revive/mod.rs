@@ -54,7 +54,7 @@ pub fn revive(game: &mut Game, out: &mut dyn Output, new: i16) {
     if new != 0 {
         stopscore();
         leave_fallen_brother(&mut game.objects, &game.hero);
-        take_over_next_brother(game, out, hero);
+        take_over_next_brother(game, hero);
         show_brother_placards(game, out);
         announce_brother(game, out);
     } else {

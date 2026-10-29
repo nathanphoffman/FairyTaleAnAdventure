@@ -73,7 +73,6 @@ pub(super) fn choose_image(
     actors: &Actors,
     hero: &Hero,
     actor: ActorRef,
-    i: i32,
     passmode: bool,
 ) -> Option<Sprite> {
     let inum = actors.actor(actor).index as i16;
@@ -94,7 +93,7 @@ pub(super) fn choose_image(
         return Some(weapon_image(actors, actor, blank));
     }
 
-    let (atype, inum) = body_image(actors, hero, actor, i, inum)?;
+    let (atype, inum) = body_image(actors, hero, actor, inum)?;
 
     Some(Sprite {
         atype,
@@ -105,13 +104,7 @@ pub(super) fn choose_image(
 
 /// The actor's own sprite sheet and image for this animation frame. `None` means nothing is drawn
 /// (a burnt body, or an object with no image).
-fn body_image(
-    actors: &Actors,
-    hero: &Hero,
-    actor: ActorRef,
-    i: i32,
-    mut inum: i16,
-) -> Option<(i16, i16)> {
+fn body_image(actors: &Actors, hero: &Hero, actor: ActorRef, mut inum: i16) -> Option<(i16, i16)> {
     let mut atype = actors.actor(actor).kind as i16;
 
     if (atype == ENEMY && actors.actor(actor).race != RACE_SPECTRE) || atype == PHIL {
@@ -132,7 +125,7 @@ fn body_image(
             inum = state_entry(inum).figure as i16;
         }
 
-        inum = pick_of_pair(actors, actor, i, inum);
+        inum = pick_of_pair(actors, actor, inum);
     }
 
     if atype == OBJECTS && actors.actor(actor).race == 0 {
@@ -149,7 +142,8 @@ fn body_image(
 
 /// Snakes use their own pictures; other enemies have two pictures per figure, picked by the race
 /// (the hero, actor 0, has just the one).
-fn pick_of_pair(actors: &Actors, actor: ActorRef, i: i32, inum: i16) -> i16 {
+fn pick_of_pair(actors: &Actors, actor: ActorRef, inum: i16) -> i16 {
+    let i = actor.slot();
     if actors.actor(actor).race == RACE_SNAKE {
         if actors.actor(actor).state < DYING {
             return inum + SNAKE_FIRST_IMAGE;
@@ -182,12 +176,10 @@ pub(super) fn image_height(atype: i16, inum: i16, sheet_height: i8) -> i8 {
 
 /// Sinks the sprite into water, shortens it when the hero rides the swan, and so on. Returns false
 /// if nothing is left to draw.
-#[allow(clippy::too_many_arguments)] // the sprite being drawn, plus the actors and the hero
 pub(super) fn adjust_for_depth(
     actors: &Actors,
     hero: &Hero,
     actor: ActorRef,
-    i: i32,
     cycle: i16,
     passmode: bool,
     sprite: &mut Sprite,
@@ -195,7 +187,7 @@ pub(super) fn adjust_for_depth(
     let depth = actors.actor(actor).environ as i16;
 
     if !passmode && sprite.atype != OBJECTS {
-        sink_body(actors, hero, actor, i, cycle, depth, sprite)
+        sink_body(actors, hero, actor, cycle, depth, sprite)
     } else {
         sink_item(depth, sprite)
     }
@@ -203,16 +195,16 @@ pub(super) fn adjust_for_depth(
 
 /// A body standing in water: the raft and the swan lift it, shallow water hides the legs, and deep
 /// water shows only bubbles. Returns false if there is nothing to draw (a dead body under water).
-#[allow(clippy::too_many_arguments)] // the sprite being drawn, plus the actors and the hero
 fn sink_body(
     actors: &Actors,
     hero: &Hero,
     actor: ActorRef,
-    i: i32,
     cycle: i16,
     depth: i16,
     sprite: &mut Sprite,
 ) -> bool {
+    let i = actor.slot() as i32;
+
     if i == 0 && hero.riding == RIDING_SWAN {
         sprite.ystop -= SWAN_LIFT;
     } else if depth == SHALLOW_DEPTH {

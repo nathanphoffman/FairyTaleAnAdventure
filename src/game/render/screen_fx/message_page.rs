@@ -4,7 +4,6 @@ use super::fading::fade_down;
 use crate::game::data::state::Game;
 use crate::game::output::Output;
 use crate::game::render::display::flip_pages;
-use crate::game::render::screen::PortId;
 
 const MAP_PEN: u8 = 24;
 
@@ -34,7 +33,7 @@ pub fn map_message(game: &mut Game, out: &mut dyn Output) {
 pub fn message_off(game: &mut Game, out: &mut dyn Output) {
     fade_down(game, out);
 
-    out.select_port(PortId::Text);
+    out.select_message_area();
     out.set_panel_visible(true);
     flip_pages(game, out);
     game.ui.view_status = VIEW_NORMAL_AGAIN;

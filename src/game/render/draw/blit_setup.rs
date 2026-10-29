@@ -2,7 +2,7 @@
 //! and the blit values.
 
 use super::images::sprite_sheet;
-use super::{Frame, OBJECTS, Sprite};
+use super::{Extent, Frame, OBJECTS, Placed, Sprite};
 use crate::game::data::state::Blitter;
 use crate::game::data::state::Graphics;
 use crate::game::data::state::Video;
@@ -104,17 +104,15 @@ pub(super) fn assign_background_save(
 /// Fills in the blitter's registers and the queue entry for this sprite: sizes, where the image,
 /// its mask and the saved background are, and the shifts. Returns false when the save buffer is
 /// full.
-#[allow(clippy::too_many_arguments)] // the blit set-up of the original, kept as one call
 pub(super) fn set_up_blit(
     video: &mut Video,
     frame: &mut Frame,
-    sprite: &Sprite,
-    clip: &Clip,
-    cwide: i8,
-    xbw: i8,
-    blitwide: i8,
-    blithigh: i8,
+    placed: &Placed,
+    extent: &Extent,
 ) -> bool {
+    let sprite = &placed.sprite;
+    let (blitwide, blithigh) = (extent.blitwide, extent.blithigh);
+
     // The sheet is looked up again: a sunk actor is drawn from the objects sheet, but is as wide
     // and high as its own.
     let seq = *sprite_sheet(video, sprite.atype);
@@ -132,7 +130,7 @@ pub(super) fn set_up_blit(
         return false;
     }
 
-    set_blitter_registers(&mut video.blitter, sprite, clip, cwide, xbw, blitwide);
+    set_blitter_registers(&mut video.blitter, placed, extent);
 
     true
 }
@@ -146,14 +144,10 @@ fn locate_sprite_data(graphics: &mut Graphics, screen: &Screen, seq: &SeqInfo, i
 
 /// Sets the blitter's mask offsets, shift and modulo for the clipped sprite, and where in the page
 /// it goes.
-fn set_blitter_registers(
-    blitter: &mut Blitter,
-    sprite: &Sprite,
-    clip: &Clip,
-    cwide: i8,
-    xbw: i8,
-    blitwide: i8,
-) {
+fn set_blitter_registers(blitter: &mut Blitter, placed: &Placed, extent: &Extent) {
+    let (sprite, clip) = (&placed.sprite, &placed.clip);
+    let (cwide, xbw, blitwide) = (placed.bytes_wide, extent.xbw, extent.blitwide);
+
     blitter.shadow_mask_offset =
         ((clip.ystart & SHADOW_LINES_MASK) as i32 * blitwide as i32 * WORD_BYTES) as i16;
 

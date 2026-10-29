@@ -9,6 +9,7 @@ use crate::game::data::state::Game;
 use crate::game::data::types::Shape;
 use crate::game::output::Output;
 use crate::game::world::places::transfer_hero;
+use crate::platform::host::Command;
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -23,21 +24,6 @@ const FIRST_ENEMY_SLOT: i16 = 3;
 
 /// Death type used when the "kill the hero" command ends the game.
 const DEATH_BY_TEST: i32 = 5;
-
-/// The commands a test script can queue (`FTA_CMD`).
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Command {
-    /// Move the hero to the point, like going through a door.
-    Teleport { x: i32, y: i32 },
-    /// Kill the hero, who has the given luck left.
-    KillHero { luck: i32 },
-    /// Set inventory slot `slot` to `count`.
-    Give { slot: i32, count: i32 },
-    /// Set a stat: 0 hunger, 1 fatigue, anything else wealth.
-    SetStat { stat: i32, value: i32 },
-    /// Kill every enemy that is out.
-    SlayEnemies,
-}
 
 /// The queued command. The display thread writes it and the game thread reads it.
 static PENDING: Mutex<Option<Command>> = Mutex::new(None);

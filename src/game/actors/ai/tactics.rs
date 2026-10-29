@@ -93,16 +93,15 @@ fn pick_tactic(
 }
 
 /// A hostile enemy strikes if close enough, otherwise acts on its tactic.
-#[allow(clippy::too_many_arguments)] // the whole situation of one actor, plus the game state
 pub(super) fn hostile_action(
     game: &mut Game,
-    i: usize,
     actor: ActorRef,
     mode: i16,
     tactic: i16,
-    xd: i16,
-    yd: i16,
+    (xd, yd): (i16, i16),
 ) {
+    let i = actor.slot();
+
     match hostile_choice(
         game.actor(actor).race,
         game.actor(actor).weapon,

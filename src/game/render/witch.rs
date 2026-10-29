@@ -7,10 +7,11 @@
 //! stands, which csrc/fmain.c uses to decide whether the beam hits the hero.
 
 use crate::game::data::object_tables::witchpoints;
-use crate::game::data::state::Game;
+use crate::game::data::state::Hero;
 use crate::game::data::state::Video;
+use crate::game::data::state::Witch;
+use crate::game::data::state::World;
 use crate::game::data::types::FPage;
-use crate::game::output::Output;
 use crate::game::render::screen::PortId;
 use crate::gfx::bitmap::Rect;
 use crate::gfx::draw::COMPLEMENT;
@@ -55,17 +56,17 @@ fn side(p1: (i16, i16), p2: (i16, i16), xh: i16, yh: i16) -> i16 {
 
 /// Draws the witch's beam on page `page` and records on which side of its edges the hero is.
 /// The drawing is clipped to the map area.
-pub fn witch_fx(game: &mut Game, video: &mut Video, page: usize) {
+pub fn witch_fx(witch: &mut Witch, world: &mut World, hero: &Hero, video: &mut Video, page: usize) {
     let fp = &video.screen.pages[page];
 
-    let xh = game.hero.x.wrapping_sub(game.world.map_x & TILE_X_MASK) as i16;
+    let xh = hero.x.wrapping_sub(world.map_x & TILE_X_MASK) as i16;
 
-    let yh = game.hero.y.wrapping_sub(game.world.map_y & TILE_Y_MASK) as i16;
+    let yh = hero.y.wrapping_sub(world.map_y & TILE_Y_MASK) as i16;
 
     let (p1, p2) = edge(fp.witchdir.wrapping_add(DIRECTIONS_BEFORE as i16), fp);
     let (p3, p4) = edge(fp.witchdir.wrapping_add(DIRECTIONS_AFTER as i16), fp);
-    game.witch.side_1 = side(p1, p2, xh, yh);
-    game.witch.side_2 = side(p3, p4, xh, yh);
+    witch.side_1 = side(p1, p2, xh, yh);
+    witch.side_2 = side(p3, p4, xh, yh);
 
     paint_beam(video, [p1, p2, p4, p3]);
 }
@@ -81,7 +82,7 @@ fn paint_beam(video: &mut Video, p: [(i16, i16); BEAM_CORNERS]) {
         height: CLIP_HEIGHT + 1,
     };
 
-    video.set_draw_mode(PortId::Map, COMPLEMENT);
+    video.screen.set_draw_mode(PortId::Map, COMPLEMENT);
     video.screen.fill_polygon(PortId::Map, &points, clip);
 }
 

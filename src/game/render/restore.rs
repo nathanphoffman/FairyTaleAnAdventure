@@ -19,6 +19,12 @@ pub fn undo_sprites(game: &mut Game, video: &mut Video) {
     video.screen.port_mut(PortId::Map).target = Some(video.screen.drawing_bitmap_id());
 
     if video.screen.drawing_page().wflag != 0 {
-        witch_fx(game, video, video.screen.drawing);
+        witch_fx(
+            &mut game.witch,
+            &mut game.world,
+            &game.hero,
+            video,
+            video.screen.drawing,
+        );
     }
 }

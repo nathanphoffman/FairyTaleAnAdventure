@@ -80,7 +80,7 @@ pub(super) fn enter_door(game: &mut Game, out: &mut dyn Output, xtest: u16, ytes
         transfer_hero(game, out, x, y, 0);
         find_place(game, out, 2);
         let colors = game.page_colors;
-        fade_page(game, out, FADE_WHITE, FADE_WHITE, FADE_WHITE, 1, &colors);
+        fade_page(game, out, (FADE_WHITE, FADE_WHITE, FADE_WHITE), 1, &colors);
     }
 }
 

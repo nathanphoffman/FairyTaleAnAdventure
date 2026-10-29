@@ -12,7 +12,6 @@ use crate::game::files::loading::{
     copy_protection_check, copy_protection_riddle, read_sample, read_score, track,
 };
 use crate::game::input::handler::reset_key_buffer;
-use crate::game::output::Output;
 use crate::game::render::display::{delay, flip_pages};
 use crate::game::render::screen::Screen;
 use crate::game::render::screen::{BitmapId, FontKind, PortId, ViewPortId};
@@ -125,23 +124,23 @@ fn show_title_screen(game: &mut Game, video: &mut Video) {
     video.screen.vp_page.ras = Some(0);
     video.screen.pages[1].ras = 1;
     clear_both_pages(&mut video.screen);
-    video.select_port(PortId::Map);
+    video.screen.current_port = PortId::Map;
     set_intro_zoom(game, video, ZOOM_NORMAL);
     set_page_color(&mut video.screen, BACKGROUND_COLOR, TITLE_BLUE);
     set_page_color(&mut video.screen, TEXT_COLOR, WHITE_RGB);
 
     let pen = video.screen.port(PortId::Map).pen.fg;
-    video.set_a_pen(PortId::Map, TITLE_PEN);
+    video.screen.set_a_pen(PortId::Map, TITLE_PEN);
     print_positioned(video, TITLE_TEXT);
-    video.set_a_pen(PortId::Map, pen);
+    video.screen.set_a_pen(PortId::Map, pen);
 
     delay(game, video, TITLE_WAIT);
 
-    video.select_port(PortId::Text);
+    video.screen.current_port = PortId::Text;
     video.screen.port_mut(PortId::Text).target = Some(BitmapId::TextPlane0);
-    video.set_font_kind(PortId::Text, FontKind::Story);
-    video.set_a_pen(PortId::Text, STORY_PEN);
-    video.set_b_pen(PortId::Text, STORY_BACKGROUND_PEN);
+    video.screen.set_font_kind(PortId::Text, FontKind::Story);
+    video.screen.set_a_pen(PortId::Text, STORY_PEN);
+    video.screen.set_b_pen(PortId::Text, STORY_BACKGROUND_PEN);
 
     read_score();
     read_sample();
@@ -186,10 +185,10 @@ fn show_play_screen_background(game: &mut Game, video: &mut Video) {
 
     set_page_color(&mut video.screen, TEXT_COLOR, WHITE_RGB);
 
-    video.select_port(PortId::Map);
+    video.screen.current_port = PortId::Map;
     video.screen.port_mut(PortId::Map).target = Some(video.screen.drawing_bitmap_id());
     show_still_screen(game, video);
-    video.set_a_pen(PortId::Map, TITLE_PEN);
+    video.screen.set_a_pen(PortId::Map, TITLE_PEN);
     placard_text(video, PLACARD_COPYRIGHT);
 
     reset_key_buffer();
