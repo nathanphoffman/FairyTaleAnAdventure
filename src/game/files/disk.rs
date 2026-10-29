@@ -2,7 +2,7 @@
 //!
 //! Nearly all the game's graphics, maps and sounds are in one big file, `image`, a dump of the
 //! original floppy disk (1760 blocks of 512 bytes). The game asks for "N blocks starting at block B"
-//! with `load_track_range`. On the Amiga those reads ran in the background through the trackdisk
+//! with `load_track_range`. In the original those reads ran in the background through the disk
 //! device; here every read is finished when the call returns, so the functions that wait for or
 //! check a read just report that it is done.
 

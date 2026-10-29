@@ -140,15 +140,15 @@ the game. Routines still stubbed are in `csrc/asm_stubs.c` and print "STUB calle
 - [ ] Test helpers: `FTA_CLICK="tick:x:y,..."` clicks the left button (x in 0-319, y in screen
       lines); `FTA_INJECT` presses keys. Gameplay starts around tick 300, and the Game menu items
       are at x 225/250 and y 148 + 9 * row.
-- [x] More test helpers (see `modern_engine_plan.md`, step 1): `FTA_STATE=file FTA_STATE_AFTER=tick`
+- [x] More test helpers (described in the old `modern_engine_plan.md`, step 1; see git history): `FTA_STATE=file FTA_STATE_AFTER=tick`
       writes the game state as text (compare with `tests/state_regress.sh`);
       `FTA_CMD="tick:tp:x:y,tick:kill:luck"` teleports or kills the hero;
       `FTA_RECORD=file` logs input and `FTA_REPLAY=file` plays it back.
 
 ### Phase 7 - Port C to Rust
-Superseded by `modern_engine_plan.md` (steps 2-4), which first cuts `main()` into functions and
+Superseded by the old `modern_engine_plan.md` (steps 2-4, see git history), which first cuts `main()` into functions and
 gathers the state into structs, then ports the rules to Rust. Keep this list as a rough guide.
-The current approach is `src/game/` (see section 4a of `modern_engine_plan.md`): `csrc/` stays untouched
+The current approach is `src/game/` (section 4a of the old `modern_engine_plan.md`, see git history): `csrc/` stays untouched
 and each file is ported into `src/game/`. Move modules one at a time, with the game runnable after each one. Rough order, easiest first:
 - [x] `asm_port.c`, `input.c`, `iffsubs.c`, `hdrive.c`
 - [x] `asm_blit.c`, `asm_text.c`, `asm_map.c`, `asm_stubs.c`

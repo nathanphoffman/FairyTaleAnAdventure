@@ -53,7 +53,7 @@ const POINTER_WIDTH: i32 = 16;
 const POINTER_MAX_LINES: usize = 32;
 const HIGH_WORD_SHIFT: u32 = 16;
 
-/// 12 bit Amiga colour (0x0RGB) to 0xRRGGBB.
+/// 12 bit colour (4 bits per channel, 0x0RGB) to 0xRRGGBB.
 pub fn rgb4(c: u16) -> u32 {
     let r = ((c >> RED_NIBBLE_SHIFT) & NIBBLE_MASK) as u32;
     let g = ((c >> GREEN_NIBBLE_SHIFT) & NIBBLE_MASK) as u32;

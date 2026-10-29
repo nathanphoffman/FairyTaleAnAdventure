@@ -1,4 +1,4 @@
-//! `Video` as an `Output`: the Amiga-style drawing of what the rules ask for.
+//! `Video` as an `Output`: the classic drawing of what the rules ask for.
 
 use crate::game::data::state::{Hero, MapData, Video, World};
 use crate::game::files::disk::load_track_range;

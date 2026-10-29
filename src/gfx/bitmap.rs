@@ -2,7 +2,7 @@
 //! each plane.
 
 /// Extra bytes before and after each plane. The sprite blitter reads and writes a word or two outside
-/// the visible area (as the Amiga's memory allowed), so the planes have room for that.
+/// the visible area (as the original's memory allowed), so the planes have room for that.
 pub const PAD: usize = 256;
 
 /// 8 pixels fit in a byte, and the leftmost pixel of a byte is its top bit.

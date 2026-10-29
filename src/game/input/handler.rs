@@ -1,4 +1,4 @@
-//! Keyboard and mouse input, replacing the Amiga input handler in fsubs.asm (HandlerInterface,
+//! Keyboard and mouse input, replacing the original input handler in fsubs.asm (HandlerInterface,
 //! getkey, decode_mouse; from csrc/input.c). The platform layer (src/platform/input) translates
 //! SDL events and calls the `fta_*` functions below.
 //!

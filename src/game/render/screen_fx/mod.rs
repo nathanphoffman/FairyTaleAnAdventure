@@ -2,9 +2,9 @@
 //! colours with the time of day, the teleport flash, the print queue and the win sequence.
 //! The colour tables live in `tables`; the view ports are still defined in csrc/fmain.c.
 //!
-//! Colours: the Amiga screen has 32 colours, each 12 bits (4 bits red, green, blue). The game
-//! fades the whole picture by scaling those components (`fade_page`) and loads them with
-//! `LoadRGB4`. Night is a darker, bluer scaling; indoors it is always full brightness.
+//! Colours: the screen has 32 colours, each 12 bits (4 bits red, green, blue). The game
+//! fades the whole picture by scaling those components (`fade_page`) and loads them as the page palette.
+//! Night is a darker, bluer scaling; indoors it is always full brightness.
 
 mod compass;
 

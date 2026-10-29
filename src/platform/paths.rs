@@ -1,4 +1,4 @@
-//! Mapping Amiga file names to real paths.
+//! Mapping the original file names to real paths.
 
 use std::path::{Path, PathBuf};
 
@@ -69,7 +69,7 @@ fn strip_disk_device(name: &str) -> Option<&str> {
     is_disk.then_some(rest)
 }
 
-/// Maps an Amiga file name to a real path. `for_write` allows names that do not exist yet.
+/// Maps an original file name to a real path. `for_write` allows names that do not exist yet.
 pub fn resolve(name: &str, for_write: bool) -> Option<PathBuf> {
     if let Some(rest) = strip_disk_device(name) {
         if rest.is_empty() {

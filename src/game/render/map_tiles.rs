@@ -111,7 +111,7 @@ pub const SCROLL_MODES: [ScrollMode; 8] = [
 /// There are 8 scroll directions.
 const DIRECTION_MASK: usize = 7;
 
-/// Shifts the map one tile in one of 8 directions (the blitter did this on the Amiga).
+/// Shifts the map one tile in one of 8 directions (the blitter did this in the original).
 /// Moving down copies from the bottom up, so lines are not overwritten before they are read.
 pub fn scroll_map(screen: &mut Screen, dir: i32) {
     let m = &SCROLL_MODES[dir as usize & DIRECTION_MASK];

@@ -2,7 +2,7 @@
 //!
 //! The same code does both: each `Transfer` method writes a value when saving and reads it back
 //! when loading, so the order of the calls in `transfer_all` is the file format. Numbers are
-//! stored big-endian (as the Amiga's 68000 kept them).
+//! stored big-endian (as the original's 68000 kept them).
 
 use crate::game::data::object_tables::glbobs;
 use crate::game::data::state::Actors;

@@ -1,10 +1,10 @@
-//! Music and sound effects, replacing gdriver.asm and the Amiga's four-channel sound chip.
+//! Music and sound effects, replacing gdriver.asm and the original four-channel sound chip.
 //!
 //! The game plays music from four tracks of (command, value) events, one per voice, and one-shot
 //! sound effects on voice 2. The original ran the sequencer from the vertical blank interrupt and
 //! let the chip play the waveforms by DMA. Here an SDL audio callback does both: it advances the
 //! sequencer 60 times a second and mixes the four channels (voices 1 and 4 left, 2 and 3 right,
-//! as on the Amiga).
+//! as in the original).
 //!
 //! Track format (see docs/data-formats.md): command byte < 128 is a note number and the value's
 //! low 6 bits index `NOTE_LENGTHS`; 128 = rest, 129 = set instrument, 0x90 = set tempo, 255 = end

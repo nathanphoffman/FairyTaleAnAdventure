@@ -107,7 +107,7 @@ pub(super) const DEFAULT_TEMPO: i32 = 150;
 /// The voice that sound effects take over.
 pub(super) const EFFECT_VOICE: usize = 1;
 
-/// Voices 1 and 4 play on the left, 2 and 3 on the right, as on the Amiga.
+/// Voices 1 and 4 play on the left, 2 and 3 on the right, as in the original.
 pub(super) const LEFT_VOICES: [usize; 2] = [0, 3];
 
 /// Scales the four mixed channels down so they rarely clip.

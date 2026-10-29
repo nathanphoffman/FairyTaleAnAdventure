@@ -65,7 +65,7 @@ pub fn load_start_sprites(game: &mut Game, out: &mut dyn Output) {
     motor_off();
 }
 
-/// Loads the next region once the previous disk read is done. On the Amiga the disk was slow, so
+/// Loads the next region once the previous disk read is done. In the original the disk was slow, so
 /// the game kept playing while a region loaded in the background and called this to check.
 pub fn load_pending_region(game: &mut Game, out: &mut dyn Output) {
     if is_last_read_pending() == 0 || last_read_finished() != 0 {

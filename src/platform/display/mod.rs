@@ -218,7 +218,7 @@ fn pace(d: &mut Display) -> Duration {
     wait
 }
 
-/// Waits for the next 50 Hz tick (the Amiga's vertical blank), keeping the window alive.
+/// Waits for the next 50 Hz tick (the original's vertical blank), keeping the window alive.
 pub fn wait_frame(scene: &Scene) {
     BEAT.fetch_add(1, Ordering::Relaxed);
     let wait = DISPLAY.with(|d| {

@@ -3,7 +3,7 @@
 //! An IFF file is a `FORM` containing chunks. Each chunk is a 4-letter id, a big-endian length and
 //! the data. This loader understands `BMHD` (picture size and compression), skips `CMAP`, `GRAB`,
 //! `CAMG` and `CRNG` (colours and display modes, which the game does not use) and unpacks `BODY`
-//! (the pixels). The pixels are stored one bitplane row at a time, which is also how the Amiga's
+//! (the pixels). The pixels are stored one bitplane row at a time, which is also how the original
 //! screen memory is laid out, so each row is unpacked straight into the matching plane of the
 //! destination bitmap.
 

@@ -1,5 +1,5 @@
 //! The blitter in software: combines up to three source channels into a destination, with shifts and
-//! a minterm, the way the Amiga chip did.
+//! a minterm, the way the original chip did.
 
 use super::{ALL_BITS, Area, Loc, USE_A, USE_B, USE_C, USE_D};
 use crate::gfx::{Bitmap, PAD};

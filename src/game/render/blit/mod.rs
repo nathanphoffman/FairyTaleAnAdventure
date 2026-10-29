@@ -1,4 +1,4 @@
-//! Sprite drawing routines that drove the Amiga blitter in fsubs.asm (from csrc/asm_blit.c).
+//! Sprite drawing routines that drove the original blitter in fsubs.asm (from csrc/asm_blit.c).
 //!
 //! The blitter combines up to three source channels (A, B, C) into a destination D, 16 bits at
 //! a time, with an optional barrel shift of A and B, first/last word masks on A, and a

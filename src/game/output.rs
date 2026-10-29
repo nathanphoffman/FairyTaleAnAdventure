@@ -1,5 +1,5 @@
 //! What the rules ask of the screen. The rules say what should be shown (a line of text, new page
-//! colours, the next frame) and an `Output` decides how: `Video` draws it into the Amiga-style
+//! colours, the next frame) and an `Output` decides how: `Video` draws it into the classic
 //! bitmaps, a test can just record it, and a new renderer could draw it in a different way.
 
 use crate::game::data::state::{Hero, MapData, World};

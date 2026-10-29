@@ -18,7 +18,7 @@ pub struct BitmapFont {
 }
 
 pub enum Font {
-    /// Fixed 8x8 stand-in for the Amiga's ROM font Topaz 8.
+    /// Fixed 8x8 stand-in for the original's built-in font (Topaz 8).
     Builtin,
     Bitmap(BitmapFont),
 }
