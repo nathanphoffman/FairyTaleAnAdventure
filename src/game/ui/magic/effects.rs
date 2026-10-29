@@ -4,16 +4,12 @@ use crate::game::actors::encounters::check_death;
 use crate::game::data::random::rand8;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
 use crate::game::data::tables::stone_ring_sectors;
 use crate::game::data::types::Shape;
 use crate::game::output::Output;
-use crate::game::render::screen::PortId;
 use crate::game::render::screen_fx::{flicker_colors, show_still_screen};
 use crate::game::ui::text::{queue_print, show_event};
-use crate::game::world::map::draw_overview_map;
 use crate::game::world::places::transfer_hero;
-use crate::gfx::draw::JAM1;
 
 // The menu entries: the spells are entries 5-11 and use the item slots 9-15 (`4 + entry`).
 /// A sector is 256 pixels wide and high, and a tile 16 (shifts of 8 and 4).
@@ -32,7 +28,6 @@ const STONE_ROW_HEIGHT: u16 = 64;
 const STONE_CIRCLES: usize = 11;
 
 // The overview map and where the hero's position is marked.
-const MAP_MARK_PEN: u8 = 31;
 const MARK_X_OFFSET: i64 = 4;
 const MARK_Y_OFFSET: i64 = 3;
 const MARK_MAX: (u32, u32) = (320, 143);
@@ -49,14 +44,9 @@ const FEAR_RACE_LIMIT: u8 = 7;
 const ENEMY: i8 = 2;
 
 /// Draws the overview map with a "+" where the hero is, and shows it.
-pub(super) fn show_map(game: &mut Game, video: &mut Video) {
-    video.screen.draw_target = video.screen.drawing_bitmap_id();
-    draw_overview_map(
-        game,
-        video,
-        game.world.map_x as i32,
-        game.world.map_y as i32,
-    );
+pub(super) fn show_map(game: &mut Game, out: &mut dyn Output) {
+    let (map_x, map_y) = (game.world.map_x as i32, game.world.map_y as i32);
+    out.draw_overview_map(&game.map, &mut game.world, map_x, map_y);
 
     // The hero on the overview map: his tile column minus the left edge of the shown sectors.
     let x = ((game.hero.x >> TILE_SHIFT) as i64
@@ -67,17 +57,11 @@ pub(super) fn show_map(game: &mut Game, video: &mut Video) {
     let y = ((game.hero.y >> TILE_SHIFT) as i64
         - ((game.world.sector_y as i64 + game.world.origin_y as i64) << TILE_SHIFT)
         + MARK_Y_OFFSET) as u32;
-    video.screen.port_mut(PortId::Map).target = Some(video.screen.draw_target);
-    video.screen.set_draw_mode(PortId::Map, JAM1);
-    video.screen.set_a_pen(PortId::Map, MAP_MARK_PEN);
-
-    if x > 0 && x < MARK_MAX.0 && y > 0 && y < MARK_MAX.1 {
-        video.screen.move_to(PortId::Map, x as i32, y as i32);
-        video.screen.text(PortId::Map, b"+");
-    }
+    let on_map = x > 0 && x < MARK_MAX.0 && y > 0 && y < MARK_MAX.1;
+    out.mark_overview_map(on_map.then_some((x as i32, y as i32)));
 
     game.ui.view_status = VIEW_MAP;
-    show_still_screen(game, video);
+    show_still_screen(game, out);
     queue_print(&mut game.ui, PRQ_MAP);
 }
 

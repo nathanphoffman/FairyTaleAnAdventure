@@ -8,7 +8,6 @@ use super::{
     WALKING, WEAPON_BOW, WEAPON_WAND, ZONE_ARROW_FAST, ZONE_ARROW_SLOW,
 };
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
 use crate::game::output::Output;
 
 use crate::game::actors::interaction::blocked_at;
@@ -19,7 +18,7 @@ use crate::game::ui::text::show_event;
 
 /// Counts the timers down and sets the hero's state from the controls: the good fairy when dead
 /// or falling, shooting, riding, fighting or walking. `cycle` is the main loop's frame counter.
-pub fn update_hero(game: &mut Game, video: &mut Video, cycle: i16) {
+pub fn update_hero(game: &mut Game, out: &mut dyn Output, cycle: i16) {
     game.world.light_timer = timer_step(game.world.light_timer);
     game.world.secret_timer = timer_step(game.world.secret_timer);
     game.world.freeze_timer = timer_step(game.world.freeze_timer);
@@ -32,12 +31,12 @@ pub fn update_hero(game: &mut Game, video: &mut Video, cycle: i16) {
     let mut state = game.actors.list[0].state;
 
     if state == DEAD || state == FALL {
-        state = fairy_revival(game, video, state, cycle);
+        state = fairy_revival(game, out, state, cycle);
     } else if state == DYING || state == SINK || state == SLEEP {
         // nothing to do
     } else if mouse_buttons() & RIGHT_BUTTON != 0 || game.ui.fight_key_held != 0 || joystick_fire()
     {
-        state = fighting_state(game, video, state);
+        state = fighting_state(game, out, state);
     } else if state == SHOOT1 {
         state = SHOOT3; // release the arrow
     } else {

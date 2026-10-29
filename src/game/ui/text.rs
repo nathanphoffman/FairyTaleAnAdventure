@@ -12,7 +12,6 @@
 use crate::game::data::state::Game;
 use crate::game::data::state::Hero;
 use crate::game::data::state::Ui;
-use crate::game::data::state::Video;
 use crate::game::data::story_text::{EVENT_MSG, PLACARD_MSGS, SPEECHES};
 use crate::game::output::Output;
 use crate::game::render::screen::PortId;
@@ -55,8 +54,8 @@ pub fn format_number(mut value: u32) -> [u8; NUMBER_DIGITS + 1] {
 
 // `move` is a Rust keyword, so this one is exported under the C name.
 /// Moves the text position (the C name is `move`, a keyword in Rust).
-pub fn move_to(video: &mut Video, x: i32, y: i32) {
-    video.screen.move_to(video.screen.current_port, x, y);
+pub fn move_to(out: &mut dyn Output, x: i32, y: i32) {
+    out.move_to(out.current_port(), x, y);
 }
 
 /// Prints the characters at the text position.
@@ -67,13 +66,13 @@ pub fn draw_text(screen: &mut Screen, bytes: &[u8]) {
 /// Prints a string that may hold XY escapes (128, x/2, y) to move the text position. A string
 /// ends at a zero byte (or its end); bytes of 128 and above end each plain run of text.
 /// (The x position is stored halved so it fits in a byte.)
-pub fn print_positioned(video: &mut Video, s: &[u8]) {
+pub fn print_positioned(out: &mut dyn Output, s: &[u8]) {
     let mut at = 0;
     let byte = |i: usize| s.get(i).copied().unwrap_or(0);
 
     while byte(at) != 0 {
         if byte(at) == XY {
-            move_to(video, byte(at + 1) as i32 * XY_X_SCALE, byte(at + 2) as i32);
+            move_to(out, byte(at + 1) as i32 * XY_X_SCALE, byte(at + 2) as i32);
 
             at += XY_BYTES;
         } else {
@@ -83,7 +82,7 @@ pub fn print_positioned(video: &mut Video, s: &[u8]) {
                 n += 1;
             }
 
-            draw_text(&mut video.screen, &s[at..at + n]);
+            out.print_cont_bytes(&s[at..at + n]);
             at += n;
 
             if n == 0 {
@@ -94,8 +93,8 @@ pub fn print_positioned(video: &mut Video, s: &[u8]) {
 }
 
 /// Prints story page text number `n` (the strings use position escapes, see `print_positioned`).
-pub fn placard_text(video: &mut Video, n: i32) {
-    print_positioned(video, PLACARD_MSGS[n as usize]);
+pub fn placard_text(out: &mut dyn Output, n: i32) {
+    print_positioned(out, PLACARD_MSGS[n as usize]);
 }
 
 /// The `n`-th zero-terminated string of a list of messages (the first is number 0). A number past
@@ -162,14 +161,14 @@ const BORDER_HIGHLIGHT_PEN: u8 = 24;
 const STROKES_PER_STEP: i32 = 5;
 
 /// Draws a line from (x0, y0) to (x1, y1).
-fn line(video: &mut Video, x0: i32, y0: i32, x1: i32, y1: i32) {
-    video.screen.move_to(PortId::Map, x0, y0);
-    video.screen.line_to(PortId::Map, x1, y1);
+fn line(out: &mut dyn Output, x0: i32, y0: i32, x1: i32, y1: i32) {
+    out.move_to(PortId::Map, x0, y0);
+    out.line_to(PortId::Map, x1, y1);
 }
 
 /// Draws the decorative border around a story page: many short strokes, five each with the last in
 /// a highlight colour, winding around the four edges. The first passes also draw the top and bottom.
-pub fn draw_placard_border(video: &mut Video) {
+pub fn draw_placard_border(out: &mut dyn Output) {
     let (mut xorg, mut yorg) = (BORDER_START_X, 0);
 
     for pass in (0..BORDER_PASSES).rev() {
@@ -184,8 +183,8 @@ pub fn draw_placard_border(video: &mut Video) {
                     BORDER_PEN
                 };
 
-                video.screen.set_a_pen(PortId::Map, pen);
-                draw_border_stroke(video, pass > LONG_EDGE_ABOVE_PASS, (xorg, yorg), (dx, dy));
+                out.set_a_pen(PortId::Map, pen);
+                draw_border_stroke(out, pass > LONG_EDGE_ABOVE_PASS, (xorg, yorg), (dx, dy));
             }
 
             xorg = dx;
@@ -197,15 +196,15 @@ pub fn draw_placard_border(video: &mut Video) {
 /// One stroke of the border from `from` to `to`, repeated on the opposite edge, and on the short
 /// edges (turned a quarter) with the x and y swapped.
 fn draw_border_stroke(
-    video: &mut Video,
+    out: &mut dyn Output,
     long_edges: bool,
     (xorg, yorg): (i32, i32),
     (dx, dy): (i32, i32),
 ) {
     if long_edges {
-        line(video, xorg, yorg, dx, dy);
+        line(out, xorg, yorg, dx, dy);
         line(
-            video,
+            out,
             LONG_EDGE_FAR.0 - xorg,
             LONG_EDGE_FAR.1 - yorg,
             LONG_EDGE_FAR.0 - dx,
@@ -214,7 +213,7 @@ fn draw_border_stroke(
     }
 
     line(
-        video,
+        out,
         SHORT_EDGE_NEAR.0 + yorg,
         SHORT_EDGE_NEAR.1 - xorg,
         SHORT_EDGE_NEAR.0 + dy,
@@ -222,7 +221,7 @@ fn draw_border_stroke(
     );
 
     line(
-        video,
+        out,
         SHORT_EDGE_FAR.0 - yorg,
         SHORT_EDGE_FAR.1 + xorg,
         SHORT_EDGE_FAR.0 - dy,
@@ -250,12 +249,12 @@ const ERROR_SCREEN_Y: i32 = 90;
 const ERROR_NO_GRAPHICS: i32 = 2;
 
 /// Shows "ERROR n" on the text panel (startup failures). Error 2 (no graphics) cannot be shown.
-pub fn show_error(video: &mut Video, n: i32) {
+pub fn show_error(out: &mut dyn Output, n: i32) {
     if n == ERROR_NO_GRAPHICS {
         return;
     }
 
-    move_to(video, ERROR_SCREEN_X, ERROR_SCREEN_Y);
-    draw_text(&mut video.screen, b"ERROR ");
-    video.print_number(n, 2);
+    move_to(out, ERROR_SCREEN_X, ERROR_SCREEN_Y);
+    out.print_cont_bytes(b"ERROR ");
+    out.print_number(n, 2);
 }

@@ -1,13 +1,16 @@
 //! Looking things up in the map: the sector at a place, the terrain under a point, collision probes and
 //! the minimap.
 
-use super::drawing::{SCREEN_COLUMNS, SCREEN_ROWS};
 use crate::game::data::state::Game;
 
+/// The play field is this many tiles wide and tall.
+pub const SCREEN_COLUMNS: usize = 19;
+pub const SCREEN_ROWS: usize = 6;
+
 /// Sectors are 16 x 8 tiles of 128 bytes; the region map has 128 sector bytes per row.
-pub(super) const SECTOR_BYTES: usize = 128;
+pub const SECTOR_BYTES: usize = 128;
 pub(super) const MAP_ROW_BYTES: usize = 128;
-pub(super) const SECTOR_ROWS_IN_REGION: i16 = 32;
+pub const SECTOR_ROWS_IN_REGION: i16 = 32;
 
 /// Tiles are 16 pixels wide and 32 high; a sector is 16 tiles wide and 8 high. These are the shifts
 /// and masks that go between pixels, tiles and sectors.

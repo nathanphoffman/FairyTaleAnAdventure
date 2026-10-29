@@ -10,21 +10,17 @@
 //! assembly did when the position is outside the loaded region.
 //!
 //! Drawing: the screen shows 19 x 6 tiles. `fill_minimap` fills `minimap` with the tile numbers for the
-//! visible area, and `draw_map`, `draw_map_column`, `draw_map_row` copy the tile graphics to the screen.
-//! `scroll_map` shifts the picture by one tile so only a new edge has to be drawn.
+//! visible area; `render/map_tiles.rs` copies the tile graphics to the screen.
 
 mod camera;
 
-mod drawing;
-
 mod lookup;
-
-mod overview;
 
 mod steps;
 
 pub use self::camera::{move_camera_to, page_turn_inset};
-pub use self::drawing::{draw_map, draw_map_column, draw_map_row, scroll_map};
-pub use self::lookup::{fill_minimap, probe_collision, terrain_at, tile_index};
-pub use self::overview::draw_overview_map;
+pub use self::lookup::{
+    SCREEN_COLUMNS, SCREEN_ROWS, SECTOR_BYTES, SECTOR_ROWS_IN_REGION, fill_minimap,
+    probe_collision, terrain_at, tile_index,
+};
 pub use self::steps::{step_x, step_y, wrap_coordinate};

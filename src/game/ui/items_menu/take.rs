@@ -10,7 +10,6 @@ use super::{
 };
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
 use crate::game::output::Output;
 use crate::game::render::screen::FontKind;
 
@@ -55,7 +54,7 @@ const EVENT_FRUIT_KEPT: i32 = 36;
 const FIRST_INDOOR_REGION: u16 = 7;
 
 /// Takes the nearest object, or searches the nearest dead body.
-pub(super) fn take_nearest(game: &mut Game, video: &mut Video) {
+pub(super) fn take_nearest(game: &mut Game, out: &mut dyn Output) {
     queue_print(&mut game.ui, PRQ_VITALITY);
     find_nearest_figure(game, 0, TAKE_RANGE);
 
@@ -69,21 +68,21 @@ pub(super) fn take_nearest(game: &mut Game, video: &mut Video) {
     let actor = ActorRef::new(game.actors.nearest_object as usize);
 
     if game.actor(actor).kind == OBJECTS {
-        if take_object(game, video) {
-            finish_pickup(game, video);
+        if take_object(game, out) {
+            finish_pickup(game, out);
         }
     } else if game.actor(actor).weapon < 0 {
         // already searched
     } else if game.actor(actor).vitality == 0 || game.world.freeze_timer != 0 {
-        search_body(game, video);
+        search_body(game, out);
     } else {
-        show_event(game, video, EVENT_ALIVE);
+        show_event(game, out, EVENT_ALIVE);
     }
 }
 
 /// Removes the picked-up object from the world, turns any arrows picked up into the arrow
 /// count, and ends the game if the talisman was found.
-fn finish_pickup(game: &mut Game, video: &mut Video) {
+fn finish_pickup(game: &mut Game, out: &mut dyn Output) {
     change_object(
         &mut game.objects,
         &game.actors,
@@ -100,10 +99,10 @@ fn finish_pickup(game: &mut Game, video: &mut Video) {
     if game.hero.stuff()[TALISMAN] != 0 {
         game.ui.quit_requested = 1;
         game.ui.view_status = VIEW_GAME_OVER;
-        map_message(game, video);
-        let current = video.screen.current_port;
-        video.screen.set_font_kind(current, FontKind::Story);
-        win_colors(game, video);
+        map_message(game, out);
+        let current = out.current_port();
+        out.set_font_kind(current, FontKind::Story);
+        win_colors(game, out);
     }
 }
 

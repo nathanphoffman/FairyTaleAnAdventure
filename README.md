@@ -16,7 +16,7 @@ The game is fully ported to Rust and playable: intro, map, fighting, shops, door
 save and load. No C is compiled any more; `csrc/` is the original C kept as a reference. The code has
 been cleaned up (short functions, named constants, unit tests) and the Amiga structs and raw pointers
 are gone, and all the game state lives in one `Game` value (no `static mut`, no `unsafe` in the game
-code). What is left is making the rules independent of the drawing (the state is already split into `Game` and `Video`), then the optional "modern engine"
+code). What is left is using the new `Output` interface (the rules already only see it, and the state is split into `Game` and `Video`), then the optional "modern engine"
 steps. The detailed status and plan are in [modern_engine_plan.md](modern_engine_plan.md)
 (start at "Where we are"); the history of the port is in [plan.md](plan.md).
 

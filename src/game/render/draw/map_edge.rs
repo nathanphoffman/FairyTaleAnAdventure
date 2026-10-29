@@ -5,8 +5,8 @@ use crate::game::data::random::{rand2, rand4};
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
 use crate::game::data::state::Video;
+use crate::game::render::map_tiles::{draw_map_column, draw_map_row};
 use crate::game::render::witch::witch_fx;
-use crate::game::world::map::{draw_map_column, draw_map_row};
 
 // ---- repair_edges ----
 /// The map strip to redraw after a scroll: the right edge (36) or the left (0), and the bottom row

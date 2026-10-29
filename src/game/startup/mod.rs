@@ -8,6 +8,8 @@ pub mod intro;
 
 pub mod open_close;
 
+pub mod story_pages;
+
 use crate::game::data::state::{Game, Video};
 use game_loop::main_loop;
 use intro::start_up;

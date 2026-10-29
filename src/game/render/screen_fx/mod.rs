@@ -10,6 +10,8 @@ mod compass;
 
 mod fading;
 
+mod item_screen;
+
 mod message_page;
 
 mod print_queue;
@@ -20,6 +22,7 @@ mod zoom;
 
 pub use self::compass::draw_compass;
 pub use self::fading::{day_fade, fade_down, fade_normal, fade_page, flicker_colors};
+pub use self::item_screen::draw_item_list;
 pub use self::message_page::{map_message, message_off, show_still_screen};
 pub use self::print_queue::handle_print_request;
 pub use self::win::win_colors;

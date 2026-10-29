@@ -4,11 +4,9 @@ use super::COLOR_COUNT;
 use super::zoom::set_intro_zoom;
 use crate::game::data::object_tables::sun_colors;
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
 use crate::game::data::tables::black_colors;
-use crate::game::files::iff_picture::load_picture;
+use crate::game::output::Output;
 use crate::game::render::display::delay;
-use crate::game::render::screen::{HIRES, SPRITES, VP_HIDE, ViewPortId};
 use crate::game::ui::messages::name;
 use crate::game::ui::text::{draw_placard_border, placard_text};
 
@@ -38,42 +36,38 @@ const RED_STEP: i32 = 0x100;
 
 /// The win screen: shows the picture and brings the sun up behind it by cycling the sky colours
 /// through `sun_colors`, with two glowing colours that fade out near the end.
-pub fn win_colors(game: &mut Game, video: &mut Video) {
-    placard_text(video, WIN_MESSAGE_FIRST);
-    name(game, video);
-    placard_text(video, WIN_MESSAGE_SECOND);
-    draw_placard_border(video);
-    delay(game, video, WIN_MESSAGE_PAUSE);
-    show_win_picture_in_black(game, video);
-    rise_sun(game, video);
+pub fn win_colors(game: &mut Game, out: &mut dyn Output) {
+    placard_text(out, WIN_MESSAGE_FIRST);
+    name(game, out);
+    placard_text(out, WIN_MESSAGE_SECOND);
+    draw_placard_border(out);
+    delay(game, out, WIN_MESSAGE_PAUSE);
+    show_win_picture_in_black(game, out);
+    rise_sun(game, out);
 
-    delay(game, video, SUNRISE_END_PAUSE);
-    video.screen.load_colors(ViewPortId::Page, &black_colors);
+    delay(game, out, SUNRISE_END_PAUSE);
+    out.load_page_colors(&black_colors);
 }
 
 /// Loads the winning picture with every colour black, so the sunrise can fade it in.
-fn show_win_picture_in_black(game: &mut Game, video: &mut Video) {
-    let id = video.screen.drawing_bitmap_id();
-    video.screen.draw_target = id;
-    load_picture("winpic", video.screen.bitmap_mut(id), 0, 0);
-    video.screen.load_colors(ViewPortId::Page, &black_colors);
-    video.screen.load_colors(ViewPortId::Text, &black_colors);
-    video.screen.vp_text.modes = HIRES | SPRITES | VP_HIDE;
-    set_intro_zoom(game, video, WIN_SCREEN_SIZE);
+fn show_win_picture_in_black(game: &mut Game, out: &mut dyn Output) {
+    out.load_picture_to_drawing_page("winpic");
+    out.load_page_colors(&black_colors);
+    out.load_panel_colors(&black_colors);
+    out.set_panel_visible(false);
+    set_intro_zoom(game, out, WIN_SCREEN_SIZE);
 }
 
 /// Steps through the sunrise palettes, one pause each.
-fn rise_sun(game: &mut Game, video: &mut Video) {
+fn rise_sun(game: &mut Game, out: &mut dyn Output) {
     for i in (SUNRISE_END + 1..=SUNRISE_START).rev() {
-        video
-            .screen
-            .load_colors(ViewPortId::Page, &sunrise_palette(i));
+        out.load_page_colors(&sunrise_palette(i));
 
         if i == SUNRISE_START {
-            delay(game, video, SUNRISE_FIRST_PAUSE);
+            delay(game, out, SUNRISE_FIRST_PAUSE);
         }
 
-        delay(game, video, SUNRISE_STEP_PAUSE);
+        delay(game, out, SUNRISE_STEP_PAUSE);
     }
 }
 

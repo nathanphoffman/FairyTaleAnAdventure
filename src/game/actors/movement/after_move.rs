@@ -15,7 +15,6 @@ use super::{
     VELOCITY_QUARTER, WALKING, WITCH_BODY_VITALITY, WORLD_MAX, WORLD_MIN, diroff, terrain,
 };
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
 use crate::game::output::Output;
 
 use crate::game::actors::encounters::check_death;
@@ -106,12 +105,12 @@ impl Ctx {
 
     /// After the movement: finishes a death, then turns the terrain under the actor into its `environ`
     /// (water depth, ice, the pit).
-    pub(super) fn tail(&mut self, game: &mut Game, video: &mut Video) -> Pc {
+    pub(super) fn tail(&mut self, game: &mut Game, out: &mut dyn Output) -> Pc {
         if self.state == DYING {
             self.finish_dying(game);
         }
 
-        self.settle_environ(game, video);
+        self.settle_environ(game, out);
 
         if self.environ == 0 && self.state == SINK {
             game.actor_mut(self.actor).state = STILL;
@@ -147,7 +146,7 @@ impl Ctx {
 
     /// Turns the terrain under the actor into its `environ`: water depth, slow ground, ice, going
     /// backwards, or falling into the pit.
-    fn settle_environ(&mut self, game: &mut Game, video: &mut Video) {
+    fn settle_environ(&mut self, game: &mut Game, out: &mut dyn Output) {
         let actor = self.actor;
         let i = self.slot;
         let j = self.terrain;
@@ -177,7 +176,7 @@ impl Ctx {
         } else if j == TERRAIN_WADE {
             self.environ = ENVIRON_WADE;
         } else if j == TERRAIN_SLOW_SINK || j == TERRAIN_DEEP_WATER {
-            self.wade(game, video, j);
+            self.wade(game, out, j);
         }
     }
 

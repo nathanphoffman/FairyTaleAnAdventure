@@ -13,7 +13,7 @@ use self::brothers::{
     take_over_next_brother,
 };
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
+use crate::game::output::Output;
 
 use self::safe_spot::{put_hero_at_safe_spot, restore_hero};
 
@@ -39,7 +39,7 @@ const VIEW_GAME_OVER: i8 = 2;
 ///
 /// Either way the hero gets full health for the bravery, the clock is set to the morning
 /// (8000), and hunger and fatigue are cleared.
-pub fn revive(game: &mut Game, video: &mut Video, new: i16) {
+pub fn revive(game: &mut Game, out: &mut dyn Output, new: i16) {
     reset_raft_setfig(&mut game.actors);
 
     let hero = ActorRef::new(0);
@@ -54,14 +54,14 @@ pub fn revive(game: &mut Game, video: &mut Video, new: i16) {
     if new != 0 {
         stopscore();
         leave_fallen_brother(&mut game.objects, &game.hero);
-        take_over_next_brother(game, video, hero);
-        show_brother_placards(game, video);
-        announce_brother(game, video);
+        take_over_next_brother(game, out, hero);
+        show_brother_placards(game, out);
+        announce_brother(game, out);
     } else {
-        fade_down(game, video);
+        fade_down(game, out);
     }
 
-    put_hero_at_safe_spot(game, video, hero);
+    put_hero_at_safe_spot(game, out, hero);
     restore_hero(game, hero);
 
     if game.hero.brother > LAST_BROTHER {

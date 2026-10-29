@@ -22,7 +22,6 @@ mod water;
 
 use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
 use crate::game::data::state::World;
 use crate::game::data::state::{ActorRef, MissileRef};
 use crate::game::data::tables::{entry, facing_frame_offsets};
@@ -277,12 +276,12 @@ fn terrain(game: &Game, x: u16, y: u16) -> i16 {
 /// Moves and animates actor `i`; `cycle` is the frame counter. `*jp` is the main loop's `j`, which
 /// carries the last terrain value from one actor to the next (a dead actor reads it without setting
 /// it), so it is passed in and written back.
-pub fn move_actor(game: &mut Game, video: &mut Video, i: i32, cycle: i16, jp: &mut i16) {
+pub fn move_actor(game: &mut Game, out: &mut dyn Output, i: i32, cycle: i16, jp: &mut i16) {
     let (mut c, mut pc) = Ctx::start(&mut game.actors, &game.world, i, cycle, *jp);
 
     loop {
         pc = match pc {
-            Pc::Dispatch => c.dispatch(game, video),
+            Pc::Dispatch => c.dispatch(game, out),
             Pc::CheckDev1 => c.check_dev1(game),
             Pc::CheckDev2 => c.check_dev2(game),
             Pc::NewLoc => c.new_loc(game),
@@ -290,8 +289,8 @@ pub fn move_actor(game: &mut Game, video: &mut Video, i: i32, cycle: i16, jp: &m
             Pc::Still => c.still(game),
             Pc::DragShoot => c.drag_shoot(game),
             Pc::Cpx => c.cpx(game),
-            Pc::Tail => c.tail(game, video),
-            Pc::Raise => c.raise(game, video),
+            Pc::Tail => c.tail(game, out),
+            Pc::Raise => c.raise(game, out),
             Pc::Statc => break,
         };
     }

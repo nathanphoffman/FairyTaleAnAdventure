@@ -4,6 +4,7 @@
 use crate::game::data::state::Game;
 use crate::game::data::state::Video;
 use crate::game::data::state::World;
+use crate::game::output::Output;
 use crate::game::render::draw::{draw_sprites, repair_edges};
 use crate::game::render::screen::Screen;
 
@@ -17,12 +18,12 @@ use crate::game::files::loading::load_pending_region;
 use crate::game::input::handler::{next_key, read_walk_direction};
 use crate::game::input::keys::{handle_key, update_hero};
 use crate::game::render::display::flip_pages;
+use crate::game::render::map_tiles::{draw_map, scroll_map};
 use crate::game::render::restore::undo_sprites;
 use crate::game::render::screen_fx::{fade_normal, handle_print_request};
 use crate::game::render::sprite_order::sort_actors;
 use crate::game::world::bed::check_bed;
 use crate::game::world::clock::day_night_tick;
-use crate::game::world::map::{draw_map, scroll_map};
 use crate::game::world::objects::spawn_object_actors;
 use crate::game::world::regions::refresh_minimap;
 use crate::game::world::survival::survival_tick;
@@ -164,13 +165,13 @@ fn run_frame(game: &mut Game, video: &mut Video, state: &mut FrameState) {
 }
 
 /// Reads one key and handles it.
-fn read_keyboard(game: &mut Game, video: &mut Video) {
+fn read_keyboard(game: &mut Game, out: &mut dyn Output) {
     let key = next_key() as i8;
 
     let notpause = game.menus[GAME_MENU].enabled[PAUSE_ENTRY] & 1 == 0;
 
     if key != 0 {
-        handle_key(game, video, key as i32, notpause as i32);
+        handle_key(game, out, key as i32, notpause as i32);
     }
 }
 
@@ -203,12 +204,12 @@ fn handle_view_status(game: &mut Game, video: &mut Video) -> bool {
 
 /// Moves the hero, the raft and every monster and person (the actor count is read each time round,
 /// as in the original).
-fn move_everything(game: &mut Game, video: &mut Video, state: &mut FrameState) {
+fn move_everything(game: &mut Game, out: &mut dyn Output, state: &mut FrameState) {
     raft_proximity(game);
     let mut i = 0;
 
     while i < game.actors.active as i32 {
-        move_actor(game, video, i, state.cycle, &mut state.last_terrain);
+        move_actor(game, out, i, state.cycle, &mut state.last_terrain);
         i += 1;
     }
 }
@@ -291,14 +292,14 @@ fn update_map_view(game: &mut Game, video: &mut Video) -> (i16, i16, bool) {
 
 /// The once-per-frame world update: the clock, then (unless time is frozen) new monsters, talking,
 /// what the monsters want to do, and hunger.
-fn run_world_update(game: &mut Game, video: &mut Video) {
-    day_night_tick(game, video);
+fn run_world_update(game: &mut Game, out: &mut dyn Output) {
+    day_night_tick(game, out);
 
     if game.world.freeze_timer == 0 {
-        spawn_encounters(game, video);
-        speak_nearby(game, video);
-        update_enemy_goals(game, video);
-        survival_tick(game, video);
+        spawn_encounters(game, out);
+        speak_nearby(game, out);
+        update_enemy_goals(game, out);
+        survival_tick(game, out);
     }
 }
 
@@ -314,7 +315,7 @@ fn draw_frame(
     page.isv_x = game.world.tile_x as i32;
     page.isv_y = game.world.tile_y as i32;
 
-    video.screen.set_a_pen(PortId::Map, SPRITE_PEN);
+    video.set_a_pen(PortId::Map, SPRITE_PEN);
 
     resolve_melee(game, video);
     advance_missiles(game, video);

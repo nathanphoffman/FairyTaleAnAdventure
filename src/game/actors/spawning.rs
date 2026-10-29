@@ -7,7 +7,6 @@ use crate::game::data::random::{fta_rand, rand4, rand64};
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
 use crate::game::data::state::World;
 use crate::game::files::disk::{motor_off, read_finished};
 use crate::game::output::Output;
@@ -54,11 +53,11 @@ const INDOOR_REGION: u16 = 7;
 
 /// Says where the hero is, finishes loading monsters, places waiting ones and now and then
 /// starts a new random encounter.
-pub fn spawn_encounters(game: &mut Game, video: &mut Video) {
-    find_place(game, video, 2);
+pub fn spawn_encounters(game: &mut Game, out: &mut dyn Output) {
+    find_place(game, out, 2);
 
     if game.actors.loading == 1 && read_finished(DISK_REQUEST_ACTORS) != 0 {
-        video.finish_sprite_load(ENEMY_SLOT);
+        out.finish_sprite_load(ENEMY_SLOT);
         motor_off();
         game.actors.loading = 0;
         game.actors.active = FIRST_ENEMY_ACTOR;
@@ -72,7 +71,7 @@ pub fn spawn_encounters(game: &mut Game, video: &mut Video) {
     }
 
     if random_encounter_due(&game.actors, &game.world) {
-        roll_random_encounter(game, video);
+        roll_random_encounter(game, out);
     }
 }
 

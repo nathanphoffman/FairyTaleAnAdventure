@@ -9,7 +9,6 @@ use crate::game::actors::encounters::load_enemy_sprites;
 use crate::game::actors::encounters::{load_carrier, place_encounter};
 use crate::game::actors::interaction::{blocked_at, rescue_princess};
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
 use crate::game::data::state::World;
 use crate::game::output::Output;
 
@@ -156,21 +155,21 @@ fn start_forced_encounter(game: &mut Game, out: &mut dyn Output) {
 /// extent the hero stands in, and whatever that extent starts.
 ///
 /// `flag` 0 is silent, 1 also starts monster zones, 2 only says the place name.
-pub fn find_place(game: &mut Game, video: &mut Video, flag: i16) -> i32 {
+pub fn find_place(game: &mut Game, out: &mut dyn Output, flag: i16) -> i32 {
     let mut flag = flag;
 
     loop {
-        announce_place(game, video, flag);
+        announce_place(game, out, flag);
         locate_extent(game);
 
-        if !enter_extent(game, video, flag) {
+        if !enter_extent(game, out, flag) {
             // the princess was rescued: look again from the top, without the messages
             flag = 0;
 
             continue;
         }
 
-        update_carrier(game, video);
+        update_carrier(game, out);
 
         return 0;
     }
@@ -271,7 +270,7 @@ fn locate_extent(game: &mut Game) {
 /// What happens when the hero walks into a different kind of extent: the princess is rescued, a
 /// boss or the turtle eggs call up their monsters, the spider pit loads the spiders, and monster
 /// zones may send a fight. Returns false if the princess was rescued (the caller starts over).
-fn enter_extent(game: &mut Game, video: &mut Video, flag: i16) -> bool {
+fn enter_extent(game: &mut Game, out: &mut dyn Output, flag: i16) -> bool {
     if game.world.extent_type == game.extents[game.world.extent].etype as u16 {
         return true;
     }
@@ -281,7 +280,7 @@ fn enter_extent(game: &mut Game, video: &mut Video, flag: i16) -> bool {
 
     if game.world.extent_type == XT_PRINCESS && game.objects.region[8][PRINCESS_OBJECT].ob_stat != 0
     {
-        rescue_princess(game, video);
+        rescue_princess(game, out);
 
         return false;
     } else if game.world.extent_type >= XT_SPECIAL_MIN {
@@ -291,7 +290,7 @@ fn enter_extent(game: &mut Game, video: &mut Video, flag: i16) -> bool {
             force = true;
         }
     } else if game.world.extent_type == XT_SPIDER_PIT {
-        load_spiders(game, video);
+        load_spiders(game, out);
     } else if game.world.extent_type >= XT_MONSTER_ZONE_MIN && flag == 1 {
         game.encounter.x = game.hero.x;
         game.encounter.y = game.hero.y;
@@ -299,7 +298,7 @@ fn enter_extent(game: &mut Game, video: &mut Video, flag: i16) -> bool {
     }
 
     if force {
-        start_forced_encounter(game, video);
+        start_forced_encounter(game, out);
     }
 
     true

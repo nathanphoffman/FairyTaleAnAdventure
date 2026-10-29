@@ -15,8 +15,7 @@
 //! 6 SW, 7 W. The value 9 means "not walking".
 
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
-use crate::game::render::screen_fx::draw_compass;
+use crate::game::output::Output;
 use std::collections::VecDeque;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -216,7 +215,7 @@ fn compass_direction(x: i32, y: i32) -> i16 {
 ///
 /// While a mouse button is down the pointer position decides; otherwise the direction key
 /// (numbered from 20, the keypad digits) does. Anything outside 20-29 means no direction.
-pub fn read_walk_direction(game: &mut Game, video: &mut Video) {
+pub fn read_walk_direction(game: &mut Game, out: &mut dyn Output) {
     let (qualifier, pointer) = {
         let handler = handler();
 
@@ -239,7 +238,7 @@ pub fn read_walk_direction(game: &mut Game, video: &mut Video) {
 
     if dir != game.ui.compass_lit_direction {
         game.ui.compass_lit_direction = dir;
-        draw_compass(&mut video.screen, dir);
+        out.draw_compass(dir);
     }
 }
 

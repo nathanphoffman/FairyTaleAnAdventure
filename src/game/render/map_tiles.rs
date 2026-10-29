@@ -4,22 +4,19 @@ use crate::game::data::state::Game;
 use crate::game::data::state::Graphics;
 use crate::game::data::state::Video;
 use crate::game::render::screen::Screen;
+use crate::game::world::map::{SCREEN_COLUMNS, SCREEN_ROWS};
 
 /// One bitplane of 256 tiles, 64 bytes per tile.
-pub(super) const IMAGE_PLANE_SIZE: usize = 16384;
-pub(super) const TILE_BYTES: usize = 64;
-pub(super) const TILE_LINES: usize = 32;
+pub const IMAGE_PLANE_SIZE: usize = 16384;
+pub const TILE_BYTES: usize = 64;
+pub const TILE_LINES: usize = 32;
 
 /// Bytes per scan line of the play field bitmaps.
-pub(super) const ROW_BYTES: usize = 40;
-pub(super) const PLANE_COUNT: usize = 5;
-
-/// The play field is this many tiles wide and tall.
-pub(super) const SCREEN_COLUMNS: usize = 19;
-pub(super) const SCREEN_ROWS: usize = 6;
+pub const ROW_BYTES: usize = 40;
+pub const PLANE_COUNT: usize = 5;
 
 /// Draws one tile at byte offset `dst` in each of the five planes (2 bytes wide, 32 lines).
-pub(super) fn draw_tile(graphics: &Graphics, screen: &mut Screen, tile: i32, dst: usize) {
+pub fn draw_tile(graphics: &Graphics, screen: &mut Screen, tile: i32, dst: usize) {
     for p in 0..PLANE_COUNT {
         let mut src = p * IMAGE_PLANE_SIZE + tile as usize * TILE_BYTES;
         let image = &graphics.image;
@@ -36,7 +33,7 @@ pub(super) fn draw_tile(graphics: &Graphics, screen: &mut Screen, tile: i32, dst
 }
 
 /// Draws the tile at minimap position (col, row) to its place on screen.
-pub(super) fn draw_minimap_tile(game: &mut Game, video: &mut Video, col: usize, row: usize) {
+pub fn draw_minimap_tile(game: &mut Game, video: &mut Video, col: usize, row: usize) {
     draw_tile(
         &video.graphics,
         &mut video.screen,
@@ -70,16 +67,16 @@ pub fn draw_map_row(game: &mut Game, video: &mut Video, r: i32) {
 
 /// One way to scroll: source x (bytes), source line, destination x, destination line, width in
 /// bytes and number of lines.
-pub(super) struct ScrollMode {
-    pub(super) src_x: usize,
-    pub(super) src_line: usize,
-    pub(super) dst_x: usize,
-    pub(super) dst_line: usize,
-    pub(super) width: usize,
-    pub(super) lines: usize,
+pub struct ScrollMode {
+    pub src_x: usize,
+    pub src_line: usize,
+    pub dst_x: usize,
+    pub dst_line: usize,
+    pub width: usize,
+    pub lines: usize,
 }
 
-pub(super) const fn mode(
+pub const fn mode(
     src_x: usize,
     src_line: usize,
     dst_x: usize,
@@ -100,7 +97,7 @@ pub(super) const fn mode(
 /// Directions are numbered by how the picture moves:
 /// 0 right, 1 down+right, 2 down, 3 down+left, 4 left, 5 up+left, 6 up, 7 up+right.
 /// The new edge is filled in by `draw_map_column` / `draw_map_row` afterwards.
-pub(super) const SCROLL_MODES: [ScrollMode; 8] = [
+pub const SCROLL_MODES: [ScrollMode; 8] = [
     mode(0, 0, 2, 0, 36, 192),
     mode(0, 0, 2, 32, 36, 160),
     mode(0, 0, 0, 32, 38, 160),

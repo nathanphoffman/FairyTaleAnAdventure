@@ -6,21 +6,14 @@
 //! blitter knows which pixels to leave alone. Each loaded sprite sequence takes its frames (5
 //! bitplanes) plus one mask plane, in memory order.
 //!
-//! Also here: reading the music scores (`read_score`) and the story book page-turn animation
-//! (`show_story_page`, `turn_page`).
+//! Also here: reading the music scores (`read_score`).
 
 mod sound_data;
 
 mod sprites;
 
-mod story_pages;
-
 pub use self::sound_data::{play_effect, read_sample, read_score, track, tune_tracks};
-pub use self::sprites::{
-    SPRITE_FILES, finish_sprite_load, load_pending_region, load_sprite_file, load_start_sprites,
-};
-
-pub use self::story_pages::{intro_skipped, show_story_page};
+pub use self::sprites::{SPRITE_FILES, load_pending_region, load_start_sprites};
 
 const CARRIER: u8 = 5;
 const DRAGON: u8 = 6;

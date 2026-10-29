@@ -5,7 +5,6 @@ mod effects;
 
 use self::effects::{heal, scare_enemies, show_map, stone_jump};
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
 use crate::game::output::Output;
 
 use crate::game::ui::menus::update_menu_availability;
@@ -37,12 +36,12 @@ const RIDING_BIG: i16 = 1;
 
 /// Handles an entry of the Magic menu. Returns false if `update_menu_availability` should not follow
 /// (the spell did not work, so the stone is not used up).
-pub fn magic_option(game: &mut Game, video: &mut Video, chosen_entry: i16) -> bool {
-    if let Some(result) = refuse_spell(game, video, chosen_entry) {
+pub fn magic_option(game: &mut Game, out: &mut dyn Output, chosen_entry: i16) -> bool {
+    if let Some(result) = refuse_spell(game, out, chosen_entry) {
         return result;
     }
 
-    if !cast_spell(game, video, chosen_entry) {
+    if !cast_spell(game, out, chosen_entry) {
         return false;
     }
 
@@ -88,22 +87,22 @@ fn refuse_spell(game: &mut Game, out: &mut dyn Output, chosen_entry: i16) -> Opt
 }
 
 /// Casts the spell. Returns false if it did not work (the stone ring only works in a circle).
-fn cast_spell(game: &mut Game, video: &mut Video, chosen_entry: i16) -> bool {
+fn cast_spell(game: &mut Game, out: &mut dyn Output, chosen_entry: i16) -> bool {
     match chosen_entry {
         SPELL_LIGHT => game.world.light_timer += LIGHT_TIME,
         SPELL_SECRET => game.world.secret_timer += SECRET_TIME,
         SPELL_FREEZE => game.world.freeze_timer += FREEZE_TIME,
-        SPELL_MAP => show_map(game, video),
+        SPELL_MAP => show_map(game, out),
         SPELL_STONE => {
-            if !stone_jump(game, video) {
+            if !stone_jump(game, out) {
                 return false;
             }
 
-            heal(game, video);
+            heal(game, out);
         }
 
-        SPELL_HEAL => heal(game, video),
-        SPELL_FEAR => scare_enemies(game, video),
+        SPELL_HEAL => heal(game, out),
+        SPELL_FEAR => scare_enemies(game, out),
         _ => {}
     }
 

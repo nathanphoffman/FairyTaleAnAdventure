@@ -15,7 +15,7 @@ pub use self::hero_state::update_hero;
 use self::cheats::{cheat_items, cheat_move};
 use self::menu_keys::{menu_click, menu_letter};
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
+use crate::game::output::Output;
 
 use crate::game::ui::menus::go_to_menu;
 use crate::game::ui::options::choose_menu_entry;
@@ -98,17 +98,17 @@ const VIAL_SLOT: usize = 22;
 /// Handles one key code. `notpause` is true unless the game is paused.
 ///
 /// A key pressed in the key menu: 1 to 6 choose that key, anything else goes back to the items.
-fn press_in_key_menu(game: &mut Game, video: &mut Video, key: i8) {
+fn press_in_key_menu(game: &mut Game, out: &mut dyn Output, key: i8) {
     if (b'1' as i8..=b'6' as i8).contains(&key) {
-        choose_menu_entry(game, video, (key - b'1' as i8 + KEY_ENTRY_BASE) as i16);
+        choose_menu_entry(game, out, (key - b'1' as i8 + KEY_ENTRY_BASE) as i16);
     } else {
-        go_to_menu(game, video, ITEMS);
+        go_to_menu(game, out, ITEMS);
     }
 }
 
 /// Codes with bit 7 set are releases. Keys that do nothing in the current state fall through
 /// to the menu shortcut letters at the end.
-pub fn handle_key(game: &mut Game, video: &mut Video, key: i32, notpause: i32) {
+pub fn handle_key(game: &mut Game, out: &mut dyn Output, key: i32, notpause: i32) {
     let key = key as i8;
     let notpause = notpause as i16 != 0;
 
@@ -126,16 +126,16 @@ pub fn handle_key(game: &mut Game, video: &mut Video, key: i32, notpause: i32) {
         game.ui.fight_key_held = 1;
     } else if key & CODE_MASK == FIGHT_KEY {
         game.ui.fight_key_held = 0;
-    } else if cheat_items(game, video, key) {
+    } else if cheat_items(game, out, key) {
         // handled
     } else if key & CODE_MASK >= FIRST_MENU_CLICK {
-        menu_click(game, video, key, notpause);
-    } else if cheat_move(game, video, key) {
+        menu_click(game, out, key, notpause);
+    } else if cheat_move(game, out, key) {
         // handled
     } else if game.ui.current_menu == KEYS && key & RELEASED == 0 {
-        press_in_key_menu(game, video, key);
+        press_in_key_menu(game, out, key);
     } else if key == b' ' as i8 || notpause {
-        menu_letter(game, video, key);
+        menu_letter(game, out, key);
     }
 }
 

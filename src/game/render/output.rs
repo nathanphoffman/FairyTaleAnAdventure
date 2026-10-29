@@ -1,12 +1,16 @@
 //! `Video` as an `Output`: the Amiga-style drawing of what the rules ask for.
 
-use crate::game::data::state::Video;
+use crate::game::data::state::{Hero, MapData, Video, World};
 use crate::game::files::disk::load_track_range;
-use crate::game::files::loading::{finish_sprite_load, load_sprite_file};
+use crate::game::files::iff_picture::load_picture;
 use crate::game::output::Output;
-use crate::game::render::screen::ViewPortId;
+use crate::game::render::overview_map::draw_overview_map;
+use crate::game::render::screen::{FontKind, HIRES, PortId, SPRITES, VP_HIDE, ViewPortId};
+use crate::game::render::screen_fx::{draw_compass, draw_item_list};
+use crate::game::render::sprite_loading::{finish_sprite_load, load_sprite_file};
 use crate::game::ui::text::{draw_text, format_number, move_to};
 use crate::gfx::bitmap::Rect;
+use crate::gfx::draw::JAM1;
 use crate::platform::display;
 
 // The scrolling message area of the text panel.
@@ -26,6 +30,14 @@ const IMAGE_PLANE_SIZE: usize = 16384;
 const QUARTER_PLANE_SIZE: usize = 4096;
 const IMAGE_PLANE_BLOCKS: i16 = 8;
 const REQ_IMAGE_FIRST: i16 = 3;
+
+/// The colour the hero's "+" is drawn in on the overview map.
+const MAP_MARK_PEN: u8 = 31;
+
+/// The intro zoom is centred on a 320 x 200 screen, and the text panel gets what is left of 95 lines.
+const SCREEN_CENTER_X: i32 = 160;
+const SCREEN_CENTER_Y: i32 = 100;
+const ZOOM_TEXT_HEIGHT: i32 = 95;
 
 /// Characters in a formatted number (the last one is the trailing space).
 const NUMBER_FIELD: i32 = 10;
@@ -112,5 +124,126 @@ impl Output for Video {
                 REQ_IMAGE_FIRST + plane as i16,
             );
         }
+    }
+
+    fn current_port(&self) -> PortId {
+        self.screen.current_port
+    }
+
+    fn select_port(&mut self, port: PortId) {
+        self.screen.current_port = port;
+    }
+
+    fn set_font_kind(&mut self, port: PortId, kind: FontKind) {
+        self.screen.set_font_kind(port, kind);
+    }
+
+    fn set_a_pen(&mut self, port: PortId, pen: u8) {
+        self.screen.set_a_pen(port, pen);
+    }
+
+    fn set_b_pen(&mut self, port: PortId, pen: u8) {
+        self.screen.set_b_pen(port, pen);
+    }
+
+    fn set_draw_mode(&mut self, port: PortId, mode: u8) {
+        self.screen.set_draw_mode(port, mode);
+    }
+
+    fn move_to(&mut self, port: PortId, x: i32, y: i32) {
+        self.screen.move_to(port, x, y);
+    }
+
+    fn text(&mut self, port: PortId, bytes: &[u8]) {
+        self.screen.text(port, bytes);
+    }
+
+    fn line_to(&mut self, port: PortId, x: i32, y: i32) {
+        self.screen.line_to(port, x, y);
+    }
+
+    fn rect_fill(&mut self, port: PortId, from: (i32, i32), to: (i32, i32)) {
+        self.screen.rect_fill(port, from, to);
+    }
+
+    fn draw_compass(&mut self, dir: i16) {
+        draw_compass(&mut self.screen, dir);
+    }
+
+    fn draw_item_list(&mut self, hero: &mut Hero) {
+        draw_item_list(self, hero);
+    }
+
+    fn draw_overview_map(&mut self, map: &MapData, world: &mut World, mx: i32, my: i32) {
+        self.screen.draw_target = self.screen.drawing_bitmap_id();
+        draw_overview_map(self, map, world, mx, my);
+    }
+
+    fn mark_overview_map(&mut self, at: Option<(i32, i32)>) {
+        self.screen.port_mut(PortId::Map).target = Some(self.screen.draw_target);
+        self.screen.set_draw_mode(PortId::Map, JAM1);
+        self.screen.set_a_pen(PortId::Map, MAP_MARK_PEN);
+
+        if let Some((x, y)) = at {
+            self.screen.move_to(PortId::Map, x, y);
+            self.screen.text(PortId::Map, b"+");
+        }
+    }
+
+    fn clear_drawing_page(&mut self, pen: u8) {
+        self.screen.port_mut(PortId::Map).target = Some(self.screen.drawing_bitmap_id());
+        self.screen.clear(PortId::Map, pen);
+        self.screen.port_mut(PortId::Map).target = Some(self.screen.viewing_bitmap_id());
+    }
+
+    fn reset_page_scroll(&mut self) {
+        let ras = self.screen.drawing_page().ras;
+        self.screen.ras[ras].x = 0;
+        self.screen.ras[ras].y = 0;
+    }
+
+    fn prepare_message_page(&mut self, pen: u8) {
+        self.screen.current_port = PortId::Map;
+        self.screen.port_mut(PortId::Map).target = Some(self.screen.drawing_bitmap_id());
+        self.screen.set_draw_mode(PortId::Map, JAM1);
+        self.screen.set_a_pen(PortId::Map, pen);
+        self.screen.clear(PortId::Map, 0);
+    }
+
+    fn set_panel_visible(&mut self, visible: bool) {
+        self.screen.vp_text.modes = if visible {
+            HIRES | SPRITES
+        } else {
+            HIRES | SPRITES | VP_HIDE
+        };
+    }
+
+    fn set_zoom_size(&mut self, x: i32, y: i32) {
+        let left = (SCREEN_CENTER_X - x) as i16;
+        let top = (SCREEN_CENTER_Y - y) as i16;
+
+        for ras in &mut self.screen.ras[..2] {
+            ras.x = left;
+            ras.y = top;
+        }
+
+        self.screen.vp_page.x = left;
+        self.screen.vp_page.width = (x + x) as i16;
+        self.screen.vp_page.y = top;
+        self.screen.vp_page.height = (y + y) as i16;
+
+        self.screen.vp_text.x = 0;
+        self.screen.vp_text.y = 0;
+        self.screen.vp_text.height = (ZOOM_TEXT_HEIGHT - y) as i16;
+    }
+
+    fn load_picture_to_drawing_page(&mut self, name: &str) {
+        let id = self.screen.drawing_bitmap_id();
+        self.screen.draw_target = id;
+        load_picture(name, self.screen.bitmap_mut(id), 0, 0);
+    }
+
+    fn load_panel_colors(&mut self, colors: &[u16]) {
+        self.screen.load_colors(ViewPortId::Text, colors);
     }
 }

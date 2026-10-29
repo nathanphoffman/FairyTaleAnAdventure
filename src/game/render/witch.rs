@@ -10,6 +10,7 @@ use crate::game::data::object_tables::witchpoints;
 use crate::game::data::state::Game;
 use crate::game::data::state::Video;
 use crate::game::data::types::FPage;
+use crate::game::output::Output;
 use crate::game::render::screen::PortId;
 use crate::gfx::bitmap::Rect;
 use crate::gfx::draw::COMPLEMENT;
@@ -80,7 +81,7 @@ fn paint_beam(video: &mut Video, p: [(i16, i16); BEAM_CORNERS]) {
         height: CLIP_HEIGHT + 1,
     };
 
-    video.screen.set_draw_mode(PortId::Map, COMPLEMENT);
+    video.set_draw_mode(PortId::Map, COMPLEMENT);
     video.screen.fill_polygon(PortId::Map, &points, clip);
 }
 

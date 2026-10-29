@@ -7,11 +7,9 @@ mod transfer;
 
 use self::transfer::{Transfer, transfer_all};
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
 use crate::game::files::loading::load_start_sprites;
 use crate::game::output::Output;
 use crate::game::render::screen::FontKind;
-use crate::game::render::screen::Screen;
 use crate::game::ui::menus::update_menu_availability;
 use crate::game::ui::text::queue_print;
 use crate::platform::paths::resolve;
@@ -27,8 +25,8 @@ const PRINT_VITALITY: i32 = 4;
 const PRINT_STATS: i32 = 7;
 
 /// Saves the game into slot `slot` (0 = A ...) when `saving`, or loads it from there.
-pub fn savegame(game: &mut Game, video: &mut Video, slot: i16, saving: bool) {
-    set_current_font(&mut video.screen, FontKind::Panel);
+pub fn savegame(game: &mut Game, out: &mut dyn Output, slot: i16, saving: bool) {
+    set_current_font(out, FontKind::Panel);
 
     let name = format!(
         "{}.faery",
@@ -37,17 +35,17 @@ pub fn savegame(game: &mut Game, video: &mut Video, slot: i16, saving: bool) {
 
     if saving {
         if write_game(game, &name).is_err() {
-            video.print("ERROR: Couldn't save game.");
+            out.print("ERROR: Couldn't save game.");
         }
     } else {
         if read_game(game, &name).is_err() {
-            video.print("ERROR: Couldn't load game.");
+            out.print("ERROR: Couldn't load game.");
         }
 
-        reset_after_load(game, video);
+        reset_after_load(game, out);
     }
 
-    set_current_font(&mut video.screen, FontKind::Story);
+    set_current_font(out, FontKind::Story);
 }
 
 /// Writes the game to the save file `name`.
@@ -70,9 +68,9 @@ fn read_game(game: &mut Game, name: &str) -> std::io::Result<()> {
 }
 
 /// Writes in the given font from now on.
-fn set_current_font(screen: &mut Screen, kind: FontKind) {
-    let current = screen.current_port;
-    screen.set_font_kind(current, kind);
+fn set_current_font(out: &mut dyn Output, kind: FontKind) {
+    let current = out.current_port();
+    out.set_font_kind(current, kind);
 }
 
 /// After loading a game: clears the encounter state and redraws the status panel for the new hero.

@@ -4,7 +4,6 @@ use crate::game::data::object_tables::ObjectLists;
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Actors;
 use crate::game::data::state::Game;
-use crate::game::data::state::Video;
 use crate::game::data::state::{Hero, World};
 use crate::game::data::tables::brother_stats;
 use crate::game::data::types::{Bro, Shape};
@@ -153,49 +152,45 @@ pub(super) fn start_next_brother(hero: &mut Hero, body: &mut Shape, next: &Bro) 
 }
 
 /// The story pages between brothers (and the game over page after the last).
-pub(super) fn show_brother_placards(game: &mut Game, video: &mut Video) {
-    map_message(game, video);
-    let current = video.screen.current_port;
-    video.screen.set_font_kind(current, FontKind::Story);
+pub(super) fn show_brother_placards(game: &mut Game, out: &mut dyn Output) {
+    map_message(game, out);
+    let current = out.current_port();
+    out.set_font_kind(current, FontKind::Story);
 
     if game.hero.brother == JULIAN {
-        placard_text(video, PLACARD_JULIAN);
-        video.screen.port_mut(PortId::Map).target = Some(video.screen.drawing_bitmap_id());
-        video.screen.clear(PortId::Map, PEN_BLACK);
-        video.screen.port_mut(PortId::Map).target = Some(video.screen.viewing_bitmap_id());
+        placard_text(out, PLACARD_JULIAN);
+        out.clear_drawing_page(PEN_BLACK);
     } else if game.hero.brother == PHILLIP {
-        placard_text(video, PLACARD_PHILLIP);
+        placard_text(out, PLACARD_PHILLIP);
     } else if game.hero.brother == KEVIN {
-        placard_text(video, PLACARD_KEVIN);
+        placard_text(out, PLACARD_KEVIN);
     } else {
-        placard_text(video, PLACARD_GAME_OVER);
+        placard_text(out, PLACARD_GAME_OVER);
     }
 
-    draw_placard_border(video);
-    delay(game, video, SHOW_PLACARD);
+    draw_placard_border(out);
+    delay(game, out, SHOW_PLACARD);
 
     if game.hero.brother > LAST_BROTHER {
         game.ui.quit_requested = 1;
-        delay(game, video, GAME_OVER_PAUSE);
+        delay(game, out, GAME_OVER_PAUSE);
     } else if game.hero.brother > JULIAN {
-        show_follow_up_placard(game, video);
+        show_follow_up_placard(game, out);
     }
 }
 
 /// After the first story page the panel is cleared and the follow-up page for this brother is shown.
-fn show_follow_up_placard(game: &mut Game, video: &mut Video) {
-    delay(game, video, SHORT_PAUSE);
-    let current = video.screen.current_port;
-    video.screen.set_a_pen(current, PEN_BLACK);
-    video
-        .screen
-        .rect_fill(current, (PANEL.0, PANEL.1), (PANEL.2, PANEL.3));
+fn show_follow_up_placard(game: &mut Game, out: &mut dyn Output) {
+    delay(game, out, SHORT_PAUSE);
+    let current = out.current_port();
+    out.set_a_pen(current, PEN_BLACK);
+    out.rect_fill(current, (PANEL.0, PANEL.1), (PANEL.2, PANEL.3));
 
-    delay(game, video, TINY_PAUSE);
-    video.screen.set_a_pen(current, PEN_TEXT);
+    delay(game, out, TINY_PAUSE);
+    out.set_a_pen(current, PEN_TEXT);
 
     placard_text(
-        video,
+        out,
         if game.hero.brother == PHILLIP {
             PLACARD_PHILLIP_FOLLOW_UP
         } else {
@@ -203,30 +198,30 @@ fn show_follow_up_placard(game: &mut Game, video: &mut Video) {
         },
     );
 
-    delay(game, video, SHOW_PLACARD);
+    delay(game, out, SHOW_PLACARD);
 }
 
 /// Loads the brother's sprites and tells where the story starts.
-pub(super) fn announce_brother(game: &mut Game, video: &mut Video) {
-    let current = video.screen.current_port;
-    video.screen.set_font_kind(current, FontKind::Panel);
-    video.screen.current_port = PortId::Text;
+pub(super) fn announce_brother(game: &mut Game, out: &mut dyn Output) {
+    let current = out.current_port();
+    out.set_font_kind(current, FontKind::Panel);
+    out.select_port(PortId::Text);
 
     game.actors.loaded_actor_file = HERO_SPRITE_FILE;
     game.actors.loaded_setfig_file = HERO_SET_FILE;
-    load_start_sprites(game, video);
+    load_start_sprites(game, out);
 
     if game.hero.brother <= LAST_BROTHER {
-        message_off(game, video);
+        message_off(game, out);
         game.hero.place = START_PLACE;
-        show_event(game, video, EVENT_SETTING_OUT);
+        show_event(game, out, EVENT_SETTING_OUT);
 
         if game.hero.brother == JULIAN {
-            video.print_cont(".");
+            out.print_cont(".");
         } else if game.hero.brother == PHILLIP {
-            show_event(game, video, EVENT_PHILLIP_SETS_OUT);
+            show_event(game, out, EVENT_PHILLIP_SETS_OUT);
         } else if game.hero.brother == KEVIN {
-            show_event(game, video, EVENT_KEVIN_SETS_OUT);
+            show_event(game, out, EVENT_KEVIN_SETS_OUT);
         }
     }
 }
