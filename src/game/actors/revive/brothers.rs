@@ -59,9 +59,6 @@ const ON_GROUND: i8 = 1;
 /// Place message numbers: "You are in..." for the start village.
 const START_PLACE: u16 = 2;
 
-/// Sound/graphics: pen colours and the panel area that is cleared between messages.
-const PEN_BLACK: u8 = 0;
-
 /// Delays, in 50ths of a second.
 const SHOW_PLACARD: i32 = 120;
 const SHORT_PAUSE: i32 = 80;
@@ -155,7 +152,7 @@ pub(super) fn show_brother_placards(game: &mut Game, out: &mut dyn Output) {
 
     if game.hero.brother == JULIAN {
         placard_text(out, PLACARD_JULIAN);
-        out.clear_drawing_page(PEN_BLACK);
+        out.clear_drawing_page();
     } else if game.hero.brother == PHILLIP {
         placard_text(out, PLACARD_PHILLIP);
     } else if game.hero.brother == KEVIN {

@@ -185,9 +185,9 @@ impl Output for Video {
         draw_placard_border(&mut self.screen);
     }
 
-    fn draw_menu_entry(&mut self, slot: usize, label: &[u8], text_pen: u8, box_pen: u8) {
+    fn draw_menu_entry(&mut self, slot: usize, label: &[u8], selected: bool, box_pen: u8) {
         let (x, y) = menu_slot_position(slot);
-        self.screen.set_a_pen(PortId::Text2, text_pen);
+        self.screen.set_a_pen(PortId::Text2, selected as u8);
         self.screen.set_b_pen(PortId::Text2, box_pen);
         self.screen.move_to(PortId::Text2, x, y);
         self.screen.text(PortId::Text2, MENU_BOX);
@@ -227,9 +227,9 @@ impl Output for Video {
         }
     }
 
-    fn clear_drawing_page(&mut self, pen: u8) {
+    fn clear_drawing_page(&mut self) {
         self.screen.port_mut(PortId::Map).target = Some(self.screen.drawing_bitmap_id());
-        self.screen.clear(PortId::Map, pen);
+        self.screen.clear(PortId::Map, PEN_BLACK);
         self.screen.port_mut(PortId::Map).target = Some(self.screen.viewing_bitmap_id());
     }
 
@@ -239,11 +239,11 @@ impl Output for Video {
         self.screen.ras[ras].y = 0;
     }
 
-    fn prepare_message_page(&mut self, pen: u8) {
+    fn prepare_message_page(&mut self) {
         self.screen.current_port = PortId::Map;
         self.screen.port_mut(PortId::Map).target = Some(self.screen.drawing_bitmap_id());
         self.screen.set_draw_mode(PortId::Map, JAM1);
-        self.screen.set_a_pen(PortId::Map, pen);
+        self.screen.set_a_pen(PortId::Map, PLACARD_TEXT_PEN);
         self.screen.clear(PortId::Map, 0);
     }
 

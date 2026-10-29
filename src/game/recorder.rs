@@ -29,7 +29,7 @@ pub enum Call {
     DrawMenuEntry {
         slot: usize,
         label: Vec<u8>,
-        text_pen: u8,
+        selected: bool,
         box_pen: u8,
     },
     BlankMenuEntry(usize),
@@ -37,9 +37,9 @@ pub enum Call {
     DrawItemList,
     DrawOverviewMap(i32, i32),
     MarkOverviewMap(Option<(i32, i32)>),
-    ClearDrawingPage(u8),
+    ClearDrawingPage,
     ResetPageScroll,
-    PrepareMessagePage(u8),
+    PrepareMessagePage,
     SetPanelVisible(bool),
     SetZoomSize(i32, i32),
     LoadPictureToDrawingPage(String),
@@ -168,11 +168,11 @@ impl Output for Recorder {
         self.calls.push(Call::DrawPlacardBorder);
     }
 
-    fn draw_menu_entry(&mut self, slot: usize, label: &[u8], text_pen: u8, box_pen: u8) {
+    fn draw_menu_entry(&mut self, slot: usize, label: &[u8], selected: bool, box_pen: u8) {
         self.calls.push(Call::DrawMenuEntry {
             slot,
             label: label.to_vec(),
-            text_pen,
+            selected,
             box_pen,
         });
     }
@@ -197,16 +197,16 @@ impl Output for Recorder {
         self.calls.push(Call::MarkOverviewMap(at));
     }
 
-    fn clear_drawing_page(&mut self, pen: u8) {
-        self.calls.push(Call::ClearDrawingPage(pen));
+    fn clear_drawing_page(&mut self) {
+        self.calls.push(Call::ClearDrawingPage);
     }
 
     fn reset_page_scroll(&mut self) {
         self.calls.push(Call::ResetPageScroll);
     }
 
-    fn prepare_message_page(&mut self, pen: u8) {
-        self.calls.push(Call::PrepareMessagePage(pen));
+    fn prepare_message_page(&mut self) {
+        self.calls.push(Call::PrepareMessagePage);
     }
 
     fn set_panel_visible(&mut self, visible: bool) {
@@ -296,7 +296,7 @@ mod tests {
         let prepare = out
             .calls
             .iter()
-            .position(|c| matches!(c, Call::PrepareMessagePage(_)));
+            .position(|c| matches!(c, Call::PrepareMessagePage));
         let hide = out
             .calls
             .iter()

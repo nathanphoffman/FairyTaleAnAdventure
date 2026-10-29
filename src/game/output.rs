@@ -80,8 +80,8 @@ pub trait Output {
 
     // ---- the menu in the text panel ----
 
-    /// Draws menu entry `slot` (0-11, two columns) with `label` in `text_pen` on a box of `box_pen`.
-    fn draw_menu_entry(&mut self, slot: usize, label: &[u8], text_pen: u8, box_pen: u8);
+    /// Draws menu entry `slot` (0-11, two columns) with `label`, highlighted if `selected`, on a box of `box_pen`.
+    fn draw_menu_entry(&mut self, slot: usize, label: &[u8], selected: bool, box_pen: u8);
 
     /// Blanks menu entry `slot`: nothing is shown there.
     fn blank_menu_entry(&mut self, slot: usize);
@@ -101,15 +101,15 @@ pub trait Output {
     /// Marks the hero's place on the overview map, if it is inside the map.
     fn mark_overview_map(&mut self, at: Option<(i32, i32)>);
 
-    /// Clears the page being drawn to colour `pen`.
-    fn clear_drawing_page(&mut self, pen: u8);
+    /// Clears the page being drawn to black.
+    fn clear_drawing_page(&mut self);
 
     /// Shows the page being drawn from its top left corner (no scrolling).
     fn reset_page_scroll(&mut self);
 
     /// Gets the play field ready for a full page message: draws on the page being drawn, in the
-    /// message pen, and clears it.
-    fn prepare_message_page(&mut self, pen: u8);
+    /// message colour, and clears it.
+    fn prepare_message_page(&mut self);
 
     /// Shows or hides the text panel.
     fn set_panel_visible(&mut self, visible: bool);

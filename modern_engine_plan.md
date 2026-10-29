@@ -72,14 +72,14 @@ Both engines share the rules. They differ only in how they draw and read input.
    is left; unused `out` parameters are gone.
 
 **Not done.**
-- `Output` still has pens (`clear_drawing_page(pen)`, `prepare_message_page(pen)`, colour numbers) and
-  `FontKind`; the ports are hidden, but a renderer with real colours would want colour names.
+- `Output` has no pens or ports any more; it still passes palettes (`load_page_colors`, 12 bit
+  colours) and `FontKind`, which a renderer with its own look would replace.
 - Many functions still take the whole `&mut Game` because they pass it on to others.
 - Steps 5 to 7 below (classic/modern engines, remastered, reimagined) have not been started.
 
 **Plan for what comes next, in order.**
-1. *Use the output interface*: replace the remaining pen and colour-number calls with higher-level
-   ones. Then the modern renderer can read `Game` directly.
+1. *Use the output interface*: write the modern renderer behind `Output` (it can read `Game`
+   directly).
 2. Step 5 (classic engine, improved options), step 6 (modern renderer: RGBA tiles, zoom, bigger view),
    step 7 (data files for items, enemies, spells and text).
 

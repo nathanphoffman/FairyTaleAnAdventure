@@ -152,7 +152,7 @@ pub fn print_menu_entry(game: &mut Game, out: &mut dyn Output, j: i16, pena: i16
     let box_pen = entry_box_pen(game, entry) as u8;
     let label = entry_label(game, entry * LABEL_LEN);
 
-    out.draw_menu_entry(j as usize, label, pena as u8, box_pen);
+    out.draw_menu_entry(j as usize, label, pena != 0, box_pen);
 }
 
 /// The colour of the box behind an entry of the current menu: fixed for the use and file menus and

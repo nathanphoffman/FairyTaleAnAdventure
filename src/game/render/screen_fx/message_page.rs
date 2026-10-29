@@ -5,8 +5,6 @@ use crate::game::data::state::Game;
 use crate::game::output::Output;
 use crate::game::render::display::flip_pages;
 
-const MAP_PEN: u8 = 24;
-
 /// `view_status` values: showing a map message, and showing the normal view again.
 const VIEW_MESSAGE: i8 = 2;
 const VIEW_NORMAL_AGAIN: i8 = 3;
@@ -21,7 +19,7 @@ pub fn show_still_screen(game: &mut Game, out: &mut dyn Output) {
 pub fn map_message(game: &mut Game, out: &mut dyn Output) {
     fade_down(game, out);
 
-    out.prepare_message_page(MAP_PEN);
+    out.prepare_message_page();
     out.set_panel_visible(false);
     show_still_screen(game, out);
     out.load_page_colors(&game.page_colors);
