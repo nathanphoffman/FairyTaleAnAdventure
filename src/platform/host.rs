@@ -41,7 +41,9 @@ static HOST: OnceLock<&'static dyn Host> = OnceLock::new();
 
 /// Connects the game. Only the first call counts.
 pub fn install(host: &'static dyn Host) {
-    let _ = HOST.set(host);
+    if HOST.set(host).is_err() {
+        eprintln!("A host was already installed; ignoring the new one");
+    }
 }
 
 /// The installed game, if any (before `install`, input and commands are dropped).

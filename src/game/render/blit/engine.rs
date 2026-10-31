@@ -40,9 +40,11 @@ impl BlitMem<'_> {
     /// The bytes of an area, and how far in the position 0 of the area is.
     fn area(&self, area: Area) -> (&[u8], isize) {
         match area {
-            Area::Plane(p) if (p as usize) < self.bitmap.depth() => {
-                (self.bitmap.padded_plane(p as usize), PAD as isize)
-            }
+            Area::Plane(plane_number) if (plane_number as usize) < self.bitmap.depth() => (
+                self.bitmap.padded_plane(plane_number as usize),
+                PAD as isize,
+            ),
+
             Area::Plane(_) => (&[], 0),
             Area::Queue => (self.queue, 0),
             Area::Mask => (self.mask, 0),
@@ -50,11 +52,14 @@ impl BlitMem<'_> {
         }
     }
 
+    // The memory behind an area, with the offset its address starts at.
     fn area_mut(&mut self, area: Area) -> (&mut [u8], isize) {
         match area {
-            Area::Plane(p) if (p as usize) < self.bitmap.depth() => {
-                (self.bitmap.padded_plane_mut(p as usize), PAD as isize)
-            }
+            Area::Plane(plane_number) if (plane_number as usize) < self.bitmap.depth() => (
+                self.bitmap.padded_plane_mut(plane_number as usize),
+                PAD as isize,
+            ),
+
             Area::Plane(_) => (&mut [], 0),
             Area::Queue => (self.queue, 0),
             Area::Mask => (self.mask, 0),
@@ -67,7 +72,7 @@ impl BlitMem<'_> {
 
         usize::try_from(base + at.pos)
             .ok()
-            .and_then(|i| bytes.get(i))
+            .and_then(|counter| bytes.get(counter))
             .copied()
             .unwrap_or(0)
     }
@@ -77,7 +82,7 @@ impl BlitMem<'_> {
 
         if let Some(byte) = usize::try_from(base + at.pos)
             .ok()
-            .and_then(|i| bytes.get_mut(i))
+            .and_then(|counter| bytes.get_mut(counter))
         {
             *byte = value;
         }
@@ -270,6 +275,7 @@ mod tests {
 
     /// The bit-at-a-time definition of a minterm, as the C original computed it.
     fn minterm_by_bits(mt: u32, a: u32, b: u32, c: u32) -> u32 {
+        // Folds the 16 bits of the result one at a time, building the answer from bit 0 up.
         (0..16).fold(0, |r, bit| {
             // The A, B and C bits of this position make the minterm's bit number (A * 4 + B * 2 + C).
             let index = ((a >> bit & 1) << 2) | ((b >> bit & 1) << 1) | (c >> bit & 1);
@@ -280,6 +286,7 @@ mod tests {
     }
 
     #[test]
+    // Checks the fast word version against the slow bit version on a few awkward patterns.
     fn minterm_words_match_the_bit_by_bit_version() {
         let samples = [0x0000, 0xffff, 0x1234, 0xa5c3, 0x0ff0, 0x8001];
 
@@ -348,17 +355,20 @@ mod tests {
     }
 
     #[test]
-    fn reads_outside_an_area_are_zero_and_writes_are_dropped() {
+    fn reads_outside_an_area_are_zero_with_writes_dropped() {
         let dst = run(&[9, 9], |mem| {
+            // Blit size word: height 1 in the high bits, width 1 word in the low 6.
             let mut t = Blit::new(USE_B | USE_D, D_EQUALS_B, 1 << 6 | 1);
             t.b = Loc {
                 area: Area::Shapes,
                 pos: -1,
             };
+
             t.d = Loc {
                 area: Area::Queue,
                 pos: 7,
             };
+
             blit(&mut t, mem);
         });
 

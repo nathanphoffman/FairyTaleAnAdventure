@@ -82,10 +82,13 @@ fn read_font_tables(seg: &[u8]) -> Option<BitmapFont> {
     let mut loc = Vec::new();
     let (mut space, mut kern) = (Vec::new(), Vec::new());
 
-    for i in 0..count {
-        loc.push((be16(seg, charloc + i * 4)?, be16(seg, charloc + i * 4 + 2)?));
-        space.push(be16(seg, charspace + i * 2)?);
-        kern.push(be16(seg, charkern + i * 2)? as i16);
+    for index in 0..count {
+        loc.push((
+            be16(seg, charloc + index * 4)?,
+            be16(seg, charloc + index * 4 + 2)?,
+        ));
+        space.push(be16(seg, charspace + index * 2)?);
+        kern.push(be16(seg, charkern + index * 2)? as i16);
     }
 
     Some(BitmapFont {
@@ -212,7 +215,7 @@ mod tests {
     }
 
     #[test]
-    fn a_builtin_letter_is_drawn_and_advances_eight() {
+    fn a_builtin_letter_is_drawn_advancing_eight() {
         let mut bm = Bitmap::new(16, 16, 1);
         let mut pen = Pen::new();
         pen.x = 0;
@@ -220,6 +223,8 @@ mod tests {
 
         let advance = Font::Builtin.draw_glyph(&mut bm, &pen, b'I', 1);
         assert_eq!(advance, 8);
+
+        // True if some pixel in the 8x16 cell is set, i.e. the glyph drew something.
         assert!((0..16).any(|y| (0..8).any(|x| bm.pixel(x, y) == 1)));
     }
 }

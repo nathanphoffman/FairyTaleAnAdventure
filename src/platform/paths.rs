@@ -84,12 +84,15 @@ pub fn resolve(name: &str, for_write: bool) -> Option<PathBuf> {
         return resolve_in_saves(name, for_write);
     }
 
+    // Falls back to the plain data path only when the caller is going to write the file.
     find_ignore_case(&data_dir(), name).or_else(|| for_write.then(|| data_dir().join(name)))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const FONT_DIR: &str = "Fonts";
 
     #[test]
     fn disk_device_prefix_is_removed() {
@@ -102,10 +105,10 @@ mod tests {
     #[test]
     fn finds_files_ignoring_case() {
         let dir = std::env::temp_dir().join(format!("fta_paths_{}", std::process::id()));
-        std::fs::create_dir_all(dir.join("Fonts")).unwrap();
-        std::fs::write(dir.join("Fonts").join("Amber"), b"x").unwrap();
+        std::fs::create_dir_all(dir.join(FONT_DIR)).unwrap();
+        std::fs::write(dir.join(FONT_DIR).join("Amber"), b"x").unwrap();
         let found = find_ignore_case(&dir, "fonts/amber").unwrap();
-        assert_eq!(found, dir.join("Fonts").join("Amber"));
+        assert_eq!(found, dir.join(FONT_DIR).join("Amber"));
         assert!(find_ignore_case(&dir, "fonts/missing").is_none());
         std::fs::remove_dir_all(&dir).unwrap();
     }

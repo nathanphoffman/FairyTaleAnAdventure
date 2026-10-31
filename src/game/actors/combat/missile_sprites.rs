@@ -41,8 +41,8 @@ fn add_missile_actor(actors: &mut Actors, ms: MissileRef, (xstart, ystart): (i16
 /// Adds the visible missiles to the end of the actor list as objects so the drawing draws them.
 /// Stops when the list is full.
 pub fn queue_missile_sprites(game: &mut Game) {
-    for i in 0..MISSILES {
-        let ms = MissileRef::new(i);
+    for number in 0..MISSILES {
+        let ms = MissileRef::new(number);
         let t = game.missile(ms).missile_type;
 
         if t == MISSILE_NONE {

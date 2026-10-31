@@ -83,8 +83,10 @@ const STATUS_COLOR: usize = 31;
 
 /// How the map moved since the last frame, in sectors (x wraps at 10 bits).
 fn scroll_step(screen: &Screen, world: &mut World) -> (i16, i16) {
+    // Pixels to tiles: a shift is a divide by the tile width.
     world.tile_x = world.map_x >> TILE_WIDTH_SHIFT;
 
+    // Pixels to tile rows: a shift is a divide by the tile height.
     world.tile_y = world.map_y >> TILE_HEIGHT_SHIFT;
     let page = screen.drawing_page();
     let dif_x = (world.tile_x as i32 - page.isv_x) as i16;
@@ -165,13 +167,13 @@ fn run_frame(game: &mut Game, video: &mut Video, state: &mut FrameState) {
 }
 
 /// Reads one key and handles it.
-fn read_keyboard(game: &mut Game, out: &mut dyn Output) {
+fn read_keyboard(game: &mut Game, output: &mut dyn Output) {
     let key = next_key() as i8;
 
     let notpause = game.menus[GAME_MENU].enabled[PAUSE_ENTRY] & 1 == 0;
 
     if key != 0 {
-        handle_key(game, out, key as i32, notpause as i32);
+        handle_key(game, output, key as i32, notpause as i32);
     }
 }
 
@@ -204,13 +206,13 @@ fn handle_view_status(game: &mut Game, video: &mut Video) -> bool {
 
 /// Moves the hero, the raft and every monster and person (the actor count is read each time round,
 /// as in the original).
-fn move_everything(game: &mut Game, out: &mut dyn Output, state: &mut FrameState) {
+fn move_everything(game: &mut Game, output: &mut dyn Output, state: &mut FrameState) {
     raft_proximity(game);
-    let mut i = 0;
+    let mut index = 0;
 
-    while i < game.actors.active as i32 {
-        move_actor(game, out, i, state.cycle, &mut state.last_terrain);
-        i += 1;
+    while index < game.actors.active as i32 {
+        move_actor(game, output, index, state.cycle, &mut state.last_terrain);
+        index += 1;
     }
 }
 
@@ -292,14 +294,14 @@ fn update_map_view(game: &mut Game, video: &mut Video) -> (i16, i16, bool) {
 
 /// The once-per-frame world update: the clock, then (unless time is frozen) new monsters, talking,
 /// what the monsters want to do, and hunger.
-fn run_world_update(game: &mut Game, out: &mut dyn Output) {
-    day_night_tick(game, out);
+fn run_world_update(game: &mut Game, output: &mut dyn Output) {
+    day_night_tick(game, output);
 
     if game.world.freeze_timer == 0 {
-        spawn_encounters(game, out);
-        speak_nearby(game, out);
-        update_enemy_goals(game, out);
-        survival_tick(game, out);
+        spawn_encounters(game, output);
+        speak_nearby(game, output);
+        update_enemy_goals(game, output);
+        survival_tick(game, output);
     }
 }
 
@@ -375,7 +377,7 @@ mod tests {
     }
 
     #[test]
-    fn no_motion_and_big_jumps_do_not_scroll() {
+    fn no_motion_with_big_jumps_do_not_scroll() {
         assert_eq!(scroll_direction(0, 0), None);
         assert_eq!(scroll_direction(2, 0), None);
         assert_eq!(scroll_direction(0, -3), None);

@@ -55,12 +55,16 @@ const HIGH_WORD_SHIFT: u32 = 16;
 
 /// 12 bit colour (4 bits per channel, 0x0RGB) to 0xRRGGBB.
 pub fn rgb4(c: u16) -> u32 {
+    // Pulls out each 4 bit component: shift it down, then mask off the rest.
     let r = ((c >> RED_NIBBLE_SHIFT) & NIBBLE_MASK) as u32;
+
+    // Same for green.
     let g = ((c >> GREEN_NIBBLE_SHIFT) & NIBBLE_MASK) as u32;
     let b = (c & NIBBLE_MASK) as u32;
 
     // Puts the three components, each stretched from 4 to 8 bits, side by side in one pixel.
     ((r * NIBBLE_TO_BYTE) << RED_BYTE_SHIFT)
+        // Green and blue are placed the same way (see above).
         | ((g * NIBBLE_TO_BYTE) << GREEN_BYTE_SHIFT)
         | (b * NIBBLE_TO_BYTE)
 }
@@ -196,6 +200,7 @@ mod tests {
             }],
             pointer: None,
         };
+
         let mut frame = vec![0u32; FRAME_WIDTH * FRAME_HEIGHT];
 
         compose(&scene, &mut frame);
@@ -222,6 +227,7 @@ mod tests {
             }],
             pointer: None,
         };
+
         let mut frame = vec![5u32; FRAME_WIDTH * FRAME_HEIGHT];
 
         compose(&scene, &mut frame);

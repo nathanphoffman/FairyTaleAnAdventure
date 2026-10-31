@@ -48,7 +48,7 @@ const RANDOM_COLOR_MASK: i32 = 0xfff;
 /// Colour 31 is changed first because it depends on where the hero is (swamp, secret room).
 pub fn fade_page(
     game: &mut Game,
-    out: &mut dyn Output,
+    output: &mut dyn Output,
     (r, g, b): (i16, i16, i16),
     limit: i16,
     colors: &[u16],
@@ -59,10 +59,10 @@ pub fn fade_page(
 
     let mut faded = [0u16; COLOR_COUNT];
 
-    for (i, slot) in faded.iter_mut().enumerate() {
+    for (index, slot) in faded.iter_mut().enumerate() {
         *slot = faded_color(
-            i,
-            colors[i],
+            index,
+            colors[index],
             (r, g, b),
             g2,
             limit != 0,
@@ -70,7 +70,7 @@ pub fn fade_page(
         );
     }
 
-    out.load_page_colors(&faded);
+    output.load_page_colors(&faded);
 }
 
 /// Colour 31 depends on where the hero is: the swamp, the secret room (open or shut), or neither.
@@ -101,7 +101,7 @@ fn clamp_levels((r, g, b): (i32, i32, i32), night: bool) -> ((i32, i32, i32), i3
 /// (percent). At night (`night`) blue is lifted by `g2` times green, the lake colours (16-24) get a
 /// moonlight tint, and blue is capped. With a magic light (`lit`) red is brought up to the green.
 fn faded_color(
-    i: usize,
+    index: usize,
     color: u16,
     (r, g, b): (i32, i32, i32),
     g2: i32,
@@ -126,7 +126,7 @@ fn faded_color(
     b1 = (b * b1 + g2 * g1) / PERCENT;
 
     if night {
-        if LAKE_COLORS.contains(&i) && g > MOONLIGHT_MIN_GREEN {
+        if LAKE_COLORS.contains(&index) && g > MOONLIGHT_MIN_GREEN {
             if g < MOONLIGHT_STRONG_BELOW {
                 b1 += MOONLIGHT_STRONG_BOOST;
             } else if g < MOONLIGHT_WEAK_BELOW {
@@ -142,7 +142,7 @@ fn faded_color(
 }
 
 /// The teleport effect: random colours flicker for a moment (32 flashes).
-pub fn flicker_colors(game: &mut Game, out: &mut dyn Output) {
+pub fn flicker_colors(game: &mut Game, output: &mut dyn Output) {
     for _ in 0..COLOR_COUNT {
         let mut flash = [0u16; COLOR_COUNT];
 
@@ -150,9 +150,9 @@ pub fn flicker_colors(game: &mut Game, out: &mut dyn Output) {
             *slot = bitrand(&mut game.rng, RANDOM_COLOR_MASK) as u16;
         }
 
-        out.load_page_colors(&flash);
+        output.load_page_colors(&flash);
 
-        delay(game, out, 1);
+        delay(game, output, 1);
     }
 }
 
@@ -160,34 +160,34 @@ pub fn flicker_colors(game: &mut Game, out: &mut dyn Output) {
 const FADE_STEP: usize = 5;
 
 /// Fades the page out to black.
-pub fn fade_down(game: &mut Game, out: &mut dyn Output) {
+pub fn fade_down(game: &mut Game, output: &mut dyn Output) {
     for level in (0..=FULL_LEVEL).rev().step_by(FADE_STEP) {
         let colors = game.page_colors;
         fade_page(
             game,
-            out,
+            output,
             (level as i16, level as i16, level as i16),
             0,
             &colors,
         );
 
-        delay(game, out, 1);
+        delay(game, output, 1);
     }
 }
 
 /// Fades the page back in from black.
-pub fn fade_normal(game: &mut Game, out: &mut dyn Output) {
+pub fn fade_normal(game: &mut Game, output: &mut dyn Output) {
     for level in (0..=FULL_LEVEL).step_by(FADE_STEP) {
         let colors = game.page_colors;
         fade_page(
             game,
-            out,
+            output,
             (level as i16, level as i16, level as i16),
             0,
             &colors,
         );
 
-        delay(game, out, 1);
+        delay(game, output, 1);
     }
 }
 
@@ -206,7 +206,7 @@ const VIEW_REBUILD: i8 = 97;
 
 /// Updates the page colours for the time of day, every fourth tick. `light_level` follows the sun;
 /// inside buildings (regions 8 and 9) it is always bright.
-pub fn day_fade(game: &mut Game, out: &mut dyn Output) {
+pub fn day_fade(game: &mut Game, output: &mut dyn Output) {
     let bonus = if game.world.light_timer != 0 {
         LIGHT_SPELL_BONUS
     } else {
@@ -220,7 +220,7 @@ pub fn day_fade(game: &mut Game, out: &mut dyn Output) {
             let level = game.world.light_level as i32;
             fade_page(
                 game,
-                out,
+                output,
                 (
                     (level - DAY_DARKEN.0 + bonus) as i16,
                     (level - DAY_DARKEN.1) as i16,
@@ -232,7 +232,7 @@ pub fn day_fade(game: &mut Game, out: &mut dyn Output) {
         } else {
             fade_page(
                 game,
-                out,
+                output,
                 (FULL_LEVEL as i16, FULL_LEVEL as i16, FULL_LEVEL as i16),
                 1,
                 &colors,

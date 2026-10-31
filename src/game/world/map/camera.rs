@@ -101,7 +101,7 @@ mod tests {
     }
 
     #[test]
-    fn camera_creeps_then_jumps() {
+    fn camera_creeps_before_jumping() {
         assert_eq!(camera_after(100, 100, 144 + 100 + 30, 170), (101, 100));
         assert_eq!(camera_after(100, 100, 144 + 100 + 80, 170), (110, 100));
         assert_eq!(camera_after(100, 100, 244, 70 + 100 + 50), (100, 106));

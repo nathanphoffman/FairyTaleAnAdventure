@@ -6,6 +6,7 @@ use super::{
     ALL_BITS, Area, D_EQUALS_A_AND_NOT_C, D_EQUALS_A_THEN_B_ELSE_C, D_EQUALS_B, Loc, MASK_START,
     PLANE_COUNT, SHIFT_MASK, TILE_LINES, TILE_MASK_BYTES, USE_A, USE_B, USE_C, USE_D,
 };
+
 use crate::game::data::state::Graphics;
 use crate::game::data::state::Video;
 use crate::game::render::blit::SShape;
@@ -51,9 +52,9 @@ impl SpriteRegs {
 }
 
 /// Where plane `p` of the play field starts for the current sprite.
-fn plane_at_sprite(regs: &SpriteRegs, p: i32) -> Loc {
+fn plane_at_sprite(regs: &SpriteRegs, plane_number: i32) -> Loc {
     Loc {
-        area: Area::Plane(p as u8),
+        area: Area::Plane(plane_number as u8),
         pos: regs.sshape.coff as isize,
     }
 }
@@ -68,8 +69,8 @@ pub fn clear_memory(video: &mut Video, size: i32) {
     let bytes = (blit_height(size as i16) * blit_width(size as i16) * 2) as usize;
 
     with_mem(&mut video.screen, &mut video.graphics.shape, |mem| {
-        for i in 0..bytes {
-            mem.set_byte(Loc::new(Area::Mask, i), 0);
+        for index in 0..bytes {
+            mem.set_byte(Loc::new(Area::Mask, index), 0);
         }
     });
 }
@@ -77,14 +78,15 @@ pub fn clear_memory(video: &mut Video, size: i32) {
 /// Copies the background under the sprite (all planes) to `savemem`.
 pub fn save_background(video: &mut Video, savemem: Loc) {
     let regs = SpriteRegs::of(video);
+
     let sshape = { video.blitter.sshape };
 
     with_mem(&mut video.screen, &mut video.graphics.shape, |mem| {
-        for p in (0..PLANE_COUNT).rev() {
+        for plane_number in (0..PLANE_COUNT).rev() {
             let mut t = Blit::new(USE_B | USE_D, D_EQUALS_B, sshape.blitsize);
-            t.b = plane_at_sprite(&regs, p);
+            t.b = plane_at_sprite(&regs, plane_number);
             t.bmod = sshape.cmod as i32;
-            t.d = savemem.add(sshape.savesize as isize * p as isize);
+            t.d = savemem.add(sshape.savesize as isize * plane_number as isize);
             blit(&mut t, mem);
         }
     });
@@ -93,13 +95,14 @@ pub fn save_background(video: &mut Video, savemem: Loc) {
 /// Puts the saved background back (this erases the sprite).
 pub fn restore_background(video: &mut Video, savemem: Loc) {
     let regs = SpriteRegs::of(video);
+
     let sshape = { video.blitter.sshape };
 
     with_mem(&mut video.screen, &mut video.graphics.shape, |mem| {
-        for p in (0..PLANE_COUNT).rev() {
+        for plane_number in (0..PLANE_COUNT).rev() {
             let mut t = Blit::new(USE_B | USE_D, D_EQUALS_B, sshape.blitsize);
-            t.b = savemem.add(sshape.savesize as isize * p as isize);
-            t.d = plane_at_sprite(&regs, p);
+            t.b = savemem.add(sshape.savesize as isize * plane_number as isize);
+            t.d = plane_at_sprite(&regs, plane_number);
             t.dmod = sshape.cmod as i32;
             blit(&mut t, mem);
         }
@@ -117,6 +120,7 @@ pub fn combine_masks(video: &mut Video) {
             video.blitter.sprite_x_shift,
         )
     };
+
     let mut t = Blit::new(USE_A | USE_C | USE_D, D_EQUALS_A_AND_NOT_C, sshape.blitsize);
 
     t.a = Loc::new(Area::Shapes, video.graphics.mask_buffer).add(mask_offset as isize);
@@ -147,8 +151,8 @@ pub fn draw_shape(video: &mut Video) {
     let regs = SpriteRegs::of(video);
 
     with_mem(&mut video.screen, &mut video.graphics.shape, |mem| {
-        for p in (0..PLANE_COUNT).rev() {
-            draw_shape_plane(&regs, mem, p, bit_shift, (first, last));
+        for plane_number in (0..PLANE_COUNT).rev() {
+            draw_shape_plane(&regs, mem, plane_number, bit_shift, (first, last));
         }
     });
 }
@@ -158,7 +162,7 @@ pub fn draw_shape(video: &mut Video) {
 fn draw_shape_plane(
     regs: &SpriteRegs,
     mem: &mut BlitMem,
-    p: i32,
+    plane_number: i32,
     bit_shift: u32,
     (first, last): (u32, u32),
 ) {
@@ -171,6 +175,7 @@ fn draw_shape_plane(
         shapedata,
         ..
     } = *regs;
+
     let mut t = Blit::new(
         USE_A | USE_B | USE_C | USE_D,
         D_EQUALS_A_THEN_B_ELSE_C,
@@ -182,9 +187,9 @@ fn draw_shape_plane(
     t.alwm = last;
     t.a = scenery_mask_at(regs);
     t.b = Loc::new(Area::Shapes, shapedata)
-        .add(mask_offset as isize + planesize as isize * p as isize);
+        .add(mask_offset as isize + planesize as isize * plane_number as isize);
     t.bmod = mask_modulo as i32;
-    t.c = plane_at_sprite(regs, p);
+    t.c = plane_at_sprite(regs, plane_number);
     t.d = t.c;
     t.cmod = sshape.cmod as i32;
     t.dmod = t.cmod;
@@ -227,9 +232,13 @@ pub fn make_sprite_masks(
     let (mut src, mut dest) = (src, dest);
 
     for _ in 0..chars {
-        for i in 0..plane_bytes {
+        for index in 0..plane_bytes {
+            // A pixel is kept only if every plane has it set (AND of all planes), 0xff when no planes.
             let all = (0..PLANE_COUNT as usize).fold(0xff, |acc, n| {
-                acc & shapes.get(src + n * plane_bytes + i).copied().unwrap_or(0)
+                acc & shapes
+                    .get(src + n * plane_bytes + index)
+                    .copied()
+                    .unwrap_or(0)
             });
 
             if let Some(byte) = shapes.get_mut(dest) {

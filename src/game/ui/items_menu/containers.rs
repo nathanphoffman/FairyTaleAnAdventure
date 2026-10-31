@@ -8,6 +8,10 @@ use crate::game::output::Output;
 /// The container items start at this entry of `item_list`; a roll of 0 there means arrows (or 100
 /// gold when it is the first of two things).
 const FIRST_CONTAINER_ITEM: i32 = 8;
+/// How many different things a roll can pick from.
+const ITEM_CHOICES: i32 = 8;
+/// How many different kinds of contents a container can roll.
+const CONTENT_KINDS: i32 = 4;
 const ROLL_ARROWS_OR_GOLD: i32 = FIRST_CONTAINER_ITEM;
 
 /// The two key types that fold onto an earlier one, and what they fold onto.
@@ -22,12 +26,12 @@ const CONTAINER_GOLD: i16 = 100;
 
 /// The item a container holds when it rolls `roll` (0-7) for one item: slot 8 means arrows.
 fn container_item(roll: i32) -> usize {
-    let i = roll + FIRST_CONTAINER_ITEM;
+    let index = roll + FIRST_CONTAINER_ITEM;
 
-    if i == ROLL_ARROWS_OR_GOLD {
+    if index == ROLL_ARROWS_OR_GOLD {
         ARROWBASE
     } else {
-        i as usize
+        index as usize
     }
 }
 
@@ -42,33 +46,33 @@ fn container_key(roll: i32) -> i32 {
 }
 
 /// What was inside a container. Returns true (the container is always used up).
-pub(super) fn container_contents(game: &mut Game, out: &mut dyn Output) -> bool {
+pub(super) fn container_contents(game: &mut Game, output: &mut dyn Output) -> bool {
     let rng = &mut game.rng;
     let contents = roll_contents(|n| fta_rand(rng) & (n - 1));
 
     match contents {
-        Contents::Nothing => out.print("nothing."),
-        Contents::One(i) => {
-            out.print("a ");
-            out.print_cont(item_name(i));
-            out.print_cont(".");
-            add_stuff(game, i, 1);
+        Contents::Nothing => output.print("nothing."),
+        Contents::One(index) => {
+            output.print("a ");
+            output.print_cont(item_name(index));
+            output.print_cont(".");
+            add_stuff(game, index, 1);
         }
 
-        Contents::Two { first, second } => take_two_things(game, out, first, second),
+        Contents::Two { first, second } => take_two_things(game, output, first, second),
         Contents::ThreeKeys(keys) => {
-            out.print("3 keys.");
+            output.print("3 keys.");
 
             for key in keys {
                 add_stuff(game, key as usize, 1);
             }
         }
 
-        Contents::ThreeOf(i) => {
-            out.print("3 ");
-            out.print_cont(item_name(i));
-            out.print_cont("s.");
-            add_stuff(game, i, MANY as u8);
+        Contents::ThreeOf(index) => {
+            output.print("3 ");
+            output.print_cont(item_name(index));
+            output.print_cont("s.");
+            add_stuff(game, index, MANY as u8);
         }
     }
 
@@ -76,16 +80,16 @@ pub(super) fn container_contents(game: &mut Game, out: &mut dyn Output) -> bool 
 }
 
 /// Tells what two things were found and adds them (the first may be 100 gold pieces).
-fn take_two_things(game: &mut Game, out: &mut dyn Output, first: usize, second: usize) {
+fn take_two_things(game: &mut Game, output: &mut dyn Output, first: usize, second: usize) {
     if first == HUNDRED_GOLD as usize {
         game.hero.wealth += CONTAINER_GOLD;
     } else {
-        out.print_cont(" a");
+        output.print_cont(" a");
     }
 
-    out.print(item_name(first));
-    out.print_cont(" and a ");
-    out.print_cont(item_name(second));
+    output.print(item_name(first));
+    output.print_cont(" and a ");
+    output.print_cont(item_name(second));
 
     if first < GOLDBASE {
         add_stuff(game, first, 1);
@@ -108,7 +112,7 @@ enum Contents {
 /// Two different things: the first may be 100 gold pieces (a roll of 0), the second is rolled again
 /// until it differs and may be arrows (a roll of 0).
 fn roll_two_things(pick: &mut impl FnMut(i32) -> i32) -> Contents {
-    let mut first = pick(8) + FIRST_CONTAINER_ITEM;
+    let mut first = pick(ITEM_CHOICES) + FIRST_CONTAINER_ITEM;
 
     if first == ROLL_ARROWS_OR_GOLD {
         first = HUNDRED_GOLD;
@@ -117,7 +121,7 @@ fn roll_two_things(pick: &mut impl FnMut(i32) -> i32) -> Contents {
     let mut second;
 
     loop {
-        second = pick(8) + FIRST_CONTAINER_ITEM;
+        second = pick(ITEM_CHOICES) + FIRST_CONTAINER_ITEM;
 
         if second != first {
             break;
@@ -137,17 +141,17 @@ fn roll_two_things(pick: &mut impl FnMut(i32) -> i32) -> Contents {
 /// Rolls the contents with the game's random draws (`pick(n)` is 0 to n - 1), in the same order as
 /// the original: the kind (a draw of 4) first, then the item rolls (draws of 8).
 fn roll_contents(mut pick: impl FnMut(i32) -> i32) -> Contents {
-    match pick(4) {
+    match pick(CONTENT_KINDS) {
         0 => Contents::Nothing,
-        1 => Contents::One(container_item(pick(8))),
+        1 => Contents::One(container_item(pick(ITEM_CHOICES))),
         2 => roll_two_things(&mut pick),
         _ => {
-            let i = pick(8) + FIRST_CONTAINER_ITEM;
+            let index = pick(ITEM_CHOICES) + FIRST_CONTAINER_ITEM;
 
-            if i == ROLL_ARROWS_OR_GOLD {
-                Contents::ThreeKeys([0; MANY].map(|_| container_key(pick(8))))
+            if index == ROLL_ARROWS_OR_GOLD {
+                Contents::ThreeKeys([0; MANY].map(|_| container_key(pick(ITEM_CHOICES))))
             } else {
-                Contents::ThreeOf(i as usize)
+                Contents::ThreeOf(index as usize)
             }
         }
     }
@@ -160,6 +164,7 @@ mod tests {
 
     #[test]
     fn container_contents_follow_the_rolls() {
+        // Feeds the scripted rolls back one at a time in place of random numbers.
         let rolls = |kind: i32, items: &[i32]| {
             let mut next = items.iter().copied();
 
@@ -173,6 +178,7 @@ mod tests {
 
     #[test]
     fn two_things_are_never_the_same() {
+        // Feeds the scripted rolls back one at a time in place of random numbers.
         let rolls = |kind: i32, items: &[i32]| {
             let mut next = items.iter().copied();
 
@@ -215,7 +221,8 @@ mod tests {
     }
 
     #[test]
-    fn three_of_one_thing_or_three_keys() {
+    fn three_of_one_thing_versus_three_keys() {
+        // Feeds the scripted rolls back one at a time in place of random numbers.
         let rolls = |kind: i32, items: &[i32]| {
             let mut next = items.iter().copied();
 

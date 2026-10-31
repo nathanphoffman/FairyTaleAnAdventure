@@ -9,6 +9,7 @@ use crate::gfx::bitmap::Rect;
 
 /// Item slots below this are shown (the rest are gold and keys' counts).
 const GOLDBASE: usize = 31;
+
 /// The sprite sheet slot of the objects.
 const OBJECTS: u8 = 1;
 

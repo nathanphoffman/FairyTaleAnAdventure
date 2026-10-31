@@ -282,7 +282,7 @@ impl Sound {
         let words = WAVE_WORDS - offset as usize;
         let ch = &mut self.chans[v];
         ch.data = (0..words * 2)
-            .map(|i| self.wav.get(wave_start + i).copied().unwrap_or(0) as i8)
+            .map(|index| self.wav.get(wave_start + index).copied().unwrap_or(0) as i8)
             .collect();
         ch.looping = true;
         ch.phase = 0.0;
@@ -292,10 +292,10 @@ impl Sound {
     }
 
     /// Mixes `out` (interleaved left, right).
-    pub(super) fn mix(&mut self, out: &mut [f32]) {
+    pub(super) fn mix(&mut self, output: &mut [f32]) {
         let per_tick = self.rate / TICK_HZ;
 
-        for frame in out.chunks_exact_mut(2) {
+        for frame in output.chunks_exact_mut(2) {
             self.tick_acc += 1.0;
 
             if self.tick_acc >= per_tick {
@@ -339,9 +339,9 @@ mod tests {
     #[test]
     fn silent_sequencer_mixes_silence() {
         let mut sound = Sound::new(44100.0);
-        let mut out = [1.0f32; 8];
-        sound.mix(&mut out);
-        assert!(out.iter().all(|&s| s == 0.0));
+        let mut output = [1.0f32; 8];
+        sound.mix(&mut output);
+        assert!(output.iter().all(|&s| s == 0.0));
     }
 
     #[test]

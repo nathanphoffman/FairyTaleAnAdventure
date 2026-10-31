@@ -12,6 +12,7 @@ use self::brothers::{
     LAST_BROTHER, announce_brother, leave_fallen_brother, reset_raft_setfig, show_brother_placards,
     take_over_next_brother,
 };
+
 use crate::game::data::state::Game;
 use crate::game::output::Output;
 
@@ -39,7 +40,7 @@ const VIEW_GAME_OVER: i8 = 2;
 ///
 /// Either way the hero gets full health for the bravery, the clock is set to the morning
 /// (8000), and hunger and fatigue are cleared.
-pub fn revive(game: &mut Game, out: &mut dyn Output, new: i16) {
+pub fn revive(game: &mut Game, output: &mut dyn Output, new: i16) {
     reset_raft_setfig(&mut game.actors);
 
     let hero = ActorRef::new(0);
@@ -55,13 +56,13 @@ pub fn revive(game: &mut Game, out: &mut dyn Output, new: i16) {
         stopscore();
         leave_fallen_brother(&mut game.objects, &game.hero);
         take_over_next_brother(game, hero);
-        show_brother_placards(game, out);
-        announce_brother(game, out);
+        show_brother_placards(game, output);
+        announce_brother(game, output);
     } else {
-        fade_down(game, out);
+        fade_down(game, output);
     }
 
-    put_hero_at_safe_spot(game, out, hero);
+    put_hero_at_safe_spot(game, output, hero);
     restore_hero(game, hero);
 
     if game.hero.brother > LAST_BROTHER {
@@ -80,6 +81,7 @@ mod tests {
     use super::brothers::{
         FIRST_REGION, FIRST_SAFE_SPOT, GOLDBASE, reset_for_next_brother, start_next_brother,
     };
+
     use crate::game::data::types::Shape;
 
     use super::safe_spot::{
@@ -131,7 +133,7 @@ mod tests {
     }
 
     #[test]
-    fn revived_hero_is_healthy_rested_and_it_is_morning() {
+    fn revived_hero_is_healthy_rested_in_the_morning() {
         let (mut hero, mut body, mut world): (Hero, Shape, World) =
             (Default::default(), Default::default(), Default::default());
         hero.brave = 40;
@@ -154,7 +156,7 @@ mod tests {
     }
 
     #[test]
-    fn next_brother_starts_with_his_own_stats_and_only_a_dirk() {
+    fn next_brother_starts_with_his_own_stats_holding_only_a_dirk() {
         let next = Bro {
             brave: 20,
             luck: 35,

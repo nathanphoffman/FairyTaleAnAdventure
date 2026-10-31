@@ -44,30 +44,32 @@ const FEAR_RACE_LIMIT: u8 = 7;
 const ENEMY: i8 = 2;
 
 /// Draws the overview map with a "+" where the hero is, and shows it.
-pub(super) fn show_map(game: &mut Game, out: &mut dyn Output) {
+pub(super) fn show_map(game: &mut Game, output: &mut dyn Output) {
     let (map_x, map_y) = (game.world.map_x as i32, game.world.map_y as i32);
-    out.draw_overview_map(&game.map, &mut game.world, map_x, map_y);
+    output.draw_overview_map(&game.map, &mut game.world, map_x, map_y);
 
     // The hero on the overview map: his tile column minus the left edge of the shown sectors.
     let x = ((game.hero.x >> TILE_SHIFT) as i64
+        // Left edge of the shown sectors, in tile columns.
         - ((game.world.sector_x as i64 + game.world.origin_x as i64) << TILE_SHIFT)
         - MARK_X_OFFSET) as u32;
 
     // The hero on the overview map: his position in 16 pixel steps minus the top edge of the shown sectors.
     let y = ((game.hero.y >> TILE_SHIFT) as i64
+        // Top edge of the shown sectors, in tile rows.
         - ((game.world.sector_y as i64 + game.world.origin_y as i64) << TILE_SHIFT)
         + MARK_Y_OFFSET) as u32;
     let on_map = x > 0 && x < MARK_MAX.0 && y > 0 && y < MARK_MAX.1;
-    out.mark_overview_map(on_map.then_some((x as i32, y as i32)));
+    output.mark_overview_map(on_map.then_some((x as i32, y as i32)));
 
     game.ui.view_status = VIEW_MAP;
-    show_still_screen(game, out);
+    show_still_screen(game, output);
     queue_print(&mut game.ui, PRQ_MAP);
 }
 
 /// The stone ring spell: only works standing in the middle of a stone circle. Takes the hero to
 /// the next circle in the direction faced. Returns false if the spell did not work.
-pub(super) fn stone_jump(game: &mut Game, out: &mut dyn Output) -> bool {
+pub(super) fn stone_jump(game: &mut Game, output: &mut dyn Output) -> bool {
     let ring_list = stone_ring_sectors;
 
     match stone_target(
@@ -80,8 +82,8 @@ pub(super) fn stone_jump(game: &mut Game, out: &mut dyn Output) -> bool {
         StoneJump::Refused => false,
         StoneJump::NoRing => true,
         StoneJump::To(x, y) => {
-            flicker_colors(game, out);
-            transfer_hero(game, out, x, y, 1);
+            flicker_colors(game, output);
+            transfer_hero(game, output, x, y, 1);
 
             if game.hero.riding != 0 {
                 game.actors.list[game.actors.carrier_slot as usize].abs_x =
@@ -117,6 +119,7 @@ fn stone_target(sector: i16, px: u16, py: u16, facing: i8, list: &[u8]) -> Stone
         return StoneJump::Refused;
     }
 
+    // Which sector the hero is in: pixels divided by the sector size via a shift.
     let (sector_x, sector_y) = (px >> SECTOR_SHIFT, py >> SECTOR_SHIFT);
 
     for ring in 0..STONE_CIRCLES {
@@ -130,6 +133,7 @@ fn stone_target(sector: i16, px: u16, py: u16, facing: i8, list: &[u8]) -> Stone
             // Back to pixels: the target sector, then the same spot inside it.
             let x = ((list[target * 2] as u16) << SECTOR_SHIFT) + (px & SECTOR_MASK);
 
+            // The target stone's sector number back to pixels, plus the hero's offset inside his sector.
             let y = ((list[target * 2 + 1] as u16) << SECTOR_SHIFT) + (py & SECTOR_MASK);
 
             return StoneJump::To(x, y);
@@ -140,17 +144,18 @@ fn stone_target(sector: i16, px: u16, py: u16, facing: i8, list: &[u8]) -> Stone
 }
 
 /// Heals the hero a little, up to a limit set by bravery.
-pub(super) fn heal(game: &mut Game, out: &mut dyn Output) {
+pub(super) fn heal(game: &mut Game, output: &mut dyn Output) {
     let hero = ActorRef::new(0);
     let (vitality, capped) = healed_vitality(
         game.actor(hero).vitality,
         game.hero.brave,
         rand8(&mut game.rng),
     );
+
     game.actor_mut(hero).vitality = vitality;
 
     if !capped {
-        out.print("That feels a lot better!");
+        output.print("That feels a lot better!");
     }
 
     queue_print(&mut game.ui, PRQ_STATS);
@@ -175,23 +180,23 @@ fn is_scared_by_fear_spell(actor: &Shape) -> bool {
 }
 
 /// Kills every weak enemy on the screen (and costs a little bravery for each).
-pub(super) fn scare_enemies(game: &mut Game, out: &mut dyn Output) {
-    let mut i = 1;
+pub(super) fn scare_enemies(game: &mut Game, output: &mut dyn Output) {
+    let mut counter = 1;
 
-    while i < game.actors.active as usize {
-        let actor = ActorRef::new(i);
+    while counter < game.actors.active as usize {
+        let actor = ActorRef::new(counter);
 
         if is_scared_by_fear_spell(game.actor(actor)) {
             game.actor_mut(actor).vitality = 0;
-            check_death(game, out, i as i32, 0);
+            check_death(game, output, counter as i32, 0);
             game.hero.brave -= 1;
         }
 
-        i += 1;
+        counter += 1;
     }
 
     if game.actors.battle_flag != 0 {
-        show_event(game, out, BATTLE_EVENT);
+        show_event(game, output, BATTLE_EVENT);
     }
 }
 
@@ -262,6 +267,7 @@ mod tests {
             race: FEAR_RACE_LIMIT - 1,
             ..Default::default()
         };
+
         assert!(is_scared_by_fear_spell(&a));
         a.race = FEAR_RACE_LIMIT;
         assert!(!is_scared_by_fear_spell(&a));

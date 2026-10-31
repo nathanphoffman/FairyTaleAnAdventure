@@ -159,6 +159,7 @@ pub fn probe_collision(game: &mut Game, x: i32, y: i32) -> i32 {
 /// Index into the sector table of the tile byte for a tile position (wraps vertically too).
 pub fn tile_index(game: &Game, imx: i32, imy: i32) -> usize {
     let (ux, uy) = (imx as u16, imy as u16);
+
     // Pixel column to sector column: 16 pixels to a tile, 16 tiles to a sector.
     let col = wrap_secx((ux >> TILE_WIDTH_SHIFT).wrapping_sub(game.world.origin_x));
 
@@ -209,9 +210,11 @@ fn tile_number(game: &Game, x: u16, y: u16) -> u8 {
 
     // Tile row to sector row: 8 tiles to a sector.
     let row = clamp_secy((y >> SECTOR_HEIGHT_SHIFT).wrapping_sub(game.world.origin_y) as i16);
+
     // The region map has 128 sectors in each row.
     let sec = game
         .map
+        // Row and column become one byte offset into the map: the row is shifted up, the column added.
         .map_byte(((row as usize) << MAP_ROW_SHIFT).wrapping_add(col as usize) as u16 as usize)
         as usize;
 
@@ -229,10 +232,13 @@ fn hero_sector(game: &mut Game) -> i16 {
 
     // The hero's sector row: 256 pixels to a sector.
     let hy =
+        // Hero y to a sector row relative to the loaded region (wrapping like the original 16 bit math).
         ((game.hero.y >> SECTOR_POSITION_SHIFT).wrapping_sub(game.world.origin_y)) as i16 as i32;
+
     // The region map has 128 sectors in each row.
     let mut sec =
         game.map
+            // Same row-and-column offset into the map as above, wrapped to 16 bits.
             .map_byte(((hy << MAP_ROW_SHIFT).wrapping_add(hx)) as u16 as usize) as i32;
 
     if game.world.region & REGION_BYTE_MASK > LAST_FIRST_HALF_REGION {

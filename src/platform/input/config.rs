@@ -53,7 +53,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn reads_key_pairs_and_skips_comments() {
+    fn reads_key_pairs_skipping_comments() {
         assert_eq!(parse_line("W = Up"), Some(("W", "Up")));
         assert_eq!(parse_line("  A=Left # strafe"), Some(("A", "Left")));
         assert_eq!(parse_line("# just a comment"), None);

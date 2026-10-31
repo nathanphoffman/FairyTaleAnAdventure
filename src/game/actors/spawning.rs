@@ -53,11 +53,11 @@ const INDOOR_REGION: u16 = 7;
 
 /// Says where the hero is, finishes loading monsters, places waiting ones and now and then
 /// starts a new random encounter.
-pub fn spawn_encounters(game: &mut Game, out: &mut dyn Output) {
-    find_place(game, out, 2);
+pub fn spawn_encounters(game: &mut Game, output: &mut dyn Output) {
+    find_place(game, output, 2);
 
     if game.actors.loading == 1 && read_finished(DISK_REQUEST_ACTORS) != 0 {
-        out.finish_sprite_load(ENEMY_SLOT);
+        output.finish_sprite_load(ENEMY_SLOT);
         motor_off();
         game.actors.loading = 0;
         game.actors.active = FIRST_ENEMY_ACTOR;
@@ -71,7 +71,7 @@ pub fn spawn_encounters(game: &mut Game, out: &mut dyn Output) {
     }
 
     if random_encounter_due(&game.actors, &game.world) {
-        roll_random_encounter(game, out);
+        roll_random_encounter(game, output);
     }
 }
 
@@ -86,7 +86,7 @@ fn random_encounter_due(actors: &Actors, world: &World) -> bool {
 
 /// Rolls the danger of the area against a random number; if it is beaten, picks the kind of the
 /// encounter (a few extents decide it by rule) and starts loading the monsters' sprites.
-fn roll_random_encounter(game: &mut Game, out: &mut dyn Output) {
+fn roll_random_encounter(game: &mut Game, output: &mut dyn Output) {
     game.encounter.danger_level = (if game.world.region > INDOOR_REGION {
         DANGER_BASE_INDOORS + game.world.extent_type
     } else {
@@ -110,7 +110,7 @@ fn roll_random_encounter(game: &mut Game, out: &mut dyn Output) {
             game.encounter.mix_flag = 0;
         }
 
-        load_enemy_sprites(game, out);
+        load_enemy_sprites(game, output);
     }
 }
 
@@ -157,18 +157,18 @@ fn place_in_free_slots(game: &mut Game) {
 /// Puts the monsters still waiting in place of dead ones that are no longer on screen (a wraith
 /// can be replaced even while its body is seen).
 fn place_in_dead_slots(game: &mut Game) {
-    let mut i = FIRST_ENEMY_ACTOR as usize;
+    let mut index = FIRST_ENEMY_ACTOR as usize;
 
-    while i < LAST_ENEMY_ACTOR as usize && game.encounter.number != 0 {
-        let actor = ActorRef::new(i);
+    while index < LAST_ENEMY_ACTOR as usize && game.encounter.number != 0 {
+        let actor = ActorRef::new(index);
 
         if game.actor(actor).state == DEAD
             && (game.actor(actor).visible == 0 || game.actor(actor).race == WRAITH)
         {
-            place_encounter(game, i as u16, SPREAD);
+            place_encounter(game, index as u16, SPREAD);
             game.encounter.number -= 1;
         }
 
-        i += 1;
+        index += 1;
     }
 }

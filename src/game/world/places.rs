@@ -87,7 +87,7 @@ const SPIDER_ENCOUNTER: u16 = 8;
 /// `new_region` must already be set. If the spot is blocked the hero is moved down until it is free.
 pub fn transfer_hero(
     game: &mut Game,
-    out: &mut dyn Output,
+    output: &mut dyn Output,
     xtest: u16,
     ytest: u16,
     flag: u16,
@@ -110,15 +110,17 @@ pub fn transfer_hero(
     if flag != 0 {
         let (sector_x, sector_y) = center_sector(&mut game.world);
 
+        // Only the lowest bit of the sector column matters: which half of the region it is in.
         let column = (sector_x >> REGION_WIDTH_SHIFT) & 1;
 
+        // The sector row's low bits pick the region row.
         let row = (sector_y >> REGION_HEIGHT_SHIFT) & TRANSFER_ROW_MASK;
         game.world.new_region = (column + row + row) as u16;
     }
 
     game.ui.held_direction = 0;
-    load_region_now(game, out);
-    refresh_minimap(game, out); // to set region_origin_x and region_origin_y
+    load_region_now(game, output);
+    refresh_minimap(game, output); // to set region_origin_x and region_origin_y
     game.ui.view_status = VIEW_REBUILD_ALL;
     set_mood(game, 1);
 
@@ -131,12 +133,12 @@ pub fn transfer_hero(
 
 /// Starts the monsters of the extent the hero is in: loads their pictures and places up to four
 /// of them (there must be room before the carrier slots).
-fn start_forced_encounter(game: &mut Game, out: &mut dyn Output) {
+fn start_forced_encounter(game: &mut Game, output: &mut dyn Output) {
     game.encounter.kind = game.extents[game.world.extent].v3 as u16;
     game.encounter.mix_flag = 0;
     game.encounter.weapon_type = 0;
-    load_enemy_sprites(game, out);
-    out.finish_sprite_load(ENEMY_SLOT);
+    load_enemy_sprites(game, output);
+    output.finish_sprite_load(ENEMY_SLOT);
     motor_off();
     game.actors.loading = 0;
     game.encounter.number = game.extents[game.world.extent].v1;
@@ -155,21 +157,21 @@ fn start_forced_encounter(game: &mut Game, out: &mut dyn Output) {
 /// extent the hero stands in, and whatever that extent starts.
 ///
 /// `flag` 0 is silent, 1 also starts monster zones, 2 only says the place name.
-pub fn find_place(game: &mut Game, out: &mut dyn Output, flag: i16) -> i32 {
+pub fn find_place(game: &mut Game, output: &mut dyn Output, flag: i16) -> i32 {
     let mut flag = flag;
 
     loop {
-        announce_place(game, out, flag);
+        announce_place(game, output, flag);
         locate_extent(game);
 
-        if !enter_extent(game, out, flag) {
+        if !enter_extent(game, output, flag) {
             // the princess was rescued: look again from the top, without the messages
             flag = 0;
 
             continue;
         }
 
-        update_carrier(game, out);
+        update_carrier(game, output);
 
         return 0;
     }
@@ -226,6 +228,7 @@ fn hero_on_loaded_edge(game: &mut Game) -> bool {
     // The hero's sector column and row: 256 pixels to a sector.
     let hero_column = (game.hero.x >> SECTOR_SHIFT).wrapping_sub(game.world.origin_x);
 
+    // Hero y as a sector row relative to the loaded region.
     let hero_row = (game.hero.y >> SECTOR_SHIFT).wrapping_sub(game.world.origin_y);
 
     game.world.new_region < NO_REGION
@@ -234,7 +237,7 @@ fn hero_on_loaded_edge(game: &mut Game) -> bool {
 }
 
 /// Remembers the place the hero is in, and says its name when it changes (if `flag` is set).
-fn announce_place(game: &mut Game, out: &mut dyn Output, flag: i16) {
+fn announce_place(game: &mut Game, output: &mut dyn Output, flag: i16) {
     let message = place_message_number(game);
 
     if message != 0 && message as u16 != game.hero.place {
@@ -247,7 +250,7 @@ fn announce_place(game: &mut Game, out: &mut dyn Output, flag: i16) {
                 PLACE_MSG
             };
 
-            show_message(game, out, messages, message as i32);
+            show_message(game, output, messages, message as i32);
         }
     }
 }
@@ -270,7 +273,7 @@ fn locate_extent(game: &mut Game) {
 /// What happens when the hero walks into a different kind of extent: the princess is rescued, a
 /// boss or the turtle eggs call up their monsters, the spider pit loads the spiders, and monster
 /// zones may send a fight. Returns false if the princess was rescued (the caller starts over).
-fn enter_extent(game: &mut Game, out: &mut dyn Output, flag: i16) -> bool {
+fn enter_extent(game: &mut Game, output: &mut dyn Output, flag: i16) -> bool {
     if game.world.extent_type == game.extents[game.world.extent].etype as u16 {
         return true;
     }
@@ -280,7 +283,7 @@ fn enter_extent(game: &mut Game, out: &mut dyn Output, flag: i16) -> bool {
 
     if game.world.extent_type == XT_PRINCESS && game.objects.region[8][PRINCESS_OBJECT].ob_stat != 0
     {
-        rescue_princess(game, out);
+        rescue_princess(game, output);
 
         return false;
     } else if game.world.extent_type >= XT_SPECIAL_MIN {
@@ -290,7 +293,7 @@ fn enter_extent(game: &mut Game, out: &mut dyn Output, flag: i16) -> bool {
             force = true;
         }
     } else if game.world.extent_type == XT_SPIDER_PIT {
-        load_spiders(game, out);
+        load_spiders(game, output);
     } else if game.world.extent_type >= XT_MONSTER_ZONE_MIN && flag == 1 {
         game.encounter.x = game.hero.x;
         game.encounter.y = game.hero.y;
@@ -298,7 +301,7 @@ fn enter_extent(game: &mut Game, out: &mut dyn Output, flag: i16) -> bool {
     }
 
     if force {
-        start_forced_encounter(game, out);
+        start_forced_encounter(game, output);
     }
 
     true
@@ -315,10 +318,10 @@ fn aim_encounter_at_extent_middle(game: &mut Game) {
 }
 
 /// The spider pit loads its spiders at once (no waiting for the disk).
-fn load_spiders(game: &mut Game, out: &mut dyn Output) {
+fn load_spiders(game: &mut Game, output: &mut dyn Output) {
     game.encounter.kind = SPIDER_ENCOUNTER;
-    load_enemy_sprites(game, out);
-    out.finish_sprite_load(ENEMY_SLOT);
+    load_enemy_sprites(game, output);
+    output.finish_sprite_load(ENEMY_SLOT);
     motor_off();
     game.actors.loading = 0;
 }
@@ -333,7 +336,7 @@ fn boss_is_missing(game: &mut Game) -> bool {
 
 /// Drops the carrier when the hero is outside the carrier extents, and loads the swan, turtle or
 /// dragon inside them.
-fn update_carrier(game: &mut Game, out: &mut dyn Output) {
+fn update_carrier(game: &mut Game, output: &mut dyn Output) {
     if game.world.extent_type < XT_CARRIER_MIN {
         game.actors.active_carrier = 0;
     } else if game.world.extent_type == XT_CARRIER
@@ -342,6 +345,6 @@ fn update_carrier(game: &mut Game, out: &mut dyn Output) {
                 && game.actors.loaded_actor_file != game.extents[game.world.extent].v3 as i16))
     {
         let carrier_file = game.extents[game.world.extent].v3 as i16;
-        load_carrier(game, out, carrier_file);
+        load_carrier(game, output, carrier_file);
     }
 }

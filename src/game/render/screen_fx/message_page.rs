@@ -10,29 +10,29 @@ const VIEW_MESSAGE: i8 = 2;
 const VIEW_NORMAL_AGAIN: i8 = 3;
 
 /// Shows the page without scrolling.
-pub fn show_still_screen(game: &mut Game, out: &mut dyn Output) {
-    out.reset_page_scroll();
-    flip_pages(game, out);
+pub fn show_still_screen(game: &mut Game, output: &mut dyn Output) {
+    output.reset_page_scroll();
+    flip_pages(game, output);
 }
 
 /// Switches to the map page for a message (the text panel is hidden) and fades in.
-pub fn map_message(game: &mut Game, out: &mut dyn Output) {
-    fade_down(game, out);
+pub fn map_message(game: &mut Game, output: &mut dyn Output) {
+    fade_down(game, output);
 
-    out.prepare_message_page();
-    out.set_panel_visible(false);
-    show_still_screen(game, out);
-    out.load_page_colors(&game.page_colors);
+    output.prepare_message_page();
+    output.set_panel_visible(false);
+    show_still_screen(game, output);
+    output.load_page_colors(&game.page_colors);
 
     game.ui.view_status = VIEW_MESSAGE;
 }
 
 /// Goes back from the map message to the normal view.
-pub fn message_off(game: &mut Game, out: &mut dyn Output) {
-    fade_down(game, out);
+pub fn message_off(game: &mut Game, output: &mut dyn Output) {
+    fade_down(game, output);
 
-    out.select_message_area();
-    out.set_panel_visible(true);
-    flip_pages(game, out);
+    output.select_message_area();
+    output.set_panel_visible(true);
+    flip_pages(game, output);
     game.ui.view_status = VIEW_NORMAL_AGAIN;
 }

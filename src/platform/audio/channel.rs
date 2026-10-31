@@ -32,10 +32,10 @@ impl Channel {
         }
 
         let len = self.data.len();
-        let i = self.phase as usize;
-        let a = self.data[i.min(len - 1)] as f32;
-        let b = if i + 1 < len {
-            self.data[i + 1] as f32
+        let index = self.phase as usize;
+        let a = self.data[index.min(len - 1)] as f32;
+        let b = if index + 1 < len {
+            self.data[index + 1] as f32
         } else if self.looping {
             self.data[0] as f32
         } else {

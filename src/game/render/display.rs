@@ -18,7 +18,7 @@ pub fn reset_input() {
 
 /// FTA_STATE=file writes the game state as text once FTA_STATE_AFTER ticks have passed (then quits).
 /// A test helper; the display only counts the ticks.
-fn dump_state_if_due(game: &mut Game, out: &dyn Output) {
+fn dump_state_if_due(game: &mut Game, output: &dyn Output) {
     let Some(path) = std::env::var_os("FTA_STATE") else {
         return;
     };
@@ -28,7 +28,7 @@ fn dump_state_if_due(game: &mut Game, out: &dyn Output) {
         .and_then(|s| s.parse().ok())
         .unwrap_or(DEFAULT_AFTER_TICKS);
 
-    if out.ticks() < after {
+    if output.ticks() < after {
         return;
     }
 
@@ -37,23 +37,23 @@ fn dump_state_if_due(game: &mut Game, out: &dyn Output) {
 }
 
 /// Waits one tick of 1/50 second, showing the screen as it is now.
-fn wait_frame(game: &mut Game, out: &mut dyn Output) {
-    dump_state_if_due(game, out);
-    out.wait_frame();
+fn wait_frame(game: &mut Game, output: &mut dyn Output) {
+    dump_state_if_due(game, output);
+    output.wait_frame();
 }
 
 /// Waits `ticks` ticks, showing the screen as it is now.
-pub fn delay(game: &mut Game, out: &mut dyn Output, ticks: i32) {
+pub fn delay(game: &mut Game, output: &mut dyn Output, ticks: i32) {
     for _ in 0..ticks.max(1) {
-        wait_frame(game, out);
+        wait_frame(game, output);
     }
 }
 
 /// Swaps the page being drawn with the one being shown, and shows the one just finished.
-pub fn flip_pages(game: &mut Game, out: &mut dyn Output) {
-    out.swap_pages();
+pub fn flip_pages(game: &mut Game, output: &mut dyn Output) {
+    output.swap_pages();
 
-    dump_state_if_due(game, out);
-    out.present();
-    wait_frame(game, out);
+    dump_state_if_due(game, output);
+    output.present();
+    wait_frame(game, output);
 }

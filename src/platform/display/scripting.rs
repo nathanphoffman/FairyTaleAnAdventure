@@ -52,6 +52,7 @@ pub(super) fn parse_clicks() -> Vec<(u32, i32, i32)> {
 /// Splits "tick:x:y,tick:x:y" into numbers, skipping items that are not three numbers.
 fn parse_click_list(text: &str) -> Vec<(u32, i32, i32)> {
     text.split(',')
+        // Each `tick:x:y` item becomes a click; items that don't parse are skipped.
         .filter_map(|item| {
             let mut p = item.split(':').map(|v| v.parse::<i32>().ok());
 
@@ -127,6 +128,7 @@ fn replay_events(tick: u32) {
         static LOG: RefCell<ReplayLog> = RefCell::new(load_replay());
     }
 
+    // Only the log entries recorded at this tick are replayed.
     LOG.with(|log| {
         for (_, w) in log.borrow().iter().filter(|(t, _)| *t == tick) {
             replay_event(w);

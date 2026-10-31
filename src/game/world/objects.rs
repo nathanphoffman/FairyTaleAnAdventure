@@ -92,19 +92,20 @@ fn inside(value: i16, (low, high): (i16, i16)) -> bool {
 
 /// Turns the global and current region's object lists into actors.
 /// Called when the screen changes (new region, scrolling far, after loading a game).
-pub fn spawn_object_actors(game: &mut Game, out: &mut dyn Output) {
+pub fn spawn_object_actors(game: &mut Game, output: &mut dyn Output) {
     game.actors.free_slot = FIRST_OBJECT_ACTOR;
     add_objects_near(
         game,
-        out,
+        output,
         ObjectList::Global,
         glbobs,
         GLOBAL_LIST_BIT as i32,
     );
+
     let region = game.world.region as usize;
     add_objects_near(
         game,
-        out,
+        output,
         ObjectList::Region(region),
         game.objects.used[region],
         0,
@@ -133,9 +134,9 @@ const TREASURE_KINDS: i32 = 16;
 
 /// Drops `object` where actor `i` stands (slot 0 of the global list is used for this).
 /// That slot is reused for each item the hero or a monster leaves behind.
-pub fn leave_item(objects: &mut ObjectLists, actors: &Actors, i: i16, object: i16) {
+pub fn leave_item(objects: &mut ObjectLists, actors: &Actors, counter: i16, object: i16) {
     let drop = &mut objects.global[0];
-    let actor = &actors.list[i as usize];
+    let actor = &actors.list[counter as usize];
     drop.xc = actor.abs_x;
     drop.yc = actor.abs_y.wrapping_add(DROP_OFFSET_Y);
     drop.ob_id = object as i8;
@@ -173,6 +174,7 @@ pub fn change_object(
 /// from `rand_treasure`. `dstobs` remembers that it has been done.
 fn distribute_treasure(game: &mut Game) {
     let region = game.world.region as usize;
+
     for _ in 0..RANDOM_TREASURES {
         let (mut x, mut y);
 
@@ -203,16 +205,16 @@ fn distribute_treasure(game: &mut Game) {
 
 /// Makes sure the sprite file for the kind of person `id` is loaded. Several kinds share one
 /// file, so it is only reloaded when the needed file differs from the loaded one.
-fn load_set_figure(actors: &mut Actors, out: &mut dyn Output, id: i8) {
+fn load_set_figure(actors: &mut Actors, output: &mut dyn Output, id: i8) {
     let entry = entry(&setfig_table, id as usize).cfile_entry;
 
     if SPRITE_FILES[entry as usize].file_id
         != SPRITE_FILES[actors.loaded_setfig_file as usize].file_id
     {
         actors.loaded_setfig_file = entry as i16;
-        out.rewind_sprites_to(SETFIG as u8);
-        out.load_sprite_file(entry as i32);
-        out.finish_sprite_load(SETFIG as i16);
+        output.rewind_sprites_to(SETFIG as u8);
+        output.load_sprite_file(entry as i32);
+        output.finish_sprite_load(SETFIG as i16);
         motor_off();
     }
 }
@@ -226,7 +228,7 @@ fn load_set_figure(actors: &mut Actors, out: &mut dyn Output, id: i8) {
 /// same place is not added twice (and is marked dead if its actor died).
 pub fn add_objects_near(
     game: &mut Game,
-    out: &mut dyn Output,
+    output: &mut dyn Output,
     which: ObjectList,
     mut length: i16,
     f: i32,
@@ -250,21 +252,27 @@ pub fn add_objects_near(
         }
 
         let mut object = game.objects.list(which)[index as usize];
-        add_object(game, out, &mut object, index, f);
+        add_object(game, output, &mut object, index, f);
         game.objects.list(which)[index as usize] = object;
         index += 1;
     }
 }
 
 /// Adds one object of a list as an actor, if it is near enough and not hidden or taken.
-fn add_object(game: &mut Game, out: &mut dyn Output, object: &mut WorldObject, index: i16, f: i32) {
+fn add_object(
+    game: &mut Game,
+    output: &mut dyn Output,
+    object: &mut WorldObject,
+    index: i16,
+    f: i32,
+) {
     let xstart = (object.xc as i32 - game.world.map_x as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
     let ystart = (object.yc as i32 - game.world.map_y as i32 - SPRITE_CENTER_OFFSET as i32) as i16;
 
     // States 3 and 4 are people; everything else is an item.
     let is_person = object.ob_stat == STAT_PERSON || object.ob_stat == STAT_DEAD_PERSON;
 
-    if is_person && !load_person_if_near(game, out, object, xstart, ystart) {
+    if is_person && !load_person_if_near(game, output, object, xstart, ystart) {
         return;
     }
 
@@ -296,7 +304,7 @@ fn add_object(game: &mut Game, out: &mut dyn Output, object: &mut WorldObject, i
 /// on screen). Returns false if the person is too far away.
 fn load_person_if_near(
     game: &mut Game,
-    out: &mut dyn Output,
+    output: &mut dyn Output,
     object: &WorldObject,
     xstart: i16,
     ystart: i16,
@@ -305,7 +313,7 @@ fn load_person_if_near(
         return false;
     }
 
-    load_set_figure(&mut game.actors, out, object.ob_id);
+    load_set_figure(&mut game.actors, output, object.ob_id);
 
     if object.ob_id == WITCH && object.ob_stat == STAT_PERSON {
         game.witch.on_screen = 1;

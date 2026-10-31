@@ -27,7 +27,7 @@ const TILE_WIDTH: i32 = 16;
 /// Is the hero standing at a door? Outdoors the doors are in sorted order and found by binary
 /// search; indoors they are searched in turn. If so, the hero is moved to the other side.
 /// Riding disables doors.
-pub fn check_door(game: &mut Game, out: &mut dyn Output) {
+pub fn check_door(game: &mut Game, output: &mut dyn Output) {
     if game.hero.riding != 0 {
         return;
     }
@@ -37,8 +37,8 @@ pub fn check_door(game: &mut Game, out: &mut dyn Output) {
     let ytest = game.hero.y & TILE_Y_MASK;
 
     if game.world.region < FIRST_INSIDE_REGION {
-        enter_door(game, out, xtest, ytest);
+        enter_door(game, output, xtest, ytest);
     } else {
-        leave_door(game, out, xtest, ytest);
+        leave_door(game, output, xtest, ytest);
     }
 }

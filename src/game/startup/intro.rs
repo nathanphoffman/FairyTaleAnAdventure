@@ -11,6 +11,7 @@ use crate::game::files::iff_picture::load_picture;
 use crate::game::files::loading::{
     copy_protection_check, copy_protection_riddle, read_sample, read_score, track,
 };
+
 use crate::game::input::handler::reset_key_buffer;
 use crate::game::render::display::{delay, flip_pages};
 use crate::game::render::screen::Screen;

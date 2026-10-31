@@ -21,6 +21,7 @@ ARITHMETIC = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.m
 def evaluate(expr):
     """Works out a whole-number expression made of + - * // and parentheses (no eval needed)."""
 
+    # Checks every node is a number or an allowed operator, and works out its value.
     def walk(node):
         if isinstance(node, ast.Constant) and isinstance(node.value, int):
             return node.value
@@ -88,7 +89,9 @@ def operand_bytes(tok):
     if re.fullmatch(r'\$[0-9A-Fa-f]{5,8}', tok):          # a dc.l value: 4 bytes, big-endian
         return list(int(tok[1:], 16).to_bytes(4, 'big'))
 
+    # An assembler expression: digits, hex, operators and parentheses only.
     if re.fullmatch(r'[\d\$\(\)\+\-\*/ A-Fa-f]+', tok):
+        # Turns $ff into 0xff and / into whole-number division so Python can evaluate it.
         expr = re.sub(r'\$([0-9A-Fa-f]+)', r'0x\1', tok).replace('/', '//')
         expr = re.sub(r'(?<![0-9A-Za-z])0+(?=\d)', '', expr)   # 02 -> 2 (decimal, not octal)
 
@@ -100,6 +103,7 @@ def rust_bytes(data):
     """A Rust byte string holding `data` plus a final NUL (the end of the last string). Long text is
     wrapped with a backslash at the end of the line, which skips the next line's indent; a space at
     the start of a wrapped line is written as \\x20 so that it is kept."""
+
     out, line = [], ''
 
     for b in list(data) + [0]:
@@ -121,19 +125,25 @@ def rust_bytes(data):
     return 'b"' + '\\\n        '.join(out) + '"'
 
 def rust_array(data, per_line):
+    # Groups the values into rows of `per_line`, each row joined with commas.
     rows = [', '.join(str(x) for x in data[i:i+per_line]) for i in range(0, len(data), per_line)]
 
     return '[\n    ' + ',\n    '.join(rows) + ',\n]'
 
 def main():
+    # Keeps the named tables and any msg/q/mst label, which are the ones we convert.
     keep = lambda n: n in ('_event_msg', '_place_tbl', '_inside_tbl', '_place_msg', '_inside_msg', '_speeches', '_titletext', '_hinor', '_hivar') or re.fullmatch(r'(msg\d+[ab]?|q\d|mst|qq)', n)
     blocks, order = {}, []
     tables = {}
     label = None
+
+    # Every line of every source file, in order.
     lines = [l for src in SRCS for l in open(src, encoding=ENCODING)]
 
     for raw in lines:
         line = raw.rstrip('\n')
+
+        # Splits a line into its label and the rest.
         m = re.match(r'^(\w+)\s*(.*)$', line)
         rest = line
 
@@ -150,7 +160,11 @@ def main():
                 order.append(label)
 
         rest = rest.strip()
+
+        # A dc.b line: the bytes after the directive.
         mb = re.match(r'dc\.b\s+(.*)', rest)
+
+        # A dc.l line: the longwords after the directive.
         ml = re.match(r'dc\.l\s+(.*)', rest)
 
         if mb and label and keep(label):

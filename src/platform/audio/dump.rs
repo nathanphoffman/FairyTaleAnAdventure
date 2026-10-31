@@ -20,30 +20,30 @@ pub(super) fn enabled() -> bool {
 }
 
 /// Keeps a copy of the samples that were just played.
-pub(super) fn capture(out: &[f32]) {
+pub(super) fn capture(output: &[f32]) {
     if let Ok(mut d) = DUMP.lock() {
-        d.extend(out.iter().map(|x| (x * FULL_SCALE) as i16));
+        d.extend(output.iter().map(|x| (x * FULL_SCALE) as i16));
     }
 }
 
 /// The 44 byte header of a 16 bit stereo PCM WAV holding `data_len` bytes of samples.
 pub(super) fn wav_header(data_len: u32) -> Vec<u8> {
     let rate = SAMPLE_RATE as u32;
-    let mut out = Vec::new();
-    out.extend_from_slice(b"RIFF");
-    out.extend_from_slice(&(WAV_HEADER_AFTER_SIZE + data_len).to_le_bytes());
-    out.extend_from_slice(b"WAVEfmt ");
-    out.extend_from_slice(&WAV_FMT_CHUNK_SIZE.to_le_bytes());
-    out.extend_from_slice(&WAV_FORMAT_PCM.to_le_bytes());
-    out.extend_from_slice(&(OUTPUT_CHANNELS as u16).to_le_bytes());
-    out.extend_from_slice(&rate.to_le_bytes());
-    out.extend_from_slice(&(rate * BYTES_PER_FRAME as u32).to_le_bytes());
-    out.extend_from_slice(&BYTES_PER_FRAME.to_le_bytes());
-    out.extend_from_slice(&BITS_PER_SAMPLE.to_le_bytes());
-    out.extend_from_slice(b"data");
-    out.extend_from_slice(&data_len.to_le_bytes());
+    let mut output = Vec::new();
+    output.extend_from_slice(b"RIFF");
+    output.extend_from_slice(&(WAV_HEADER_AFTER_SIZE + data_len).to_le_bytes());
+    output.extend_from_slice(b"WAVEfmt ");
+    output.extend_from_slice(&WAV_FMT_CHUNK_SIZE.to_le_bytes());
+    output.extend_from_slice(&WAV_FORMAT_PCM.to_le_bytes());
+    output.extend_from_slice(&(OUTPUT_CHANNELS as u16).to_le_bytes());
+    output.extend_from_slice(&rate.to_le_bytes());
+    output.extend_from_slice(&(rate * BYTES_PER_FRAME as u32).to_le_bytes());
+    output.extend_from_slice(&BYTES_PER_FRAME.to_le_bytes());
+    output.extend_from_slice(&BITS_PER_SAMPLE.to_le_bytes());
+    output.extend_from_slice(b"data");
+    output.extend_from_slice(&data_len.to_le_bytes());
 
-    out
+    output
 }
 
 /// Writes the captured audio as a 16 bit stereo WAV.
@@ -53,13 +53,13 @@ pub fn dump() {
     };
 
     let samples = DUMP.lock().map(|d| d.clone()).unwrap_or_default();
-    let mut out = wav_header((samples.len() * 2) as u32);
+    let mut output = wav_header((samples.len() * 2) as u32);
 
     for s in samples {
-        out.extend_from_slice(&s.to_le_bytes());
+        output.extend_from_slice(&s.to_le_bytes());
     }
 
-    if let Err(e) = std::fs::write(&path, out) {
+    if let Err(e) = std::fs::write(&path, output) {
         eprintln!("Could not write audio dump: {e}");
     }
 }

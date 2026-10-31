@@ -12,8 +12,8 @@ pub fn find_nearest_figure(game: &mut Game, constraint: c_char, mut dist: i16) -
     const ALWAYS_COUNTED_OBJECT: i8 = 0x1d;
     game.actors.nearest_object = 0;
 
-    for i in 1..game.actors.drawn as i32 {
-        let a = actor_at(i);
+    for number in 1..game.actors.drawn as i32 {
+        let a = actor_at(number);
 
         if game.actor(a).kind == OBJECTS
             && (constraint != 0 || game.actor(a).index == ALWAYS_COUNTED_OBJECT)
@@ -21,10 +21,10 @@ pub fn find_nearest_figure(game: &mut Game, constraint: c_char, mut dist: i16) -
             continue;
         }
 
-        let d = actor_distance(game, i, 0);
+        let d = actor_distance(game, number, 0);
 
         if d < dist as i32 {
-            game.actors.nearest_object = i as i16;
+            game.actors.nearest_object = number as i16;
             dist = d as i16;
         }
     }
@@ -43,6 +43,7 @@ pub fn actor_distance(game: &Game, a: i32, b: i32) -> i32 {
         &game.actors.list[actor_at(a).slot()],
         &game.actors.list[actor_at(b).slot()],
     );
+
     let x = (a.abs_x as i32 - b.abs_x as i32).abs();
     let y = (a.abs_y as i32 - b.abs_y as i32).abs();
 

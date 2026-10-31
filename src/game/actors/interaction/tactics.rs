@@ -5,6 +5,7 @@ use super::{
     ATTACK2, BACKUP, BUMBLE_SEEK, EGG_SEEK, EVADE, FOLLOW, HERO, PURSUE, RANDOM, SHOOT, SHOOT1,
     WALKING,
 };
+
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
 
@@ -42,9 +43,9 @@ const EGG_Y: i32 = 5667;
 ///   diagonal) and aim, else approach.  - RANDOM: wander.  - BUMBLE_SEEK: head toward the hero
 ///   without smart steering.  - BACKUP: head away from the hero.  - FOLLOW: stay near the leader.
 /// - EVADE: keep away from another enemy.  - EGG_SEEK: go to the turtle eggs.
-pub fn run_tactic(game: &mut Game, i: i32, tactic: i32) {
+pub fn run_tactic(game: &mut Game, index: i32, tactic: i32) {
     let mut acts_now = fta_rand(&mut game.rng) & ACTS_ONE_IN_8 == 0;
-    let actor = actor_at(i);
+    let actor = actor_at(index);
     game.actor_mut(actor).tactic = tactic as i8;
 
     if game.actor(actor).goal == ATTACK2 {
@@ -54,15 +55,15 @@ pub fn run_tactic(game: &mut Game, i: i32, tactic: i32) {
     let (hx, hy) = (game.hero.x as i32, game.hero.y as i32);
 
     match tactic {
-        PURSUE => steer_if(game, acts_now, i, hx, hy, COURSE_TOWARD),
-        SHOOT => engage_target(game, i, actor, hx, hy),
+        PURSUE => steer_if(game, acts_now, index, hx, hy, COURSE_TOWARD),
+        SHOOT => engage_target(game, index, actor, hx, hy),
         RANDOM => wander(game, actor, acts_now),
-        BUMBLE_SEEK => steer_if(game, acts_now, i, hx, hy, COURSE_STRAIGHT),
-        BACKUP => steer_if(game, acts_now, i, hx, hy, COURSE_AWAY),
-        FOLLOW => follow_leader(game, i, actor, acts_now),
-        EVADE => evade_neighbour(game, i, acts_now),
+        BUMBLE_SEEK => steer_if(game, acts_now, index, hx, hy, COURSE_STRAIGHT),
+        BACKUP => steer_if(game, acts_now, index, hx, hy, COURSE_AWAY),
+        FOLLOW => follow_leader(game, index, actor, acts_now),
+        EVADE => evade_neighbour(game, index, acts_now),
         EGG_SEEK => {
-            steer_if(game, acts_now, i, EGG_X, EGG_Y, COURSE_TOWARD);
+            steer_if(game, acts_now, index, EGG_X, EGG_Y, COURSE_TOWARD);
             game.actor_mut(actor).state = WALKING;
         }
 
@@ -71,14 +72,14 @@ pub fn run_tactic(game: &mut Game, i: i32, tactic: i32) {
 }
 
 /// Steers actor `i` toward a point (or however `mode` says) if this is one of its active ticks.
-fn steer_if(game: &mut Game, acts_now: bool, i: i32, x: i32, y: i32, mode: i32) {
+fn steer_if(game: &mut Game, acts_now: bool, index: i32, x: i32, y: i32, mode: i32) {
     if acts_now {
-        steer_actor(game, i, x, y, mode);
+        steer_actor(game, index, x, y, mode);
     }
 }
 
 /// An archer lines up with the hero (same row, column or diagonal) and aims, otherwise approaches.
-fn engage_target(game: &mut Game, i: i32, actor: ActorRef, hx: i32, hy: i32) {
+fn engage_target(game: &mut Game, index: i32, actor: ActorRef, hx: i32, hy: i32) {
     let hero = actor_at(HERO as i32);
     let xd = (game.actor(actor).abs_x as i32 - game.actor(hero).abs_x as i32) as i16;
     let yd = (game.actor(actor).abs_y as i32 - game.actor(hero).abs_y as i32) as i16;
@@ -89,13 +90,13 @@ fn engage_target(game: &mut Game, i: i32, actor: ActorRef, hx: i32, hy: i32) {
             && (xd as i32) < yd as i32 + SHOOT_DIAGONAL_ABOVE as i32);
 
     if fta_rand(&mut game.rng) & 1 != 0 && lined_up {
-        steer_actor(game, i, hx, hy, COURSE_TURN_ONLY);
+        steer_actor(game, index, hx, hy, COURSE_TURN_ONLY);
 
         if game.actor(actor).state < SHOOT1 {
             game.actor_mut(actor).state = SHOOT1;
         }
     } else {
-        steer_actor(game, i, hx, hy, COURSE_TOWARD);
+        steer_actor(game, index, hx, hy, COURSE_TOWARD);
     }
 }
 
@@ -109,37 +110,37 @@ fn wander(game: &mut Game, actor: ActorRef, acts_now: bool) {
 }
 
 /// Stay near the leader (an enemy cannot follow itself, so it wanders instead).
-fn follow_leader(game: &mut Game, i: i32, actor: ActorRef, acts_now: bool) {
+fn follow_leader(game: &mut Game, index: i32, actor: ActorRef, acts_now: bool) {
     let leader_slot = game.actors.leader as i32;
 
-    if i == leader_slot {
+    if index == leader_slot {
         game.actor_mut(actor).tactic = RANDOM as i8; // can't follow self
     }
 
     if acts_now {
-        steer_toward_actor(game, i, leader_slot, COURSE_TOWARD);
+        steer_toward_actor(game, index, leader_slot, COURSE_TOWARD);
     }
 }
 
 /// Keep away from another enemy (the one before the last, or the one at twice this slot number).
-fn evade_neighbour(game: &mut Game, i: i32, acts_now: bool) {
-    let other = if i == game.actors.active as i32 {
-        i - 1
+fn evade_neighbour(game: &mut Game, index: i32, acts_now: bool) {
+    let other = if index == game.actors.active as i32 {
+        index - 1
     } else {
-        i + i
+        index + index
     };
 
     if acts_now {
-        steer_toward_actor(game, i, other, COURSE_WOBBLE_CLOSE);
+        steer_toward_actor(game, index, other, COURSE_WOBBLE_CLOSE);
     }
 }
 
 /// Steers actor `i` toward (a little below) actor `target`.
-fn steer_toward_actor(game: &mut Game, i: i32, target: i32, mode: i32) {
+fn steer_toward_actor(game: &mut Game, index: i32, target: i32, mode: i32) {
     let target = actor_at(target);
     steer_actor(
         game,
-        i,
+        index,
         game.actor(target).abs_x as i32,
         game.actor(target).abs_y as i32 + FOLLOW_OFFSET,
         mode,

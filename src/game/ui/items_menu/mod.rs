@@ -46,12 +46,12 @@ const SACKS: u32 = 0x10;
 const PRQ_VITALITY: i32 = 7;
 
 /// The name of inventory item `i`.
-pub(in crate::game::ui) fn item_name(i: usize) -> &'static str {
-    item(i).name
+pub(in crate::game::ui) fn item_name(index: usize) -> &'static str {
+    item(index).name
 }
 
-fn item(i: usize) -> &'static InvItem {
-    &item_list[i]
+fn item(index: usize) -> &'static InvItem {
+    &item_list[index]
 }
 
 /// Adds `amount` to the hero's count of inventory slot `slot`.
@@ -60,13 +60,13 @@ pub(in crate::game::ui) fn add_stuff(game: &mut Game, slot: usize, amount: u8) {
 }
 
 /// Handles an entry of the Items menu.
-pub fn items_option(game: &mut Game, out: &mut dyn Output, chosen_entry: i16) {
+pub fn items_option(game: &mut Game, output: &mut dyn Output, chosen_entry: i16) {
     match chosen_entry {
-        USE_ENTRY => go_to_menu(game, out, USE),
-        LIST => show_item_list(game, out),
-        TAKE => take_nearest(game, out),
-        LOOK => look_around(game, out),
-        GIVE_ENTRY => go_to_menu(game, out, GIVE),
+        USE_ENTRY => go_to_menu(game, output, USE),
+        LIST => show_item_list(game, output),
+        TAKE => take_nearest(game, output),
+        LOOK => look_around(game, output),
+        GIVE_ENTRY => go_to_menu(game, output, GIVE),
         _ => {}
     }
 }

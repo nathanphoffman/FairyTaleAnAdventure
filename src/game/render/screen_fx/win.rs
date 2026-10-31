@@ -36,45 +36,45 @@ const RED_STEP: i32 = 0x100;
 
 /// The win screen: shows the picture and brings the sun up behind it by cycling the sky colours
 /// through `sun_colors`, with two glowing colours that fade out near the end.
-pub fn win_colors(game: &mut Game, out: &mut dyn Output) {
-    placard_text(out, WIN_MESSAGE_FIRST);
-    name(game, out);
-    placard_text(out, WIN_MESSAGE_SECOND);
-    out.draw_placard_border();
-    delay(game, out, WIN_MESSAGE_PAUSE);
-    show_win_picture_in_black(game, out);
-    rise_sun(game, out);
+pub fn win_colors(game: &mut Game, output: &mut dyn Output) {
+    placard_text(output, WIN_MESSAGE_FIRST);
+    name(game, output);
+    placard_text(output, WIN_MESSAGE_SECOND);
+    output.draw_placard_border();
+    delay(game, output, WIN_MESSAGE_PAUSE);
+    show_win_picture_in_black(game, output);
+    rise_sun(game, output);
 
-    delay(game, out, SUNRISE_END_PAUSE);
-    out.load_page_colors(&black_colors);
+    delay(game, output, SUNRISE_END_PAUSE);
+    output.load_page_colors(&black_colors);
 }
 
 /// Loads the winning picture with every colour black, so the sunrise can fade it in.
-fn show_win_picture_in_black(game: &mut Game, out: &mut dyn Output) {
-    out.load_picture_to_drawing_page("winpic");
-    out.load_page_colors(&black_colors);
-    out.load_panel_colors(&black_colors);
-    out.set_panel_visible(false);
-    set_intro_zoom(game, out, WIN_SCREEN_SIZE);
+fn show_win_picture_in_black(game: &mut Game, output: &mut dyn Output) {
+    output.load_picture_to_drawing_page("winpic");
+    output.load_page_colors(&black_colors);
+    output.load_panel_colors(&black_colors);
+    output.set_panel_visible(false);
+    set_intro_zoom(game, output, WIN_SCREEN_SIZE);
 }
 
 /// Steps through the sunrise palettes, one pause each.
-fn rise_sun(game: &mut Game, out: &mut dyn Output) {
-    for i in (SUNRISE_END + 1..=SUNRISE_START).rev() {
-        out.load_page_colors(&sunrise_palette(i));
+fn rise_sun(game: &mut Game, output: &mut dyn Output) {
+    for number in (SUNRISE_END + 1..=SUNRISE_START).rev() {
+        output.load_page_colors(&sunrise_palette(number));
 
-        if i == SUNRISE_START {
-            delay(game, out, SUNRISE_FIRST_PAUSE);
+        if number == SUNRISE_START {
+            delay(game, output, SUNRISE_FIRST_PAUSE);
         }
 
-        delay(game, out, SUNRISE_STEP_PAUSE);
+        delay(game, output, SUNRISE_STEP_PAUSE);
     }
 }
 
 /// The palette for step `i` of the sunrise over the ending picture. Colours 1 and 28 are white,
 /// 0 and 31 black; the sky and sun colours come from `sun_colors` offset by `i`, and the glow
 /// (29, 30) is a fixed orange at first and then fades out.
-fn sunrise_palette(i: i32) -> [u16; COLOR_COUNT] {
+fn sunrise_palette(number: i32) -> [u16; COLOR_COUNT] {
     let mut colors = [0u16; COLOR_COUNT];
 
     for white in WHITE_COLORS {
@@ -82,7 +82,7 @@ fn sunrise_palette(i: i32) -> [u16; COLOR_COUNT] {
     }
 
     for j in SUNRISE_COLORS {
-        let index = i + j as i32;
+        let index = number + j as i32;
         colors[j] = if index > 0 {
             sun_colors[index as usize] as u16
         } else {
@@ -90,11 +90,11 @@ fn sunrise_palette(i: i32) -> [u16; COLOR_COUNT] {
         };
     }
 
-    if i > SUN_GLOW_UNTIL {
+    if number > SUN_GLOW_UNTIL {
         colors[GLOW_FIRST] = GLOW_BRIGHT.0;
         colors[GLOW_SECOND] = GLOW_BRIGHT.1;
     } else {
-        let j = (i + GLOW_FADE_OFFSET) / 2;
+        let j = (number + GLOW_FADE_OFFSET) / 2;
         colors[GLOW_FIRST] = (RED_STEP * j) as u16;
         colors[GLOW_SECOND] = (RED_STEP * (j / 2)) as u16;
     }
@@ -107,7 +107,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn sunrise_palette_keeps_fixed_colours_and_fades_the_glow() {
+    fn sunrise_palette_keeps_fixed_colours_fading_the_glow() {
         let early = sunrise_palette(SUNRISE_START);
         assert_eq!(
             (early[0], early[1], early[28], early[31]),

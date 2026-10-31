@@ -17,8 +17,8 @@ const DIR_DOWN: usize = 1;
 const DIR_LEFT: usize = 2;
 const DIR_RIGHT: usize = 3;
 
-pub fn pad_direction(i: usize, down: bool) {
-    direction(PAD_ARROWS + i, down);
+pub fn pad_direction(index: usize, down: bool) {
+    direction(PAD_ARROWS + index, down);
 }
 
 /// Gamepad buttons act as the original's menu keys.

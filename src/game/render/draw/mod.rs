@@ -208,6 +208,7 @@ fn blit_extent(clip: &Clip) -> Extent {
     // Pixel columns to word columns (16 pixels to a word).
     let xbw = (clip.xstart >> WORD_SHIFT) as i8;
 
+    // Word column of the right edge: pixels divided by 16 via a shift.
     let xew = (clip.xstop >> WORD_SHIFT) as i8;
     let mut blitwide = (xew as i16 - xbw as i16 + 1) as i8;
     let blithigh = (clip.ystop - clip.ystart + 1) as i8;
@@ -236,6 +237,7 @@ fn blit_sprite(
     if !set_up_blit(video, frame, placed, &extent) {
         return Drawn::OutOfRoom; // no more blits if no room
     }
+
     save_background(video, video.blitter.sshape.backsave);
 
     if !drawn_in_front(

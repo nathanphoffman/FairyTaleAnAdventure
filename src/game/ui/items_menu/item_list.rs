@@ -13,10 +13,10 @@ const VIEW_ITEMS: i8 = 4;
 pub(super) const VIEW_GAME_OVER: i8 = 2;
 
 /// Draws every item the hero has, stacked, on a black page and shows it.
-pub(super) fn show_item_list(game: &mut Game, out: &mut dyn Output) {
-    out.draw_item_list(&mut game.hero);
-    show_still_screen(game, out);
-    out.load_page_colors(&game.page_colors);
+pub(super) fn show_item_list(game: &mut Game, output: &mut dyn Output) {
+    output.draw_item_list(&mut game.hero);
+    show_still_screen(game, output);
+    output.load_page_colors(&game.page_colors);
 
     game.ui.view_status = VIEW_ITEMS;
     queue_print(&mut game.ui, PRQ_LIST);

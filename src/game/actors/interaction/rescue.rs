@@ -41,31 +41,31 @@ const REWARD_GOLD: i16 = 100;
 /// Shows the story pages, moves the hero to the princess's home, repositions the extent for the
 /// next princess, changes the princess object, gives 100 gold and three of each key, and bumps
 /// the `princess` count (each rescue shows different story pages).
-pub fn rescue_princess(game: &mut Game, out: &mut dyn Output) {
-    map_message(game, out);
-    out.use_story_font();
+pub fn rescue_princess(game: &mut Game, output: &mut dyn Output) {
+    map_message(game, output);
+    output.use_story_font();
     let line = game.hero.princesses_rescued as i32 * RESCUE_PLACARDS_EACH;
-    placard_text(out, RESCUE_PLACARD_BASE + line);
-    name(game, out);
-    placard_text(out, RESCUE_PLACARD_BASE + 1 + line);
-    name(game, out);
-    placard_text(out, RESCUE_PLACARD_BASE + 2 + line);
-    out.draw_placard_border();
-    delay(game, out, RESCUE_PAUSE);
-    out.clear_placard();
-    delay(game, out, CLEAR_PAUSE);
-    placard_text(out, AFTER_RESCUE_PLACARDS.0);
-    name(game, out);
-    placard_text(out, AFTER_RESCUE_PLACARDS.1);
-    delay(game, out, RESCUE_PAUSE);
-    message_off(game, out);
+    placard_text(output, RESCUE_PLACARD_BASE + line);
+    name(game, output);
+    placard_text(output, RESCUE_PLACARD_BASE + 1 + line);
+    name(game, output);
+    placard_text(output, RESCUE_PLACARD_BASE + 2 + line);
+    output.draw_placard_border();
+    delay(game, output, RESCUE_PAUSE);
+    output.clear_placard();
+    delay(game, output, CLEAR_PAUSE);
+    placard_text(output, AFTER_RESCUE_PLACARDS.0);
+    name(game, output);
+    placard_text(output, AFTER_RESCUE_PLACARDS.1);
+    delay(game, output, RESCUE_PAUSE);
+    message_off(game, output);
 
     game.hero.princesses_rescued += 1;
-    transfer_hero(game, out, PRINCESS_HOME.0, PRINCESS_HOME.1, 0); // do princess transfer
+    transfer_hero(game, output, PRINCESS_HOME.0, PRINCESS_HOME.1, 0); // do princess transfer
     center_extent_on(game, 0, PRINCESS_EXTENT.0, PRINCESS_EXTENT.1);
     game.objects.region(INSIDE_OBJECTS)[PRINCESS_OBJECT].ob_id = PRINCESS_OBJECT_ID;
     game.hero.stuff_mut()[PRINCESS_STUFF] = 1;
-    speak(game, out, REWARD_MESSAGE);
+    speak(game, output, REWARD_MESSAGE);
     game.hero.wealth = game.hero.wealth.wrapping_add(REWARD_GOLD);
     game.objects.region(INSIDE_OBJECTS)[CAPTIVE_OBJECT].ob_stat = 0;
 

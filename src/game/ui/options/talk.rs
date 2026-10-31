@@ -40,7 +40,7 @@ const YELL: i16 = 5;
 const CARRIER_TURTLE: i16 = 5;
 
 /// Yell (louder, reaches further) or say something to the nearest person.
-pub(super) fn talk_option(game: &mut Game, out: &mut dyn Output, chosen_entry: i16) -> bool {
+pub(super) fn talk_option(game: &mut Game, output: &mut dyn Output, chosen_entry: i16) -> bool {
     let distance = find_nearest_figure(
         game,
         1,
@@ -66,7 +66,7 @@ pub(super) fn talk_option(game: &mut Game, out: &mut dyn Output, chosen_entry: i
         game.hero.stuff()[SHELL] != 0,
     );
 
-    carry_out(game, out, action, actor);
+    carry_out(game, output, action, actor);
 
     true
 }
@@ -85,26 +85,26 @@ fn describe_target(actors: &Actors, actor: ActorRef) -> Target {
 }
 
 /// Does what `talk_action` decided: speaks, and turns the person to talk or hands over the shell.
-fn carry_out(game: &mut Game, out: &mut dyn Output, action: TalkAction, actor: ActorRef) {
+fn carry_out(game: &mut Game, output: &mut dyn Output, action: TalkAction, actor: ActorRef) {
     match action {
         TalkAction::Nothing => {}
-        TalkAction::TooCloseToYell => speak(game, out, SPEECH_TOO_CLOSE_TO_YELL),
+        TalkAction::TooCloseToYell => speak(game, output, SPEECH_TOO_CLOSE_TO_YELL),
         TalkAction::Person { starts_talking } => {
             if starts_talking {
                 game.actor_mut(actor).state = TALKING;
                 game.actor_mut(actor).tactic = TACTIC_TALK;
             }
 
-            person_speaks(game, out, game.actor(actor).race & PERSON_MASK, actor);
+            person_speaks(game, output, game.actor(actor).race & PERSON_MASK, actor);
         }
 
-        TalkAction::TurtleHasShell => speak(game, out, SPEECH_TURTLE_HAS_SHELL),
+        TalkAction::TurtleHasShell => speak(game, output, SPEECH_TURTLE_HAS_SHELL),
         TalkAction::TurtleGivesShell => {
             game.hero.stuff_mut()[SHELL] = 1;
-            speak(game, out, SPEECH_TURTLE_GIVES_SHELL);
+            speak(game, output, SPEECH_TURTLE_GIVES_SHELL);
         }
 
-        TalkAction::EnemyShouts(race) => speak(game, out, race as i32),
+        TalkAction::EnemyShouts(race) => speak(game, output, race as i32),
     }
 }
 

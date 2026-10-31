@@ -14,6 +14,7 @@ use super::{
     TERRAIN_ICE, TERRAIN_PIT, TERRAIN_SHALLOW, TERRAIN_SLOW, TERRAIN_SLOW_SINK, TERRAIN_WADE,
     VELOCITY_QUARTER, WALKING, WITCH_BODY_VITALITY, WORLD_MAX, WORLD_MIN, diroff, terrain,
 };
+
 use crate::game::data::state::Game;
 use crate::game::output::Output;
 
@@ -105,12 +106,12 @@ impl Ctx {
 
     /// After the movement: finishes a death, then turns the terrain under the actor into its `environ`
     /// (water depth, ice, the pit).
-    pub(super) fn tail(&mut self, game: &mut Game, out: &mut dyn Output) -> Pc {
+    pub(super) fn tail(&mut self, game: &mut Game, output: &mut dyn Output) -> Pc {
         if self.state == DYING {
             self.finish_dying(game);
         }
 
-        self.settle_environ(game, out);
+        self.settle_environ(game, output);
 
         if self.environ == 0 && self.state == SINK {
             game.actor_mut(self.actor).state = STILL;
@@ -123,7 +124,7 @@ impl Ctx {
     /// talisman, the lasso keeper the lasso.
     fn finish_dying(&mut self, game: &mut Game) {
         let actor = self.actor;
-        let i = self.slot;
+        let number = self.slot;
 
         game.actor_mut(actor).tactic = game.actor(actor).tactic.wrapping_sub(1);
 
@@ -135,23 +136,23 @@ impl Ctx {
                 game.actor_mut(actor).vitality = WITCH_BODY_VITALITY;
                 game.actor_mut(actor).state = STILL;
                 game.actor_mut(actor).weapon = 0;
-                leave_item(&mut game.objects, &game.actors, i as i16, TALISMAN);
+                leave_item(&mut game.objects, &game.actors, number as i16, TALISMAN);
             }
 
             if game.actor(actor).race == RACE_LASSO_CARRIER {
-                leave_item(&mut game.objects, &game.actors, i as i16, LASSO);
+                leave_item(&mut game.objects, &game.actors, number as i16, LASSO);
             }
         }
     }
 
     /// Turns the terrain under the actor into its `environ`: water depth, slow ground, ice, going
     /// backwards, or falling into the pit.
-    fn settle_environ(&mut self, game: &mut Game, out: &mut dyn Output) {
+    fn settle_environ(&mut self, game: &mut Game, output: &mut dyn Output) {
         let actor = self.actor;
-        let i = self.slot;
+        let number = self.slot;
         let j = self.terrain;
 
-        if i == 0 && game.actors.raft_nearness != 0 {
+        if number == 0 && game.actors.raft_nearness != 0 {
             self.environ = 0; // can't drown on the raft
         } else if j == 0 {
             self.environ = 0;
@@ -161,7 +162,7 @@ impl Ctx {
             self.environ = ENVIRON_ICE;
         } else if j == TERRAIN_BACKWARDS {
             self.environ = ENVIRON_BACKWARDS;
-        } else if j == TERRAIN_PIT && i == 0 && game.world.extent_type == PIT_XTYPE {
+        } else if j == TERRAIN_PIT && number == 0 && game.world.extent_type == PIT_XTYPE {
             if game.actor(actor).state as i16 != FALL {
                 self.image = fallstates[(game.hero.brother * FALL_FRAMES) as usize] as i16;
                 game.actor_mut(actor).state = FALL as i8;
@@ -176,15 +177,15 @@ impl Ctx {
         } else if j == TERRAIN_WADE {
             self.environ = ENVIRON_WADE;
         } else if j == TERRAIN_SLOW_SINK || j == TERRAIN_DEEP_WATER {
-            self.wade(game, out, j);
+            self.wade(game, output, j);
         }
     }
 
     /// Stores the environ, adjusts the sprite for some enemies, keeps the hero inside the world and
     /// scrolls the map to it, and applies lava and drowning damage.
-    pub(super) fn raise(&mut self, game: &mut Game, out: &mut dyn Output) -> Pc {
+    pub(super) fn raise(&mut self, game: &mut Game, output: &mut dyn Output) -> Pc {
         let actor = self.actor;
-        let i = self.slot;
+        let number = self.slot;
 
         if game.world.new_region >= NO_REGION {
             game.actor_mut(actor).environ = self.environ;
@@ -198,7 +199,7 @@ impl Ctx {
 
         game.actor_mut(actor).index = self.image as i8;
 
-        if i == 0 {
+        if number == 0 {
             self.hero_wrap(game);
             game.hero.x = game.actor(actor).abs_x;
             game.hero.y = game.actor(actor).abs_y;
@@ -210,20 +211,20 @@ impl Ctx {
             return Pc::Statc;
         }
 
-        self.take_lava_damage(game, out);
-        self.take_drowning_damage(game, out);
+        self.take_lava_damage(game, output);
+        self.take_drowning_damage(game, output);
 
         Pc::Statc
     }
 
     /// While lava is flowing the actor in deep lava dies and one wading in it is hurt, unless the
     /// hero carries the fireproof item.
-    fn take_lava_damage(&mut self, game: &mut Game, out: &mut dyn Output) {
+    fn take_lava_damage(&mut self, game: &mut Game, output: &mut dyn Output) {
         let actor = self.actor;
-        let i = self.slot;
+        let number = self.slot;
 
         if game.actors.fiery_death != 0 {
-            if i == 0 && game.hero.stuff()[STUFF_FIREPROOF] != 0 {
+            if number == 0 && game.hero.stuff()[STUFF_FIREPROOF] != 0 {
                 game.actor_mut(actor).environ = 0;
             } else if game.actor(actor).environ > ENVIRON_SINKING {
                 game.actor_mut(actor).vitality = 0;
@@ -231,15 +232,15 @@ impl Ctx {
                 game.actor_mut(actor).vitality = game.actor(actor).vitality.wrapping_sub(1);
             }
 
-            check_death(game, out, i, DEATH_LAVA);
+            check_death(game, output, number, DEATH_LAVA);
         }
     }
 
     /// A drowning actor loses a point of vitality every eighth frame (wraiths and snakes are
     /// immune).
-    fn take_drowning_damage(&mut self, game: &mut Game, out: &mut dyn Output) {
+    fn take_drowning_damage(&mut self, game: &mut Game, output: &mut dyn Output) {
         let actor = self.actor;
-        let i = self.slot;
+        let number = self.slot;
         let cycle = self.cycle as i32;
         let race = game.actor(actor).race as i8;
 
@@ -248,7 +249,7 @@ impl Ctx {
             && !DROWN_IMMUNE_RACES.contains(&race)
         {
             game.actor_mut(actor).vitality = game.actor(actor).vitality.wrapping_sub(1);
-            check_death(game, out, i, DEATH_DROWN);
+            check_death(game, output, number, DEATH_DROWN);
         }
     }
 

@@ -29,17 +29,18 @@ pub fn export_tunes(
         with_sound(|s| {
             (sound.ins, sound.wav, sound.vol) = (s.ins.clone(), s.wav.clone(), s.vol.clone())
         });
+
         sound.tempo = DEFAULT_TEMPO;
         sound.play(tracks.clone());
         let samples = render(&mut sound);
         let path = dir.join(format!("{name}.wav"));
-        let mut out = wav_header((samples.len() * 2) as u32);
+        let mut output = wav_header((samples.len() * 2) as u32);
 
         for s in &samples {
-            out.extend_from_slice(&s.to_le_bytes());
+            output.extend_from_slice(&s.to_le_bytes());
         }
 
-        match std::fs::write(&path, out) {
+        match std::fs::write(&path, output) {
             Ok(()) => eprintln!("{}: {:.1} seconds", path.display(), seconds(samples.len())),
             Err(e) => eprintln!("Could not write {}: {e}", path.display()),
         }
@@ -64,8 +65,8 @@ fn render(sound: &mut Sound) -> Vec<i16> {
     let fade = (FADE_SECONDS * per_second).min(all.len());
     let start = all.len() - fade;
 
-    for (i, s) in all[start..].iter_mut().enumerate() {
-        *s *= 1.0 - i as f32 / fade as f32;
+    for (index, s) in all[start..].iter_mut().enumerate() {
+        *s *= 1.0 - index as f32 / fade as f32;
     }
 
     all.iter().map(|x| (x * FULL_SCALE) as i16).collect()

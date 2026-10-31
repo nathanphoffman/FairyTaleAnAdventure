@@ -22,7 +22,7 @@ const SPECTRE_THANKS: i32 = 48;
 const SPECTRE_BONE_DROP: i16 = 140;
 
 /// Gives gold to a beggar, or the bone to the spectre.
-pub(super) fn give_option(game: &mut Game, out: &mut dyn Output, chosen_entry: i16) -> bool {
+pub(super) fn give_option(game: &mut Game, output: &mut dyn Output, chosen_entry: i16) -> bool {
     if game.actors.nearest_person == 0 {
         return true;
     }
@@ -41,15 +41,15 @@ pub(super) fn give_option(game: &mut Game, out: &mut dyn Output, chosen_entry: i
         queue_print(&mut game.ui, PRQ_VITALITY);
 
         if race == BEGGAR_RACE {
-            speak(game, out, BEGGAR_SPEECH + game.actor(person).goal as i32);
+            speak(game, output, BEGGAR_SPEECH + game.actor(person).goal as i32);
         } else {
-            speak(game, out, BEGGAR_THANKS);
+            speak(game, output, BEGGAR_THANKS);
         }
     } else if chosen_entry == GIVE_BONE && game.hero.stuff()[BONE] != 0 {
         if race != SPECTRE_RACE {
-            speak(game, out, SPECTRE_NOT_HERE);
+            speak(game, output, SPECTRE_NOT_HERE);
         } else {
-            speak(game, out, SPECTRE_THANKS);
+            speak(game, output, SPECTRE_THANKS);
             game.hero.stuff_mut()[BONE] = 0;
             leave_item(
                 &mut game.objects,
@@ -60,7 +60,7 @@ pub(super) fn give_option(game: &mut Game, out: &mut dyn Output, chosen_entry: i
         }
     }
 
-    go_to_menu(game, out, ITEMS as i16);
+    go_to_menu(game, output, ITEMS as i16);
 
     true
 }

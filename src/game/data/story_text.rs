@@ -116,7 +116,7 @@ pub static INSIDE_MSG: &[u8] =
 const MSG1: &[u8] =
     b"\x80\x0a\x1c   \"Rescue the Talisman!\"\x80\x0a'was the Mayor's plea.\x80\x0a2\"Only the Ta\
         lisman can\x80\x0a=protect our village from\x80\x0aHthe evil forces of the\x80\x0aSnight.\"\
-        \x20And so Julian\x80\x0a^set out on his quest to\x80\x0airecover it.\x00\x00";
+        \x20And so Julian\x80\x0a^set output on his quest to\x80\x0airecover it.\x00\x00";
 
 const MSG2: &[u8] =
     b"\x80\x0c,Unfortunately for Julian,\x80\x0c7his luck had run out.\x80\x0cBMany months passed\

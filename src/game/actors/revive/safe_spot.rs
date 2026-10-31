@@ -33,14 +33,14 @@ const PRQ_STATS: i32 = 4;
 const PRQ_VITALITY: i32 = 7;
 
 /// The hero (re)appears at the last safe spot, and the region there is loaded.
-pub(super) fn put_hero_at_safe_spot(game: &mut Game, out: &mut dyn Output, hero: ActorRef) {
+pub(super) fn put_hero_at_safe_spot(game: &mut Game, output: &mut dyn Output, hero: ActorRef) {
     move_to_safe_spot(
         &mut game.hero,
         &mut game.actors.list[hero.slot()],
         &mut game.world,
     );
 
-    load_region_now(game, out);
+    load_region_now(game, output);
 }
 
 /// The hero's position becomes the safe spot, the camera is centred on it, and its region is the

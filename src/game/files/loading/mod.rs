@@ -17,6 +17,7 @@ pub use self::sprites::{SPRITE_FILES, load_pending_region, load_start_sprites};
 
 const CARRIER: u8 = 5;
 const DRAGON: u8 = 6;
+
 /// Mirror of `struct cfile_info`: one loadable sprite file (a character set).
 /// `width` is in 16-pixel words, `height` in lines, `count` the number of frames.
 #[repr(C)]

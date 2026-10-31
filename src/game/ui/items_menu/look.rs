@@ -14,24 +14,24 @@ const EVENT_NOTHING_HIDDEN: i32 = 20;
 const EVENT_FOUND_HIDDEN: i32 = 38;
 
 /// Reveals hidden objects within reach.
-pub(super) fn look_around(game: &mut Game, out: &mut dyn Output) {
+pub(super) fn look_around(game: &mut Game, output: &mut dyn Output) {
     let mut found = false;
 
-    for i in 0..game.actors.drawn as i32 {
-        let actor = ActorRef::new(i as usize);
+    for index in 0..game.actors.drawn as i32 {
+        let actor = ActorRef::new(index as usize);
 
         if game.actor(actor).kind == OBJECTS
             && game.actor(actor).race == 0
-            && actor_distance(game, i, 0) < LOOK_RANGE
+            && actor_distance(game, index, 0) < LOOK_RANGE
         {
             found = true;
-            change_object(&mut game.objects, &game.actors, &mut game.world, i, 1);
+            change_object(&mut game.objects, &game.actors, &mut game.world, index, 1);
         }
     }
 
     show_event(
         game,
-        out,
+        output,
         if found {
             EVENT_FOUND_HIDDEN
         } else {

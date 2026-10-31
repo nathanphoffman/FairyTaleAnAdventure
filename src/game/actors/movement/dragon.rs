@@ -4,6 +4,7 @@ use super::{
     Ctx, DEAD, DRAGON_BREATH_FACING, DRAGON_DEAD_FRAME, DRAGON_DYING_FRAME, DYING, EFFECT_FIREBALL,
     EFFECT_FIREBALL_PITCH, MAX_MISSILE, MISSILE_ROCK_TYPE, MISSILE_SPEED_FIREBALL, Pc, WEAPON_BOW,
 };
+
 use crate::game::data::state::Game;
 
 use crate::game::data::object_tables::{bowshotx, bowshoty, gunshoty};

@@ -51,15 +51,15 @@ fn may_leave(d: &Door, hero_x: u16, hero_y: u16) -> bool {
 
 /// Indoors: if the hero stands at the inside entrance of a door and is lined up with it, he is moved
 /// to the outside.
-pub(super) fn leave_door(game: &mut Game, out: &mut dyn Output, xtest: u16, ytest: u16) {
+pub(super) fn leave_door(game: &mut Game, output: &mut dyn Output, xtest: u16, ytest: u16) {
     for j in 0..DOORCOUNT {
         let d = door_at(j);
 
         if is_exit_here(d, xtest, ytest) {
             if may_leave(d, game.hero.x, game.hero.y) {
                 let (x, y) = outside_spot(d);
-                transfer_hero(game, out, x, y, 1);
-                find_place(game, out, 0);
+                transfer_hero(game, output, x, y, 1);
+                find_place(game, output, 0);
             }
 
             break;

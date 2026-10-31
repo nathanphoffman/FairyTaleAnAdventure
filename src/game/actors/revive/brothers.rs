@@ -70,22 +70,22 @@ const VIEW_REDRAW: i8 = 99;
 const HERO_SPRITE_FILE: i16 = 6;
 const HERO_SET_FILE: i16 = 13;
 
+/// Puts one actor back at its start: its kind, its position and the first picture with no weapon.
+fn place_at_start(actors: &mut Actors, actor: ActorRef, kind: i8, start: (u16, u16)) {
+    actors.actor_mut(actor).kind = kind;
+    actors.actor_mut(actor).abs_x = start.0;
+    actors.actor_mut(actor).abs_y = start.1;
+    actors.actor_mut(actor).index = 0;
+    actors.actor_mut(actor).weapon = 0;
+}
+
 /// Puts the raft and the first person back where they start.
 pub(super) fn reset_raft_setfig(actors: &mut Actors) {
     let raft = ActorRef::new(1);
-    actors.actor_mut(raft).kind = RAFT;
-    actors.actor_mut(raft).abs_x = RAFT_START.0;
-    actors.actor_mut(raft).abs_y = RAFT_START.1;
-    actors.actor_mut(raft).index = 0;
-    actors.actor_mut(raft).weapon = 0;
+    place_at_start(actors, raft, RAFT, RAFT_START);
     actors.actor_mut(raft).environ = 0;
 
-    let setfig = ActorRef::new(2);
-    actors.actor_mut(setfig).kind = SETFIG;
-    actors.actor_mut(setfig).abs_x = SETFIG_START.0;
-    actors.actor_mut(setfig).abs_y = SETFIG_START.1;
-    actors.actor_mut(setfig).index = 0;
-    actors.actor_mut(setfig).weapon = 0;
+    place_at_start(actors, ActorRef::new(2), SETFIG, SETFIG_START);
 }
 
 /// The fallen brother's body is left where he died, and his ghost appears.
@@ -112,6 +112,7 @@ pub(super) fn take_over_next_brother(game: &mut Game, hero: ActorRef) {
         game.hero.safe_x as i32,
         game.hero.safe_y as i32,
     );
+
     game.ui.view_status = VIEW_REDRAW;
     game.actors.on_screen = 1;
     game.actors.loading = 0;
@@ -146,41 +147,41 @@ pub(super) fn start_next_brother(hero: &mut Hero, body: &mut Shape, next: &Bro) 
 }
 
 /// The story pages between brothers (and the game over page after the last).
-pub(super) fn show_brother_placards(game: &mut Game, out: &mut dyn Output) {
-    map_message(game, out);
-    out.use_story_font();
+pub(super) fn show_brother_placards(game: &mut Game, output: &mut dyn Output) {
+    map_message(game, output);
+    output.use_story_font();
 
     if game.hero.brother == JULIAN {
-        placard_text(out, PLACARD_JULIAN);
-        out.clear_drawing_page();
+        placard_text(output, PLACARD_JULIAN);
+        output.clear_drawing_page();
     } else if game.hero.brother == PHILLIP {
-        placard_text(out, PLACARD_PHILLIP);
+        placard_text(output, PLACARD_PHILLIP);
     } else if game.hero.brother == KEVIN {
-        placard_text(out, PLACARD_KEVIN);
+        placard_text(output, PLACARD_KEVIN);
     } else {
-        placard_text(out, PLACARD_GAME_OVER);
+        placard_text(output, PLACARD_GAME_OVER);
     }
 
-    out.draw_placard_border();
-    delay(game, out, SHOW_PLACARD);
+    output.draw_placard_border();
+    delay(game, output, SHOW_PLACARD);
 
     if game.hero.brother > LAST_BROTHER {
         game.ui.quit_requested = 1;
-        delay(game, out, GAME_OVER_PAUSE);
+        delay(game, output, GAME_OVER_PAUSE);
     } else if game.hero.brother > JULIAN {
-        show_follow_up_placard(game, out);
+        show_follow_up_placard(game, output);
     }
 }
 
 /// After the first story page the panel is cleared and the follow-up page for this brother is shown.
-fn show_follow_up_placard(game: &mut Game, out: &mut dyn Output) {
-    delay(game, out, SHORT_PAUSE);
-    out.clear_placard();
+fn show_follow_up_placard(game: &mut Game, output: &mut dyn Output) {
+    delay(game, output, SHORT_PAUSE);
+    output.clear_placard();
 
-    delay(game, out, TINY_PAUSE);
+    delay(game, output, TINY_PAUSE);
 
     placard_text(
-        out,
+        output,
         if game.hero.brother == PHILLIP {
             PLACARD_PHILLIP_FOLLOW_UP
         } else {
@@ -188,29 +189,29 @@ fn show_follow_up_placard(game: &mut Game, out: &mut dyn Output) {
         },
     );
 
-    delay(game, out, SHOW_PLACARD);
+    delay(game, output, SHOW_PLACARD);
 }
 
 /// Loads the brother's sprites and tells where the story starts.
-pub(super) fn announce_brother(game: &mut Game, out: &mut dyn Output) {
-    out.use_panel_font();
-    out.select_message_area();
+pub(super) fn announce_brother(game: &mut Game, output: &mut dyn Output) {
+    output.use_panel_font();
+    output.select_message_area();
 
     game.actors.loaded_actor_file = HERO_SPRITE_FILE;
     game.actors.loaded_setfig_file = HERO_SET_FILE;
-    load_start_sprites(game, out);
+    load_start_sprites(game, output);
 
     if game.hero.brother <= LAST_BROTHER {
-        message_off(game, out);
+        message_off(game, output);
         game.hero.place = START_PLACE;
-        show_event(game, out, EVENT_SETTING_OUT);
+        show_event(game, output, EVENT_SETTING_OUT);
 
         if game.hero.brother == JULIAN {
-            out.print_cont(".");
+            output.print_cont(".");
         } else if game.hero.brother == PHILLIP {
-            show_event(game, out, EVENT_PHILLIP_SETS_OUT);
+            show_event(game, output, EVENT_PHILLIP_SETS_OUT);
         } else if game.hero.brother == KEVIN {
-            show_event(game, out, EVENT_KEVIN_SETS_OUT);
+            show_event(game, output, EVENT_KEVIN_SETS_OUT);
         }
     }
 }

@@ -26,7 +26,7 @@ fn mood_due(clock: u16, battle: bool) -> bool {
 }
 
 /// Notes a safe spot, picks the music, and makes the hero hungrier and more tired.
-pub fn survival_tick(game: &mut Game, out: &mut dyn Output) {
+pub fn survival_tick(game: &mut Game, output: &mut dyn Output) {
     let facts = SurvivalFacts {
         clock: game.world.day_clock,
         region: game.world.region,
@@ -40,7 +40,7 @@ pub fn survival_tick(game: &mut Game, out: &mut dyn Output) {
 
     for step in steps {
         match step {
-            SurvivalStep::Event(e) => show_event(game, out, e),
+            SurvivalStep::Event(e) => show_event(game, output, e),
             SurvivalStep::RedrawStats => queue_print(&mut game.ui, PRQ_STATS),
             SurvivalStep::PickMusic => set_mood(game, 0),
         }
@@ -157,7 +157,7 @@ mod tests {
     }
 
     #[test]
-    fn a_calm_frame_notes_the_safe_spot_and_adds_hunger() {
+    fn a_calm_frame_notes_the_safe_spot_adding_hunger() {
         let (facts, mut hero, mut body) = calm_hero();
         let steps = survival_step(&facts, &mut hero, &mut body);
         assert_eq!((hero.safe_r, hero.safe_x, hero.safe_y), (3, 1234, 5678));
@@ -166,6 +166,7 @@ mod tests {
     }
 
     #[test]
+    // Hunger keeps counting during danger; only the safe spot stops.
     fn danger_stops_the_safe_spot_but_not_the_hunger() {
         for danger in 0..4 {
             let (mut facts, mut hero, mut body) = calm_hero();
@@ -235,7 +236,7 @@ mod tests {
     }
 
     #[test]
-    fn no_hunger_while_asleep_or_dead() {
+    fn no_hunger_while_asleep_dead() {
         let (facts, mut hero, mut body) = calm_hero();
         body.state = SLEEP;
         survival_step(&facts, &mut hero, &mut body);

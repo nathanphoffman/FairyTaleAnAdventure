@@ -15,6 +15,7 @@ use crate::game::data::types::Need;
 use crate::game::files::disk::{
     is_read_pending, load_track_range, mark_read_unused, motor_off, read_finished, wait_for_read,
 };
+
 use crate::game::output::Output;
 
 use crate::game::world::map::fill_minimap;
@@ -76,9 +77,9 @@ const BLOCKED_TILE: u8 = 254;
 ///
 /// Outdoors the region comes from the middle of the screen: bit 6 of the sector column gives
 /// west or east, and two bits of the sector row give which of four rows.
-pub fn refresh_minimap(game: &mut Game, out: &mut dyn Output) {
+pub fn refresh_minimap(game: &mut Game, output: &mut dyn Output) {
     if game.world.region < FIRST_INDOOR_REGION {
-        follow_outdoor_region(game, out);
+        follow_outdoor_region(game, output);
     } else {
         game.world.target_region = game.world.region;
     }
@@ -92,14 +93,14 @@ pub fn refresh_minimap(game: &mut Game, out: &mut dyn Output) {
 
 /// Outdoors: loads a pending region when the camera is in the loadable band, then works out the
 /// region at the middle of the screen and starts loading it if it is not the current one.
-fn follow_outdoor_region(game: &mut Game, out: &mut dyn Output) {
+fn follow_outdoor_region(game: &mut Game, output: &mut dyn Output) {
     if game.world.new_region < NO_REGION {
         let xs = game.world.map_x as u32 & MAP_X_WRAP;
 
         let ys = game.world.map_y as u32 & MAP_Y_WRAP;
 
         if (ys > MAP_Y_MIN_FOR_LOAD && ys < MAP_Y_MAX_FOR_LOAD) && !DEAD_STRIP_X.contains(&xs) {
-            load_region_now(game, out);
+            load_region_now(game, output);
         }
     }
 
@@ -114,7 +115,7 @@ fn follow_outdoor_region(game: &mut Game, out: &mut dyn Output) {
 
     if game.world.target_region != game.world.region {
         game.world.new_region = game.world.target_region;
-        load_region_now(game, out);
+        load_region_now(game, output);
     }
 }
 
@@ -128,8 +129,10 @@ fn update_region_origin(world: &mut World) {
         world.target_region & 1
     };
 
+    // Region column to the region's first sector column (shift = multiply by the region width).
     world.origin_x = xr << REGION_WIDTH_SHIFT;
 
+    // Region row to the region's first sector row (shift = multiply by the region height).
     world.origin_y = yr << REGION_HEIGHT_SHIFT;
 }
 
@@ -137,15 +140,17 @@ fn update_region_origin(world: &mut World) {
 /// left corner, so the middle is 151 pixels across and 64 down from it, and a sector is 256 pixels.
 pub fn center_sector(world: &mut World) -> (u32, u32) {
     (
+        // Map x shifted by the screen centre, then divided into sectors with a shift.
         (world.map_x as u32 + CENTER_OFFSET_X) >> SECTOR_PIXELS_SHIFT,
+        // Same for map y.
         (world.map_y as u32 + CENTER_OFFSET_Y) >> SECTOR_PIXELS_SHIFT,
     )
 }
 
 /// Loads the pending region completely (`load_region_piece` does one piece per call).
-pub fn load_region_now(game: &mut Game, out: &mut dyn Output) {
+pub fn load_region_now(game: &mut Game, output: &mut dyn Output) {
     while game.world.new_region < NO_REGION {
-        load_region_piece(game, out);
+        load_region_piece(game, output);
     }
 }
 
@@ -153,7 +158,7 @@ pub fn load_region_now(game: &mut Game, out: &mut dyn Output) {
 /// terrain tables, then one image bank per call. Each piece is only read if the loaded one is
 /// different (`loaded_blocks`). When everything is there, waits for the reads, turns the drive
 /// off, and `new_region` becomes the current region.
-pub fn load_region_piece(game: &mut Game, out: &mut dyn Output) {
+pub fn load_region_piece(game: &mut Game, output: &mut dyn Output) {
     if game.world.new_region >= NO_REGION {
         return;
     }
@@ -162,7 +167,7 @@ pub fn load_region_piece(game: &mut Game, out: &mut dyn Output) {
 
     load_changed_tables(game, need);
 
-    if load_next_image_bank(out, &mut game.map, need) {
+    if load_next_image_bank(output, &mut game.map, need) {
         return;
     }
 
@@ -226,10 +231,10 @@ fn load_changed_terrain(memory: &mut MapData, need: &Need) {
 
 /// Loads the first of the four image banks that differs from the loaded one. Returns true if it
 /// loaded one (only one bank per call, so the game keeps running), false if all are up to date.
-fn load_next_image_bank(out: &mut dyn Output, memory: &mut MapData, need: &Need) -> bool {
+fn load_next_image_bank(output: &mut dyn Output, memory: &mut MapData, need: &Need) -> bool {
     for bank in 0..4 {
         if need.image[bank] != memory.loaded_blocks.image[bank] {
-            out.load_image_bank(bank, need.image[bank] as i16);
+            output.load_image_bank(bank, need.image[bank] as i16);
             memory.loaded_blocks.image[bank] = need.image[bank];
 
             return true;

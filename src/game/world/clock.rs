@@ -93,7 +93,7 @@ fn heal_due(clock: u16, vitality: i16, bravery: i16, state: i8) -> bool {
 }
 
 /// Sleeping, the day clock, the light level, the messages for the time of day and slow healing.
-pub fn day_night_tick(game: &mut Game, out: &mut dyn Output) {
+pub fn day_night_tick(game: &mut Game, output: &mut dyn Output) {
     let hero = ActorRef::new(0);
 
     if game.actor(hero).state == SLEEP {
@@ -116,10 +116,10 @@ pub fn day_night_tick(game: &mut Game, out: &mut dyn Output) {
     game.world.day_period = tick.period;
 
     if let Some(e) = tick.period_event {
-        show_event(game, out, e);
+        show_event(game, output, e);
     }
 
-    day_fade(game, out);
+    day_fade(game, output);
 
     if tick.heal {
         game.actor_mut(hero).vitality += 1;
@@ -244,7 +244,7 @@ mod tests {
     }
 
     #[test]
-    fn clock_counts_wraps_and_freezes() {
+    fn clock_counts_wraps_freezes() {
         assert_eq!(clock_step(0, false), 1);
         assert_eq!(clock_step(500, true), 500);
         assert_eq!(clock_step(DAY_LENGTH - 1, false), DAY_LENGTH);
@@ -265,12 +265,13 @@ mod tests {
     }
 
     #[test]
-    fn day_periods_and_messages() {
+    fn day_periods_with_messages() {
         assert_eq!(day_period(0), 0);
         assert_eq!(day_period(1999), 0);
         assert_eq!(day_period(2000), 1);
         assert_eq!(day_period(23999), 11);
         let said: Vec<_> = (0..12)
+            // Pairs each period number with its event, skipping periods with none.
             .filter_map(|p| period_event(p).map(|e| (p, e)))
             .collect();
         assert_eq!(said, vec![(0, 28), (4, 29), (6, 30), (9, 31)]);
@@ -287,7 +288,7 @@ mod tests {
     }
 
     #[test]
-    fn sleep_steps_fast_and_wakes() {
+    fn sleep_steps_fast_waking() {
         let mut drawn = 0;
         let (clock, tired, wake) = sleep_step(100, 50, false, || {
             drawn += 1;

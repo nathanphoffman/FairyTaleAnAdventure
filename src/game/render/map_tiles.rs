@@ -17,10 +17,10 @@ pub const PLANE_COUNT: usize = 5;
 
 /// Draws one tile at byte offset `dst` in each of the five planes (2 bytes wide, 32 lines).
 pub fn draw_tile(graphics: &Graphics, screen: &mut Screen, tile: i32, dst: usize) {
-    for p in 0..PLANE_COUNT {
-        let mut src = p * IMAGE_PLANE_SIZE + tile as usize * TILE_BYTES;
+    for plane_number in 0..PLANE_COUNT {
+        let mut src = plane_number * IMAGE_PLANE_SIZE + tile as usize * TILE_BYTES;
         let image = &graphics.image;
-        let plane = screen.draw_bitmap_mut().plane_mut(p);
+        let plane = screen.draw_bitmap_mut().plane_mut(plane_number);
         let mut d = dst;
 
         for _ in 0..TILE_LINES {
@@ -117,15 +117,15 @@ pub fn scroll_map(screen: &mut Screen, dir: i32) {
     let m = &SCROLL_MODES[dir as usize & DIRECTION_MASK];
     let bitmap = screen.draw_bitmap_mut();
 
-    for p in 0..PLANE_COUNT {
-        let plane = bitmap.plane_mut(p);
+    for plane_number in 0..PLANE_COUNT {
+        let plane = bitmap.plane_mut(plane_number);
 
-        for i in 0..m.lines {
+        for index in 0..m.lines {
             // copy bottom-up when moving down so rows are not overwritten before being read
             let line = if m.dst_line > m.src_line {
-                m.lines - 1 - i
+                m.lines - 1 - index
             } else {
-                i
+                index
             };
 
             let from = (m.src_line + line) * ROW_BYTES + m.src_x;

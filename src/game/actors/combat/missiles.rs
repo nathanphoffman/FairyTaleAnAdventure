@@ -48,19 +48,19 @@ pub(super) const BY_FIREBALL: i32 = -2;
 
 /// Moves the six arrows and fireballs; they hit actors in the way and stop at walls. Nothing
 /// moves while time is frozen.
-pub fn advance_missiles(game: &mut Game, out: &mut dyn Output) {
+pub fn advance_missiles(game: &mut Game, output: &mut dyn Output) {
     if game.world.freeze_timer != 0 {
         return;
     }
 
-    for i in 0..MISSILES {
-        let ms = MissileRef::new(i);
-        fly(game, out, i, ms);
+    for position in 0..MISSILES {
+        let ms = MissileRef::new(position);
+        fly(game, output, position, ms);
     }
 }
 
 /// One missile's flight for this frame.
-pub(super) fn fly(game: &mut Game, out: &mut dyn Output, i: usize, ms: MissileRef) {
+pub(super) fn fly(game: &mut Game, output: &mut dyn Output, position: usize, ms: MissileRef) {
     let mut s = game.missile(ms).speed as i16 * 2;
 
     if missile_expired(game.missile_mut(ms), s) {
@@ -78,7 +78,7 @@ pub(super) fn fly(game: &mut Game, out: &mut dyn Output, i: usize, ms: MissileRe
     }
 
     let fc = game.missile(ms).direction as i32;
-    hit_first_actor_in_path(game, out, i, ms, xs, ys);
+    hit_first_actor_in_path(game, output, position, ms, xs, ys);
     game.missile_mut(ms).abs_x = step_x(game.missile(ms).abs_x as i32, fc, s as i32) as u16;
     game.missile_mut(ms).abs_y = step_y(game.missile(ms).abs_y as i32, fc, s as i32) as u16;
 }
@@ -102,8 +102,8 @@ pub(super) fn missile_expired(ms: &mut Missile, s: i16) -> bool {
 /// fixed one.
 pub(super) fn hit_first_actor_in_path(
     game: &mut Game,
-    out: &mut dyn Output,
-    i: usize,
+    output: &mut dyn Output,
+    position: usize,
     ms: MissileRef,
     xs: i16,
     ys: i16,
@@ -130,12 +130,12 @@ pub(super) fn hit_first_actor_in_path(
         let dist = distance_to_point(&game.actors, ActorRef::new(target), xs, ys);
 
         // the original tests the missile's own index here, not the target's
-        if missile_connects(i, dist, range, dodge, || {
+        if missile_connects(position, dist, range, dodge, || {
             bitrand(&mut game.rng, DODGE_RANGE)
         }) {
             let by = if is_rock { BY_FIREBALL } else { BY_ARROW };
             let damage = (rand8(&mut game.rng) + MISSILE_DAMAGE_BASE) as i16;
-            hit_actor(game, out, by, target as i32, fc, damage);
+            hit_actor(game, output, by, target as i32, fc, damage);
 
             game.missile_mut(ms).speed = 0;
 
@@ -178,7 +178,7 @@ mod tests {
     }
 
     #[test]
-    fn unused_spent_and_stopped_missiles_expire() {
+    fn unused_spent_stopped_missiles_expire() {
         assert!(missile_expired(&mut missile(MISSILE_NONE, 5, 0), 10));
         assert!(missile_expired(&mut missile(MISSILE_SPENT, 5, 0), 10));
         assert!(missile_expired(&mut missile(MISSILE_ROCK, 0, 0), 0));

@@ -100,7 +100,7 @@ pub(super) fn hostile_action(
     tactic: i16,
     (xd, yd): (i16, i16),
 ) {
-    let i = actor.slot();
+    let index = actor.slot();
 
     match hostile_choice(
         game.actor(actor).race,
@@ -111,7 +111,13 @@ pub(super) fn hostile_action(
         yd,
     ) {
         Hostile::Strike => {
-            steer_actor(game, i as i32, game.hero.x as i32, game.hero.y as i32, 0);
+            steer_actor(
+                game,
+                index as i32,
+                game.hero.x as i32,
+                game.hero.y as i32,
+                0,
+            );
 
             if game.actor(actor).state >= WALKING {
                 game.actor_mut(actor).state = FIGHTING;
@@ -123,7 +129,7 @@ pub(super) fn hostile_action(
             game.actor_mut(actor).facing = DKNIGHT_FACING;
         }
 
-        Hostile::Tactic => run_tactic(game, i as i32, tactic as i32),
+        Hostile::Tactic => run_tactic(game, index as i32, tactic as i32),
     }
 }
 
@@ -209,7 +215,7 @@ mod tests {
     }
 
     #[test]
-    fn archer_backs_off_when_close_shoots_in_range_and_otherwise_closes_in() {
+    fn archer_backs_off_when_close_shoots_in_range_else_closes_in() {
         let archer = enemy(BOW_BIT, 20);
         let (close_x, close_y) = (ARCHER_TOO_CLOSE.0 - 1, ARCHER_TOO_CLOSE.1 - 1);
         assert_eq!(

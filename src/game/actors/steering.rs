@@ -89,12 +89,14 @@ fn steer(xdif: i16, ydif: i16, mode: i32, random_bit: impl FnOnce() -> bool) -> 
 /// An axis less than half as far as the other is ignored, so the actor goes straight along the
 /// long one.
 fn along_the_long_axis((xdir, ydir): (i32, i32), xabs: u16, yabs: u16) -> (i32, i32) {
+    // Compare as signed values: the shifted magnitude is at most half the other axis.
     let ydir = if (yabs as i16) < (xabs >> IGNORE_SHIFT) as i16 {
         0
     } else {
         ydir
     };
 
+    // Same test with the axes swapped.
     let xdir = if (xabs as i16) < (yabs >> IGNORE_SHIFT) as i16 {
         0
     } else {
@@ -161,7 +163,7 @@ mod tests {
     }
 
     #[test]
-    fn close_targets_wobble_in_modes_1_and_2() {
+    fn close_targets_wobble_in_modes_1_to_2() {
         assert_eq!(steer(10, 0, 1, || true), Course::Face { facing: 0 });
         assert_eq!(steer(10, 0, 1, || false), Course::Face { facing: 6 });
 

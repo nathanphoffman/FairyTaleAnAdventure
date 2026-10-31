@@ -72,10 +72,10 @@ pub(super) fn drawn_in_front(
     sprite: &Sprite,
 ) -> bool {
     let (atype, inum) = (sprite.atype, sprite.inum);
-    let i = actor.slot();
+    let index = actor.slot();
 
     if atype == CARRIER
-        || (i == 0
+        || (index == 0
             && (hero.riding == RIDING_SWAN
                 || world.extent_type == NO_MASK_XTYPE
                 || (hero.x > FRONT_AREA_X.0
@@ -147,8 +147,11 @@ pub(super) fn mask_against_scenery(
     extent: &Extent,
 ) {
     let blitwide = extent.blitwide;
+
+    // First tile row of the sprite: pixel row divided by the tile height via a shift.
     let ym1 = (placed.clip.ystart >> TILE_ROW_SHIFT) as u8;
 
+    // Last tile row, then made relative to the first by subtracting it (wrapping like the original byte math).
     let ym2 = ((placed.clip.ystop >> TILE_ROW_SHIFT) as u8).wrapping_sub(ym1);
     let tiles = SpriteTiles {
         actor,

@@ -38,6 +38,7 @@ impl BitMapHeader {
     /// Reads the sizes at the start of the chunk's data: the width and height, then (after the
     /// position, plane count and masking fields) the compression type.
     fn read(data: &[u8]) -> BitMapHeader {
+        // Reads a big-endian u16 at `at`, or 0 when the chunk is too short.
         let be16 = |at: usize| {
             data.get(at..at + 2)
                 .map_or(0, |b| u16::from_be_bytes([b[0], b[1]]))
@@ -219,11 +220,14 @@ fn unpack_body(header: &BitMapHeader, body: &mut Body, bitmap: &mut Bitmap, offs
     for row in 0..header.height {
         let start = offset + row * bytes_per_row;
 
-        for p in 0..BRUSH_PLANES {
-            if bitmap.depth() > p {
+        for plane_number in 0..BRUSH_PLANES {
+            if bitmap.depth() > plane_number {
                 body.unpack_line(&mut line);
 
-                if let Some(dest) = bitmap.plane_mut(p).get_mut(start..start + row_bytes) {
+                if let Some(dest) = bitmap
+                    .plane_mut(plane_number)
+                    .get_mut(start..start + row_bytes)
+                {
                     dest.copy_from_slice(&line);
                 }
             }
@@ -245,32 +249,32 @@ mod tests {
 
     #[test]
     fn literal_runs_are_copied() {
-        let mut out = [0u8; 3];
+        let mut output = [0u8; 3];
         let mut b = body(&[2, 10, 20, 30], true); // 3 literal bytes
-        b.unpack_line(&mut out);
+        b.unpack_line(&mut output);
 
-        assert_eq!(out, [10, 20, 30]);
+        assert_eq!(output, [10, 20, 30]);
         assert_eq!(b.at, 4);
     }
 
     #[test]
     fn repeat_runs_are_expanded() {
-        let mut out = [0u8; 4];
+        let mut output = [0u8; 4];
         let mut b = body(&[(-3i8) as u8, 7], true); // 7 repeated 4 times
-        b.unpack_line(&mut out);
+        b.unpack_line(&mut output);
 
-        assert_eq!(out, [7, 7, 7, 7]);
+        assert_eq!(output, [7, 7, 7, 7]);
         assert_eq!(b.at, 2);
     }
 
     #[test]
     fn an_uncompressed_row_is_copied() {
-        let mut out = [0u8; 2];
+        let mut output = [0u8; 2];
         let mut b = body(&[5, 6, 7, 8], false);
-        b.unpack_line(&mut out);
-        assert_eq!(out, [5, 6]);
-        b.unpack_line(&mut out);
-        assert_eq!(out, [7, 8]);
+        b.unpack_line(&mut output);
+        assert_eq!(output, [5, 6]);
+        b.unpack_line(&mut output);
+        assert_eq!(output, [7, 8]);
     }
 
     #[test]
@@ -279,6 +283,7 @@ mod tests {
             width: 320,
             ..Default::default()
         };
+
         assert_eq!(header.row_bytes(), 40);
     }
 

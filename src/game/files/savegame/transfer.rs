@@ -18,6 +18,7 @@ const OBJECT_REGIONS: usize = 10;
 /// A 16 bit number, signed or not.
 pub trait Word: Copy {
     fn to_bits(self) -> u16;
+
     fn from_bits(bits: u16) -> Self;
 }
 
@@ -44,6 +45,7 @@ impl Word for i16 {
 /// A one byte number, signed or not.
 pub trait Byte: Copy {
     fn to_byte(self) -> u8;
+
     fn from_byte(byte: u8) -> Self;
 }
 
@@ -128,150 +130,155 @@ impl Transfer {
 /// The 40 variables the original saved as one 80 byte block, in that order: the map and hero
 /// positions, the stats (bravery, luck, kindness, wealth, hunger, fatigue), which brother is
 /// playing, the day/night clock, the magic timers and so on. The order is the file format.
-fn transfer_variables(game: &mut Game, t: &mut Transfer) {
-    t.u16(&mut game.world.map_x);
-    t.u16(&mut game.world.map_y);
-    t.u16(&mut game.hero.x);
-    t.u16(&mut game.hero.y);
-    t.u16(&mut game.hero.safe_x);
-    t.u16(&mut game.hero.safe_y);
-    t.u16(&mut game.hero.safe_r);
-    t.u16(&mut game.world.tile_x);
-    t.u16(&mut game.world.tile_y);
-    t.u16(&mut game.ui.cheat_enabled);
-    t.u16(&mut game.hero.riding);
-    t.u16(&mut game.hero.flying);
-    t.u16(&mut game.actors.carrier_slot);
-    t.u16(&mut game.actors.turtle_nearness);
-    t.u16(&mut game.actors.raft_nearness);
-    t.u16(&mut game.hero.brave);
-    t.u16(&mut game.hero.luck);
-    t.u16(&mut game.hero.kindness);
-    t.u16(&mut game.hero.wealth);
-    t.u16(&mut game.hero.hunger);
-    t.u16(&mut game.hero.fatigue);
-    t.u16(&mut game.hero.brother);
-    t.u16(&mut game.hero.princesses_rescued);
-    t.u16(&mut game.hero.sector);
-    t.u16(&mut game.hero.place);
-    t.u16(&mut game.world.day_clock);
-    t.u16(&mut game.world.light_level);
-    t.u16(&mut game.actors.loaded_actor_file);
-    t.u16(&mut game.actors.loaded_setfig_file);
-    t.u16(&mut game.actors.active_carrier);
-    t.u16(&mut game.world.extent_type);
-    t.u16(&mut game.actors.leader);
-    t.u16(&mut game.world.secret_timer);
-    t.u16(&mut game.world.light_timer);
-    t.u16(&mut game.world.freeze_timer);
-    t.u16(&mut game.ui.current_menu);
-    t.u16(&mut game.encounter.kind);
-    t.u16(&mut game.save_padding[0]);
-    t.u16(&mut game.save_padding[1]);
-    t.u16(&mut game.save_padding[2]);
+fn transfer_variables(game: &mut Game, transfer: &mut Transfer) {
+    transfer.u16(&mut game.world.map_x);
+    transfer.u16(&mut game.world.map_y);
+    transfer.u16(&mut game.hero.x);
+    transfer.u16(&mut game.hero.y);
+    transfer.u16(&mut game.hero.safe_x);
+    transfer.u16(&mut game.hero.safe_y);
+    transfer.u16(&mut game.hero.safe_r);
+    transfer.u16(&mut game.world.tile_x);
+    transfer.u16(&mut game.world.tile_y);
+    transfer.u16(&mut game.ui.cheat_enabled);
+    transfer.u16(&mut game.hero.riding);
+    transfer.u16(&mut game.hero.flying);
+    transfer.u16(&mut game.actors.carrier_slot);
+    transfer.u16(&mut game.actors.turtle_nearness);
+    transfer.u16(&mut game.actors.raft_nearness);
+    transfer.u16(&mut game.hero.brave);
+    transfer.u16(&mut game.hero.luck);
+    transfer.u16(&mut game.hero.kindness);
+    transfer.u16(&mut game.hero.wealth);
+    transfer.u16(&mut game.hero.hunger);
+    transfer.u16(&mut game.hero.fatigue);
+    transfer.u16(&mut game.hero.brother);
+    transfer.u16(&mut game.hero.princesses_rescued);
+    transfer.u16(&mut game.hero.sector);
+    transfer.u16(&mut game.hero.place);
+    transfer.u16(&mut game.world.day_clock);
+    transfer.u16(&mut game.world.light_level);
+    transfer.u16(&mut game.actors.loaded_actor_file);
+    transfer.u16(&mut game.actors.loaded_setfig_file);
+    transfer.u16(&mut game.actors.active_carrier);
+    transfer.u16(&mut game.world.extent_type);
+    transfer.u16(&mut game.actors.leader);
+    transfer.u16(&mut game.world.secret_timer);
+    transfer.u16(&mut game.world.light_timer);
+    transfer.u16(&mut game.world.freeze_timer);
+    transfer.u16(&mut game.ui.current_menu);
+    transfer.u16(&mut game.encounter.kind);
+    transfer.u16(&mut game.save_padding[0]);
+    transfer.u16(&mut game.save_padding[1]);
+    transfer.u16(&mut game.save_padding[2]);
 }
 
 /// Saves or loads one actor.
-fn transfer_actor(t: &mut Transfer, a: &mut Shape) {
-    t.u16(&mut a.abs_x);
-    t.u16(&mut a.abs_y);
-    t.u16(&mut a.rel_x);
-    t.u16(&mut a.rel_y);
-    t.u8(&mut a.kind);
-    t.u8(&mut a.race);
-    t.u8(&mut a.index);
-    t.u8(&mut a.visible);
-    t.u8(&mut a.weapon);
-    t.u8(&mut a.environ);
-    t.u8(&mut a.goal);
-    t.u8(&mut a.tactic);
-    t.u8(&mut a.state);
-    t.u8(&mut a.facing);
-    t.u16(&mut a.vitality);
-    t.u8(&mut a.vel_x);
-    t.u8(&mut a.vel_y);
+fn transfer_actor(transfer: &mut Transfer, a: &mut Shape) {
+    transfer.u16(&mut a.abs_x);
+    transfer.u16(&mut a.abs_y);
+    transfer.u16(&mut a.rel_x);
+    transfer.u16(&mut a.rel_y);
+    transfer.u8(&mut a.kind);
+    transfer.u8(&mut a.race);
+    transfer.u8(&mut a.index);
+    transfer.u8(&mut a.visible);
+    transfer.u8(&mut a.weapon);
+    transfer.u8(&mut a.environ);
+    transfer.u8(&mut a.goal);
+    transfer.u8(&mut a.tactic);
+    transfer.u8(&mut a.state);
+    transfer.u8(&mut a.facing);
+    transfer.u16(&mut a.vitality);
+    transfer.u8(&mut a.vel_x);
+    transfer.u8(&mut a.vel_y);
 }
 
 /// Saves or loads one extent (a special rectangle of the world).
-fn transfer_extent(t: &mut Transfer, e: &mut Extent) {
-    t.u16(&mut e.x1);
-    t.u16(&mut e.y1);
-    t.u16(&mut e.x2);
-    t.u16(&mut e.y2);
-    t.u8(&mut e.etype);
-    t.u8(&mut e.v1);
-    t.u8(&mut e.v2);
-    t.u8(&mut e.v3);
+fn transfer_extent(transfer: &mut Transfer, e: &mut Extent) {
+    transfer.u16(&mut e.x1);
+    transfer.u16(&mut e.y1);
+    transfer.u16(&mut e.x2);
+    transfer.u16(&mut e.y2);
+    transfer.u8(&mut e.etype);
+    transfer.u8(&mut e.v1);
+    transfer.u8(&mut e.v2);
+    transfer.u8(&mut e.v3);
 }
 
 /// Saves or loads one object (an item or person in the world).
-fn transfer_object(t: &mut Transfer, o: &mut WorldObject) {
-    t.u16(&mut o.xc);
-    t.u16(&mut o.yc);
-    t.u8(&mut o.ob_id);
-    t.u8(&mut o.ob_stat);
+fn transfer_object(transfer: &mut Transfer, o: &mut WorldObject) {
+    transfer.u16(&mut o.xc);
+    transfer.u16(&mut o.yc);
+    transfer.u8(&mut o.ob_id);
+    transfer.u8(&mut o.ob_stat);
 }
 
 /// Saves or loads one missile (arrow, rock, fireball).
-fn transfer_missile(t: &mut Transfer, m: &mut Missile) {
-    t.u16(&mut m.abs_x);
-    t.u16(&mut m.abs_y);
-    t.u8(&mut m.missile_type);
-    t.u8(&mut m.time_of_flight);
-    t.u8(&mut m.speed);
-    t.u8(&mut m.direction);
-    t.u8(&mut m.archer);
+fn transfer_missile(transfer: &mut Transfer, m: &mut Missile) {
+    transfer.u16(&mut m.abs_x);
+    transfer.u16(&mut m.abs_y);
+    transfer.u8(&mut m.missile_type);
+    transfer.u8(&mut m.time_of_flight);
+    transfer.u8(&mut m.speed);
+    transfer.u8(&mut m.direction);
+    transfer.u8(&mut m.archer);
 }
 
 /// Saves or loads the three brothers' item lists and the missiles (the count `next_missile` is saved
 /// elsewhere).
-fn transfer_party(actors: &mut Actors, hero: &mut Hero, t: &mut Transfer) {
-    t.bytes(&mut hero.julstuff[..SAVED_STUFF_SLOTS]);
-    t.bytes(&mut hero.philstuff[..SAVED_STUFF_SLOTS]);
-    t.bytes(&mut hero.kevstuff[..SAVED_STUFF_SLOTS]);
+fn transfer_party(actors: &mut Actors, hero: &mut Hero, transfer: &mut Transfer) {
+    transfer.bytes(&mut hero.julstuff[..SAVED_STUFF_SLOTS]);
+    transfer.bytes(&mut hero.philstuff[..SAVED_STUFF_SLOTS]);
+    transfer.bytes(&mut hero.kevstuff[..SAVED_STUFF_SLOTS]);
 
     for missile in actors.missiles.iter_mut() {
-        transfer_missile(t, missile);
+        transfer_missile(transfer, missile);
     }
 }
 
 /// Writes (`Transfer::saving`) or reads the whole game state: the misc variables, the region, the
 /// actors, the inventories and missiles, the extents and the object lists.
-pub fn transfer_all(game: &mut Game, t: &mut Transfer) {
-    transfer_variables(game, t);
-    t.u16(&mut game.world.region);
+pub fn transfer_all(game: &mut Game, transfer: &mut Transfer) {
+    transfer_variables(game, transfer);
+    transfer.u16(&mut game.world.region);
 
-    t.u16(&mut game.actors.active);
-    t.u16(&mut game.actors.drawn);
-    t.u16(&mut game.actors.next_missile);
+    transfer.u16(&mut game.actors.active);
+    transfer.u16(&mut game.actors.drawn);
+    transfer.u16(&mut game.actors.next_missile);
 
-    for i in 0..game.actors.active as usize {
-        transfer_actor(t, &mut game.actors.list[i]);
+    for position in 0..game.actors.active as usize {
+        transfer_actor(transfer, &mut game.actors.list[position]);
     }
 
-    transfer_party(&mut game.actors, &mut game.hero, t);
+    transfer_party(&mut game.actors, &mut game.hero, transfer);
 
     for extent in game.extents.iter_mut().take(SAVED_EXTENTS) {
-        transfer_extent(t, extent);
+        transfer_extent(transfer, extent);
     }
 
     for object in game.objects.global.iter_mut().take(glbobs as usize) {
-        transfer_object(t, object);
+        transfer_object(transfer, object);
     }
 
     for count in game.objects.used.iter_mut().take(OBJECT_REGIONS) {
-        t.u16(count);
+        transfer.u16(count);
     }
 
     for count in game.objects.distributed.iter_mut().take(OBJECT_REGIONS) {
-        t.u16(count);
+        transfer.u16(count);
     }
 
-    for i in 0..OBJECT_REGIONS {
-        let count = game.objects.used[i];
+    for position in 0..OBJECT_REGIONS {
+        let count = game.objects.used[position];
 
-        for object in game.objects.region(i).iter_mut().take(count as usize) {
-            transfer_object(t, object);
+        for object in game
+            .objects
+            .region(position)
+            .iter_mut()
+            .take(count as usize)
+        {
+            transfer_object(transfer, object);
         }
     }
 }
@@ -282,31 +289,31 @@ mod tests {
 
     #[test]
     fn numbers_are_stored_big_endian() {
-        let mut t = Transfer::saving();
+        let mut transfer = Transfer::saving();
         let (mut word, mut byte, mut signed) = (0x1234u16, 0x56u8, -2i16);
-        t.u16(&mut word);
-        t.u8(&mut byte);
-        t.u16(&mut signed);
+        transfer.u16(&mut word);
+        transfer.u8(&mut byte);
+        transfer.u16(&mut signed);
 
-        assert_eq!(t.finish(), vec![0x12, 0x34, 0x56, 0xff, 0xfe]);
+        assert_eq!(transfer.finish(), vec![0x12, 0x34, 0x56, 0xff, 0xfe]);
     }
 
     #[test]
     fn reading_gives_back_what_was_written() {
-        let mut t = Transfer::loading(vec![0x12, 0x34, 0x56, 0xff, 0xfe]);
+        let mut transfer = Transfer::loading(vec![0x12, 0x34, 0x56, 0xff, 0xfe]);
         let (mut word, mut byte, mut signed) = (0u16, 0u8, 0i16);
-        t.u16(&mut word);
-        t.u8(&mut byte);
-        t.u16(&mut signed);
+        transfer.u16(&mut word);
+        transfer.u8(&mut byte);
+        transfer.u16(&mut signed);
 
         assert_eq!((word, byte, signed), (0x1234, 0x56, -2));
     }
 
     #[test]
     fn a_file_that_ends_early_leaves_the_rest_alone() {
-        let mut t = Transfer::loading(vec![0x12]);
+        let mut transfer = Transfer::loading(vec![0x12]);
         let mut word = 0x5678u16;
-        t.u16(&mut word);
+        transfer.u16(&mut word);
 
         assert_eq!(word, 0x1278);
     }

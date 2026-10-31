@@ -38,14 +38,14 @@ impl AudioCallback for Callback {
 
     /// Called by SDL when it needs more sound: mixes the music and effects into `out` (silence if
     /// another thread panicked while holding the sound state).
-    fn callback(&mut self, out: &mut [f32]) {
+    fn callback(&mut self, output: &mut [f32]) {
         match self.0.lock() {
-            Ok(mut s) => s.mix(out),
-            Err(_) => out.fill(0.0),
+            Ok(mut s) => s.mix(output),
+            Err(_) => output.fill(0.0),
         }
 
         if dump::enabled() {
-            dump::capture(out);
+            dump::capture(output);
         }
     }
 }
@@ -74,8 +74,10 @@ pub fn init(audio: &AudioSubsystem) {
             d.resume();
             std::mem::forget(d); // keep playing for the life of the program
 
-            if let Some(s) = shared {
-                let _ = SOUND.set(s);
+            if let Some(s) = shared
+                && SOUND.set(s).is_err()
+            {
+                eprintln!("Audio was already started; ignoring the second device");
             }
         }
 
@@ -95,4 +97,5 @@ fn with_sound(f: impl FnOnce(&mut Sound)) {
 pub use self::calls::{
     init_music, playsample, playscore, set_instrument, setscore, stopscore, wrap_music,
 };
+
 pub use self::sequencer::Track;

@@ -20,21 +20,21 @@ const SPEECH_NECROMANCER: i32 = 43;
 const SPEECH_DKNIGHT: i32 = 41;
 
 /// The nearest person says something when they come near (once per person).
-pub fn speak_nearby(game: &mut Game, out: &mut dyn Output) {
+pub fn speak_nearby(game: &mut Game, output: &mut dyn Output) {
     let race = game.actors.list[game.actors.nearest_person as usize].race as i16;
 
     if game.actors.nearest_person != 0 && race != game.actors.last_person {
         match race {
-            BEGGAR => speak(game, out, SPEECH_BEGGAR),
-            WITCH => speak(game, out, SPEECH_WITCH),
+            BEGGAR => speak(game, output, SPEECH_BEGGAR),
+            WITCH => speak(game, output, SPEECH_WITCH),
             PRINCESS => {
                 if game.objects.region[8][PRINCESS_FREED_SLOT].ob_stat != 0 {
-                    speak(game, out, SPEECH_PRINCESS);
+                    speak(game, output, SPEECH_PRINCESS);
                 }
             }
 
-            NECROMANCER => speak(game, out, SPEECH_NECROMANCER),
-            DKNIGHT => speak(game, out, SPEECH_DKNIGHT),
+            NECROMANCER => speak(game, output, SPEECH_NECROMANCER),
+            DKNIGHT => speak(game, output, SPEECH_DKNIGHT),
             _ => {}
         }
 

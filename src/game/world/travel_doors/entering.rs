@@ -66,7 +66,7 @@ pub(super) fn door_at(j: i32) -> &'static Door {
     &door_list[j as usize]
 }
 
-pub(super) fn enter_door(game: &mut Game, out: &mut dyn Output, xtest: u16, ytest: u16) {
+pub(super) fn enter_door(game: &mut Game, output: &mut dyn Output, xtest: u16, ytest: u16) {
     let Some(index) = find_outdoor_door(xtest, ytest) else {
         return;
     };
@@ -77,10 +77,16 @@ pub(super) fn enter_door(game: &mut Game, out: &mut dyn Output, xtest: u16, ytes
     if may_enter(d, game.hero.x, game.hero.y, statues) {
         let (x, y) = inside_spot(d);
         game.world.new_region = region_inside(d);
-        transfer_hero(game, out, x, y, 0);
-        find_place(game, out, 2);
+        transfer_hero(game, output, x, y, 0);
+        find_place(game, output, 2);
         let colors = game.page_colors;
-        fade_page(game, out, (FADE_WHITE, FADE_WHITE, FADE_WHITE), 1, &colors);
+        fade_page(
+            game,
+            output,
+            (FADE_WHITE, FADE_WHITE, FADE_WHITE),
+            1,
+            &colors,
+        );
     }
 }
 

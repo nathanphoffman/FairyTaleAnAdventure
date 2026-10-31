@@ -119,14 +119,14 @@ mod tests {
     }
 
     #[test]
-    fn weak_and_exhausted_hero_collapses_asleep() {
+    fn weak_exhausted_hero_collapses_asleep() {
         let (mut hero, mut body) = hero_with_body(80, COLLAPSE_FATIGUE + 1, WEAK_VITALITY);
         let report = hunger_effects(&mut hero, &mut body);
         assert_eq!((report.events, body.state), (vec![12], SLEEP));
     }
 
     #[test]
-    fn weak_and_starving_hero_faints_and_hunger_resets() {
+    fn weak_starving_hero_faints_resetting_hunger() {
         let (mut hero, mut body) =
             hero_with_body(FAINT_HUNGER + 8 - FAINT_HUNGER % 8, 0, WEAK_VITALITY);
         let report = hunger_effects(&mut hero, &mut body);

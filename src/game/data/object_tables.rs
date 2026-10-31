@@ -495,6 +495,7 @@ mod tests {
     fn every_region_has_room_for_its_used_objects() {
         let game = &mut Game::new();
         let capacity = [13, 11, 15, 22, 13, 15, 11, 11, 78, 9];
+
         for (region, room) in capacity.iter().enumerate() {
             assert!(game.objects.used[region] <= *room, "region {region}");
         }
@@ -503,8 +504,10 @@ mod tests {
     #[test]
     fn regions_with_random_treasure_have_ten_spare_entries() {
         let game = &mut Game::new();
+
         // regions not yet distributed (dstobs 0) get 10 new objects when first visited
         let capacity = [13, 11, 15, 22, 13, 15, 11, 11];
+
         for (region, room) in capacity.iter().enumerate() {
             assert!(game.objects.used[region] + 10 <= *room, "region {region}");
         }

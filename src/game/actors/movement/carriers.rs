@@ -5,6 +5,7 @@ use super::{
     SWAN_FILE, TERRAIN_DEEP_WATER, TERRAIN_WADE, TURTLE_STEP, TURTLE_WATER, WALKING, pos_x, pos_y,
     terrain,
 };
+
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
 
@@ -127,6 +128,7 @@ impl Ctx {
             game.actor(actor).abs_x as i32,
             game.actor(actor).abs_y as i32,
         );
+
         self.facing = turtle_heading(self.facing, |dir| {
             terrain(
                 game,
@@ -173,7 +175,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_swan_needs_the_lasso_and_the_turtle_does_not() {
+    fn the_swan_needs_the_lasso_where_the_turtle_does_not() {
         assert!(swan_carries(1, CARRIER_SLOT as i16, true));
         assert!(!swan_carries(1, CARRIER_SLOT as i16, false));
         assert!(!swan_carries(0, CARRIER_SLOT as i16, true));

@@ -143,12 +143,13 @@ fn body_image(actors: &Actors, hero: &Hero, actor: ActorRef, mut inum: i16) -> O
 /// Snakes use their own pictures; other enemies have two pictures per figure, picked by the race
 /// (the hero, actor 0, has just the one).
 fn pick_of_pair(actors: &Actors, actor: ActorRef, inum: i16) -> i16 {
-    let i = actor.slot();
+    let position = actor.slot();
+
     if actors.actor(actor).race == RACE_SNAKE {
         if actors.actor(actor).state < DYING {
             return inum + SNAKE_FIRST_IMAGE;
         }
-    } else if i > 0 {
+    } else if position > 0 {
         if actors.actor(actor).race & 1 != 0 {
             return inum | IMAGE_PAIR_BIT;
         }
@@ -203,9 +204,9 @@ fn sink_body(
     depth: i16,
     sprite: &mut Sprite,
 ) -> bool {
-    let i = actor.slot() as i32;
+    let position = actor.slot() as i32;
 
-    if i == 0 && hero.riding == RIDING_SWAN {
+    if position == 0 && hero.riding == RIDING_SWAN {
         sprite.ystop -= SWAN_LIFT;
     } else if depth == SHALLOW_DEPTH {
         sprite.ystop -= SHALLOW_HIDDEN_LINES;
@@ -219,7 +220,7 @@ fn sink_body(
         sprite.ystop = sprite.ystart + BUBBLES_HEIGHT;
         sprite.atype = OBJECTS;
 
-        sprite.inum = OBJ_SUNK + ((cycle as i32 + i) & 1) as i16;
+        sprite.inum = OBJ_SUNK + ((cycle as i32 + position) & 1) as i16;
     } else if depth > SHALLOW_DEPTH {
         sprite.ystart += depth;
     }

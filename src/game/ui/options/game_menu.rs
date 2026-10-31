@@ -17,41 +17,45 @@ const SAVE: i16 = 5;
 const EXIT: i16 = 6;
 
 /// Music on/off, and going to the save/exit and load menus.
-pub(super) fn game_option(game: &mut Game, out: &mut dyn Output, chosen_entry: i16) -> bool {
+pub(super) fn game_option(game: &mut Game, output: &mut dyn Output, chosen_entry: i16) -> bool {
     if chosen_entry == MUSIC {
         set_mood(game, 1);
     }
 
     if chosen_entry == QUIT {
-        go_to_menu(game, out, SAVEX as i16);
+        go_to_menu(game, output, SAVEX as i16);
     }
 
     if chosen_entry == LOAD {
         game.ui.saving = false;
-        go_to_menu(game, out, FILE as i16);
+        go_to_menu(game, output, FILE as i16);
     }
 
     true
 }
 
 /// Saving goes to the file menu; exiting ends the game.
-pub(super) fn save_exit_option(game: &mut Game, out: &mut dyn Output, chosen_entry: i16) -> bool {
+pub(super) fn save_exit_option(
+    game: &mut Game,
+    output: &mut dyn Output,
+    chosen_entry: i16,
+) -> bool {
     if chosen_entry == EXIT {
         game.ui.quit_requested = 1;
     }
 
     if chosen_entry == SAVE {
         game.ui.saving = true;
-        go_to_menu(game, out, FILE as i16);
+        go_to_menu(game, output, FILE as i16);
     }
 
     true
 }
 
 /// A save slot was chosen: save or load, then back to the game menu.
-pub(super) fn file_option(game: &mut Game, out: &mut dyn Output, chosen_entry: i16) -> bool {
-    savegame(game, out, chosen_entry, game.ui.saving);
-    go_to_menu(game, out, GAME as i16);
+pub(super) fn file_option(game: &mut Game, output: &mut dyn Output, chosen_entry: i16) -> bool {
+    savegame(game, output, chosen_entry, game.ui.saving);
+    go_to_menu(game, output, GAME as i16);
 
     true
 }

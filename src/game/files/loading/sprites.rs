@@ -47,29 +47,29 @@ const RAFT_FILE: i32 = 4;
 
 /// Loads the sprite sets the game starts with: objects, the current brother, the raft, the
 /// current monsters and set figures, then the region.
-pub fn load_start_sprites(game: &mut Game, out: &mut dyn Output) {
-    out.forget_sprites();
-    out.load_sprite_file(OBJECTS_FILE);
-    out.finish_sprite_load(OBJECTS as i16);
-    out.load_sprite_file(game.hero.brother as i32 - 1);
-    out.finish_sprite_load(PHIL as i16);
-    out.load_sprite_file(RAFT_FILE);
-    out.finish_sprite_load(RAFT as i16);
-    out.start_sprite_sheet(ENEMY);
-    out.load_sprite_file(game.actors.loaded_actor_file as i32);
-    out.finish_sprite_load(SPRITE_FILES[game.actors.loaded_actor_file as usize].seq_num as i16);
-    out.load_sprite_file(game.actors.loaded_setfig_file as i32);
-    out.finish_sprite_load(SETFIG as i16);
+pub fn load_start_sprites(game: &mut Game, output: &mut dyn Output) {
+    output.forget_sprites();
+    output.load_sprite_file(OBJECTS_FILE);
+    output.finish_sprite_load(OBJECTS as i16);
+    output.load_sprite_file(game.hero.brother as i32 - 1);
+    output.finish_sprite_load(PHIL as i16);
+    output.load_sprite_file(RAFT_FILE);
+    output.finish_sprite_load(RAFT as i16);
+    output.start_sprite_sheet(ENEMY);
+    output.load_sprite_file(game.actors.loaded_actor_file as i32);
+    output.finish_sprite_load(SPRITE_FILES[game.actors.loaded_actor_file as usize].seq_num as i16);
+    output.load_sprite_file(game.actors.loaded_setfig_file as i32);
+    output.finish_sprite_load(SETFIG as i16);
     game.world.new_region = game.world.region;
-    load_region_now(game, out);
+    load_region_now(game, output);
     motor_off();
 }
 
 /// Loads the next region once the previous disk read is done. In the original the disk was slow, so
 /// the game kept playing while a region loaded in the background and called this to check.
-pub fn load_pending_region(game: &mut Game, out: &mut dyn Output) {
+pub fn load_pending_region(game: &mut Game, output: &mut dyn Output) {
     if is_last_read_pending() == 0 || last_read_finished() != 0 {
-        load_region_piece(game, out);
+        load_region_piece(game, output);
     }
 }
 

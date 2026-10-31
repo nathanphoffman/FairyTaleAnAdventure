@@ -7,6 +7,7 @@ use super::{
     NOT_WALKING, RIGHT_BUTTON, SHOOT1, SHOOT3, SHOOTING_ZONE, SINK, SLEEP, STILL, STUMBLE_HUNGER,
     WALKING, WEAPON_BOW, WEAPON_WAND, ZONE_ARROW_FAST, ZONE_ARROW_SLOW,
 };
+
 use crate::game::data::state::Game;
 use crate::game::output::Output;
 
@@ -18,7 +19,7 @@ use crate::game::ui::text::show_event;
 
 /// Counts the timers down and sets the hero's state from the controls: the good fairy when dead
 /// or falling, shooting, riding, fighting or walking. `cycle` is the main loop's frame counter.
-pub fn update_hero(game: &mut Game, out: &mut dyn Output, cycle: i16) {
+pub fn update_hero(game: &mut Game, output: &mut dyn Output, cycle: i16) {
     game.world.light_timer = timer_step(game.world.light_timer);
     game.world.secret_timer = timer_step(game.world.secret_timer);
     game.world.freeze_timer = timer_step(game.world.freeze_timer);
@@ -31,12 +32,12 @@ pub fn update_hero(game: &mut Game, out: &mut dyn Output, cycle: i16) {
     let mut state = game.actors.list[0].state;
 
     if state == DEAD || state == FALL {
-        state = fairy_revival(game, out, state, cycle);
+        state = fairy_revival(game, output, state, cycle);
     } else if state == DYING || state == SINK || state == SLEEP {
         // nothing to do
     } else if mouse_buttons() & RIGHT_BUTTON != 0 || game.ui.fight_key_held != 0 || joystick_fire()
     {
-        state = fighting_state(game, out, state);
+        state = fighting_state(game, output, state);
     } else if state == SHOOT1 {
         state = SHOOT3; // release the arrow
     } else {
@@ -52,15 +53,15 @@ pub(super) fn timer_step(timer: i16) -> i16 {
 }
 
 /// The fight button is down: shoot in a shooting zone, dismount, or fight with the weapon held.
-pub(super) fn fighting_state(game: &mut Game, out: &mut dyn Output, state: i8) -> i8 {
+pub(super) fn fighting_state(game: &mut Game, output: &mut dyn Output, state: i8) -> i8 {
     let hero = ActorRef::new(0);
 
     if game.world.extent_type > SHOOTING_ZONE {
-        return enter_shooting_zone(game, out, state);
+        return enter_shooting_zone(game, output, state);
     }
 
     if game.hero.riding == BIRD {
-        try_to_dismount(game, out, hero);
+        try_to_dismount(game, output, hero);
 
         return state;
     }
@@ -77,13 +78,13 @@ pub(super) fn fighting_state(game: &mut Game, out: &mut dyn Output, state: i8) -
 }
 
 /// In a shooting zone the hero shoots; the two special zones say so the first time.
-fn enter_shooting_zone(game: &mut Game, out: &mut dyn Output, state: i8) -> i8 {
+fn enter_shooting_zone(game: &mut Game, output: &mut dyn Output, state: i8) -> i8 {
     if state != SHOOT1 && game.world.extent_type == ZONE_ARROW_SLOW {
-        show_event(game, out, EVENT_ZONE_81);
+        show_event(game, output, EVENT_ZONE_81);
     }
 
     if state != SHOOT1 && game.world.extent_type == ZONE_ARROW_FAST {
-        show_event(game, out, EVENT_ZONE_82);
+        show_event(game, output, EVENT_ZONE_82);
     }
 
     SHOOT1
@@ -91,11 +92,11 @@ fn enter_shooting_zone(game: &mut Game, out: &mut dyn Output, state: i8) -> i8 {
 
 /// On the bird, the fight button tries to land: not over lava, not when moving too fast, and only
 /// where there is room to stand.
-fn try_to_dismount(game: &mut Game, out: &mut dyn Output, hero: ActorRef) {
+fn try_to_dismount(game: &mut Game, output: &mut dyn Output, hero: ActorRef) {
     let (dif_x, dif_y) = (game.actor(hero).vel_x, game.actor(hero).vel_y);
 
     if game.actors.fiery_death != 0 {
-        show_event(game, out, EVENT_LAVA);
+        show_event(game, output, EVENT_LAVA);
     } else if dif_x > -DISMOUNT_SPEED
         && dif_x < DISMOUNT_SPEED
         && dif_y > -DISMOUNT_SPEED
@@ -115,7 +116,7 @@ fn try_to_dismount(game: &mut Game, out: &mut dyn Output, hero: ActorRef) {
             game.actor_mut(hero).abs_y = ytest;
         }
     } else {
-        show_event(game, out, EVENT_TOO_FAST);
+        show_event(game, output, EVENT_TOO_FAST);
     }
 }
 
@@ -211,7 +212,7 @@ mod tests {
     }
 
     #[test]
-    fn timers_count_down_and_stop_at_zero() {
+    fn timers_count_down_stopping_at_zero() {
         assert_eq!(timer_step(3), 2);
         assert_eq!(timer_step(1), 0);
         assert_eq!(timer_step(0), 0);

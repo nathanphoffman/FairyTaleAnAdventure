@@ -4,6 +4,7 @@ use super::{
     Ctx, DEAD, DYING, PERSON_DEAD_OFFSET, PERSON_DYING_OFFSET, PERSON_MASK, Pc, SETFIG_WITCH,
     STILL, TALKING, WITCH_EXTRA_OFFSET,
 };
+
 use crate::game::data::state::Game;
 
 use crate::game::actors::steering::steer_actor;

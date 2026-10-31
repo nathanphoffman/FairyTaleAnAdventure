@@ -4,6 +4,7 @@ use super::{
     CODE_MASK, DISPLAYED, FIRST_ACTION_MENU, FIRST_MENU_CLICK, LETTER_COUNT, PRQ_OPTIONS, RELEASED,
     SAVEX, SELECTED, TYPE_IMMEDIATE, TYPE_MASK, TYPE_RADIO, TYPE_TOGGLE,
 };
+
 use crate::game::data::state::Game;
 use crate::game::output::Output;
 
@@ -15,7 +16,7 @@ use crate::game::ui::text::queue_print;
 
 /// A click on a menu slot (the mouse sends 'a' + slot for the button going down, and the same
 /// with bit 7 set for it coming up).
-pub(super) fn menu_click(game: &mut Game, out: &mut dyn Output, key: i8, notpause: bool) {
+pub(super) fn menu_click(game: &mut Game, output: &mut dyn Output, key: i8, notpause: bool) {
     let slot = ((key & CODE_MASK) - FIRST_MENU_CLICK) as i16;
     game.ui.chosen_entry = game.ui.slot_entries[slot as usize];
     let chosen_entry = game.ui.chosen_entry as i16;
@@ -24,7 +25,7 @@ pub(super) fn menu_click(game: &mut Game, out: &mut dyn Output, key: i8, notpaus
 
     if key & RELEASED != 0 {
         if valid {
-            print_menu_entry(game, out, slot, 0);
+            print_menu_entry(game, output, slot, 0);
         }
 
         return;
@@ -36,14 +37,14 @@ pub(super) fn menu_click(game: &mut Game, out: &mut dyn Output, key: i8, notpaus
         return;
     }
 
-    press_entry(game, out, slot, chosen_entry, notpause);
+    press_entry(game, output, slot, chosen_entry, notpause);
 }
 
 /// Presses a valid menu entry according to its type: toggles, immediate actions and radio buttons
 /// work even when paused; the rest (menu names) only when not.
 fn press_entry(
     game: &mut Game,
-    out: &mut dyn Output,
+    output: &mut dyn Output,
     slot: i16,
     chosen_entry: i16,
     notpause: bool,
@@ -60,18 +61,19 @@ fn press_entry(
         game.menus[menu].enabled[entry] ^= SELECTED;
         print_menu_entry(
             game,
-            out,
+            output,
             slot,
             (game.menus[menu].enabled[entry] & SELECTED) as i16,
         );
-        choose_menu_entry(game, out, chosen_entry);
+
+        choose_menu_entry(game, output, chosen_entry);
     } else if kind == TYPE_IMMEDIATE {
-        print_menu_entry(game, out, slot, 1);
-        choose_menu_entry(game, out, chosen_entry);
+        print_menu_entry(game, output, slot, 1);
+        choose_menu_entry(game, output, chosen_entry);
     } else if kind == TYPE_RADIO {
         game.menus[menu].enabled[entry] |= SELECTED;
-        print_menu_entry(game, out, slot, 1);
-        choose_menu_entry(game, out, chosen_entry);
+        print_menu_entry(game, output, slot, 1);
+        choose_menu_entry(game, output, chosen_entry);
     } else if !notpause {
         // paused: only the menu types above work
     } else if kind == 0 && chosen_entry < FIRST_ACTION_MENU {
@@ -80,7 +82,7 @@ fn press_entry(
     } else {
         print_menu_entry(
             game,
-            out,
+            output,
             slot,
             (game.menus[menu].enabled[entry] & SELECTED) as i16,
         );
@@ -88,7 +90,7 @@ fn press_entry(
 }
 
 /// A keyboard shortcut for a menu entry. Letters only work for the Save/Exit menu while it is open.
-pub(super) fn menu_letter(game: &mut Game, out: &mut dyn Output, key: i8) {
+pub(super) fn menu_letter(game: &mut Game, output: &mut dyn Output, key: i8) {
     for shortcut in menu_shortcuts.iter().take(LETTER_COUNT) {
         if shortcut.letter != key {
             continue;
@@ -109,8 +111,8 @@ pub(super) fn menu_letter(game: &mut Game, out: &mut dyn Output, key: i8) {
             *entry ^= SELECTED;
         }
 
-        choose_menu_entry(game, out, game.ui.chosen_entry as i16);
-        print_options(game, out);
+        choose_menu_entry(game, output, game.ui.chosen_entry as i16);
+        print_options(game, output);
 
         break;
     }

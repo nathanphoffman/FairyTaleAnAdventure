@@ -10,10 +10,10 @@ use crate::game::output::Output;
 use crate::game::ui::messages::print_wrapped;
 
 /// Searches the dead body `nearest_object`: takes its weapon and any treasure.
-pub(super) fn search_body(game: &mut Game, out: &mut dyn Output) {
+pub(super) fn search_body(game: &mut Game, output: &mut dyn Output) {
     let actor = ActorRef::new(game.actors.nearest_object as usize);
-    print_wrapped(game, out, "% searched the body and found");
-    out.print("");
+    print_wrapped(game, output, "% searched the body and found");
+    output.print("");
     let (body_weapon, hero_weapon) = (game.actor(actor).weapon, game.actors.list[0].weapon);
     let race = game.actor(actor).race;
     let rng = &mut game.rng;
@@ -24,26 +24,26 @@ pub(super) fn search_body(game: &mut Game, out: &mut dyn Output) {
 
     game.actor_mut(actor).weapon = -1;
 
-    take_found_weapon(game, out, &loot);
+    take_found_weapon(game, output, &loot);
 
     if let Some(arrows) = loot.arrows {
-        out.print_cont(" and ");
-        out.print_number(arrows, 1);
-        out.print_cont(" Arrows.");
+        output.print_cont(" and ");
+        output.print_number(arrows, 1);
+        output.print_cont(" Arrows.");
         add_stuff(game, ARROWS, arrows as u8);
 
         return;
     }
 
-    take_treasure(game, out, &loot);
-    out.print_cont(".");
+    take_treasure(game, output, &loot);
+    output.print_cont(".");
 }
 
 /// Says what weapon was found, adds it to the pack, and arms the hero with it if it is better.
-fn take_found_weapon(game: &mut Game, out: &mut dyn Output, loot: &BodyLoot) {
+fn take_found_weapon(game: &mut Game, output: &mut dyn Output, loot: &BodyLoot) {
     if loot.weapon != 0 {
-        out.print_cont("a ");
-        out.print_cont(item_name(loot.weapon as usize - 1));
+        output.print_cont("a ");
+        output.print_cont(item_name(loot.weapon as usize - 1));
         add_stuff(game, loot.weapon as usize - 1, 1);
         game.actors.list[0].weapon = loot.hero_weapon;
     }
@@ -51,17 +51,17 @@ fn take_found_weapon(game: &mut Game, out: &mut dyn Output, loot: &BodyLoot) {
 
 /// Says what other treasure was found and takes it: gold into the purse, anything else into the
 /// pack. Says "nothing" if there was neither weapon nor treasure.
-fn take_treasure(game: &mut Game, out: &mut dyn Output, loot: &BodyLoot) {
+fn take_treasure(game: &mut Game, output: &mut dyn Output, loot: &BodyLoot) {
     if loot.treasure != 0 {
         if loot.weapon != 0 {
-            out.print_cont(" and ");
+            output.print_cont(" and ");
         }
 
         if loot.treasure < GOLDBASE as u32 {
-            out.print_cont("a ");
+            output.print_cont("a ");
         }
 
-        out.print_cont(item_name(loot.treasure as usize));
+        output.print_cont(item_name(loot.treasure as usize));
 
         if loot.treasure >= GOLDBASE as u32 {
             game.hero.wealth += item(loot.treasure as usize).maxshown as i16;
@@ -69,7 +69,7 @@ fn take_treasure(game: &mut Game, out: &mut dyn Output, loot: &BodyLoot) {
             add_stuff(game, loot.treasure as usize, 1);
         }
     } else if loot.weapon == 0 {
-        out.print_cont("nothing");
+        output.print_cont("nothing");
     }
 }
 
@@ -151,6 +151,7 @@ fn better_weapon(current: i8, found: u32) -> i8 {
 fn roll_body_treasure(race: u8, rng: &mut Rng) -> u32 {
     const SETFIG_RACE_BIT: u8 = 0x80;
     const TREASURE_CLASS_SIZE: i32 = 8;
+
     if race & SETFIG_RACE_BIT != 0 {
         return 0;
     }
@@ -188,6 +189,7 @@ mod tests {
             LootRoll::Arrows => 5,
             LootRoll::Treasure => unreachable!(),
         });
+
         assert_eq!(
             (l.weapon, l.arrows, l.treasure, l.hero_weapon),
             (4, Some(5), 0, 4)

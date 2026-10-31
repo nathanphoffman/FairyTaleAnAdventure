@@ -48,14 +48,14 @@ fn ticks_from_env(name: &str) -> u32 {
 
 /// The frame as a binary PPM image.
 fn frame_as_ppm(frame: &[u32]) -> Vec<u8> {
-    let mut out = format!("P6\n{WIDTH} {HEIGHT}\n255\n").into_bytes();
+    let mut output = format!("P6\n{WIDTH} {HEIGHT}\n255\n").into_bytes();
 
     for px in frame {
         // The pixel as red, green and blue bytes.
-        out.extend_from_slice(&[(px >> 16) as u8, (px >> 8) as u8, *px as u8]);
+        output.extend_from_slice(&[(px >> 16) as u8, (px >> 8) as u8, *px as u8]);
     }
 
-    out
+    output
 }
 
 /// FTA_SHOT=file.ppm saves the screen after FTA_SHOT_AFTER ticks and quits.
@@ -96,7 +96,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ppm_has_header_and_three_bytes_per_pixel() {
+    fn ppm_has_header_with_three_bytes_per_pixel() {
         let ppm = frame_as_ppm(&[0xFF8040, 0x000001]);
         let header = format!("P6\n{WIDTH} {HEIGHT}\n255\n").len();
         assert_eq!(ppm.len(), header + 6);

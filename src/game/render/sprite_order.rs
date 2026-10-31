@@ -26,23 +26,23 @@ pub fn sort_actors(game: &mut Game) {
     game.actors.nearest_person = 0;
     game.actors.nearest_person_distance = PERSON_RANGE;
 
-    for i in 0..game.actors.drawn as usize {
-        game.actors.draw_order[i] = i as u8;
+    for index in 0..game.actors.drawn as usize {
+        game.actors.draw_order[index] = index as u8;
     }
 
-    for i in 0..game.actors.drawn as usize {
-        let actor = ActorRef::new(i);
+    for index in 0..game.actors.drawn as usize {
+        let actor = ActorRef::new(index);
 
-        if i != 0
+        if index != 0
             && game.actor(actor).kind != OBJECTS
             && game.actor(actor).state != DEAD
             && game.hero.riding != BIRD
         {
-            let dist = actor_distance(game, i as i32, 0) as i16;
+            let dist = actor_distance(game, index as i32, 0) as i16;
 
             if dist < game.actors.nearest_person_distance {
                 game.actors.nearest_person_distance = dist;
-                game.actors.nearest_person = i as i16;
+                game.actors.nearest_person = index as i16;
             }
         }
 

@@ -33,21 +33,21 @@ pub(super) const WHOOSH_MARGIN: i16 = 2;
 
 /// Everything not walking swings its weapon (or bites) at whatever is within reach of the tip:
 /// `hit_actor` if it lands, a whoosh if it nearly does. Only the hero acts while time is frozen.
-pub fn resolve_melee(game: &mut Game, out: &mut dyn Output) {
-    let mut i = 0;
+pub fn resolve_melee(game: &mut Game, output: &mut dyn Output) {
+    let mut index = 0;
 
-    while i < game.actors.active as usize {
-        if i > 0 && game.world.freeze_timer != 0 {
+    while index < game.actors.active as usize {
+        if index > 0 && game.world.freeze_timer != 0 {
             break;
         }
 
-        let attacker = ActorRef::new(i);
+        let attacker = ActorRef::new(index);
 
-        if i != RAFT && game.actor(attacker).state < WALKING {
-            swing(game, out, i);
+        if index != RAFT && game.actor(attacker).state < WALKING {
+            swing(game, output, index);
         }
 
-        i += 1;
+        index += 1;
     }
 }
 
@@ -92,8 +92,8 @@ struct Swing {
 }
 
 /// One actor's swing.
-pub(super) fn swing(game: &mut Game, out: &mut dyn Output, i: usize) {
-    let attacker = ActorRef::new(i);
+pub(super) fn swing(game: &mut Game, output: &mut dyn Output, index: usize) {
+    let attacker = ActorRef::new(index);
     let Some(base) = melee_weapon(game.actor(attacker).weapon as i16) else {
         return;
     };
@@ -101,11 +101,11 @@ pub(super) fn swing(game: &mut Game, out: &mut dyn Output, i: usize) {
     let strength = base + bitrand(&mut game.rng, 2) as i16;
     let facing = game.actor(attacker).facing as i32;
     let swing = Swing {
-        attacker: i,
+        attacker: index,
         facing,
         strength,
         tip: weapon_tip(game, attacker, facing, strength),
-        reach: if i == 0 {
+        reach: if index == 0 {
             hero_reach(game.hero.brave)
         } else {
             enemy_reach(rand4(&mut game.rng) as i16)
@@ -113,7 +113,7 @@ pub(super) fn swing(game: &mut Game, out: &mut dyn Output, i: usize) {
     };
 
     for j in 0..game.actors.active as usize {
-        if swing_at(game, out, &swing, j) {
+        if swing_at(game, output, &swing, j) {
             break;
         }
     }
@@ -121,7 +121,7 @@ pub(super) fn swing(game: &mut Game, out: &mut dyn Output, i: usize) {
 
 /// Swings at actor `j` if it is a target (not the raft, the attacker, the dead, or by a carrier).
 /// Returns true when the swing hit, which ends it.
-fn swing_at(game: &mut Game, out: &mut dyn Output, swing: &Swing, j: usize) -> bool {
+fn swing_at(game: &mut Game, output: &mut dyn Output, swing: &Swing, j: usize) -> bool {
     let attacker = ActorRef::new(swing.attacker);
     let target = ActorRef::new(j);
 
@@ -147,7 +147,7 @@ fn swing_at(game: &mut Game, out: &mut dyn Output, swing: &Swing, j: usize) -> b
         SwingResult::Hit => {
             hit_actor(
                 game,
-                out,
+                output,
                 swing.attacker as i32,
                 j as i32,
                 swing.facing,
@@ -375,7 +375,7 @@ mod tests {
     }
 
     #[test]
-    fn nothing_hits_while_time_is_frozen_and_touches_are_silent() {
+    fn nothing_hits_while_time_is_frozen_with_silent_touches() {
         assert_eq!(
             swing_result(
                 &SwingFacts {

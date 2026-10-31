@@ -51,6 +51,7 @@ fn edge(dir: i16, fp: &FPage) -> ((i16, i16), (i16, i16)) {
 fn side(p1: (i16, i16), p2: (i16, i16), xh: i16, yh: i16) -> i16 {
     let (dx, dy) = (p2.0.wrapping_sub(p1.0), p2.1.wrapping_sub(p1.1));
     let (dx1, dy1) = (xh.wrapping_sub(p1.0), yh.wrapping_sub(p1.1));
+
     (dx as i32 * dy1 as i32 - dy as i32 * dx1 as i32) as i16
 }
 

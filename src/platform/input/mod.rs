@@ -69,9 +69,9 @@ fn set_fire(down: bool) {
 
 /// Sets one direction input (0-3 keyboard up/down/left/right, 4-7 the same on the gamepad) and
 /// sends the matching keypad direction key to the game.
-fn direction(i: usize, down: bool) {
+fn direction(index: usize, down: bool) {
     let mut a = ARROWS.with(|c| c.get());
-    a[i] = down;
+    a[index] = down;
     ARROWS.with(|c| c.set(a));
 
     // arrows are turned into the keypad direction keys, so two arrows give a diagonal
@@ -111,8 +111,8 @@ pub fn key_event(key: Keycode, down: bool) {
 
     let key = config::remapped(key);
 
-    if let Some(i) = arrow_index(key) {
-        direction(i, down);
+    if let Some(index) = arrow_index(key) {
+        direction(index, down);
     } else if key == Keycode::LCtrl || key == Keycode::RCtrl {
         set_fire(down);
     } else {
@@ -132,6 +132,7 @@ pub fn mouse_move(frame_x: i32, frame_y: i32) {
     if let Some(host) = host() {
         host.mouse_moved(x, y);
     }
+
     let clamped = (
         x.clamp(POINTER_X_RANGE.0, POINTER_X_RANGE.1),
         y.clamp(POINTER_Y_RANGE.0, POINTER_Y_RANGE.1),

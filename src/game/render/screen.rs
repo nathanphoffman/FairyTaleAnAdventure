@@ -29,6 +29,7 @@ pub enum BitmapId {
 }
 
 impl BitmapId {
+    // The position of this id in the screen's list.
     fn index(self) -> usize {
         match self {
             BitmapId::Page1 => 0,
@@ -61,6 +62,7 @@ pub enum PortId {
 }
 
 impl PortId {
+    // The position of this id in the screen's list.
     fn index(self) -> usize {
         match self {
             PortId::Map => 0,
@@ -232,7 +234,7 @@ impl Screen {
     /// Makes the bitmaps, pens and view ports, and the memory the sprite blitter works in.
     pub fn set_up(&mut self, compass: [&[u8]; 2]) {
         self.make_bitmaps(compass);
-        self.make_rasters_and_ports();
+        self.make_rasters_with_ports();
         self.make_view_ports();
 
         self.queue_region = vec![0; BLITTER_REGION];
@@ -249,13 +251,14 @@ impl Screen {
             BitmapId::Text,
             Bitmap::new(TEXT_WIDTH, TEXT_ROWS, TEXT_DEPTH),
         );
+
         self.set_bitmap(BitmapId::PageA, page());
         self.set_bitmap(BitmapId::PageB, page());
         self.compass = compass.map(|data| Bitmap::from_plane(COMPASS_WIDTH, COMPASS_ROWS, data));
     }
 
     /// Which bitmap each raster shows, which page is drawn and shown, and where each port draws.
-    fn make_rasters_and_ports(&mut self) {
+    fn make_rasters_with_ports(&mut self) {
         let at_origin = |bitmap| RasInfo { bitmap, x: 0, y: 0 };
 
         self.ras = [
@@ -490,6 +493,7 @@ impl Screen {
     /// Sets one colour of a view port from its red, green and blue (4 bits each).
     pub fn set_color(&mut self, id: ViewPortId, n: usize, (r, g, b): (u32, u32, u32)) {
         if let Some(color) = self.view_port_mut(id).colors.get_mut(n) {
+            // Packs the three components into one 12 bit colour: each masked to its width, then moved to its place.
             *color = ((r & COMPONENT_MASK) << RED_SHIFT
                 | (g & COMPONENT_MASK) << GREEN_SHIFT
                 | (b & COMPONENT_MASK)) as u16;
@@ -563,7 +567,10 @@ mod tests {
         s.move_to(PortId::Text, 0, 8);
         s.text(PortId::Text, b"A");
 
+        // True if some pixel in the 8x8 cell is set, i.e. the glyph drew something.
         assert!((0..8).any(|y| (0..8).any(|x| s.bitmap(BitmapId::Text).pixel(x, y) == 1)));
+
+        // True if every pixel in the 8x8 cell is 0 or 1 (a single plane).
         assert!((0..8).all(|y| (0..8).all(|x| s.bitmap(BitmapId::Text).pixel(x, y) <= 1)));
     }
 

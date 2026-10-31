@@ -8,6 +8,7 @@ use super::{
     ARROWBASE, ARROWS, CHEST, FRUIT_SLOT, GOLDBASE, OBJECTS, PRQ_VITALITY, SACKS, TALISMAN, URN,
     add_stuff, item_name,
 };
+
 use crate::game::data::state::ActorRef;
 use crate::game::data::state::Game;
 use crate::game::output::Output;
@@ -53,11 +54,12 @@ const EVENT_FRUIT_KEPT: i32 = 36;
 const FIRST_INDOOR_REGION: u16 = 7;
 
 /// Takes the nearest object, or searches the nearest dead body.
-pub(super) fn take_nearest(game: &mut Game, out: &mut dyn Output) {
+pub(super) fn take_nearest(game: &mut Game, output: &mut dyn Output) {
     queue_print(&mut game.ui, PRQ_VITALITY);
     find_nearest_figure(game, 0, TAKE_RANGE);
 
     game.hero.stuff_mut()[ARROWBASE] = 0;
+
     if game.actors.nearest_object == 0 {
         queue_print(&mut game.ui, PRQ_NOTHING_NEAR);
 
@@ -67,21 +69,21 @@ pub(super) fn take_nearest(game: &mut Game, out: &mut dyn Output) {
     let actor = ActorRef::new(game.actors.nearest_object as usize);
 
     if game.actor(actor).kind == OBJECTS {
-        if take_object(game, out) {
-            finish_pickup(game, out);
+        if take_object(game, output) {
+            finish_pickup(game, output);
         }
     } else if game.actor(actor).weapon < 0 {
         // already searched
     } else if game.actor(actor).vitality == 0 || game.world.freeze_timer != 0 {
-        search_body(game, out);
+        search_body(game, output);
     } else {
-        show_event(game, out, EVENT_ALIVE);
+        show_event(game, output, EVENT_ALIVE);
     }
 }
 
 /// Removes the picked-up object from the world, turns any arrows picked up into the arrow
 /// count, and ends the game if the talisman was found.
-fn finish_pickup(game: &mut Game, out: &mut dyn Output) {
+fn finish_pickup(game: &mut Game, output: &mut dyn Output) {
     change_object(
         &mut game.objects,
         &game.actors,
@@ -89,6 +91,7 @@ fn finish_pickup(game: &mut Game, out: &mut dyn Output) {
         game.actors.nearest_object as i32,
         2,
     );
+
     add_stuff(
         game,
         ARROWS,
@@ -98,14 +101,14 @@ fn finish_pickup(game: &mut Game, out: &mut dyn Output) {
     if game.hero.stuff()[TALISMAN] != 0 {
         game.ui.quit_requested = 1;
         game.ui.view_status = VIEW_GAME_OVER;
-        map_message(game, out);
-        out.use_story_font();
-        win_colors(game, out);
+        map_message(game, output);
+        output.use_story_font();
+        win_colors(game, output);
     }
 }
 
 /// Handles taking the object `nearest_object`. Returns true if it was taken (so it must be removed).
-fn take_object(game: &mut Game, out: &mut dyn Output) -> bool {
+fn take_object(game: &mut Game, output: &mut dyn Output) -> bool {
     let actor = ActorRef::new(game.actors.nearest_object as usize);
     let id = game.actor(actor).index as u8 as u32;
 
@@ -113,34 +116,34 @@ fn take_object(game: &mut Game, out: &mut dyn Output) -> bool {
 
     match classify_take(id, game.hero.hunger, game.world.region) {
         Take::Gold => {
-            announce_treasure(game, out, "50 gold pieces");
+            announce_treasure(game, output, "50 gold pieces");
             game.hero.wealth += GOLD_FOUND;
 
             true
         }
 
-        Take::Paper { indoors } => read_paper(game, out, indoors),
-        Take::Fruit { keep } => take_fruit(game, out, keep),
+        Take::Paper { indoors } => read_paper(game, output, indoors),
+        Take::Fruit { keep } => take_fruit(game, output, keep),
         Take::Eggs => false, // not taken
-        Take::Bones => take_brothers_goods(game, out, owner),
+        Take::Bones => take_brothers_goods(game, output, owner),
 
         Take::Container(name) => {
-            announce_container(game, out, name);
+            announce_container(game, output, name);
 
-            container_contents(game, out)
+            container_contents(game, output)
         }
 
         Take::Left => false,
-        Take::Plain => take_plain_item(game, out, id),
+        Take::Plain => take_plain_item(game, output, id),
     }
 }
 
 /// Reads the scrap of paper; what it says depends on being indoors.
-fn read_paper(game: &mut Game, out: &mut dyn Output, indoors: bool) -> bool {
-    show_event(game, out, EVENT_PAPER);
+fn read_paper(game: &mut Game, output: &mut dyn Output, indoors: bool) -> bool {
+    show_event(game, output, EVENT_PAPER);
     show_event(
         game,
-        out,
+        output,
         if indoors {
             EVENT_PAPER_INDOORS
         } else {
@@ -152,12 +155,12 @@ fn read_paper(game: &mut Game, out: &mut dyn Output, indoors: bool) -> bool {
 }
 
 /// Fruit is kept in the pack when the hero is not hungry, and eaten otherwise.
-fn take_fruit(game: &mut Game, out: &mut dyn Output, keep: bool) -> bool {
+fn take_fruit(game: &mut Game, output: &mut dyn Output, keep: bool) -> bool {
     if keep {
         add_stuff(game, FRUIT_SLOT, 1);
-        show_event(game, out, EVENT_FRUIT_KEPT);
+        show_event(game, output, EVENT_FRUIT_KEPT);
     } else {
-        eat_food(game, out, FRUIT_HUNGER);
+        eat_food(game, output, FRUIT_HUNGER);
     }
 
     true
@@ -165,8 +168,8 @@ fn take_fruit(game: &mut Game, out: &mut dyn Output, keep: bool) -> bool {
 
 /// Picks up a fallen brother's bones and everything he carried (`owner` 1 is Julian, otherwise
 /// Phillip).
-fn take_brothers_goods(game: &mut Game, out: &mut dyn Output, owner: u32) -> bool {
-    announce_treasure(game, out, "his brother's bones.");
+fn take_brothers_goods(game: &mut Game, output: &mut dyn Output, owner: u32) -> bool {
+    announce_treasure(game, output, "his brother's bones.");
     game.objects.global[BONES.0].ob_stat = 0;
     game.objects.global[BONES.1].ob_stat = 0;
 
@@ -243,13 +246,13 @@ fn item_slot(id: u32, table: &[u8]) -> Option<usize> {
 }
 
 /// A single item lying about: the slot is found in the `itrans` table. Unknown objects are left.
-fn take_plain_item(game: &mut Game, out: &mut dyn Output, id: u32) -> bool {
+fn take_plain_item(game: &mut Game, output: &mut dyn Output, id: u32) -> bool {
     match item_slot(id, &itrans) {
         Some(slot) => {
             add_stuff(game, slot, 1);
-            announce_treasure(game, out, "a ");
-            out.print_cont(item_name(slot));
-            out.print_cont(".");
+            announce_treasure(game, output, "a ");
+            output.print_cont(item_name(slot));
+            output.print_cont(".");
 
             true
         }

@@ -81,40 +81,41 @@ impl LineBuffer {
 /// a line reaches 37 characters it is cut at that space (the space becomes the end of the string)
 /// and printed, and the leftover characters start the next line. The message ends at a zero byte
 /// (or the end of `message`).
-pub fn print_wrapped(game: &mut Game, out: &mut dyn Output, message: impl AsRef<[u8]>) {
+pub fn print_wrapped(game: &mut Game, output: &mut dyn Output, message: impl AsRef<[u8]>) {
     let message = message.as_ref();
     let mut buffer = LineBuffer {
         bytes: [0; LINE_BUFFER],
         end: 0,
     };
+
     let mut chars = message.iter().copied().chain(std::iter::repeat(0));
     let mut line_start = 0;
-    let mut i: i16 = 0;
+    let mut index: i16 = 0;
 
     loop {
-        let line_break = copy_up_to_a_line(game, &mut chars, &mut buffer, &mut i);
+        let line_break = copy_up_to_a_line(game, &mut chars, &mut buffer, &mut index);
 
         if let Some(line_break) = line_break {
             // found a wrap point: end the line and print it
             buffer.terminate(line_break);
-            out.print_bytes(buffer.line(line_start));
+            output.print_bytes(buffer.line(line_start));
 
-            if i > END_COLUMN {
+            if index > END_COLUMN {
                 break;
             }
 
-            i = (buffer.end as isize - (line_break + 1) as isize) as i16;
+            index = (buffer.end as isize - (line_break + 1) as isize) as i16;
             line_start = line_break + 1;
         } else {
             // no wrap point, so print the whole thing
             buffer.put(0);
 
-            if i > END_COLUMN {
+            if index > END_COLUMN {
                 break;
             }
 
-            out.print_bytes(buffer.line(line_start));
-            i = 0;
+            output.print_bytes(buffer.line(line_start));
+            index = 0;
             line_start = buffer.end;
         }
     }
@@ -126,11 +127,11 @@ fn copy_up_to_a_line(
     game: &mut Game,
     chars: &mut impl Iterator<Item = u8>,
     buffer: &mut LineBuffer,
-    i: &mut i16,
+    index: &mut i16,
 ) -> Option<usize> {
     let mut line_break = None; // end of the current line
 
-    while *i < WRAP_COLUMN {
+    while *index < WRAP_COLUMN {
         let c = chars.next().unwrap_or(0);
 
         if c == b' ' {
@@ -140,46 +141,47 @@ fn copy_up_to_a_line(
         if c == 0 {
             line_break = Some(buffer.end);
             buffer.terminate(buffer.end);
-            *i = MESSAGE_ENDED;
+            *index = MESSAGE_ENDED;
         }
 
         if c == CARRIAGE_RETURN {
             line_break = Some(buffer.end);
             buffer.terminate(buffer.end);
+
             break;
         }
 
         if c == NAME_MARK {
-            *i += buffer.put_brother_name(game);
+            *index += buffer.put_brother_name(game);
         } else {
             buffer.put(c);
         }
 
-        *i += 1;
+        *index += 1;
     }
 
     line_break
 }
 
 /// Prints "<Brother> found <container> containing ", ready for the contents to be added.
-pub fn announce_container(game: &mut Game, out: &mut dyn Output, s: &str) {
+pub fn announce_container(game: &mut Game, output: &mut dyn Output, s: &str) {
     let name = brother_name(game);
-    out.print(name);
-    out.print_cont(" found ");
-    out.print_cont(s);
-    out.print_cont(" containing ");
+    output.print(name);
+    output.print_cont(" found ");
+    output.print_cont(s);
+    output.print_cont(" containing ");
 }
 
 /// Prints "<Brother> found <treasure>".
-pub fn announce_treasure(game: &mut Game, out: &mut dyn Output, s: &str) {
+pub fn announce_treasure(game: &mut Game, output: &mut dyn Output, s: &str) {
     let name = brother_name(game);
-    out.print(name);
-    out.print_cont(" found ");
-    out.print_cont(s);
+    output.print(name);
+    output.print_cont(" found ");
+    output.print_cont(s);
 }
 
 /// Adds the current brother's name to the line being printed.
-pub fn name(game: &mut Game, out: &mut dyn Output) {
+pub fn name(game: &mut Game, output: &mut dyn Output) {
     let name = brother_name(game);
-    out.print_cont(name);
+    output.print_cont(name);
 }

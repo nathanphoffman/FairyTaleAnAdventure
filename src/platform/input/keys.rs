@@ -117,7 +117,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn letters_and_digits_become_ascii() {
+    fn letters_with_digits_become_ascii() {
         assert_eq!(translate(Keycode::A), b'A');
         assert_eq!(translate(Keycode::Z), b'Z');
         assert_eq!(translate(Keycode::Num0), b'0');
@@ -125,7 +125,7 @@ mod tests {
     }
 
     #[test]
-    fn function_and_keypad_keys_use_the_game_codes() {
+    fn function_plus_keypad_keys_use_the_game_codes() {
         assert_eq!(translate(Keycode::F1), 10);
         assert_eq!(translate(Keycode::F10), 19);
         assert_eq!(translate(Keycode::Kp7), 20);

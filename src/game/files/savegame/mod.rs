@@ -25,8 +25,8 @@ const PRINT_VITALITY: i32 = 4;
 const PRINT_STATS: i32 = 7;
 
 /// Saves the game into slot `slot` (0 = A ...) when `saving`, or loads it from there.
-pub fn savegame(game: &mut Game, out: &mut dyn Output, slot: i16, saving: bool) {
-    set_current_font(out, FontKind::Panel);
+pub fn savegame(game: &mut Game, output: &mut dyn Output, slot: i16, saving: bool) {
+    set_current_font(output, FontKind::Panel);
 
     let name = format!(
         "{}.faery",
@@ -35,17 +35,17 @@ pub fn savegame(game: &mut Game, out: &mut dyn Output, slot: i16, saving: bool) 
 
     if saving {
         if write_game(game, &name).is_err() {
-            out.print("ERROR: Couldn't save game.");
+            output.print("ERROR: Couldn't save game.");
         }
     } else {
         if read_game(game, &name).is_err() {
-            out.print("ERROR: Couldn't load game.");
+            output.print("ERROR: Couldn't load game.");
         }
 
-        reset_after_load(game, out);
+        reset_after_load(game, output);
     }
 
-    set_current_font(out, FontKind::Story);
+    set_current_font(output, FontKind::Story);
 }
 
 /// Writes the game to the save file `name`.
@@ -68,25 +68,25 @@ fn read_game(game: &mut Game, name: &str) -> std::io::Result<()> {
 }
 
 /// Writes in the given font from now on.
-fn set_current_font(out: &mut dyn Output, kind: FontKind) {
+fn set_current_font(output: &mut dyn Output, kind: FontKind) {
     match kind {
-        FontKind::Story => out.use_story_font(),
-        FontKind::Panel => out.use_panel_font(),
+        FontKind::Story => output.use_story_font(),
+        FontKind::Panel => output.use_panel_font(),
     }
 }
 
 /// After loading a game: clears the encounter state and redraws the status panel for the new hero.
-fn reset_after_load(game: &mut Game, out: &mut dyn Output) {
+fn reset_after_load(game: &mut Game, output: &mut dyn Output) {
     game.encounter.weapon_type = 0;
     game.encounter.number = 0;
-    load_start_sprites(game, out);
+    load_start_sprites(game, output);
     update_menu_availability(game);
     game.ui.view_status = VIEW_CORRUPT;
     queue_print(&mut game.ui, PRINT_VITALITY);
     queue_print(&mut game.ui, PRINT_STATS);
-    out.print("");
-    out.print("");
-    out.print("");
+    output.print("");
+    output.print("");
+    output.print("");
     game.encounter.kind = 0;
     game.actors.loading = 0;
 }

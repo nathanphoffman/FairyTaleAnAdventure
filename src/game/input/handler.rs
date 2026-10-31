@@ -215,7 +215,7 @@ fn compass_direction(x: i32, y: i32) -> i16 {
 ///
 /// While a mouse button is down the pointer position decides; otherwise the direction key
 /// (numbered from 20, the keypad digits) does. Anything outside 20-29 means no direction.
-pub fn read_walk_direction(ui: &mut Ui, out: &mut dyn Output) {
+pub fn read_walk_direction(ui: &mut Ui, output: &mut dyn Output) {
     let (qualifier, pointer) = {
         let handler = handler();
 
@@ -238,7 +238,7 @@ pub fn read_walk_direction(ui: &mut Ui, out: &mut dyn Output) {
 
     if dir != ui.compass_lit_direction {
         ui.compass_lit_direction = dir;
-        out.draw_compass(dir);
+        output.draw_compass(dir);
     }
 }
 

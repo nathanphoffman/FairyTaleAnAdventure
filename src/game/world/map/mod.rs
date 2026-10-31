@@ -23,4 +23,5 @@ pub use self::lookup::{
     SCREEN_COLUMNS, SCREEN_ROWS, SECTOR_BYTES, SECTOR_ROWS_IN_REGION, fill_minimap,
     probe_collision, terrain_at, tile_index,
 };
+
 pub use self::steps::{step_x, step_y, wrap_coordinate};

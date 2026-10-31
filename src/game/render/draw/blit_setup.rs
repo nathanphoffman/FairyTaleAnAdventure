@@ -122,6 +122,7 @@ pub(super) fn set_up_blit(
 
     // Blitter size word: height in the high bits, width in words in the low 6 bits.
     video.blitter.sshape.blitsize =
+        // Shifts the height into the high bits of the size word, then adds the width.
         (((blithigh as i32) << BLIT_HEIGHT_SHIFT) + blitwide as i32) as i16;
 
     locate_sprite_data(&mut video.graphics, &video.screen, &seq, sprite.inum);
@@ -188,7 +189,7 @@ mod tests {
     }
 
     #[test]
-    fn a_sprite_over_the_left_and_top_edges_is_cut() {
+    fn a_sprite_over_the_left_plus_top_edges_is_cut() {
         let mut sprite = sprite_at(PHIL, 5, -5, -10, 26, 21);
         let clip = clip_to_screen(&mut sprite);
         assert_eq!((clip.xstart, clip.ystart), (0, 0));
@@ -196,7 +197,7 @@ mod tests {
     }
 
     #[test]
-    fn a_sprite_over_the_right_and_bottom_edges_stops_at_the_screen() {
+    fn a_sprite_over_the_right_plus_bottom_edges_stops_at_the_screen() {
         let mut sprite = sprite_at(PHIL, 5, 300, 160, 331, 191);
         let clip = clip_to_screen(&mut sprite);
         assert_eq!((clip.xstop, clip.ystop), (SCREEN_RIGHT, SCREEN_BOTTOM));

@@ -74,9 +74,9 @@ thread_local! {
 fn open_pads(system: &sdl2::GameControllerSubsystem) -> Vec<sdl2::controller::GameController> {
     let mut pads = Vec::new();
 
-    for i in 0..system.num_joysticks().unwrap_or(0) {
-        if system.is_game_controller(i)
-            && let Ok(c) = system.open(i)
+    for index in 0..system.num_joysticks().unwrap_or(0) {
+        if system.is_game_controller(index)
+            && let Ok(c) = system.open(index)
         {
             pads.push(c);
         }
@@ -158,8 +158,8 @@ fn draw(d: &mut Display, scene: &Scene) {
             let frame = &d.frame;
             let copied = texture.with_lock(None, |bytes, pitch| {
                 for (row, pixels) in bytes.chunks_mut(pitch).zip(frame.chunks(WIDTH as usize)) {
-                    for (out, pixel) in row.chunks_mut(BYTES_PER_PIXEL).zip(pixels) {
-                        out.copy_from_slice(&pixel.to_ne_bytes());
+                    for (output, pixel) in row.chunks_mut(BYTES_PER_PIXEL).zip(pixels) {
+                        output.copy_from_slice(&pixel.to_ne_bytes());
                     }
                 }
             });
@@ -244,5 +244,6 @@ pub fn wait_frame(scene: &Scene) {
 
 /// How many ticks of 1/50 second have passed since the window opened (0 without a window).
 pub fn ticks() -> u32 {
+    // Gives 0 when there is no window; otherwise the window's tick count.
     DISPLAY.with(|d| d.borrow().as_ref().map_or(0, |d| d.ticks))
 }

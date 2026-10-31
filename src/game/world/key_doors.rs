@@ -100,7 +100,13 @@ fn set_tile(game: &mut Game, x: i32, y: i32, value: u8) {
 /// without a key). Looks 4 pixels either side for the door terrain, then walks left and down to
 /// the door's top-left tile. Returns 1 if a door opened, 0 if not ("It's locked." is said the
 /// first time).
-pub fn open_door_near(game: &mut Game, out: &mut dyn Output, x: u16, y: u16, keytype: u32) -> i32 {
+pub fn open_door_near(
+    game: &mut Game,
+    output: &mut dyn Output,
+    x: u16,
+    y: u16,
+    keytype: u32,
+) -> i32 {
     let Some((x, y)) = find_door_corner(game, x, y) else {
         return 0;
     };
@@ -108,19 +114,20 @@ pub fn open_door_near(game: &mut Game, out: &mut dyn Output, x: u16, y: u16, key
     // we know where the door starts; now which type is it?
     let sector_id = tile(game, x, y);
 
+    // The high bits of the sector number say which map set it belongs to.
     let map_id = game.map.loaded_blocks.image[(sector_id >> MAP_SET_SHIFT) as usize];
 
     if let Some(open) = find_open(sector_id, map_id, keytype) {
         swap_in_open_door_tiles(game, open, x, y);
         game.ui.view_status = REDRAW_MAP;
         game.ui.held_direction = 0;
-        out.print("It opened.");
+        output.print("It opened.");
 
         return 1;
     }
 
     if game.world.bumped_locked_door == 0 && keytype == 0 {
-        out.print("It's locked.");
+        output.print("It's locked.");
     }
 
     game.world.bumped_locked_door = 1;
@@ -161,7 +168,9 @@ fn find_door_corner(game: &mut Game, x: u16, y: u16) -> Option<(i32, i32)> {
     }
 
     Some((
+        // Pixel x to tile column (shift = divide by tile width).
         (x >> TILE_WIDTH_SHIFT) as i32,
+        // Pixel y to tile row (shift = divide by tile height).
         (y >> TILE_HEIGHT_SHIFT) as i32,
     ))
 }

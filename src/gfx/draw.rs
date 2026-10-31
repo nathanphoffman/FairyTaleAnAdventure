@@ -62,6 +62,7 @@ pub fn rect_fill(
 pub fn line_to(bm: &mut Bitmap, pen: &mut Pen, (x, y): (i32, i32), planes: usize) {
     let (mut cx, mut cy) = (pen.x, pen.y);
     let (dx, dy) = ((x - cx).abs(), -(y - cy).abs());
+
     let (sx, sy) = (if cx < x { 1 } else { -1 }, if cy < y { 1 } else { -1 });
     let mut err = dx + dy;
 
@@ -93,8 +94,8 @@ pub fn line_to(bm: &mut Bitmap, pen: &mut Pen, (x, y): (i32, i32), planes: usize
 fn crossings(points: &[(i32, i32)], y: i32) -> Vec<i32> {
     let mut xs = Vec::new();
 
-    for i in 0..points.len() {
-        let (a, b) = (points[i], points[(i + 1) % points.len()]);
+    for index in 0..points.len() {
+        let (a, b) = (points[index], points[(index + 1) % points.len()]);
 
         if (a.1 <= y && b.1 > y) || (b.1 <= y && a.1 > y) {
             xs.push(a.0 + (y - a.1) * (b.0 - a.0) / (b.1 - a.1));
@@ -114,8 +115,18 @@ pub fn fill_polygon(bm: &mut Bitmap, pen: &Pen, points: &[(i32, i32)], clip: Rec
     }
 
     let (cx1, cy1) = (clip.x + clip.width - 1, clip.y + clip.height - 1);
-    let ymin = points.iter().map(|p| p.1).min().unwrap_or(0).max(clip.y);
-    let ymax = points.iter().map(|p| p.1).max().unwrap_or(0).min(cy1);
+    let ymin = points
+        .iter()
+        .map(|plane_number| plane_number.1)
+        .min()
+        .unwrap_or(0)
+        .max(clip.y);
+    let ymax = points
+        .iter()
+        .map(|plane_number| plane_number.1)
+        .max()
+        .unwrap_or(0)
+        .min(cy1);
 
     for y in ymin..=ymax {
         for pair in crossings(points, y).chunks(2) {
@@ -154,20 +165,20 @@ mod tests {
     }
 
     #[test]
-    fn a_line_moves_the_pen_and_includes_both_ends() {
+    fn a_line_moves_the_pen_including_both_ends() {
         let mut bm = Bitmap::new(16, 8, 1);
-        let mut p = pen(1);
-        p.x = 1;
-        p.y = 1;
-        line_to(&mut bm, &mut p, (5, 3), 1);
+        let mut plane_number = pen(1);
+        plane_number.x = 1;
+        plane_number.y = 1;
+        line_to(&mut bm, &mut plane_number, (5, 3), 1);
 
-        assert_eq!((p.x, p.y), (5, 3));
+        assert_eq!((plane_number.x, plane_number.y), (5, 3));
         assert_eq!(bm.pixel(1, 1), 1);
         assert_eq!(bm.pixel(5, 3), 1);
     }
 
     #[test]
-    fn polygons_fill_inside_and_stay_in_the_clip() {
+    fn polygons_fill_inside_staying_in_the_clip() {
         let mut bm = Bitmap::new(32, 16, 1);
         let square = [(2, 2), (10, 2), (10, 10), (2, 10)];
         let clip = Rect {
@@ -186,12 +197,12 @@ mod tests {
     #[test]
     fn complement_mode_draws_twice_to_erase() {
         let mut bm = Bitmap::new(16, 4, 1);
-        let mut p = pen(1);
-        p.mode = COMPLEMENT;
+        let mut plane_number = pen(1);
+        plane_number.mode = COMPLEMENT;
 
-        rect_fill(&mut bm, &p, (0, 0), (3, 3), 1);
+        rect_fill(&mut bm, &plane_number, (0, 0), (3, 3), 1);
         assert_eq!(bm.pixel(1, 1), 1);
-        rect_fill(&mut bm, &p, (0, 0), (3, 3), 1);
+        rect_fill(&mut bm, &plane_number, (0, 0), (3, 3), 1);
         assert_eq!(bm.pixel(1, 1), 0);
     }
 }

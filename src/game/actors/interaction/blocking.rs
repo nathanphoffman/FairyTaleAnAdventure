@@ -22,13 +22,13 @@ const SOFT_TERRAIN: [i32; 2] = [8, 9];
 /// and 9). Then every other actor is checked: it blocks if it is within 10 pixels sideways and
 /// 8 pixels up or down.
 /// Dead actors and the raft can be walked over.
-pub fn blocked_at(game: &mut Game, x: i16, y: i16, i: i16) -> i32 {
-    let me = actor_at(i as i32);
+pub fn blocked_at(game: &mut Game, x: i16, y: i16, index: i16) -> i32 {
+    let me = actor_at(index as i32);
 
     if game.actor(me).kind != ENEMY || game.actor(me).race != RACE_WRAITH {
         let mut terrain = probe_collision(game, x as i32, y as i32);
 
-        if i == 0 && SOFT_TERRAIN.contains(&terrain) {
+        if index == 0 && SOFT_TERRAIN.contains(&terrain) {
             terrain = 0;
         }
 
@@ -37,7 +37,7 @@ pub fn blocked_at(game: &mut Game, x: i16, y: i16, i: i16) -> i32 {
         }
     }
 
-    if (0..game.actors.active as i32).any(|j| blocked_by_actor(&game.actors, x, y, i, j)) {
+    if (0..game.actors.active as i32).any(|j| blocked_by_actor(&game.actors, x, y, index, j)) {
         return BLOCKED_BY_ACTOR;
     }
 
@@ -46,10 +46,10 @@ pub fn blocked_at(game: &mut Game, x: i16, y: i16, i: i16) -> i32 {
 
 /// Whether actor `j` stands in the way of actor `i` at (`x`, `y`). Dead actors and rafts can be
 /// walked over.
-fn blocked_by_actor(actors: &Actors, x: i16, y: i16, i: i16, j: i32) -> bool {
+fn blocked_by_actor(actors: &Actors, x: i16, y: i16, index: i16, j: i32) -> bool {
     let other = actor_at(j);
 
-    if i as i32 == j
+    if index as i32 == j
         || j == RAFT_SLOT as i32
         || actors.actor(other).kind == RAFT_TYPE
         || actors.actor(other).state == DEAD

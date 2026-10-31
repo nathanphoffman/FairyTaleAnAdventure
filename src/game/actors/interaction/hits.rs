@@ -48,8 +48,8 @@ const PEACEFUL_EXTENT: u16 = 50;
 const BRAVE_LOW_VITALITY: i16 = 5;
 
 /// Actor `i`.
-pub(super) fn actor_at(i: i32) -> ActorRef {
-    ActorRef::new(i as usize)
+pub(super) fn actor_at(index: i32) -> ActorRef {
+    ActorRef::new(index as usize)
 }
 
 /// A hit from actor `i` on actor `j`: `wt` damage, then the target is pushed back in direction `fc`.
@@ -59,13 +59,13 @@ pub(super) fn actor_at(i: i32) -> ActorRef {
 /// kind 9) cannot be hurt by weak weapons (weapon below 4); the witch can be hurt anyway if the hero
 /// holds the item in inventory slot 7 (the sun stone). Races 0x8a and 0x8b (the spectre and the
 /// ghost brothers) are never hurt. Dragons and people are not pushed back.
-pub fn hit_actor(game: &mut Game, out: &mut dyn Output, i: i32, j: i32, fc: i32, wt: i16) {
+pub fn hit_actor(game: &mut Game, output: &mut dyn Output, index: i32, j: i32, fc: i32, wt: i16) {
     let target = actor_at(j);
     let hero_weapon = game.actors.list[actor_at(HERO as i32).slot()].weapon;
     let has_spirit_item = game.hero.stuff()[SPIRIT_HURT_ITEM] != 0;
 
     if too_weak_to_hurt(game.actor(target).race, hero_weapon, has_spirit_item) {
-        speak(game, out, MESSAGE_NEEDS_WEAPON);
+        speak(game, output, MESSAGE_NEEDS_WEAPON);
 
         return;
     }
@@ -76,22 +76,28 @@ pub fn hit_actor(game: &mut Game, out: &mut dyn Output, i: i32, j: i32, fc: i32,
 
     game.actor_mut(target).vitality = vitality_after_hit(game.actor(target).vitality, wt);
 
-    match hit_sound(i, j) {
+    match hit_sound(index, j) {
         HitSound::Arrow => {
             let pitch = PITCH_ARROW + rand64(&mut game.rng);
+
             play_effect(game, EFFECT_ARROW_HIT, pitch)
         }
+
         HitSound::Rock => {
             let pitch = PITCH_ROCK + bitrand(&mut game.rng, PITCH_SPREAD);
+
             play_effect(game, EFFECT_ROCK_HIT, pitch)
         }
+
         HitSound::HeroHurt => {
             let pitch = PITCH_HERO_HURT + bitrand(&mut game.rng, PITCH_SPREAD);
+
             play_effect(game, EFFECT_HERO_HURT, pitch)
         }
 
         HitSound::FoeHurt => {
             let pitch = PITCH_FOE_HURT + rand256(&mut game.rng);
+
             play_effect(game, EFFECT_FOE_HURT, pitch)
         }
     }
@@ -99,12 +105,12 @@ pub fn hit_actor(game: &mut Game, out: &mut dyn Output, i: i32, j: i32, fc: i32,
     // push back the foe
     if can_be_pushed(game.actor(target).kind)
         && step_figure(game, j as i16, fc as i16, KNOCKBACK) != 0
-        && i >= 0
+        && index >= 0
     {
-        step_figure(game, i as i16, fc as i16, KNOCKBACK);
+        step_figure(game, index as i16, fc as i16, KNOCKBACK);
     }
 
-    check_death(game, out, j, WORLD_DEAD_CHECK);
+    check_death(game, output, j, WORLD_DEAD_CHECK);
 }
 
 /// Which sound a hit makes: `i` is the attacker (-1 an arrow, -2 a fireball), `j` the target.
@@ -171,31 +177,31 @@ fn vitality_after_hit(vitality: i16, wt: i16) -> i16 {
 
 /// After a fight: reports how many foes were defeated or fled, or "Bravely done!" if the hero is
 /// nearly dead. Then, if turtle eggs are around, the turtle story event is checked.
-pub fn report_battle_result(game: &mut Game, out: &mut dyn Output) {
+pub fn report_battle_result(game: &mut Game, output: &mut dyn Output) {
     let (dead, fled) = count_casualties(&game.actors);
     let vitality = game.actors.list[actor_at(HERO as i32).slot()].vitality;
 
     match battle_report(vitality, dead, fled, game.world.extent_type) {
         BattleReport::Silent => {}
-        BattleReport::Bravely => out.print("Bravely done!"),
+        BattleReport::Bravely => output.print("Bravely done!"),
         BattleReport::Foes { dead, fled } => {
             if dead != 0 {
-                out.print("");
-                out.print_number(dead, 1);
-                out.print_cont("foes were defeated in battle.");
+                output.print("");
+                output.print_number(dead, 1);
+                output.print_cont("foes were defeated in battle.");
             }
 
             if fled != 0 {
-                out.print("");
-                out.print_number(fled, 1);
-                out.print_cont("foes fled in retreat.");
+                output.print("");
+                output.print_number(fled, 1);
+                output.print_cont("foes fled in retreat.");
             }
         }
     }
 
     // check for presence of turtle eggs
     if game.actors.turtle_eggs != 0 {
-        summon_turtle(game, out);
+        summon_turtle(game, output);
     }
 }
 
@@ -203,8 +209,8 @@ pub fn report_battle_result(game: &mut Game, out: &mut dyn Output) {
 fn count_casualties(actors: &Actors) -> (i32, i32) {
     let (mut dead, mut fled) = (0, 0);
 
-    for i in FIRST_MONSTER_SLOT..actors.active as i32 {
-        let a = actor_at(i);
+    for index in FIRST_MONSTER_SLOT..actors.active as i32 {
+        let a = actor_at(index);
 
         if actors.actor(a).kind != ENEMY {
             continue;
@@ -258,7 +264,7 @@ mod tests {
     }
 
     #[test]
-    fn dragons_and_people_are_not_pushed_back() {
+    fn dragons_as_well_as_people_are_not_pushed_back() {
         assert!(!can_be_pushed(DRAGON));
         assert!(!can_be_pushed(SETFIG));
         assert!(can_be_pushed(2));

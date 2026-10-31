@@ -36,14 +36,14 @@ const PRINT_QUEUE_MASK: i16 = 31;
 /// `print_number` prints after the number).
 pub fn format_number(mut value: u32) -> [u8; NUMBER_DIGITS + 1] {
     let mut text = [b' '; NUMBER_DIGITS + 1];
-    let mut i = NUMBER_DIGITS;
+    let mut index = NUMBER_DIGITS;
 
     loop {
-        i -= 1;
-        text[i] = b'0' + (value % DECIMAL_BASE) as u8;
+        index -= 1;
+        text[index] = b'0' + (value % DECIMAL_BASE) as u8;
         value /= DECIMAL_BASE;
 
-        if value == 0 || i == 0 {
+        if value == 0 || index == 0 {
             break;
         }
     }
@@ -53,8 +53,8 @@ pub fn format_number(mut value: u32) -> [u8; NUMBER_DIGITS + 1] {
 
 // `move` is a Rust keyword, so this one is exported under the C name.
 /// Moves the text position (the C name is `move`, a keyword in Rust).
-pub fn move_to(out: &mut dyn Output, x: i32, y: i32) {
-    out.set_text_position(x, y);
+pub fn move_to(output: &mut dyn Output, x: i32, y: i32) {
+    output.set_text_position(x, y);
 }
 
 /// Prints the characters at the text position.
@@ -65,13 +65,17 @@ pub fn draw_text(screen: &mut Screen, bytes: &[u8]) {
 /// Prints a string that may hold XY escapes (128, x/2, y) to move the text position. A string
 /// ends at a zero byte (or its end); bytes of 128 and above end each plain run of text.
 /// (The x position is stored halved so it fits in a byte.)
-pub fn print_positioned(out: &mut dyn Output, s: &[u8]) {
+pub fn print_positioned(output: &mut dyn Output, s: &[u8]) {
     let mut at = 0;
-    let byte = |i: usize| s.get(i).copied().unwrap_or(0);
+    let byte = |index: usize| s.get(index).copied().unwrap_or(0);
 
     while byte(at) != 0 {
         if byte(at) == XY {
-            move_to(out, byte(at + 1) as i32 * XY_X_SCALE, byte(at + 2) as i32);
+            move_to(
+                output,
+                byte(at + 1) as i32 * XY_X_SCALE,
+                byte(at + 2) as i32,
+            );
 
             at += XY_BYTES;
         } else {
@@ -81,7 +85,7 @@ pub fn print_positioned(out: &mut dyn Output, s: &[u8]) {
                 n += 1;
             }
 
-            out.print_cont_bytes(&s[at..at + n]);
+            output.print_cont_bytes(&s[at..at + n]);
             at += n;
 
             if n == 0 {
@@ -92,8 +96,8 @@ pub fn print_positioned(out: &mut dyn Output, s: &[u8]) {
 }
 
 /// Prints story page text number `n` (the strings use position escapes, see `print_positioned`).
-pub fn placard_text(out: &mut dyn Output, n: i32) {
-    print_positioned(out, PLACARD_MSGS[n as usize]);
+pub fn placard_text(output: &mut dyn Output, n: i32) {
+    print_positioned(output, PLACARD_MSGS[n as usize]);
 }
 
 /// The `n`-th zero-terminated string of a list of messages (the first is number 0). A number past
@@ -110,18 +114,18 @@ fn nth_string(list: &[u8], n: i32) -> &[u8] {
 }
 
 /// Shows the `num`-th string of a list of messages, word-wrapped (see `print_wrapped`).
-pub fn show_message(game: &mut Game, out: &mut dyn Output, list: &[u8], num: i32) {
-    print_wrapped(game, out, nth_string(list, num));
+pub fn show_message(game: &mut Game, output: &mut dyn Output, list: &[u8], num: i32) {
+    print_wrapped(game, output, nth_string(list, num));
 }
 
 /// Shows event message `n` (things that happen to the hero, such as hunger).
-pub fn show_event(game: &mut Game, out: &mut dyn Output, n: i32) {
-    show_message(game, out, EVENT_MSG, n);
+pub fn show_event(game: &mut Game, output: &mut dyn Output, n: i32) {
+    show_message(game, output, EVENT_MSG, n);
 }
 
 /// Shows speech number `n` (what people say).
-pub fn speak(game: &mut Game, out: &mut dyn Output, n: i32) {
-    show_message(game, out, SPEECHES, n);
+pub fn speak(game: &mut Game, output: &mut dyn Output, n: i32) {
+    show_message(game, output, SPEECHES, n);
 }
 
 /// Adds a request to the print queue (ignored if the queue is full). `handle_print_request` handles them one
@@ -157,12 +161,12 @@ const ERROR_SCREEN_Y: i32 = 90;
 const ERROR_NO_GRAPHICS: i32 = 2;
 
 /// Shows "ERROR n" on the text panel (startup failures). Error 2 (no graphics) cannot be shown.
-pub fn show_error(out: &mut dyn Output, n: i32) {
+pub fn show_error(output: &mut dyn Output, n: i32) {
     if n == ERROR_NO_GRAPHICS {
         return;
     }
 
-    move_to(out, ERROR_SCREEN_X, ERROR_SCREEN_Y);
-    out.print_cont_bytes(b"ERROR ");
-    out.print_number(n, 2);
+    move_to(output, ERROR_SCREEN_X, ERROR_SCREEN_Y);
+    output.print_cont_bytes(b"ERROR ");
+    output.print_number(n, 2);
 }

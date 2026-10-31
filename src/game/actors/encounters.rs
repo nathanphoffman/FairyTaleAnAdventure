@@ -98,9 +98,9 @@ const FIRST_CARRIER_SLOT: usize = 3;
 /// encounter spot (`encounter_x`, `encounter_y`), on a free square. Its race is `encounter_type`
 /// (mixed with the one next to it when `mixflag` bit 1 is set). Returns 1 if it was placed and
 /// 0 if no free spot was found in 15 tries.
-pub fn place_encounter(game: &mut Game, i: u16, spread: u16) -> i32 {
-    let actor = ActorRef::new(i as usize);
-    let Some((xtest, ytest)) = find_open_spot(game, i, spread) else {
+pub fn place_encounter(game: &mut Game, position: u16, spread: u16) -> i32 {
+    let actor = ActorRef::new(position as usize);
+    let Some((xtest, ytest)) = find_open_spot(game, position, spread) else {
         return 0;
     };
 
@@ -151,7 +151,7 @@ fn arm_enemy(game: &mut Game, actor: ActorRef, race: i32) {
 /// Finds a place near the encounter point for actor `i`, trying up to `MAX_TRY` random spots
 /// within `spread` pixels. Some encounters always use one fixed place. Returns `None` if every
 /// spot was blocked.
-fn find_open_spot(game: &mut Game, i: u16, spread: u16) -> Option<(u16, u16)> {
+fn find_open_spot(game: &mut Game, position: u16, spread: u16) -> Option<(u16, u16)> {
     if game.extents[game.world.extent].v3 == FIXED_PLACE_ENCOUNTER {
         return Some(FIXED_PLACE);
     }
@@ -162,7 +162,7 @@ fn find_open_spot(game: &mut Game, i: u16, spread: u16) -> Option<(u16, u16)> {
         let ytest = (game.encounter.y as i32 + bitrand(&mut game.rng, spread as i32)
             - (spread as i32 / 2)) as u16;
 
-        if blocked_at(game, xtest as i16, ytest as i16, i as i16) == 0 {
+        if blocked_at(game, xtest as i16, ytest as i16, position as i16) == 0 {
             return Some((xtest, ytest));
         }
 
@@ -190,23 +190,27 @@ fn encounter_race(game: &mut Game) -> i32 {
 /// DYING, the hero gains bravery for a kill, and killing a person (not the lasso keeper) costs
 /// 3 kindness. If it is the hero, `dtype` is the death message, luck drops by 5 and the music
 /// changes. The hero's stats are always refreshed on screen.
-pub fn check_death(game: &mut Game, out: &mut dyn Output, i: i32, dtype: i32) {
-    let actor = ActorRef::new(i as usize);
+pub fn check_death(game: &mut Game, output: &mut dyn Output, position: i32, dtype: i32) {
+    let actor = ActorRef::new(position as usize);
 
-    if let Some(death) = start_dying(i, &mut game.actors.list[actor.slot()], &mut game.hero) {
+    if let Some(death) = start_dying(
+        position,
+        &mut game.actors.list[actor.slot()],
+        &mut game.hero,
+    ) {
         if death.dark_knight {
-            speak(game, out, SPEAK_DARK_KNIGHT_DIES);
+            speak(game, output, SPEAK_DARK_KNIGHT_DIES);
         }
 
-        if i == 0 {
-            show_event(game, out, dtype);
+        if position == 0 {
+            show_event(game, output, dtype);
             set_mood(game, 1);
         }
 
         queue_print(&mut game.ui, PRQ_VITALITY);
     }
 
-    if i == 0 {
+    if position == 0 {
         queue_print(&mut game.ui, PRQ_STATS);
     }
 }
@@ -221,7 +225,7 @@ struct Death {
 /// goes into the dying state with a countdown. Killing a person (except the lasso keeper) costs
 /// the hero kindness; killing anything else gives bravery; the hero's own death costs luck.
 /// Returns `None` if nothing happened.
-fn start_dying(i: i32, actor: &mut Shape, hero: &mut Hero) -> Option<Death> {
+fn start_dying(position: i32, actor: &mut Shape, hero: &mut Hero) -> Option<Death> {
     if actor.vitality >= 1 || actor.state == DYING || actor.state == DEAD {
         return None;
     }
@@ -236,7 +240,7 @@ fn start_dying(i: i32, actor: &mut Shape, hero: &mut Hero) -> Option<Death> {
         hero.kindness -= KINDNESS_LOSS;
     }
 
-    if i != 0 {
+    if position != 0 {
         hero.brave += 1;
     } else {
         hero.luck -= LUCK_LOSS;
@@ -251,7 +255,7 @@ fn start_dying(i: i32, actor: &mut Shape, hero: &mut Hero) -> Option<Death> {
 
 /// Puts carrier `n` (5 turtle, 10 dragon, otherwise the swan) in actor slot 3, loading its sprites
 /// if they are not the ones already loaded, in the middle of its extent.
-pub fn load_carrier(game: &mut Game, out: &mut dyn Output, n: i16) {
+pub fn load_carrier(game: &mut Game, output: &mut dyn Output, n: i16) {
     let actor = ActorRef::new(FIRST_CARRIER_SLOT);
 
     game.actor_mut(actor).kind = if n == CARRIER_DRAGON { DRAGON } else { CARRIER };
@@ -264,9 +268,9 @@ pub fn load_carrier(game: &mut Game, out: &mut dyn Output, n: i16) {
     };
 
     if game.actors.loaded_actor_file != n {
-        out.rewind_sprites_to(SEQ_ENEMY as u8);
-        out.load_sprite_file(n as i32);
-        out.finish_sprite_load(game.actor(actor).kind as i16);
+        output.rewind_sprites_to(SEQ_ENEMY as u8);
+        output.load_sprite_file(n as i32);
+        output.finish_sprite_load(game.actor(actor).kind as i16);
         motor_off();
     }
 
@@ -286,7 +290,7 @@ pub fn load_carrier(game: &mut Game, out: &mut dyn Output, n: i16) {
 
 /// The actors' sprite file the monsters of this encounter need: sets how many appear and, if that
 /// file is not the one loaded, loads it (the carrier is dropped then).
-pub fn load_enemy_sprites(game: &mut Game, out: &mut dyn Output) {
+pub fn load_enemy_sprites(game: &mut Game, output: &mut dyn Output) {
     const FIRST_ENEMY_SLOT: i16 = 3;
     game.encounter.number = (game.extents[game.world.extent].v1 as i32
         + rnd(&mut game.rng, game.extents[game.world.extent].v2 as i32))
@@ -296,8 +300,8 @@ pub fn load_enemy_sprites(game: &mut Game, out: &mut dyn Output) {
     if game.actors.loaded_actor_file != file {
         game.actors.loaded_actor_file = file;
         game.actors.active = FIRST_ENEMY_SLOT;
-        out.rewind_sprites_to(ENEMY as u8);
-        out.load_sprite_file(game.actors.loaded_actor_file as i32);
+        output.rewind_sprites_to(ENEMY as u8);
+        output.load_sprite_file(game.actors.loaded_actor_file as i32);
         game.actors.loading = 1;
         game.actors.active_carrier = 0;
     }
@@ -332,7 +336,7 @@ mod tests {
     }
 
     #[test]
-    fn dying_and_dead_actors_are_not_killed_twice() {
+    fn finished_actors_are_not_killed_twice() {
         let mut h = hero(10, 10, 10);
         assert_eq!(start_dying(5, &mut actor(0, DYING), &mut h), None);
         assert_eq!(start_dying(5, &mut actor(0, DEAD), &mut h), None);
@@ -340,7 +344,7 @@ mod tests {
     }
 
     #[test]
-    fn killing_an_enemy_starts_the_death_and_gives_bravery() {
+    fn killing_an_enemy_starts_the_death_giving_bravery() {
         let (mut a, mut h) = (actor(-4, 0), hero(10, 10, 10));
         assert_eq!(
             start_dying(5, &mut a, &mut h),
@@ -379,7 +383,7 @@ mod tests {
     }
 
     #[test]
-    fn the_dark_knight_speaks_and_costs_no_kindness() {
+    fn the_dark_knight_speaks_costing_no_kindness() {
         let mut a = actor(0, 0);
         a.kind = SETFIG;
         a.race = RACE_DARK_KNIGHT;

@@ -80,46 +80,48 @@ impl Bitmap {
     }
 
     /// The visible bytes of plane `p`, row after row.
-    pub fn plane(&self, p: usize) -> &[u8] {
-        &self.planes[p][PAD..PAD + self.visible_len()]
+    pub fn plane(&self, plane_number: usize) -> &[u8] {
+        &self.planes[plane_number][PAD..PAD + self.visible_len()]
     }
 
-    pub fn plane_mut(&mut self, p: usize) -> &mut [u8] {
+    pub fn plane_mut(&mut self, plane_number: usize) -> &mut [u8] {
         let len = self.visible_len();
 
-        &mut self.planes[p][PAD..PAD + len]
+        &mut self.planes[plane_number][PAD..PAD + len]
     }
 
     /// Plane `p` with its padding: the visible bytes start `PAD` bytes in. The sprite blitter may
     /// reach a little outside the visible bytes, into the padding.
-    pub fn padded_plane(&self, p: usize) -> &[u8] {
-        &self.planes[p]
+    pub fn padded_plane(&self, plane_number: usize) -> &[u8] {
+        &self.planes[plane_number]
     }
 
-    pub fn padded_plane_mut(&mut self, p: usize) -> &mut [u8] {
-        &mut self.planes[p]
+    pub fn padded_plane_mut(&mut self, plane_number: usize) -> &mut [u8] {
+        &mut self.planes[plane_number]
     }
 
+    // True when the point is inside the bitmap (the negative checks come first so the casts are safe).
     pub fn contains(&self, x: i32, y: i32) -> bool {
         x >= 0 && y >= 0 && (y as usize) < self.rows && (x as usize) < self.width()
     }
 
-    fn byte_and_mask(&self, x: i32, y: i32) -> (usize, u8) {
+    fn pixel_location(&self, x: i32, y: i32) -> (usize, u8) {
         let byte = y as usize * self.bytes_per_row + x as usize / PIXELS_PER_BYTE;
 
+        // The pixel's bit inside its byte: the leftmost pixel is the top bit, so shift right by the column.
         (byte, LEFTMOST_PIXEL >> (x as usize % PIXELS_PER_BYTE))
     }
 
     /// Bit `p` of the pixel at (`x`, `y`), which must be inside the bitmap.
-    pub fn bit(&self, p: usize, x: i32, y: i32) -> bool {
-        let (byte, mask) = self.byte_and_mask(x, y);
+    pub fn bit(&self, plane_number: usize, x: i32, y: i32) -> bool {
+        let (byte, mask) = self.pixel_location(x, y);
 
-        self.plane(p)[byte] & mask != 0
+        self.plane(plane_number)[byte] & mask != 0
     }
 
-    pub fn set_bit(&mut self, p: usize, x: i32, y: i32, on: bool) {
-        let (byte, mask) = self.byte_and_mask(x, y);
-        let plane = self.plane_mut(p);
+    pub fn set_bit(&mut self, plane_number: usize, x: i32, y: i32, on: bool) {
+        let (byte, mask) = self.pixel_location(x, y);
+        let plane = self.plane_mut(plane_number);
 
         if on {
             plane[byte] |= mask;
@@ -130,11 +132,12 @@ impl Bitmap {
 
     /// The colour number of the pixel at (`x`, `y`), which must be inside the bitmap.
     pub fn pixel(&self, x: i32, y: i32) -> usize {
-        let (byte, mask) = self.byte_and_mask(x, y);
+        let (byte, mask) = self.pixel_location(x, y);
 
         (0..self.depth())
-            .filter(|&p| self.plane(p)[byte] & mask != 0)
-            .fold(0, |index, p| index | 1 << p)
+            .filter(|&plane_number| self.plane(plane_number)[byte] & mask != 0)
+            // Builds the colour number: each plane with the pixel set adds 2 to the power of its plane number.
+            .fold(0, |index, plane_number| index | 1 << plane_number)
     }
 
     /// Draws one pixel in colour `pen` on the first `planes` planes, or flips it (`complement`).
@@ -144,24 +147,29 @@ impl Bitmap {
             return;
         }
 
-        for p in 0..self.depth().min(planes) {
+        for plane_number in 0..self.depth().min(planes) {
             let on = if complement {
-                !self.bit(p, x, y)
+                !self.bit(plane_number, x, y)
             } else {
-                pen >> p & 1 != 0
+                // Bit `p` of the pen number says whether this plane gets the pixel.
+                pen >> plane_number & 1 != 0
             };
 
-            self.set_bit(p, x, y, on);
+            self.set_bit(plane_number, x, y, on);
         }
     }
 
     /// Fills the first `planes` planes with colour `pen`.
     pub fn clear(&mut self, pen: u8, planes: usize) {
-        for p in 0..self.depth().min(planes) {
+        for plane_number in 0..self.depth().min(planes) {
             // A plane is all ones if the pen has that bit set, and all zeros otherwise.
-            let fill = if pen >> p & 1 != 0 { 0xff } else { 0 };
+            let fill = if pen >> plane_number & 1 != 0 {
+                0xff
+            } else {
+                0
+            };
 
-            self.plane_mut(p).fill(fill);
+            self.plane_mut(plane_number).fill(fill);
         }
     }
 }
@@ -192,27 +200,34 @@ pub fn copy_plane_rect(
 }
 
 /// The bits of `rect` in plane `p` of `src`, row after row (false outside the bitmap).
-fn read_rect(src: &Bitmap, p: usize, rect: Rect) -> Vec<bool> {
+fn read_rect(src: &Bitmap, plane_number: usize, rect: Rect) -> Vec<bool> {
     let mut bits = Vec::with_capacity((rect.width.max(0) * rect.height.max(0)) as usize);
 
     for y in 0..rect.height {
         for x in 0..rect.width {
             let (px, py) = (rect.x + x, rect.y + y);
 
-            bits.push(src.contains(px, py) && src.bit(p, px, py));
+            bits.push(src.contains(px, py) && src.bit(plane_number, px, py));
         }
     }
 
     bits
 }
 
-fn write_rect(dst: &mut Bitmap, p: usize, rect: Rect, (dst_x, dst_y): (i32, i32), bits: &[bool]) {
+// Writes one plane of a rectangle, skipping pixels that fall outside the bitmap.
+fn write_rect(
+    dst: &mut Bitmap,
+    plane_number: usize,
+    rect: Rect,
+    (dst_x, dst_y): (i32, i32),
+    bits: &[bool],
+) {
     for y in 0..rect.height {
         for x in 0..rect.width {
             let (px, py) = (dst_x + x, dst_y + y);
 
             if dst.contains(px, py) {
-                dst.set_bit(p, px, py, bits[(y * rect.width + x) as usize]);
+                dst.set_bit(plane_number, px, py, bits[(y * rect.width + x) as usize]);
             }
         }
     }
@@ -222,11 +237,12 @@ fn write_rect(dst: &mut Bitmap, p: usize, rect: Rect, (dst_x, dst_y): (i32, i32)
 /// plane `p`) that both bitmaps have. Returns how many planes were copied.
 pub fn copy_rect(src: &Bitmap, dst: &mut Bitmap, rect: Rect, to: (i32, i32), mask: u32) -> usize {
     let planes: Vec<usize> = (0..src.depth().min(dst.depth()))
-        .filter(|&p| mask >> p & 1 != 0)
+        // Only the planes whose bit is set in `mask` are copied.
+        .filter(|&plane_number| mask >> plane_number & 1 != 0)
         .collect();
 
-    for &p in &planes {
-        copy_plane_rect(src, p, dst, p, rect, to);
+    for &plane_number in &planes {
+        copy_plane_rect(src, plane_number, dst, plane_number, rect, to);
     }
 
     planes.len()
@@ -235,8 +251,8 @@ pub fn copy_rect(src: &Bitmap, dst: &mut Bitmap, rect: Rect, to: (i32, i32), mas
 /// Scrolls the pixels of `area` (on the first `planes` planes) by (`dx`, `dy`): a pixel moves up and
 /// left by that much. The strip that scrolls in at the edge is filled with colour `fill`.
 pub fn scroll(bm: &mut Bitmap, area: Rect, (dx, dy): (i32, i32), fill: u8, planes: usize) {
-    for p in 0..bm.depth().min(planes) {
-        let bits = read_rect(bm, p, area);
+    for plane_number in 0..bm.depth().min(planes) {
+        let bits = read_rect(bm, plane_number, area);
 
         for y in 0..area.height {
             for x in 0..area.width {
@@ -245,12 +261,14 @@ pub fn scroll(bm: &mut Bitmap, area: Rect, (dx, dy): (i32, i32), fill: u8, plane
                 let on = if inside {
                     bits[(sy * area.width + sx) as usize]
                 } else {
-                    fill >> p & 1 != 0
+                    // Outside the shape, use bit `p` of the fill colour.
+                    fill >> plane_number & 1 != 0
                 };
+
                 let (px, py) = (area.x + x, area.y + y);
 
                 if bm.contains(px, py) {
-                    bm.set_bit(p, px, py, on);
+                    bm.set_bit(plane_number, px, py, on);
                 }
             }
         }
@@ -279,7 +297,7 @@ mod tests {
     }
 
     #[test]
-    fn plotting_outside_is_ignored_and_complement_flips() {
+    fn plotting_outside_is_ignored_with_complement_flips() {
         let mut bm = Bitmap::new(16, 2, 2);
         bm.plot(-1, 0, 3, false, 2);
         bm.plot(16, 0, 3, false, 2);
@@ -319,7 +337,7 @@ mod tests {
     }
 
     #[test]
-    fn scrolling_moves_pixels_up_and_fills_the_bottom() {
+    fn scrolling_moves_pixels_up_filling_the_bottom() {
         let mut bm = Bitmap::new(16, 4, 1);
         bm.plot(2, 3, 1, false, 1);
         let area = Rect {

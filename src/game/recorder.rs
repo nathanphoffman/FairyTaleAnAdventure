@@ -78,6 +78,7 @@ impl Recorder {
                         last.push_str(&String::from_utf8_lossy(text));
                     }
                 }
+
                 _ => {}
             }
         }
@@ -237,11 +238,11 @@ mod tests {
 
     #[test]
     fn show_error_prints_the_error_number_at_a_fixed_place() {
-        let mut out = Recorder::new();
-        show_error(&mut out, 5);
+        let mut output = Recorder::new();
+        show_error(&mut output, 5);
 
         assert_eq!(
-            out.calls,
+            output.calls,
             vec![
                 Call::SetTextPosition(200, 90),
                 Call::PrintContBytes(b"ERROR ".to_vec()),
@@ -252,24 +253,24 @@ mod tests {
 
     #[test]
     fn show_error_without_graphics_prints_nothing() {
-        let mut out = Recorder::new();
-        show_error(&mut out, 2);
+        let mut output = Recorder::new();
+        show_error(&mut output, 2);
 
-        assert!(out.calls.is_empty());
+        assert!(output.calls.is_empty());
     }
 
     #[test]
-    fn a_menu_prints_one_entry_per_slot_and_blanks_the_rest() {
+    fn a_menu_prints_one_entry_per_slot_blanking_the_rest() {
         let mut game = Game::new();
-        let mut out = Recorder::new();
-        print_options(&mut game, &mut out);
+        let mut output = Recorder::new();
+        print_options(&mut game, &mut output);
 
-        let drawn = out
+        let drawn = output
             .calls
             .iter()
             .filter(|c| matches!(c, Call::DrawMenuEntry { .. }))
             .count();
-        let blank = out
+        let blank = output
             .calls
             .iter()
             .filter(|c| matches!(c, Call::BlankMenuEntry(_)))
@@ -281,29 +282,29 @@ mod tests {
     fn an_event_message_is_printed_as_text_lines() {
         let mut game = Game::new();
         game.hero.brother = 1;
-        let mut out = Recorder::new();
-        show_event(&mut game, &mut out, 0);
+        let mut output = Recorder::new();
+        show_event(&mut game, &mut output, 0);
 
-        assert!(!out.printed_lines().is_empty());
+        assert!(!output.printed_lines().is_empty());
     }
 
     #[test]
-    fn a_map_message_fades_out_switches_page_and_shows_again() {
+    fn a_map_message_fades_out_switches_page_showing_again() {
         let mut game = Game::new();
-        let mut out = Recorder::new();
-        map_message(&mut game, &mut out);
+        let mut output = Recorder::new();
+        map_message(&mut game, &mut output);
 
-        let prepare = out
+        let prepare = output
             .calls
             .iter()
             .position(|c| matches!(c, Call::PrepareMessagePage));
-        let hide = out
+        let hide = output
             .calls
             .iter()
             .position(|c| *c == Call::SetPanelVisible(false));
         assert!(prepare.is_some() && hide > prepare);
 
-        assert!(out.ticks() > 0, "the fade waits for frames");
+        assert!(output.ticks() > 0, "the fade waits for frames");
         assert_eq!(game.ui.view_status, 2);
     }
 }

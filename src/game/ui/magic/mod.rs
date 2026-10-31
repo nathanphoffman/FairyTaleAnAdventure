@@ -36,12 +36,12 @@ const RIDING_BIG: i16 = 1;
 
 /// Handles an entry of the Magic menu. Returns false if `update_menu_availability` should not follow
 /// (the spell did not work, so the stone is not used up).
-pub fn magic_option(game: &mut Game, out: &mut dyn Output, chosen_entry: i16) -> bool {
-    if let Some(result) = refuse_spell(game, out, chosen_entry) {
+pub fn magic_option(game: &mut Game, output: &mut dyn Output, chosen_entry: i16) -> bool {
+    if let Some(result) = refuse_spell(game, output, chosen_entry) {
         return result;
     }
 
-    if !cast_spell(game, out, chosen_entry) {
+    if !cast_spell(game, output, chosen_entry) {
         return false;
     }
 
@@ -52,7 +52,7 @@ pub fn magic_option(game: &mut Game, out: &mut dyn Output, chosen_entry: i16) ->
 
 /// Checks that the spell can be cast here and now. Gives `Some(result)` for `magic_option` to
 /// return when it cannot, and `None` when the spell goes ahead.
-fn refuse_spell(game: &mut Game, out: &mut dyn Output, chosen_entry: i16) -> Option<bool> {
+fn refuse_spell(game: &mut Game, output: &mut dyn Output, chosen_entry: i16) -> Option<bool> {
     let count = if chosen_entry < FIRST_SPELL {
         0
     } else {
@@ -70,13 +70,13 @@ fn refuse_spell(game: &mut Game, out: &mut dyn Output, chosen_entry: i16) -> Opt
 
     match gate {
         SpellGate::NoSpell => {
-            show_event(game, out, NO_SPELL_EVENT);
+            show_event(game, output, NO_SPELL_EVENT);
 
             Some(true)
         }
 
         SpellGate::QuietZone => {
-            speak(game, out, NO_MAGIC_SPEECH);
+            speak(game, output, NO_MAGIC_SPEECH);
 
             Some(true)
         }
@@ -87,22 +87,22 @@ fn refuse_spell(game: &mut Game, out: &mut dyn Output, chosen_entry: i16) -> Opt
 }
 
 /// Casts the spell. Returns false if it did not work (the stone ring only works in a circle).
-fn cast_spell(game: &mut Game, out: &mut dyn Output, chosen_entry: i16) -> bool {
+fn cast_spell(game: &mut Game, output: &mut dyn Output, chosen_entry: i16) -> bool {
     match chosen_entry {
         SPELL_LIGHT => game.world.light_timer += LIGHT_TIME,
         SPELL_SECRET => game.world.secret_timer += SECRET_TIME,
         SPELL_FREEZE => game.world.freeze_timer += FREEZE_TIME,
-        SPELL_MAP => show_map(game, out),
+        SPELL_MAP => show_map(game, output),
         SPELL_STONE => {
-            if !stone_jump(game, out) {
+            if !stone_jump(game, output) {
                 return false;
             }
 
-            heal(game, out);
+            heal(game, output);
         }
 
-        SPELL_HEAL => heal(game, out),
-        SPELL_FEAR => scare_enemies(game, out),
+        SPELL_HEAL => heal(game, output),
+        SPELL_FEAR => scare_enemies(game, output),
         _ => {}
     }
 

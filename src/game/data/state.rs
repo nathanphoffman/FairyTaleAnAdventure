@@ -94,6 +94,7 @@ impl Hero {
         }
     }
 
+    // The inventory of whichever brother is playing now.
     pub fn stuff_mut(&mut self) -> &mut [u8; STUFF_SLOTS] {
         match self.brother {
             2 => &mut self.philstuff,
@@ -314,6 +315,7 @@ impl Graphics {
             shapedata: 0,
             mask_buffer: 0,
             nextshape: 0,
+
             seq_list: [const { SeqInfo::EMPTY }; SPRITE_SHEETS],
         }
     }

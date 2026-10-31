@@ -61,15 +61,15 @@ const RAFT_SLOT: usize = 1;
 
 /// Eats: lowers hunger by `amt`. If that would go below zero the hero is simply full
 /// (message 13); otherwise "Yum!".
-pub fn eat_food(game: &mut Game, out: &mut dyn Output, amt: i32) {
+pub fn eat_food(game: &mut Game, output: &mut dyn Output, amt: i32) {
     const HUNGER_FULL_MESSAGE: i32 = 13;
     game.hero.hunger = (game.hero.hunger as i32 - amt) as i16;
 
     if game.hero.hunger < 0 {
         game.hero.hunger = 0;
-        show_event(game, out, HUNGER_FULL_MESSAGE);
+        show_event(game, output, HUNGER_FULL_MESSAGE);
     } else {
-        out.print("Yum!");
+        output.print("Yum!");
     }
 }
 

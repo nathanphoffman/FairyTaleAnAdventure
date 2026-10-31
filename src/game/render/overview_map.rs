@@ -74,10 +74,10 @@ pub fn draw_overview_map(video: &mut Video, map: &MapData, world: &mut World, mx
     let mut offset = 0usize;
 
     for j in 0..OVERVIEW_ROWS {
-        for i in 0..OVERVIEW_COLUMNS {
+        for number in 0..OVERVIEW_COLUMNS {
             let index =
                 // Index into the region map: the sector row times 128 plus the column.
-                world.origin_x as i32 + x as i32 + i as i32 + (((y + j) as i32) << MAP_ROW_SHIFT);
+                world.origin_x as i32 + x as i32 + number as i32 + (((y + j) as i32) << MAP_ROW_SHIFT);
             let sec = map.map_byte(index as u16 as usize) as usize;
 
             draw_overview_sector(map, video, sec * SECTOR_BYTES, offset);
@@ -99,6 +99,7 @@ fn draw_overview_sector(map: &MapData, video: &mut Video, tiles: usize, offset: 
 
             // A 16 pixel row is two bytes, high byte first.
             plane[d] = (word >> BYTE_SHIFT) as u8;
+
             // The second copy is for the other page.
             plane[d + OVERVIEW_LINE_COPY] = (word >> BYTE_SHIFT) as u8;
             plane[d + 1] = *word as u8;
