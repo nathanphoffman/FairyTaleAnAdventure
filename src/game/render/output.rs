@@ -12,6 +12,7 @@ use crate::game::render::sprite_loading::{finish_sprite_load, load_sprite_file};
 use crate::game::ui::text::{draw_text, format_number, move_to};
 use crate::gfx::bitmap::Rect;
 use crate::gfx::draw::JAM1;
+use crate::gfx::overlay::Overlay;
 use crate::platform::display;
 
 // The scrolling message area of the text panel.
@@ -120,6 +121,10 @@ impl Output for Video {
 
     fn ticks(&self) -> u32 {
         display::ticks()
+    }
+
+    fn set_overlay(&mut self, overlay: Overlay) {
+        display::set_overlay(overlay);
     }
 
     fn forget_sprites(&mut self) {

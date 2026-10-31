@@ -9,17 +9,41 @@ use crate::game::render::display::delay;
 use crate::game::render::display::flip_pages;
 use crate::game::render::screen::BitmapId;
 use crate::gfx::bitmap::Rect;
+use crate::platform::display::launch_skipped;
 
 const ALL_PLANES: u32 = 0x1f;
 
-/// Whether the intro is being skipped. Once Space has been seen the skip sticks (the original
-/// reset it on every poll without a key).
+/// The code Escape gives while it is set to skip the intro.
+pub const ESCAPE_KEY: i32 = 27;
+
+/// Whether the intro is being skipped. Once Space or Escape has been seen the skip sticks (the
+/// original reset it on every poll without a key).
 pub fn intro_skipped(ui: &mut Ui) -> i32 {
-    if next_key() == b' ' as i32 {
+    let key = next_key();
+
+    if key == b' ' as i32 || key == ESCAPE_KEY {
         ui.intro_skip_requested = 1;
     }
 
     ui.intro_skip_requested as i32
+}
+
+/// Whether to leave the intro right now: the player has pressed Space or Escape. The tests skip
+/// the intro too, but they keep its full timing so their screenshots stay the same, so this is
+/// only true in a real launch.
+pub fn leave_intro_now(ui: &mut Ui) -> bool {
+    !launch_skipped() && intro_skipped(ui) != 0
+}
+
+/// Like `delay`, but ends early when the player skips the intro.
+pub fn skippable_delay(game: &mut Game, video: &mut Video, ticks: i32) {
+    for _ in 0..ticks.max(1) {
+        if leave_intro_now(&mut game.ui) {
+            return;
+        }
+
+        delay(game, video, 1);
+    }
 }
 
 const SCREEN_WIDTH: i32 = 320;
@@ -39,7 +63,11 @@ pub fn show_story_page(game: &mut Game, video: &mut Video, br1: &str, br2: &str,
         return;
     }
 
-    delay(game, video, PAGE_DELAY);
+    skippable_delay(game, video, PAGE_DELAY);
+
+    if leave_intro_now(&mut game.ui) {
+        return;
+    }
 
     let whole = Rect {
         x: 0,
@@ -153,6 +181,10 @@ pub fn turn_page(game: &mut Game, video: &mut Video) {
     let (a, b) = (BitmapId::PageA, BitmapId::PageB);
 
     for frame in 0..FLIP_RATE.len() {
+        if leave_intro_now(&mut game.ui) {
+            return;
+        }
+
         let temp = video.screen.drawing_bitmap_id();
         let rate = FLIP_RATE[frame];
         let wide = FLIP_WIDE[frame] as i32;

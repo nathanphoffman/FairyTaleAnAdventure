@@ -3,6 +3,7 @@
 //! bitmaps, a test can just record it, and a new renderer could draw it in a different way.
 
 use crate::game::data::state::{Hero, MapData, World};
+use crate::gfx::overlay::Overlay;
 
 /// The things the rules can ask for.
 pub trait Output {
@@ -39,6 +40,9 @@ pub trait Output {
 
     /// Ticks waited since the game started.
     fn ticks(&self) -> u32;
+
+    /// Sets the text and dark panels drawn over the picture (an empty overlay removes them).
+    fn set_overlay(&mut self, overlay: Overlay);
 
     /// Forgets all sprite sheets: the next one loads at the start of sprite memory.
     fn forget_sprites(&mut self);

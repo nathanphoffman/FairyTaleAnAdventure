@@ -3,6 +3,7 @@
 
 use crate::game::data::state::{Hero, MapData, World};
 use crate::game::output::Output;
+use crate::gfx::overlay::Overlay;
 
 /// One thing the rules asked an `Output` to do.
 #[derive(Debug, Clone, PartialEq)]
@@ -14,6 +15,7 @@ pub enum Call {
     SwapPages,
     Present,
     WaitFrame,
+    SetOverlay(Overlay),
     ForgetSprites,
     RewindSpritesTo(u8),
     StartSpriteSheet(u8),
@@ -119,6 +121,10 @@ impl Output for Recorder {
 
     fn ticks(&self) -> u32 {
         self.ticks
+    }
+
+    fn set_overlay(&mut self, overlay: Overlay) {
+        self.calls.push(Call::SetOverlay(overlay));
     }
 
     fn forget_sprites(&mut self) {

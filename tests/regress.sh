@@ -7,7 +7,7 @@
 cd "$(dirname "$0")/.."
 export SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy FTA_FAST=1
 cargo build -q 2>&1 | grep -E "^error" -A5 && exit 2
-BIN=target/debug/faery_tale
+BIN="target/debug/faery_tale --skip-launch"
 mkdir -p tests/out
 update=0; [ "$1" = "--update" ] && update=1
 new=tests/golden.new; : > $new

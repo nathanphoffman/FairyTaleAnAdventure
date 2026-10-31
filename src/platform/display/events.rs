@@ -79,10 +79,15 @@ fn handle_mouse(event: Event) {
     }
 }
 
-/// One window event: closing or Escape ends the program; the other keys, the mouse and window
+/// One window event: closing or Escape ends the program (unless Escape is skipping the intro); the other keys, the mouse and window
 /// changes are passed on.
 fn handle_event(d: &mut Display, event: Event) {
     match event {
+        Event::KeyDown {
+            keycode: Some(Keycode::Escape),
+            repeat: false,
+            ..
+        } if d.escape_skips => input::key_event(Keycode::Escape, true),
         Event::Quit { .. }
         | Event::KeyDown {
             keycode: Some(Keycode::Escape),

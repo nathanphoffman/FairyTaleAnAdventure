@@ -403,8 +403,18 @@ pub struct Witch {
     pub side_2: i16,
 }
 
+/// Which version of the game the player chose in the launch menu.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Experience {
+    #[default]
+    Original,
+    Remastered,
+    Reimagined,
+}
+
 /// Everything that changes while the game runs, in one value that is passed down from `run_game`.
 pub struct Game {
+    pub experience: Experience,
     pub witch: Witch,
     pub ui: Ui,
     pub encounter: Encounters,
@@ -442,6 +452,7 @@ impl Game {
 
     pub fn new() -> Game {
         Game {
+            experience: Experience::default(),
             witch: Witch {
                 direction: 0,
                 on_screen: 0,

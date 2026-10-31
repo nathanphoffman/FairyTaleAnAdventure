@@ -1,6 +1,6 @@
 //! Test helpers driven by environment variables.
 
-use super::{BEAT, Display, HEIGHT, WIDTH};
+use super::{BEAT, Display, WIDTH};
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
@@ -46,9 +46,9 @@ fn ticks_from_env(name: &str) -> u32 {
         .unwrap_or(DEFAULT_AFTER_TICKS)
 }
 
-/// The frame as a binary PPM image.
-fn frame_as_ppm(frame: &[u32]) -> Vec<u8> {
-    let mut output = format!("P6\n{WIDTH} {HEIGHT}\n255\n").into_bytes();
+/// The frame, `height` rows tall, as a binary PPM image.
+fn frame_as_ppm(frame: &[u32], height: u32) -> Vec<u8> {
+    let mut output = format!("P6\n{WIDTH} {height}\n255\n").into_bytes();
 
     for px in frame {
         // The pixel as red, green and blue bytes.
@@ -68,7 +68,9 @@ fn screenshot_hook(d: &Display) {
         return;
     }
 
-    if let Err(e) = std::fs::write(&path, frame_as_ppm(&d.frame)) {
+    let (pixels, height) = d.shown();
+
+    if let Err(e) = std::fs::write(&path, frame_as_ppm(pixels, height)) {
         eprintln!("Could not save the screenshot: {e}");
     }
 
@@ -97,8 +99,8 @@ mod tests {
 
     #[test]
     fn ppm_has_header_with_three_bytes_per_pixel() {
-        let ppm = frame_as_ppm(&[0xFF8040, 0x000001]);
-        let header = format!("P6\n{WIDTH} {HEIGHT}\n255\n").len();
+        let ppm = frame_as_ppm(&[0xFF8040, 0x000001], 200);
+        let header = format!("P6\n{WIDTH} 200\n255\n").len();
         assert_eq!(ppm.len(), header + 6);
         assert_eq!(&ppm[header..], &[0xFF, 0x80, 0x40, 0, 0, 1]);
     }

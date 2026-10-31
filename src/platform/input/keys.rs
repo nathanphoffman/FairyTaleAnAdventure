@@ -10,6 +10,9 @@ const CODE_TAB: u8 = 9;
 const CODE_RETURN: u8 = 13;
 const CODE_DELETE: u8 = 0x7f;
 
+/// Only reaches the game while Escape is set to skip the intro (otherwise Escape quits).
+pub const CODE_ESCAPE: u8 = 27;
+
 /// F1 is code 10, F2 is 11 ... F10 is 19.
 const FUNCTION_KEY_BASE: u8 = 10;
 
@@ -98,6 +101,7 @@ pub(super) fn translate(key: Keycode) -> u8 {
         Keycode::Tab => CODE_TAB,
         Keycode::Return | Keycode::KpEnter => CODE_RETURN,
         Keycode::Delete => CODE_DELETE,
+        Keycode::Escape => CODE_ESCAPE,
         Keycode::Kp0 => b'0',
         _ => 0,
     };

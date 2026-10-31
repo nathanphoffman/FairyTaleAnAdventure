@@ -248,6 +248,37 @@ pub fn copy_rect(src: &Bitmap, dst: &mut Bitmap, rect: Rect, to: (i32, i32), mas
     planes.len()
 }
 
+/// Copies the window of `src` whose top left pixel is (`x`, `y`) over the whole of `dst`, plane by
+/// plane. It works on whole bytes with a shift for the odd pixels, so it is quick enough to pan a
+/// picture every frame. Parts of the window outside `src` are left as they are in `dst`.
+pub fn copy_window(src: &Bitmap, dst: &mut Bitmap, (x, y): (usize, usize)) {
+    let first_byte = x / PIXELS_PER_BYTE;
+    let shift = x % PIXELS_PER_BYTE;
+    let (src_row, dst_row) = (src.bytes_per_row(), dst.bytes_per_row());
+
+    for plane_number in 0..src.depth().min(dst.depth()) {
+        for row in 0..dst.rows().min(src.rows().saturating_sub(y)) {
+            let from = &src.plane(plane_number)[(y + row) * src_row..(y + row + 1) * src_row];
+            let to = &mut dst.plane_mut(plane_number)[row * dst_row..(row + 1) * dst_row];
+
+            for (index, byte) in to.iter_mut().enumerate() {
+                let Some(&high) = from.get(first_byte + index) else {
+                    break;
+                };
+
+                let low = from.get(first_byte + index + 1).copied().unwrap_or(0);
+
+                // The pixels left of the window's edge fall off the top, the next byte fills in.
+                *byte = if shift == 0 {
+                    high
+                } else {
+                    high << shift | low >> (PIXELS_PER_BYTE - shift)
+                };
+            }
+        }
+    }
+}
+
 /// Scrolls the pixels of `area` (on the first `planes` planes) by (`dx`, `dy`): a pixel moves up and
 /// left by that much. The strip that scrolls in at the edge is filled with colour `fill`.
 pub fn scroll(bm: &mut Bitmap, area: Rect, (dx, dy): (i32, i32), fill: u8, planes: usize) {
@@ -354,5 +385,28 @@ mod tests {
         scroll(&mut bm, area, (0, 1), 0, 1);
         assert_eq!(bm.pixel(2, 1), 1);
         assert_eq!(bm.pixel(2, 3), 0);
+    }
+
+    #[test]
+    fn a_window_copy_moves_pixels_by_any_amount() {
+        let mut src = Bitmap::new(64, 4, 2);
+        src.plot(21, 2, 3, false, 2);
+
+        let mut dst = Bitmap::new(32, 4, 2);
+        copy_window(&src, &mut dst, (13, 1));
+
+        // The pixel was at x 21, y 2; the window starts at x 13, y 1.
+        assert_eq!(dst.pixel(8, 1), 3);
+        assert_eq!(dst.pixel(7, 1), 0);
+        assert_eq!(dst.pixel(9, 1), 0);
+    }
+
+    #[test]
+    fn a_window_past_the_edge_is_harmless() {
+        let src = Bitmap::new(32, 4, 1);
+        let mut dst = Bitmap::new(32, 4, 1);
+
+        copy_window(&src, &mut dst, (1000, 1000));
+        copy_window(&src, &mut dst, (20, 3));
     }
 }

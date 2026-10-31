@@ -13,7 +13,7 @@
 //! - `statedump`: test helper that writes the game state as text.
 //!
 //! Functions the C still calls keep their C names. The old file names (`asm_blit`, `hdrive`,
-//! `iffsubs`, ...) are listed in modern_engine_plan.md.
+//! `iffsubs`, ...) are listed in plan.md.
 
 pub mod actors;
 

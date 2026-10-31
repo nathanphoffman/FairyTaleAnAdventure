@@ -9,7 +9,7 @@ T=/tmp/fta-asan-target
 CFLAGS="-fsanitize=address -fno-omit-frame-pointer" \
 RUSTFLAGS="-C link-arg=-Wl,--no-as-needed -C link-arg=-lasan" \
     cargo build -q --target x86_64-unknown-linux-gnu --target-dir $T 2>&1 | grep -E "^error" -A5 && exit 2
-BIN=$T/x86_64-unknown-linux-gnu/debug/faery_tale
+BIN="$T/x86_64-unknown-linux-gnu/debug/faery_tale --skip-launch"
 fail=0
 for seed in $(seq 1 $runs); do
     read -r inj clk < <(python3 - $seed $ticks <<'P'

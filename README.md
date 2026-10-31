@@ -1,6 +1,7 @@
-# The Faery Tale Adventure - Linux Port
+# Fairy Tale: An Adventure
 
-A native Linux port of *The Faery Tale Adventure* (MicroIllusions, 1987, Amiga), written in Rust.
+An adaptation, for Linux and written in Rust, of *The Faery Tale Adventure* (written by David Joiner,
+published by MicroIllusions, 1987, Amiga). It is not the original release.
 
 The original Amiga source by Talin is at https://github.com/viridia/faery-tale-amiga. Clone it
 into `faery-tale-amiga/` in this directory to use as a reference. It is git-ignored and is not part
@@ -17,8 +18,7 @@ save and load. No C is compiled any more; `csrc/` is the original C kept as a re
 been cleaned up (short functions, named constants, unit tests) and the Amiga structs and raw pointers
 are gone, and all the game state lives in one `Game` value (no `static mut`, no `unsafe` in the game
 code). What is left is a modern renderer behind the `Output` interface (the rules already only see it, the state is split into `Game` and `Video`, and `Recorder` runs the rules without a screen), then the optional "modern engine"
-steps. The detailed status and plan are in [modern_engine_plan.md](modern_engine_plan.md)
-(start at "Where we are"); the history of the port is in [plan.md](plan.md).
+steps. The history of the port is in [plan.md](plan.md).
 
 ## Approach
 
@@ -39,15 +39,15 @@ steps. The detailed status and plan are in [modern_engine_plan.md](modern_engine
 | `docs/` | Notes on the data formats, Amiga calls and assembly routines |
 | `tests/` | Headless regression scripts and their golden hashes |
 | `tools/` | Helper scripts (`narr2rs.py` regenerates the story text, `package.sh`) |
-| `plan.md`, `modern_engine_plan.md` | History and plan |
+| `plan.md` | History of the port |
 
 ## Building
 
 Needs Rust (stable) and SDL2 (`libsdl2-dev`). No C compiler is needed.
 
 ```
-cargo run                                   # runs the game, skipping the intro (Esc quits)
-cargo run -- --intro                        # plays the story-book intro first
+cargo run                                   # intro (Esc skips it), then the launch menu, then the game (Esc quits)
+cargo run -- --skip-launch                  # skips the intro and the launch menu
 cargo test                                  # unit tests
 cargo run --bin dump_image -- faery-tale-amiga/game/image   # map of the floppy image
 ```
@@ -85,5 +85,8 @@ Saves go in `saves/` (git-ignored) as `A.faery` ... `H.faery`. Use Game, Quit, S
 
 ## Legal
 
-The original source is released by its author under an MIT-style license, but the copyright status
-of the game and its data files is unclear. Do not distribute game data from this repo.
+The original source and game files were released by their author, David Joiner (Talin), on GitHub
+(https://github.com/viridia/faery-tale-amiga). In his README he says he cannot say for certain what the
+exact copyright status is, and that whatever rights he has he makes freely available under an
+MIT-style permissive license. This repo does not include the game files; it loads them from a clone
+of his repository (see the top of this file).

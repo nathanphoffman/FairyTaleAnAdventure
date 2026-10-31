@@ -11,7 +11,11 @@ pub mod draw;
 
 pub mod font;
 
+pub mod overlay;
+
 pub mod scene;
+
+pub mod wood;
 
 pub use self::bitmap::{Bitmap, PAD};
 pub use self::font::Font;

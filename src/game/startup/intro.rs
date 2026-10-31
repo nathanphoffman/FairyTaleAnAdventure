@@ -13,15 +13,22 @@ use crate::game::files::loading::{
 };
 
 use crate::game::input::handler::reset_key_buffer;
+use crate::game::output::Output;
 use crate::game::render::display::{delay, flip_pages};
 use crate::game::render::screen::Screen;
 use crate::game::render::screen::{BitmapId, FontKind, PortId, ViewPortId};
 use crate::game::render::screen_fx::{set_intro_zoom, show_still_screen};
-use crate::game::startup::story_pages::{intro_skipped, show_story_page};
+use crate::game::startup::launch_menu::choose_experience;
+use crate::game::startup::splash::show_splash;
+use crate::game::startup::story_pages::{
+    intro_skipped, leave_intro_now, show_story_page, skippable_delay,
+};
 use crate::game::ui::menus::print_options;
 use crate::game::ui::text::{placard_text, print_positioned};
 use crate::gfx::bitmap::Rect;
+use crate::gfx::overlay::{Overlay, Text};
 use crate::platform::audio::{playscore, stopscore};
+use crate::platform::display::{launch_skipped, set_escape_skips};
 
 // Where the view ports sit once the game starts.
 const PAGE_HEIGHT: i16 = 143;
@@ -69,11 +76,24 @@ const STORY_PAGES: [(&str, &str, i16, i16); 3] = [
 
 /// Waits, in fiftieths of a second.
 const TITLE_WAIT: i32 = 50;
+
+/// In a real launch the title screen stays up a little less (the tests keep the original timing).
+const LAUNCH_TITLE_WAIT: i32 = 40;
 const INTRO_PAGES_WAIT: i32 = 190;
 const PLACARD_WAIT: i32 = 20;
 
 /// The placard shown while the copy protection question is asked.
 const PLACARD_COPYRIGHT: i32 = 19;
+
+/// The message in the corner while the intro plays.
+const SKIP_HINT: &str = "Press ESC to skip";
+
+/// A caption under the original title screen, so it is clear that screen is the original game's
+/// own (its text is left exactly as it was, copyright notice included).
+const TITLE_CAPTION: &str = "Original title screen";
+const CAPTION_X: i32 = 16;
+const CAPTION_Y: i32 = 390;
+const CAPTION_COLOR: u32 = 0xffa0_a0c0;
 
 /// Disk track range holding the shadow masks.
 const SHADOW_BLOCK: (i16, i16) = (896, 24);
@@ -81,7 +101,20 @@ const SHADOW_BLOCK: (i16, i16) = (896, 24);
 /// Returns false if the player failed the copy protection.
 pub(super) fn start_up(game: &mut Game, video: &mut Video) -> bool {
     stopscore();
+    let launching = !launch_skipped();
+
+    if launching {
+        set_escape_skips(true);
+        show_splash(game, video, SKIP_HINT);
+        video.set_overlay(title_overlay());
+    }
+
     show_title_screen(game, video);
+
+    if launching {
+        video.set_overlay(Overlay::corner_hint(SKIP_HINT));
+    }
+
     prepare_intro(game, video);
 
     if let Some(dir) = std::env::var_os("FTA_MUSIC_EXPORT") {
@@ -92,6 +125,16 @@ pub(super) fn start_up(game: &mut Game, video: &mut Video) -> bool {
 
     if intro_skipped(&mut game.ui) == 0 {
         play_intro(game, video);
+    }
+
+    if launching {
+        set_escape_skips(false);
+        video.set_overlay(Overlay::default());
+
+        match choose_experience(game, video) {
+            Some(experience) => game.experience = experience,
+            None => return false,
+        }
     }
 
     copy_protection_check();
@@ -108,7 +151,7 @@ pub(super) fn start_up(game: &mut Game, video: &mut Video) -> bool {
 }
 
 /// Blanks both pages.
-fn clear_both_pages(screen: &mut Screen) {
+pub(super) fn clear_both_pages(screen: &mut Screen) {
     for page in [screen.viewing_bitmap_id(), screen.drawing_bitmap_id()] {
         screen.port_mut(PortId::Map).target = Some(page);
         screen.clear(PortId::Map, 0);
@@ -116,12 +159,27 @@ fn clear_both_pages(screen: &mut Screen) {
 }
 
 /// Sets a colour of the page palette from 4-bit red, green and blue.
-fn set_page_color(screen: &mut Screen, color: usize, rgb: (u32, u32, u32)) {
+pub(super) fn set_page_color(screen: &mut Screen, color: usize, rgb: (u32, u32, u32)) {
     screen.set_color(ViewPortId::Page, color, rgb);
 }
 
-/// The legal title text on a blue page, then the music and the sound effects are read in.
-fn show_title_screen(game: &mut Game, video: &mut Video) {
+/// The skip message plus the caption of the original title screen.
+fn title_overlay() -> Overlay {
+    let mut overlay = Overlay::corner_hint(SKIP_HINT);
+
+    overlay.texts.push(Text {
+        text: TITLE_CAPTION.to_string(),
+        x: CAPTION_X,
+        y: CAPTION_Y,
+        color: CAPTION_COLOR,
+        scale: 1,
+    });
+
+    overlay
+}
+
+/// Blanks the page and makes it blue with white text, ready for the title and the launch menu.
+pub(super) fn prepare_blue_page(game: &mut Game, video: &mut Video) {
     video.screen.vp_page.ras = Some(0);
     video.screen.pages[1].ras = 1;
     clear_both_pages(&mut video.screen);
@@ -129,13 +187,18 @@ fn show_title_screen(game: &mut Game, video: &mut Video) {
     set_intro_zoom(game, video, ZOOM_NORMAL);
     set_page_color(&mut video.screen, BACKGROUND_COLOR, TITLE_BLUE);
     set_page_color(&mut video.screen, TEXT_COLOR, WHITE_RGB);
+}
+
+/// The legal title text on a blue page, then the music and the sound effects are read in.
+fn show_title_screen(game: &mut Game, video: &mut Video) {
+    prepare_blue_page(game, video);
 
     let pen = video.screen.port(PortId::Map).pen.fg;
     video.screen.set_a_pen(PortId::Map, TITLE_PEN);
     print_positioned(video, TITLE_TEXT);
     video.screen.set_a_pen(PortId::Map, pen);
 
-    delay(game, video, TITLE_WAIT);
+    skippable_delay(game, video, title_wait());
 
     video.screen.current_port = PortId::Text;
     video.screen.port_mut(PortId::Text).target = Some(BitmapId::TextPlane0);
@@ -146,7 +209,16 @@ fn show_title_screen(game: &mut Game, video: &mut Video) {
     read_score();
     read_sample();
 
-    delay(game, video, TITLE_WAIT);
+    skippable_delay(game, video, title_wait());
+}
+
+/// How long each pause on the title screen lasts, in ticks.
+fn title_wait() -> i32 {
+    if launch_skipped() {
+        TITLE_WAIT
+    } else {
+        LAUNCH_TITLE_WAIT
+    }
 }
 
 /// Starts the intro tune, and flips the pages twice so both show the same thing.
@@ -235,6 +307,10 @@ fn play_intro(game: &mut Game, video: &mut Video) {
     video.screen.pages[1].ras = 0;
 
     for x in (0..=ZOOM_FULL).step_by(ZOOM_STEP) {
+        if leave_intro_now(&mut game.ui) {
+            break;
+        }
+
         set_intro_zoom(game, video, x);
     }
 
@@ -246,13 +322,17 @@ fn play_intro(game: &mut Game, video: &mut Video) {
         }
 
         if { game.ui.intro_skip_requested } == 0 {
-            delay(game, video, INTRO_PAGES_WAIT);
+            skippable_delay(game, video, INTRO_PAGES_WAIT);
         }
     }
 
     video.screen.pages[1].ras = 0;
 
     for x in (0..=ZOOM_NORMAL).rev().step_by(ZOOM_STEP) {
+        if leave_intro_now(&mut game.ui) {
+            break;
+        }
+
         set_intro_zoom(game, video, x);
     }
 }

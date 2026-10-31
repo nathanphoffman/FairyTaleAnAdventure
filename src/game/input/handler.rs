@@ -24,6 +24,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 struct Handler {
     /// Pointer position, in lores pixels (x) and screen lines (y).
     pointer: (i16, i16),
+    /// Where the pointer really is, before it is kept inside the text panel (for the launch menu).
+    raw_pointer: (i16, i16),
     /// Which mouse buttons are down (bit 0x4000 left, 0x2000 right).
     qualifier: i16,
     /// Keys pressed and released, oldest first (`next_key` takes the oldest).
@@ -34,6 +36,7 @@ struct Handler {
 
 static HANDLER: Mutex<Handler> = Mutex::new(Handler {
     pointer: (POINTER_START, POINTER_START),
+    raw_pointer: (POINTER_START, POINTER_START),
     qualifier: 0,
     keys: VecDeque::new(),
     last_menu: 0,
@@ -129,11 +132,27 @@ pub fn next_key() -> i32 {
     handler().keys.pop_front().map_or(0, |code| code as i32)
 }
 
+/// Whether the left mouse button is held.
+pub fn left_button_down() -> bool {
+    handler().qualifier & LEFT_BUTTON != 0
+}
+
+/// Where the pointer is on the whole screen, in lores pixels and screen lines.
+pub fn raw_pointer() -> (i32, i32) {
+    let (x, y) = handler().raw_pointer;
+
+    (x as i32, y as i32)
+}
+
 /// Pointer position in lores pixels (x 0-319) and screen lines (y 0-199).
 /// The pointer is kept inside the text panel (the bottom of the screen), where the menus and
 /// the compass are, because that is the only place the mouse is used.
 pub fn mouse_moved(x: i32, y: i32) {
-    handler().pointer = (
+    let handler = &mut handler();
+
+    handler.raw_pointer = (x as i16, y as i16);
+
+    handler.pointer = (
         x.clamp(POINTER_MIN_X, POINTER_MAX_X) as i16,
         y.clamp(POINTER_MIN_Y, POINTER_MAX_Y) as i16,
     );

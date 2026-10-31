@@ -11,6 +11,7 @@ mod hooks;
 
 mod scripting;
 
+use crate::gfx::overlay::Overlay;
 use crate::gfx::scene::{FRAME_HEIGHT, FRAME_WIDTH, Scene, compose};
 use sdl2::EventPump;
 use sdl2::pixels::PixelFormatEnum;
@@ -23,11 +24,17 @@ use std::time::{Duration, Instant};
 /// Counts calls to wait_frame/present; the test watchdog uses it to see if the game is stuck.
 static BEAT: AtomicU32 = AtomicU32::new(0);
 
-/// Set before init(): press Space for the player early on, which skips the intro.
-static SKIP_INTRO: AtomicBool = AtomicBool::new(false);
+/// Set before init(): skips the intro and the launch menu (the tests and `--skip-launch` use it).
+/// A Space press is sent early on, which is how the intro is skipped.
+static SKIP_LAUNCH: AtomicBool = AtomicBool::new(false);
 
-pub fn set_skip_intro(skip: bool) {
-    SKIP_INTRO.store(skip, Ordering::Relaxed);
+pub fn set_skip_launch(skip: bool) {
+    SKIP_LAUNCH.store(skip, Ordering::Relaxed);
+}
+
+/// Whether the intro and the launch menu are skipped.
+pub fn launch_skipped() -> bool {
+    SKIP_LAUNCH.load(Ordering::Relaxed)
 }
 
 pub const WIDTH: u32 = FRAME_WIDTH as u32;
@@ -35,7 +42,7 @@ pub const HEIGHT: u32 = FRAME_HEIGHT as u32;
 const TICK: Duration = Duration::from_millis(20); // 50 Hz
 /// If the game falls this many ticks behind, pacing restarts instead of catching up.
 const MAX_LAG_TICKS: u32 = 4;
-const WINDOW_TITLE: &str = "The Faery Tale Adventure";
+const WINDOW_TITLE: &str = "Fairy Tale: An Adventure";
 const WINDOW_WIDTH: u32 = 1280;
 const WINDOW_HEIGHT: u32 = 800;
 
@@ -64,6 +71,14 @@ struct Display {
     pads: Vec<sdl2::controller::GameController>,
     /// left stick state: left, right, up, down
     stick: [bool; 4],
+    /// text and dark panels drawn over the picture (the menu, the skip message)
+    overlay: Overlay,
+    /// the picture with the overlay on it, `ROW_SCALE` times as tall as `frame` (empty when there
+    /// is no overlay, and then `frame` is what is shown)
+    with_overlay: Vec<u32>,
+    /// whether Escape skips the intro (it quits the program otherwise)
+    escape_skips: bool,
+    mouse: sdl2::mouse::MouseUtil,
 }
 
 thread_local! {
@@ -89,7 +104,7 @@ fn open_pads(system: &sdl2::GameControllerSubsystem) -> Vec<sdl2::controller::Ga
 fn initial_script() -> Vec<(u32, String, bool)> {
     let mut script = scripting::parse_script();
 
-    if SKIP_INTRO.load(Ordering::Relaxed) {
+    if launch_skipped() {
         script.push((SKIP_INTRO_TICKS.0, "Space".to_string(), true));
         script.push((SKIP_INTRO_TICKS.1, "Space".to_string(), false));
     }
@@ -116,7 +131,8 @@ pub fn init() -> Result<(), String> {
     let controller_system = sdl.game_controller()?;
     let pads = open_pads(&controller_system);
     super::input::load_config();
-    sdl.mouse().show_cursor(false); // the game draws its own pointer
+    let mouse = sdl.mouse();
+    mouse.show_cursor(false); // the game draws its own pointer
 
     match sdl.audio() {
         Ok(audio) => super::audio::init(&audio),
@@ -139,6 +155,10 @@ pub fn init() -> Result<(), String> {
         pads,
         stick: [false; 4],
         script: initial_script(),
+        overlay: Overlay::default(),
+        with_overlay: Vec::new(),
+        escape_skips: false,
+        mouse,
     };
 
     DISPLAY.with(|d| *d.borrow_mut() = Some(display));
@@ -149,15 +169,17 @@ pub fn init() -> Result<(), String> {
 /// Converts the scene to RGB and shows it.
 fn draw(d: &mut Display, scene: &Scene) {
     compose(scene, &mut d.frame);
+    layer_overlay(d);
+
+    let (pixels, height) = d.shown();
     let texture = d
         .creator
-        .create_texture_streaming(PixelFormatEnum::ARGB8888, WIDTH, HEIGHT);
+        .create_texture_streaming(PixelFormatEnum::ARGB8888, WIDTH, height);
 
     match texture {
         Ok(mut texture) => {
-            let frame = &d.frame;
             let copied = texture.with_lock(None, |bytes, pitch| {
-                for (row, pixels) in bytes.chunks_mut(pitch).zip(frame.chunks(WIDTH as usize)) {
+                for (row, pixels) in bytes.chunks_mut(pitch).zip(pixels.chunks(WIDTH as usize)) {
                     for (output, pixel) in row.chunks_mut(BYTES_PER_PIXEL).zip(pixels) {
                         output.copy_from_slice(&pixel.to_ne_bytes());
                     }
@@ -178,6 +200,35 @@ fn draw(d: &mut Display, scene: &Scene) {
         }
 
         Err(e) => eprintln!("Could not create the screen texture: {e}"),
+    }
+}
+
+/// Puts the overlay on the picture. The overlay works on a grid with the rows doubled (as they
+/// are on screen), so it can draw text with square pixels; the picture's rows are repeated to match.
+fn layer_overlay(d: &mut Display) {
+    d.with_overlay.clear();
+
+    if d.overlay.is_empty() {
+        return;
+    }
+
+    for row in d.frame.chunks(WIDTH as usize) {
+        for _ in 0..ROW_SCALE {
+            d.with_overlay.extend_from_slice(row);
+        }
+    }
+
+    d.overlay.draw(&mut d.with_overlay, WIDTH as usize);
+}
+
+impl Display {
+    /// The pixels on screen now, and how many rows tall they are.
+    fn shown(&self) -> (&[u32], u32) {
+        if self.with_overlay.is_empty() {
+            (&self.frame, HEIGHT)
+        } else {
+            (&self.with_overlay, HEIGHT * ROW_SCALE)
+        }
     }
 }
 
@@ -246,4 +297,28 @@ pub fn wait_frame(scene: &Scene) {
 pub fn ticks() -> u32 {
     // Gives 0 when there is no window; otherwise the window's tick count.
     DISPLAY.with(|d| d.borrow().as_ref().map_or(0, |d| d.ticks))
+}
+
+/// Sets what is drawn over the picture (an empty overlay draws nothing).
+pub fn set_overlay(overlay: Overlay) {
+    with_display(|d| d.overlay = overlay);
+}
+
+/// While this is on, Escape reaches the game as a key (to skip the intro); otherwise it quits.
+pub fn set_escape_skips(skips: bool) {
+    with_display(|d| d.escape_skips = skips);
+}
+
+/// Shows or hides the ordinary mouse arrow (the game draws its own while playing).
+pub fn show_system_cursor(shown: bool) {
+    with_display(|d| d.mouse.show_cursor(shown));
+}
+
+/// Runs `change` on the window, if there is one.
+fn with_display(change: impl FnOnce(&mut Display)) {
+    DISPLAY.with(|d| {
+        if let Some(d) = d.borrow_mut().as_mut() {
+            change(d);
+        }
+    });
 }

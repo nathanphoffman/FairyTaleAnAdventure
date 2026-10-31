@@ -6,7 +6,13 @@ pub mod game_loop;
 
 pub mod intro;
 
+pub mod launch_menu;
+
+pub mod menu_background;
+
 pub mod open_close;
+
+pub mod splash;
 
 pub mod story_pages;
 
