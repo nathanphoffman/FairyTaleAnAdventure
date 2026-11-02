@@ -8,8 +8,10 @@ use crate::game::output::Output;
 /// The container items start at this entry of `item_list`; a roll of 0 there means arrows (or 100
 /// gold when it is the first of two things).
 const FIRST_CONTAINER_ITEM: i32 = 8;
+
 /// How many different things a roll can pick from.
 const ITEM_CHOICES: i32 = 8;
+
 /// How many different kinds of contents a container can roll.
 const CONTENT_KINDS: i32 = 4;
 const ROLL_ARROWS_OR_GOLD: i32 = FIRST_CONTAINER_ITEM;

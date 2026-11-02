@@ -176,6 +176,7 @@ fn menu_key_at(x: i32, y: i32) -> Option<i32> {
 /// (it makes the hero fight, see `read_walk_direction`).
 pub fn mouse_buttons_changed(left: bool, right: bool) {
     let new_qualifier =
+
         (if left { LEFT_BUTTON } else { 0 }) | (if right { RIGHT_BUTTON } else { 0 });
     let handler = &mut handler();
 

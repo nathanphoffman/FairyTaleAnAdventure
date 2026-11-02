@@ -207,6 +207,7 @@ fn act_on_goal(
             game.hero.y as i32,
             0,
         );
+
         game.actor_mut(actor).state = STILL;
     } else if mode == WAIT {
         game.actor_mut(actor).state = STILL;

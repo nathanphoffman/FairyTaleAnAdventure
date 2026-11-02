@@ -340,6 +340,7 @@ fn update_carrier(game: &mut Game, output: &mut dyn Output) {
     if game.world.extent_type < XT_CARRIER_MIN {
         game.actors.active_carrier = 0;
     } else if game.world.extent_type == XT_CARRIER
+
         && (game.actors.active_carrier == 0
             || (game.hero.riding == 0
                 && game.actors.loaded_actor_file != game.extents[game.world.extent].v3 as i16))

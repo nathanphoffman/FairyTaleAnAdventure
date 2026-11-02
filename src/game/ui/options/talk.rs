@@ -44,6 +44,7 @@ pub(super) fn talk_option(game: &mut Game, output: &mut dyn Output, chosen_entry
     let distance = find_nearest_figure(
         game,
         1,
+
         if chosen_entry == YELL {
             YELL_RANGE
         } else {

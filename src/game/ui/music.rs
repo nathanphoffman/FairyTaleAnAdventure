@@ -83,6 +83,7 @@ fn pick_tune(actors: &Actors, world: &World, hero: &Hero) -> usize {
     if actors.list[0].vitality == 0 {
         TUNE_DEATH
     } else if hero.x > ASTRAL_X.0
+
         && hero.x < ASTRAL_X.1
         && hero.y > ASTRAL_Y.0
         && hero.y < ASTRAL_Y.1
@@ -93,6 +94,7 @@ fn pick_tune(actors: &Actors, world: &World, hero: &Hero) -> usize {
     } else if world.region > INDOOR_REGION {
         set_instrument(
             WAVE_SLOT,
+
             if world.region == CAVE_REGION {
                 WAVE_CAVE
             } else {

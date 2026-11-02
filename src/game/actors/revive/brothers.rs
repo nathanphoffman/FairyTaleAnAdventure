@@ -182,6 +182,7 @@ fn show_follow_up_placard(game: &mut Game, output: &mut dyn Output) {
 
     placard_text(
         output,
+
         if game.hero.brother == PHILLIP {
             PLACARD_PHILLIP_FOLLOW_UP
         } else {

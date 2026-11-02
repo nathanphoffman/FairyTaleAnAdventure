@@ -187,6 +187,7 @@ impl Ctx {
             game.actors.test_y as i16,
             self.slot as i16,
         ) == 0
+
         {
             return Some(Pc::NewLoc);
         }
@@ -208,6 +209,7 @@ impl Ctx {
             game.actors.test_y as i16,
             self.slot as i16,
         ) != 0
+
         {
             Pc::CheckDev2
         } else {
@@ -229,6 +231,7 @@ impl Ctx {
             game.actors.test_y as i16,
             self.slot as i16,
         ) != 0
+
         {
             Pc::Blocked
         } else {

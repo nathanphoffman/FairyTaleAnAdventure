@@ -23,6 +23,7 @@ use crate::game::startup::splash::show_splash;
 use crate::game::startup::story_pages::{
     intro_skipped, leave_intro_now, show_story_page, skippable_delay,
 };
+
 use crate::game::ui::menus::print_options;
 use crate::game::ui::text::{placard_text, print_positioned};
 use crate::gfx::bitmap::Rect;

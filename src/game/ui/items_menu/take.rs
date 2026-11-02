@@ -144,6 +144,7 @@ fn read_paper(game: &mut Game, output: &mut dyn Output, indoors: bool) -> bool {
     show_event(
         game,
         output,
+
         if indoors {
             EVENT_PAPER_INDOORS
         } else {

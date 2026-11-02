@@ -300,6 +300,7 @@ mod tests {
                 .iter()
                 .all(|&p| p == 0xff80_8080)
         );
+
         assert!(frame.contains(&WHITE));
         assert!(frame.contains(&darken(0xff80_8080, HINT_DARKNESS)));
     }
@@ -335,6 +336,7 @@ mod tests {
             blended >> 16 & 0xff > 100 && blended & 0xff > 100,
             "{blended:x}"
         );
+
         assert_eq!(frame[5 * COLUMNS + 7], 0xff00_00ff);
     }
 

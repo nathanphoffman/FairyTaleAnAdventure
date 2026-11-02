@@ -87,6 +87,7 @@ fn read_font_tables(seg: &[u8]) -> Option<BitmapFont> {
             be16(seg, charloc + index * 4)?,
             be16(seg, charloc + index * 4 + 2)?,
         ));
+
         space.push(be16(seg, charspace + index * 2)?);
         kern.push(be16(seg, charkern + index * 2)? as i16);
     }

@@ -32,6 +32,7 @@ pub(super) fn look_around(game: &mut Game, output: &mut dyn Output) {
     show_event(
         game,
         output,
+
         if found {
             EVENT_FOUND_HIDDEN
         } else {

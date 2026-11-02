@@ -6,6 +6,7 @@ use crate::game::data::state::{Experience, Game, Video};
 use crate::game::input::handler::{
     forget_last_menu, left_button_down, next_key, raw_pointer, reset_key_buffer,
 };
+
 use crate::game::output::Output;
 use crate::game::render::display::delay;
 use crate::game::startup::intro::prepare_blue_page;
@@ -117,6 +118,7 @@ pub(super) fn choose_experience(game: &mut Game, video: &mut Video) -> Option<Ex
 
     let choice = loop {
         let pointer = raw_pointer();
+
         // The pointer is in lores game pixels; the menu is in overlay pixels, twice as many.
         let hovered = option_at(&blocks, pointer.0 * 2, pointer.1 * 2);
 
@@ -243,6 +245,7 @@ fn menu_overlay(blocks: &[Block], planks: &Planks, hovered: Option<usize>) -> Ov
 
     for (index, (block, option)) in blocks.iter().zip(&OPTIONS).enumerate() {
         let lit = hovered == Some(index);
+
         let title_color = if lit { HOVER_COLOR } else { TITLE_COLOR };
         let line_color = if lit {
             LIT_DESCRIPTION_COLOR
@@ -269,6 +272,7 @@ fn menu_overlay(blocks: &[Block], planks: &Planks, hovered: Option<usize>) -> Ov
     }
 
     let lit = hovered == Some(QUIT);
+
     let color = if lit { HOVER_COLOR } else { TITLE_COLOR };
 
     overlay.images.push(planks.quit[lit as usize].clone());

@@ -321,6 +321,7 @@ impl Ctx {
         let (ox, oy) = if game.actor(actor).kind == CARRIER && game.hero.riding == RIDING_SWAN {
             ANCHOR_SWAN
         } else if game.actor(actor).kind == RAFT
+
             || game.actor(actor).kind == CARRIER
             || game.actor(actor).kind == DRAGON
         {

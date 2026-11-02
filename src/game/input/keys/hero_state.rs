@@ -36,6 +36,7 @@ pub fn update_hero(game: &mut Game, output: &mut dyn Output, cycle: i16) {
     } else if state == DYING || state == SINK || state == SLEEP {
         // nothing to do
     } else if mouse_buttons() & RIGHT_BUTTON != 0 || game.ui.fight_key_held != 0 || joystick_fire()
+
     {
         state = fighting_state(game, output, state);
     } else if state == SHOOT1 {
@@ -98,6 +99,7 @@ fn try_to_dismount(game: &mut Game, output: &mut dyn Output, hero: ActorRef) {
     if game.actors.fiery_death != 0 {
         show_event(game, output, EVENT_LAVA);
     } else if dif_x > -DISMOUNT_SPEED
+
         && dif_x < DISMOUNT_SPEED
         && dif_y > -DISMOUNT_SPEED
         && dif_y < DISMOUNT_SPEED
@@ -111,6 +113,7 @@ fn try_to_dismount(game: &mut Game, output: &mut dyn Output, hero: ActorRef) {
                 ytest.wrapping_add(DISMOUNT_CHECK) as i16,
                 0,
             ) == 0
+
         {
             game.hero.riding = 0;
             game.actor_mut(hero).abs_y = ytest;
