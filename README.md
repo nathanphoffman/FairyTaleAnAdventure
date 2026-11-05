@@ -42,7 +42,7 @@ tests/regress.sh; tests/state_regress.sh                            # scenario r
 
 ## Controls
 
-- **Walk:** arrow keys (two together for diagonals), keypad digits, or hold the left mouse button over the compass.
+- **Walk:** arrow keys (two together for diagonals), keypad digits, or hold the left mouse button over the compass. In Remastered and Reimagined also `WASD`, and a left click on the play field walks there. Because of that, in those modes Say is `H`, Ask is `N` and the Buy menu's sword is `Z`.
 - **Fight:** right mouse button, Ctrl, or keypad 0.
 - **Menus:** click them, or use the keys the original game had:
   Items menu: `I` List, `T` Take, `?` Look, `U` Use, `G` Give.
@@ -51,7 +51,7 @@ tests/regress.sh; tests/state_regress.sh                            # scenario r
 - **Gamepad:** left stick or D-pad walks, A fights, X Take, Y List, B Look, LB Use, RB Give, Start Pause.
 - **Fullscreen:** F11 or Alt+Enter. The window can also be resized.
 - **Remap keys:** copy `controls.cfg.example` to `controls.cfg` and edit it (`W = Up`).
-- **Esc** closes the window.
+- **Esc:** skips the intro. In a game, Original returns to the game selection; Remastered and Reimagined open the game menu. Closing the window quits.
 
 ## Testing
 

@@ -2,6 +2,7 @@ using FaeryTale.Game.Data;
 using FaeryTale.Game.Files;
 using FaeryTale.Game.Input;
 using FaeryTale.Game.Output;
+using FaeryTale.Game.Remastered;
 using FaeryTale.Game.Render;
 using FaeryTale.Game.Ui;
 using FaeryTale.Gfx;
@@ -67,18 +68,29 @@ public static class Launch
     private const int CAPTION_Y = 390;
     private const uint CAPTION_COLOR = 0xffa0_a0c0;
 
-    /// The code Escape gives while it is set to skip the intro.
-    public const int ESCAPE_KEY = 27;
-
     /// Whether the intro and the launch menu are skipped (the tests and --skip-launch).
     public static bool LaunchSkipped { get; set; }
 
-    /// The game: the original main.
+    /// The game: the original main. After a game ends the player is taken back to the launch menu
+    /// (unless they chose to exit the program or the test scripts are running).
     public static void RunGame(IDisplayDevice device)
+    {
+        Func<Data.Game, Video, bool> begin = StartUp;
+
+        while (PlayOnce(device, begin) && !LaunchSkipped)
+        {
+            begin = ReturnToMenu;
+        }
+    }
+
+    // One game from opening to closing, with a fresh game state. Returns true when the player
+    // should be offered the launch menu again.
+    private static bool PlayOnce(IDisplayDevice device, Func<Data.Game, Video, bool> begin)
     {
         Data.Game game = new();
         Video video = new() { Device = device };
 
+        ForgetLastGame();
         game.World.LightTimer = 0;
 
         if (OpenClose.OpenAll(game, video) is var error && error != 0)
@@ -86,16 +98,31 @@ public static class Launch
             TextRoutines.ShowError(video, error);
             OpenClose.CloseAll();
 
-            return;
+            return false;
         }
 
-        if (StartUp(game, video))
+        bool backToMenu = false;
+
+        if (begin(game, video))
         {
             GameLoop.Run(game, video);
             Music.Player.StopScore();
+            video.SetOverlay(new Overlay());
+            backToMenu = !game.Ui.ExitProgram;
         }
 
         OpenClose.CloseAll();
+
+        return backToMenu;
+    }
+
+    // Clears the keyboard, mouse and walking state a game leaves behind in static fields.
+    private static void ForgetLastGame()
+    {
+        InputHandler.Reset();
+        ClickToMove.Cancel();
+        ClickOverlay.Reset();
+        WindowControls.SystemCursorShown = false;
     }
 
     /// Whether the intro is being skipped. Once Space or Escape has been seen the skip sticks (the
@@ -104,7 +131,7 @@ public static class Launch
     {
         int key = InputHandler.NextKey();
 
-        if (key == ' ' || key == ESCAPE_KEY)
+        if (key == ' ' || key == InputHandler.ESCAPE_KEY)
         {
             ui.IntroSkipRequested = 1;
         }
@@ -153,7 +180,6 @@ public static class Launch
 
         if (launching)
         {
-            WindowControls.EscapeSkips = true;
             Splash.Show(game, video, SKIP_HINT);
             video.SetOverlay(TitleOverlay());
         }
@@ -172,24 +198,57 @@ public static class Launch
             StoryPages.PlayIntro(game, video);
         }
 
-        if (launching)
-        {
-            WindowControls.EscapeSkips = false;
-            video.SetOverlay(new Overlay());
+        video.SetOverlay(new Overlay());
 
+        return ChooseAndBegin(game, video);
+    }
+
+    // Back from a game: straight to the menu, without the splash and the intro. Returns false
+    // when the player chose Quit.
+    private static bool ReturnToMenu(Data.Game game, Video video)
+    {
+        Music.Player.StopScore();
+        PrepareBluePage(game, video);
+        SetUpStoryText(video.Screen);
+
+        return ChooseAndBegin(game, video);
+    }
+
+    // Asks which version to play (the tests skip the question), then starts the first brother.
+    // Returns false when the player chose Quit.
+    private static bool ChooseAndBegin(Data.Game game, Video video)
+    {
+        if (!LaunchSkipped)
+        {
             if (LaunchMenu.ChooseExperience(game, video) is not { } experience)
             {
                 return false;
             }
 
-            game.Experience = experience;
+            ChooseExperience(game, experience);
+        }
+        else if (Environment.GetEnvironmentVariable("FTA_EXPERIENCE") is { } name && Enum.TryParse(name, true, out Experience scripted))
+        {
+            ChooseExperience(game, scripted); // lets the test scripts start in another mode
         }
 
         ShowPlayScreenBackground(game, video);
-        Display.Delay(game, video, PLACARD_WAIT);
+
+        if (game.Experience == Experience.Original)
+        {
+            Display.Delay(game, video, PLACARD_WAIT);
+        }
+
         StartFirstBrother(game, video);
 
         return true;
+    }
+
+    // Remembers the chosen mode. Remastered and Reimagined let the pointer roam the whole screen.
+    private static void ChooseExperience(Data.Game game, Experience experience)
+    {
+        game.Experience = experience;
+        InputHandler.RemasteredControls = experience != Experience.Original;
     }
 
     // The skip message plus the caption of the original title screen.
@@ -229,16 +288,22 @@ public static class Launch
 
         SkippableDelay(game, video, TitleWait());
 
-        video.Screen.CurrentPort = PortId.Text;
-        video.Screen.GetPort(PortId.Text).Target = BitmapId.TextPlane0;
-        video.Screen.SetFontKind(PortId.Text, FontKind.Story);
-        video.Screen.SetAPen(PortId.Text, STORY_PEN);
-        video.Screen.SetBPen(PortId.Text, STORY_BACKGROUND_PEN);
+        SetUpStoryText(video.Screen);
 
         Audio.SoundBank.ReadScore();
         Audio.SoundBank.ReadSample();
 
         SkippableDelay(game, video, TitleWait());
+    }
+
+    // Points the text port at the panel with the story font and the paper colours for play.
+    private static void SetUpStoryText(Screen screen)
+    {
+        screen.CurrentPort = PortId.Text;
+        screen.GetPort(PortId.Text).Target = BitmapId.TextPlane0;
+        screen.SetFontKind(PortId.Text, FontKind.Story);
+        screen.SetAPen(PortId.Text, STORY_PEN);
+        screen.SetBPen(PortId.Text, STORY_BACKGROUND_PEN);
     }
 
     // How long each pause on the title screen lasts, in ticks.
@@ -276,8 +341,14 @@ public static class Launch
         video.Screen.CurrentPort = PortId.Map;
         video.Screen.GetPort(PortId.Map).Target = video.Screen.DrawingBitmapId;
         MessagePage.ShowStillScreen(game, video);
-        video.Screen.SetAPen(PortId.Map, TITLE_PEN);
-        TextRoutines.PlacardText(video, PLACARD_COPYRIGHT);
+
+        // The copyright placard is a flash of text between the menu and the game: only the
+        // original game has it.
+        if (game.Experience == Experience.Original)
+        {
+            video.Screen.SetAPen(PortId.Map, TITLE_PEN);
+            TextRoutines.PlacardText(video, PLACARD_COPYRIGHT);
+        }
 
         InputHandler.ResetKeyBuffer();
     }

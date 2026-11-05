@@ -1,3 +1,5 @@
+using FaeryTale.Game.Input;
+
 namespace FaeryTale.Platform;
 
 /// Translating key names into the game's key codes. The names are the ones SDL gives its keys
@@ -32,8 +34,8 @@ public static class KeyNames
     /// F1 is code 10, F2 is 11 ... F10 is 19.
     private const int FUNCTION_KEY_BASE = 10;
 
-    /// Only reaches the game while Escape is set to skip the intro (otherwise Escape quits).
-    public const int CODE_ESCAPE = 27;
+    /// Escape: skips the intro, leaves a game, or opens the game menu.
+    public const int CODE_ESCAPE = InputHandler.ESCAPE_KEY;
 
     private static readonly Dictionary<string, Key> NAMES = Build();
 

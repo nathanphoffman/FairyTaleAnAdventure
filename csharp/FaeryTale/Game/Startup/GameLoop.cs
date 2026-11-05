@@ -9,6 +9,7 @@ using FaeryTale.Game.Input.Keys;
 using FaeryTale.Game.Land;
 using FaeryTale.Game.Land.TravelDoors;
 using FaeryTale.Game.Output;
+using FaeryTale.Game.Remastered;
 using FaeryTale.Game.Render;
 using FaeryTale.Game.Testing;
 
@@ -132,6 +133,8 @@ public static class GameLoop
             return;
         }
 
+        ClickToMove.Drive(game);
+        ClickOverlay.Update(game, video);
         HeroControls.UpdateHero(game, video, state.Cycle);
         MoveEverything(game, video, state);
         Bed.CheckBed(game, video);
@@ -157,9 +160,30 @@ public static class GameLoop
         sbyte key = unchecked((sbyte)InputHandler.NextKey());
         bool notPause = (game.Menus[GAME_MENU].Enabled[PAUSE_ENTRY] & 1) == 0;
 
-        if (key != 0)
+        if (key == InputHandler.ESCAPE_KEY && output is Video video)
+        {
+            PressEscape(game, video);
+        }
+        else if (key != 0)
         {
             KeyHandler.HandleKey(game, output, key, notPause ? 1 : 0);
+        }
+    }
+
+    // Escape leaves this game for the game selection. Remastered and Reimagined ask first with the
+    // game menu, which can also resume or leave the program.
+    private static void PressEscape(Data.Game game, Video video)
+    {
+        GameMenuChoice choice = game.Experience == Experience.Original ? GameMenuChoice.BackToGameSelection : GameMenu.Show(game, video);
+
+        if (choice == GameMenuChoice.ExitGame)
+        {
+            game.Ui.ExitProgram = true;
+        }
+
+        if (choice != GameMenuChoice.Resume)
+        {
+            game.Ui.QuitRequested = 1;
         }
     }
 

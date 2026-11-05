@@ -23,9 +23,13 @@ public static class InputHandler
     private const int KEY_BUFFER_CAPACITY = 127;
     private const int KEY_RELEASED = 0x80;
 
+    /// The code of the Escape key. It is not one of the direction codes (20-29), the function key
+    /// codes (10-19) or a letter, so it cannot be mistaken for another key (27 would be "west").
+    public const int ESCAPE_KEY = 31;
+
     // Qualifier bits for the mouse buttons.
     private const short LEFT_BUTTON = 0x4000;
-    private const short RIGHT_BUTTON = 0x2000;
+    internal const short RIGHT_BUTTON = 0x2000;
 
     /// The pointer starts off the play field.
     private const short POINTER_START = 320;
@@ -65,6 +69,15 @@ public static class InputHandler
     private static (short X, short Y) rawPointer = (POINTER_START, POINTER_START);
     private static short qualifier;
     private static sbyte lastMenu;
+    private static (int X, int Y)? pendingClick;
+
+    /// The play field ends and the text panel starts at this screen line.
+    private const int PLAY_FIELD_BOTTOM = 143;
+
+    /// Remastered and Reimagined: the pointer goes over the whole screen, a left click on the play
+    /// field is kept for click to move, and the keys are the modern set (WASD walks). Original
+    /// keeps the pointer in the text panel and the original keys.
+    public static bool RemasteredControls { get; set; }
 
     /// Whether the joystick fire button is held.
     public static bool JoystickFire { get; set; }
@@ -114,6 +127,22 @@ public static class InputHandler
         lock (padlock)
         {
             PushKey(code);
+        }
+    }
+
+    /// Forgets everything a finished game left behind: keys, buttons and the pointer.
+    public static void Reset()
+    {
+        lock (padlock)
+        {
+            keys.Clear();
+            pointer = (POINTER_START, POINTER_START);
+            rawPointer = (POINTER_START, POINTER_START);
+            qualifier = 0;
+            lastMenu = 0;
+            pendingClick = null;
+            RemasteredControls = false;
+            JoystickFire = false;
         }
     }
 
@@ -172,7 +201,10 @@ public static class InputHandler
 
                 if ((newQualifier & LEFT_BUTTON) != 0)
                 {
-                    key = MenuKeyAt(pointer.X, pointer.Y);
+                    (int x, int y) = RemasteredControls ? rawPointer : pointer;
+
+                    key = MenuKeyAt(x, y);
+                    RememberPlayFieldClick(x, y);
                 }
                 else if (lastMenu != 0)
                 {
@@ -200,37 +232,50 @@ public static class InputHandler
     /// (numbered from 20, the keypad digits) does. Anything outside 20-29 means no direction.
     public static void ReadWalkDirection(Data.Ui ui, IOutput output)
     {
+        short direction = UserDirection(ui);
+
+        // With no key or compass click, a click to move walk lights the compass instead.
+        if (direction == DIR_NONE)
+        {
+            direction = ui.PathDirection;
+        }
+
+        ui.CompassLitDirection = direction;
+
+        if (direction != ui.CompassDrawnDirection)
+        {
+            ui.CompassDrawnDirection = direction;
+            output.DrawCompass(direction);
+        }
+    }
+
+    /// The direction the player asks for by hand (0-7, 9 = none): the pointer over the compass
+    /// while a button is down, else the direction keys.
+    public static short UserDirection(Data.Ui ui)
+    {
         short buttons;
         (int X, int Y) place;
 
         lock (padlock)
         {
             buttons = qualifier;
-            place = (pointer.X, pointer.Y);
+            place = RemasteredControls ? (rawPointer.X, rawPointer.Y) : (pointer.X, pointer.Y);
         }
-
-        short direction;
 
         if ((buttons & (LEFT_BUTTON | RIGHT_BUTTON)) != 0)
         {
-            direction = CompassDirection(place.X, place.Y);
-        }
-        else
-        {
-            direction = unchecked((short)(ui.HeldDirection - KEYDIR_BASE));
-
-            if (direction < 0 || direction >= DIRECTION_COUNT)
-            {
-                ui.HeldDirection = 0;
-                direction = DIR_NONE;
-            }
+            return CompassDirection(place.X, place.Y);
         }
 
-        if (direction != ui.CompassLitDirection)
+        short direction = unchecked((short)(ui.HeldDirection - KEYDIR_BASE));
+
+        if (direction < 0 || direction >= DIRECTION_COUNT)
         {
-            ui.CompassLitDirection = direction;
-            output.DrawCompass(direction);
+            ui.HeldDirection = 0;
+            direction = DIR_NONE;
         }
+
+        return direction;
     }
 
     /// Walking direction (0-7, 9 = none) for a pointer position over the on-screen compass.
@@ -239,7 +284,8 @@ public static class InputHandler
     /// direction. Left of the compass nothing is selected.
     internal static short CompassDirection(int x, int y)
     {
-        if (x <= COMPASS_MIN_X)
+        // Above the text panel there is no compass (the pointer can only be there when it is free to roam).
+        if (x <= COMPASS_MIN_X || y < POINTER_MIN_Y)
         {
             return DIR_NONE;
         }
@@ -269,6 +315,28 @@ public static class InputHandler
         int right = x >= MENU_RIGHT_COLUMN_X ? 1 : 0;
 
         return row * 2 + MENU_FIRST_KEY + right;
+    }
+
+    /// The play field position (lores pixels) of a left click not yet used by click to move.
+    public static (int X, int Y)? TakeClick()
+    {
+        lock (padlock)
+        {
+            (int X, int Y)? click = pendingClick;
+
+            pendingClick = null;
+
+            return click;
+        }
+    }
+
+    // Keeps a left click on the play field for click to move (called with the lock held).
+    private static void RememberPlayFieldClick(int x, int y)
+    {
+        if (RemasteredControls && y < PLAY_FIELD_BOTTOM)
+        {
+            pendingClick = (x, y);
+        }
     }
 
     // Appends a key to the buffer; the key is dropped if the buffer is full.

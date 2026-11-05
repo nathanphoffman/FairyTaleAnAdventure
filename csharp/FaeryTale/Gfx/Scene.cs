@@ -66,8 +66,16 @@ public sealed class Scene
         return ((red * NIBBLE_TO_BYTE) << RED_BYTE_SHIFT) | ((green * NIBBLE_TO_BYTE) << GREEN_BYTE_SHIFT) | (blue * NIBBLE_TO_BYTE);
     }
 
-    /// Draws the whole scene into the frame (FRAME_WIDTH x FRAME_HEIGHT pixels).
+    /// Draws the whole scene into the frame (FRAME_WIDTH x FRAME_HEIGHT pixels), the pointer too.
     public void Compose(uint[] frame)
+    {
+        ComposeWithoutPointer(frame);
+        DrawPointerOn(frame, 1);
+    }
+
+    /// Draws the view ports only, for when something is to be drawn over the picture before the
+    /// pointer (see DrawPointerOn).
+    public void ComposeWithoutPointer(uint[] frame)
     {
         Array.Fill(frame, 0u);
 
@@ -75,19 +83,24 @@ public sealed class Scene
         {
             DrawViewPort(viewPort, frame);
         }
+    }
 
+    /// Draws the pointer on a frame FRAME_WIDTH wide whose rows are rowScale times as many as the
+    /// scene's (the overlay's grid has every row twice).
+    public void DrawPointerOn(uint[] frame, int rowScale)
+    {
         ViewPort? pointerColors = ViewPorts.FirstOrDefault(viewPort => viewPort.ShowsPointer);
 
         if (Pointer is not null && pointerColors is not null)
         {
-            DrawPointer(frame, pointerColors.Colors, Pointer);
+            DrawPointer(frame, pointerColors.Colors, Pointer, rowScale);
         }
     }
 
     // Sets a frame pixel if it lies inside the frame.
     internal static void PutPixel(uint[] frame, int x, int y, uint color)
     {
-        if (x >= 0 && x < FRAME_WIDTH && y >= 0 && y < FRAME_HEIGHT)
+        if (x >= 0 && x < FRAME_WIDTH && y >= 0 && y < frame.Length / FRAME_WIDTH)
         {
             frame[y * FRAME_WIDTH + x] = color;
         }
@@ -135,7 +148,7 @@ public sealed class Scene
     }
 
     // Draws the mouse pointer: a 16 pixel wide sprite, 2 frame pixels per sprite pixel.
-    private static void DrawPointer(uint[] frame, ushort[] colors, Pointer pointer)
+    private static void DrawPointer(uint[] frame, ushort[] colors, Pointer pointer, int rowScale)
     {
         for (int line = 0; line < POINTER_MAX_LINES; line++)
         {
@@ -146,7 +159,10 @@ public sealed class Scene
                 break;
             }
 
-            DrawPointerLine(frame, colors, word, (pointer.Position.X * LORES_SCALE, pointer.Position.Y + line));
+            for (int copy = 0; copy < rowScale; copy++)
+            {
+                DrawPointerLine(frame, colors, word, (pointer.Position.X * LORES_SCALE, (pointer.Position.Y + line) * rowScale + copy));
+            }
         }
     }
 

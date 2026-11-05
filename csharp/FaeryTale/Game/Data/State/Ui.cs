@@ -26,6 +26,9 @@ public sealed class Ui
     public short CheatEnabled;
     public sbyte QuitRequested;
 
+    /// The player chose to leave the program (not just this game).
+    public bool ExitProgram;
+
     /// What the screen is showing or must do next: 0 is the normal view, the other values (game
     /// over, fade in, redraw, items, map message, ...) are named where they are used.
     public sbyte ViewStatus;
@@ -36,6 +39,15 @@ public sealed class Ui
     public PrintQueue PrintQueue = new();
     public sbyte IntroSkipRequested;
     public short CompassLitDirection = NO_COMPASS_DIRECTION;
+
+    /// The direction the compass picture shows now (the picture is only redrawn when this changes).
+    public short CompassDrawnDirection = NO_COMPASS_DIRECTION;
+
+    /// A click to move route is steering the hero this frame (Remastered and Reimagined only).
+    public bool PathWalking;
+
+    /// The direction (0-7, 9 = none) click to move is walking in; the compass shows it.
+    public short PathDirection = NO_COMPASS_DIRECTION;
 }
 
 /// The witch and her spinning beam.

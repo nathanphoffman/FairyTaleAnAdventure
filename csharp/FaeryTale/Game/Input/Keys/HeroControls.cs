@@ -244,7 +244,7 @@ public static class HeroControls
         game.Ui.CompassLitDirection = Stumble(game.Ui.CompassLitDirection, game.Hero.Hunger, n => game.Rng.Next() & (n - 1));
         game.Actors.List[0].Facing = (sbyte)game.Ui.CompassLitDirection;
 
-        return (InputHandler.MouseButtons & LEFT_BUTTON) != 0 || game.Ui.HeldDirection != 0 ? ActorState.WALKING : state;
+        return (InputHandler.MouseButtons & LEFT_BUTTON) != 0 || game.Ui.HeldDirection != 0 || game.Ui.PathWalking ? ActorState.WALKING : state;
     }
 
     // The good fairy: after the hero dies she flies in and revives him, or the next brother takes

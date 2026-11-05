@@ -17,6 +17,10 @@ public static class Blocking
     /// The raft is always slot 1; rafts and other carriers do not block movement.
     private const int RAFT_SLOT = 1;
 
+    // The object numbers of a shut and an open treasure chest.
+    private const sbyte CHEST = 15;
+    private const sbyte OPENED_CHEST = 0x1d;
+
     /// The wraith race floats, so it ignores terrain.
     internal const byte RACE_WRAITH = 2;
 
@@ -62,7 +66,7 @@ public static class Blocking
             }
         }
 
-        return 0;
+        return index == 0 && game.Experience != Experience.Original && BlockedByChest(game.Actors, x, y) ? BLOCKED_BY_ACTOR : 0;
     }
 
     /// Moves an actor dist in direction dir if nothing blocks it. Returns 1 if it moved.
@@ -127,6 +131,36 @@ public static class Blocking
         return y > x + x ? y : (x + y) * DIAGONAL_NUMERATOR / DIAGONAL_DENOMINATOR;
     }
 
+    // Remastered and Reimagined: a treasure chest (shut or open) is solid for the hero, who in the
+    // original walks straight over it. The hero is only stopped from walking into the chest: one
+    // who already stands in its box (put there by a teleport, say) can walk out.
+    private static bool BlockedByChest(Actors actors, short x, short y)
+    {
+        Shape hero = actors.List[0];
+
+        for (int other = actors.Active; other < actors.Drawn; other++)
+        {
+            Shape item = actors.List[other];
+
+            if (item.Kind == ActorKind.OBJECTS && (item.Index == CHEST || item.Index == OPENED_CHEST)
+                && InsideBox(item, x, y) && !InsideBox(item, (short)hero.AbsX, (short)hero.AbsY))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Whether the point is inside the collision box around an actor.
+    private static bool InsideBox(Shape actor, short x, short y)
+    {
+        int dx = x - actor.AbsX;
+        int dy = y - actor.AbsY;
+
+        return dx < BLOCK_HALF_WIDTH && dx > -BLOCK_HALF_WIDTH && dy < BLOCK_HALF_HEIGHT && dy > -BLOCK_HALF_HEIGHT;
+    }
+
     // Whether actor other stands in the way of actor index at (x, y). Dead actors and rafts can be
     // walked over.
     private static bool BlockedByActor(Actors actors, short x, short y, short index, int other)
@@ -138,9 +172,6 @@ public static class Blocking
             return false;
         }
 
-        int dx = x - actor.AbsX;
-        int dy = y - actor.AbsY;
-
-        return dx < BLOCK_HALF_WIDTH && dx > -BLOCK_HALF_WIDTH && dy < BLOCK_HALF_HEIGHT && dy > -BLOCK_HALF_HEIGHT;
+        return InsideBox(actor, x, y);
     }
 }

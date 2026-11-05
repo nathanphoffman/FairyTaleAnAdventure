@@ -2,6 +2,7 @@ using FaeryTale.Game.Data;
 using FaeryTale.Game.Input;
 using FaeryTale.Game.Render;
 using FaeryTale.Gfx;
+using static FaeryTale.Gfx.MenuStyle;
 using FaeryTale.Platform;
 
 namespace FaeryTale.Game.Startup;
@@ -31,8 +32,7 @@ internal static class LaunchMenu
 
     private const string HEADING = "Choose your adventure";
 
-    // Titles are drawn at the size of the classic game text, descriptions at half that.
-    private const int TITLE_SCALE = 2;
+    // Descriptions are drawn at half the size of the titles.
     private const int BODY_SCALE = 1;
 
     // The Quit entry sits in the bottom right corner. As a hover or a choice it is numbered one
@@ -50,25 +50,12 @@ internal static class LaunchMenu
     private const int HEADING_Y = 56;
     private const int FIRST_OPTION_Y = 124;
 
-    // A title is this far above its baseline, and its first description line this far below it.
-    private const int TITLE_ASCENT = 14 * TITLE_SCALE / 2;
+    // A description's first line is this far below its title, and two panels are this far apart.
     private const int DESCRIPTION_OFFSET = 21;
-
-    // Space between the text and the edge of its dark panel, and between two panels.
-    private const int PANEL_PADDING = 8;
     private const int PANEL_GAP = 12;
 
     /// An entry can be clicked from side margin to side margin.
     private const int SIDE_MARGIN = 16;
-
-    // Colours of the text on the wood: cream, gold for the heading, yellow under the pointer, with
-    // a dark shadow behind each letter so it can be read on the grain.
-    private const uint TITLE_COLOR = 0xffff_f4dc;
-    private const uint HEADING_COLOR = 0xffff_e08a;
-    private const uint HOVER_COLOR = 0xffff_e566;
-    private const uint DESCRIPTION_COLOR = 0xffee_dcb8;
-    private const uint LIT_DESCRIPTION_COLOR = Overlay.WHITE;
-    private const uint TEXT_SHADOW_COLOR = 0xff1e_1006;
 
     /// The wooden boards behind the heading, each option and Quit, made once. Each entry has a
     /// plain board and a lit one (for when the pointer is on it).
@@ -242,14 +229,6 @@ internal static class LaunchMenu
         return new Planks(Board(HeadingArea(), 11)[0], options, Board(QuitArea(), 31));
     }
 
-    // A plain and a lit board for an area (left, top, width, height).
-    private static Image[] Board((int Left, int Top, int Width, int Height) area, uint seed)
-    {
-        Image Make(bool lit) => new(area.Left, area.Top, area.Width + Wood.SHADOW, area.Height + Wood.SHADOW, Wood.Plank(area.Width, area.Height, seed, lit));
-
-        return [Make(false), Make(true)];
-    }
-
     // The heading, the options and Quit as text on wooden boards, the hovered one lit.
     private static Overlay MenuOverlay(List<Block> blocks, Planks planks, int? hovered)
     {
@@ -278,17 +257,6 @@ internal static class LaunchMenu
         AddText(overlay, QUIT_LABEL, (QuitLeft(), QUIT_Y), quitLit ? HOVER_COLOR : TITLE_COLOR, TITLE_SCALE);
 
         return overlay;
-    }
-
-    // Adds a line of text in the middle of the screen with its baseline at y.
-    private static void AddCentered(Overlay overlay, string text, int y, uint color, int scale) =>
-        AddText(overlay, text, ((Overlay.WIDTH - Overlay.TextWidth(text, scale)) / 2, y), color, scale);
-
-    // Adds a line of text with a dark shadow behind it, down and to the right.
-    private static void AddText(Overlay overlay, string text, (int X, int Y) at, uint color, int scale)
-    {
-        overlay.Texts.Add(new Text(text, at.X + scale, at.Y + scale, TEXT_SHADOW_COLOR, scale));
-        overlay.Texts.Add(new Text(text, at.X, at.Y, color, scale));
     }
 
     // The area behind the heading.

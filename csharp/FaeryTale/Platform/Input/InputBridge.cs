@@ -14,6 +14,8 @@ public static class InputBridge
     private const int FRAME_TO_LORES = 2;
 
     // Where the pointer can go, in lores pixels / screen lines (the game's play field and panel).
+    private const int LORES_WIDTH = 320;
+    private const int SCREEN_LINES = 200;
     private const int POINTER_MIN_X = 5;
     private const int POINTER_MAX_X = 315;
     private const int POINTER_MIN_Y = 147;
@@ -31,7 +33,7 @@ public static class InputBridge
     /// key code. A name SDL does not know does nothing.
     public static void KeyEvent(string name, bool down)
     {
-        KeyNames.Key key = KeyNames.Lookup(name);
+        KeyNames.Key key = KeyNames.Lookup(InputHandler.RemasteredControls ? RemasteredKeys.Translate(name) : name);
 
         switch (key.Kind)
         {
@@ -55,7 +57,9 @@ public static class InputBridge
         int x = frameX / FRAME_TO_LORES;
 
         InputHandler.MouseMoved(x, frameY);
-        Pointer = (Math.Clamp(x, POINTER_MIN_X, POINTER_MAX_X), Math.Clamp(frameY, POINTER_MIN_Y, POINTER_MAX_Y));
+        Pointer = InputHandler.RemasteredControls
+            ? (Math.Clamp(x, 0, LORES_WIDTH - 1), Math.Clamp(frameY, 0, SCREEN_LINES - 1))
+            : (Math.Clamp(x, POINTER_MIN_X, POINTER_MAX_X), Math.Clamp(frameY, POINTER_MIN_Y, POINTER_MAX_Y));
     }
 
     /// A mouse button was pressed or released.

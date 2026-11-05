@@ -127,7 +127,7 @@ internal static class Splash
         {
             int key = InputHandler.NextKey();
 
-            if (key == Launch.ESCAPE_KEY)
+            if (key == InputHandler.ESCAPE_KEY)
             {
                 return true;
             }

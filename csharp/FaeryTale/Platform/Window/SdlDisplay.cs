@@ -6,8 +6,9 @@ using static SDL2.SDL;
 namespace FaeryTale.Platform;
 
 /// The real window, on SDL2: shows the frames, paces the game at 50 Hz and passes keyboard,
-/// mouse and gamepad events to the input bridge. Escape or closing the window quits (unless
-/// Escape is skipping the intro). F11 or Alt+Enter switch fullscreen.
+/// mouse and gamepad events to the input bridge. Closing the window quits; Escape is passed on to
+/// the game (it skips the intro, leaves a game, or opens the game menu). F11 or Alt+Enter switch
+/// fullscreen.
 public sealed class SdlDisplay : IDisplayDevice, IDisposable
 {
     private const string WINDOW_TITLE = "Fairy Tale: An Adventure";
@@ -19,7 +20,7 @@ public sealed class SdlDisplay : IDisplayDevice, IDisposable
     private const int MAX_LAG_TICKS = 4;
 
     /// 640x200 pixels are shown on a 4:3 screen, so each row is drawn two pixels tall.
-    private const int ROW_SCALE = 2;
+    private const int ROW_SCALE = FrameComposer.ROW_SCALE;
     private const int BYTES_PER_PIXEL = 4;
 
     private readonly IntPtr window;
@@ -28,7 +29,6 @@ public sealed class SdlDisplay : IDisplayDevice, IDisposable
     private readonly bool fast = Environment.GetEnvironmentVariable("FTA_FAST") is not null;
     private readonly PadInput pad = new();
     private Overlay overlay = new();
-    private uint[] withOverlay = [];
     private bool cursorShown;
     private DateTime nextTick = DateTime.UtcNow.AddMilliseconds(TICK_MILLISECONDS);
 
@@ -86,9 +86,7 @@ public sealed class SdlDisplay : IDisplayDevice, IDisposable
     // Composes the scene and the overlay and puts the result on screen.
     private void Draw(Scene scene)
     {
-        scene.Compose(frame);
-
-        (uint[] pixels, int height) = LayerOverlay();
+        (uint[] pixels, int height) = FrameComposer.Build(scene, overlay, frame);
         IntPtr texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, (int)SDL_TextureAccess.SDL_TEXTUREACCESS_STREAMING, Scene.FRAME_WIDTH, height);
 
         if (texture == IntPtr.Zero)
@@ -122,30 +120,6 @@ public sealed class SdlDisplay : IDisplayDevice, IDisposable
         SDL_RenderClear(renderer);
         SDL_RenderCopy(renderer, texture, IntPtr.Zero, IntPtr.Zero);
         SDL_RenderPresent(renderer);
-    }
-
-    // The picture with the overlay on it. The overlay works on a grid with the rows doubled, so
-    // the picture's rows are repeated to match; without an overlay the frame is shown as it is.
-    private (uint[] Pixels, int Height) LayerOverlay()
-    {
-        if (overlay.IsEmpty)
-        {
-            return (frame, Scene.FRAME_HEIGHT);
-        }
-
-        withOverlay = new uint[frame.Length * ROW_SCALE];
-
-        for (int row = 0; row < Scene.FRAME_HEIGHT; row++)
-        {
-            for (int copy = 0; copy < ROW_SCALE; copy++)
-            {
-                Array.Copy(frame, row * Scene.FRAME_WIDTH, withOverlay, (row * ROW_SCALE + copy) * Scene.FRAME_WIDTH, Scene.FRAME_WIDTH);
-            }
-        }
-
-        overlay.Draw(withOverlay, Scene.FRAME_WIDTH);
-
-        return (withOverlay, Scene.FRAME_HEIGHT * ROW_SCALE);
     }
 
     // Waits for the next 50 Hz tick (the original's vertical blank).
@@ -211,12 +185,6 @@ public sealed class SdlDisplay : IDisplayDevice, IDisposable
     private void HandleKey(SDL_KeyboardEvent key)
     {
         bool down = key.type == SDL_EventType.SDL_KEYDOWN;
-        bool escape = key.keysym.sym == SDL_Keycode.SDLK_ESCAPE;
-
-        if (down && escape && !WindowControls.EscapeSkips)
-        {
-            Environment.Exit(0);
-        }
 
         if (down && IsFullscreenToggle(key.keysym))
         {

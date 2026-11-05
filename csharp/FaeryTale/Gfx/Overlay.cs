@@ -30,6 +30,12 @@ public sealed class Overlay
 
     public List<Text> Texts { get; init; } = new();
 
+    /// The game's mouse pointer is drawn over the overlay instead of under it (menus that cover the game).
+    public bool PointerOnTop { get; init; }
+
+    /// The game's mouse pointer is not drawn at all (something else, such as a door icon, takes its place).
+    public bool HidePointer { get; init; }
+
     /// Draws the overlay on a frame width pixels wide (and so many rows tall).
     public void Draw(uint[] frame, int width)
     {

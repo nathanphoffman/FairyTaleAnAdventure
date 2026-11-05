@@ -22,9 +22,6 @@ public sealed class HeadlessDisplay : IDisplayDevice
     /// Lores pixels are doubled horizontally in the 640 wide frame.
     private const int LORES_TO_FRAME = 2;
 
-    /// The overlay works on a grid with the rows doubled, so the picture's rows are repeated.
-    private const int ROW_SCALE = 2;
-
     /// Scripted Space press that skips the intro: (press tick, release tick).
     private const uint SKIP_INTRO_PRESS = 5;
     private const uint SKIP_INTRO_RELEASE = 9;
@@ -36,7 +33,7 @@ public sealed class HeadlessDisplay : IDisplayDevice
     private readonly bool fast = Environment.GetEnvironmentVariable("FTA_FAST") is not null;
     private readonly DateTime started = DateTime.UtcNow;
     private Overlay overlay = new();
-    private uint[] withOverlay = [];
+    private (uint[] Pixels, int Height) shown;
     private DateTime nextTick = DateTime.UtcNow.AddMilliseconds(TICK_MILLISECONDS);
 
     public HeadlessDisplay(bool launchSkipped)
@@ -69,33 +66,8 @@ public sealed class HeadlessDisplay : IDisplayDevice
 
     public void SetOverlay(Overlay overlay) => this.overlay = overlay;
 
-    // Turns the scene into the frame, with the overlay on top.
-    private void Draw(Scene scene)
-    {
-        scene.Compose(frame);
-        withOverlay = [];
-
-        if (overlay.IsEmpty)
-        {
-            return;
-        }
-
-        withOverlay = new uint[frame.Length * ROW_SCALE];
-
-        for (int row = 0; row < Scene.FRAME_HEIGHT; row++)
-        {
-            for (int copy = 0; copy < ROW_SCALE; copy++)
-            {
-                Array.Copy(frame, row * Scene.FRAME_WIDTH, withOverlay, (row * ROW_SCALE + copy) * Scene.FRAME_WIDTH, Scene.FRAME_WIDTH);
-            }
-        }
-
-        overlay.Draw(withOverlay, Scene.FRAME_WIDTH);
-    }
-
-    // The pixels on screen now, and how many rows tall they are.
-    private (uint[] Pixels, int Height) Shown() =>
-        withOverlay.Length == 0 ? (frame, Scene.FRAME_HEIGHT) : (withOverlay, Scene.FRAME_HEIGHT * ROW_SCALE);
+    // Turns the scene into the pixels on screen, with the overlay on top.
+    private void Draw(Scene scene) => shown = FrameComposer.Build(scene, overlay, frame);
 
     // Waits for the next 50 Hz tick (the original's vertical blank).
     private void Pace()
@@ -147,7 +119,7 @@ public sealed class HeadlessDisplay : IDisplayDevice
 
         if (path is not null && Ticks >= TicksFromEnvironment("FTA_SHOT_AFTER"))
         {
-            (uint[] pixels, int height) = Shown();
+            (uint[] pixels, int height) = shown;
 
             try
             {

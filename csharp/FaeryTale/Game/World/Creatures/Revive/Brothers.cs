@@ -139,6 +139,13 @@ public static class Brothers
         MessagePage.MapMessage(game, output);
         output.UseStoryFont();
 
+        if (game.Hero.Brother == JULIAN && game.Experience != Experience.Original)
+        {
+            output.ClearDrawingPage(); // Remastered starts the game without the opening placard
+
+            return;
+        }
+
         if (game.Hero.Brother == JULIAN)
         {
             TextRoutines.PlacardText(output, PLACARD_JULIAN);
