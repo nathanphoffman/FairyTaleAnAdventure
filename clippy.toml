@@ -1,6 +1,0 @@
-# Thresholds only. The lints that use them are switched on by scripts/cleanup.py (RUST_LINTS), not here.
-too-many-arguments-threshold = 6        # RULE-01: at most 6 arguments
-too-many-lines-threshold = 36           # RULE-01: functions may run up to 36 lines
-excessive-nesting-threshold = 3         # RULE-04: nest blocks at most 3 deep
-max-fn-params-bools = 0                 # RULE-04: no true/false flag parameters
-min-ident-chars-threshold = 2           # RULE-02: no one-letter names (min_ident_chars)

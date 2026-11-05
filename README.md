@@ -1,6 +1,6 @@
 # Fairy Tale: An Adventure
 
-An adaptation, for Linux and written in Rust, of *The Faery Tale Adventure* (written by David Joiner,
+An adaptation, for Linux and written in C#, of *The Faery Tale Adventure* (written by David Joiner,
 published by MicroIllusions, 1987, Amiga). It is not the original release.
 
 The original Amiga source by Talin is at https://github.com/viridia/faery-tale-amiga. Clone it
@@ -13,43 +13,31 @@ git clone https://github.com/viridia/faery-tale-amiga
 
 ## Status
 
-The game is fully ported to Rust and playable: intro, map, fighting, shops, doors, magic, music,
-save and load. No C is compiled any more; `csrc/` is the original C kept as a reference. The code has
-been cleaned up (short functions, named constants, unit tests) and the Amiga structs and raw pointers
-are gone, and all the game state lives in one `Game` value (no `static mut`, no `unsafe` in the game
-code). What is left is a modern renderer behind the `Output` interface (the rules already only see it, the state is split into `Game` and `Video`, and `Recorder` runs the rules without a screen), then the optional "modern engine"
-steps. The history of the port is in [plan.md](plan.md).
-
-## Approach
-
-- `src/game/` is the game, a clean Rust version of the C with the same behaviour (bugs included).
-- `src/gfx/` is safe drawing code: owned bitmaps, pens, fonts, and a scene that becomes one frame.
-- `src/platform/` is SDL2: window, audio, input, file paths.
-- `csrc/` (original C) is not built and not edited. It is the reference for what the game should do.
+The game is fully ported and playable: intro, map, fighting, shops, doors, magic, music, save and
+load. It was ported from C to Rust and then to C# (SDL2-CS); the history is in [plan.md](plan.md) and
+[csharp_port_plan.md](csharp_port_plan.md). `csrc/` is the original C, kept as a reference.
 
 ## Layout
 
 | Path | Purpose |
 |------|---------|
 | `faery-tale-amiga/` | Original source, reference only (git-ignored) |
-| `src/game/` | The game: `actors`, `world`, `ui`, `input`, `render`, `files`, `data`, `startup` |
-| `src/gfx/` | Safe bitmap, font and scene drawing |
-| `src/platform/` | SDL2 layer: `display`, `audio`, `input`, `paths` |
+| `csharp/FaeryTale/` | The game: `Game` (rules, render, data, ui, input, startup), `Gfx`, `Audio`, `Platform` |
+| `csharp/FaeryTale.Tests/` | Unit tests |
 | `csrc/` | Original C, reference only |
 | `docs/` | Notes on the data formats, Amiga calls and assembly routines |
 | `tests/` | Headless regression scripts and their golden hashes |
-| `tools/` | Helper scripts (`narr2rs.py` regenerates the story text, `package.sh`) |
-| `plan.md` | History of the port |
+| `tools/` | `package.sh` builds a release archive |
 
 ## Building
 
-Needs Rust (stable) and SDL2 (`libsdl2-dev`). No C compiler is needed.
+Needs the .NET 10 SDK and SDL2 (`libsdl2-dev`).
 
 ```
-cargo run                                   # intro (Esc skips it), then the launch menu, then the game (Esc quits)
-cargo run -- --skip-launch                  # skips the intro and the launch menu
-cargo test                                  # unit tests
-cargo run --bin dump_image -- faery-tale-amiga/game/image   # map of the floppy image
+dotnet run -c Release --project csharp/FaeryTale                    # intro (Esc skips it), launch menu, game (Esc quits)
+dotnet run -c Release --project csharp/FaeryTale -- --skip-launch   # skips the intro and the launch menu
+dotnet test csharp/FaeryTale.slnx                                   # unit tests
+tests/regress.sh; tests/state_regress.sh                            # scenario regression (needs the game data)
 ```
 
 ## Controls

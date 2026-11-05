@@ -6,18 +6,10 @@
 #   tests/state_regress.sh --update   accept the current output as the new golden state
 # Scenarios come from tests/scenarios.txt and tests/state_scenarios.txt (the second has an extra
 # FTA_CMD column for teleport and kill commands).
-# A failing run can be recorded with FTA_RECORD=file and repeated with FTA_REPLAY=file.
 cd "$(dirname "$0")/.."
 export SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy FTA_FAST=1
-# FTA_IMPL=csharp runs the C# port instead of the Rust game (against the same golden files).
-if [ "$FTA_IMPL" = csharp ]; then
-    [ "$1" = "--update" ] && { echo "Refusing to update the golden files from the C# build"; exit 2; }
-    dotnet build -v q csharp/FaeryTale 2>&1 | grep -E ": error " -A5 && exit 2
-    BIN="dotnet csharp/FaeryTale/bin/Debug/net10.0/FaeryTale.dll --skip-launch"
-else
-    cargo build -q 2>&1 | grep -E "^error" -A5 && exit 2
-    BIN="target/debug/faery_tale --skip-launch"
-fi
+dotnet build -v q csharp/FaeryTale 2>&1 | grep -E ": error " -A5 && exit 2
+BIN="dotnet csharp/FaeryTale/bin/Debug/net10.0/FaeryTale.dll --skip-launch"
 mkdir -p tests/out
 update=0; [ "$1" = "--update" ] && update=1
 new=tests/state_golden.new; : > $new

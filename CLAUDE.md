@@ -42,10 +42,10 @@ Short version: Power of 6s. Clear names. Simple first. One job. Be secure. No re
 - **Do not make git commits** (and do not push). The user makes all commits. When a piece of work is
   finished and the tests pass, leave the changes in the working tree, list what changed in a few
   lines, and suggest a one-line commit message. Only commit if the user explicitly asks in that message.
-- The C to Rust port is finished and no C is built. The rules only see `Output`, and
-  `game::recorder::Recorder` is a screenless one for tests. The history of the port is in `plan.md`;
-  there is no current plan document yet.
+- The game is C# (`csharp/`). The C to Rust to C# ports are finished and no C is built. The rules
+  only see `IOutput`, and `Recorder` is a screenless one for tests. The history is in `plan.md` and
+  `csharp_port_plan.md`.
 - `csrc/` is the reference and is not edited or built.
-- Check a change with `cargo build`, `cargo clippy`, `cargo test`, `tests/regress.sh` and
-  `tests/state_regress.sh` (run the last two in the background, one at a time, never rebuild while
-  they run; every scenario must say `ok`).
+- Check a change with `dotnet build`, `dotnet test csharp/FaeryTale.slnx`, `tests/regress.sh` and
+  `tests/state_regress.sh` (run the last two one at a time, never rebuild while they run; every
+  scenario must say `ok`).
