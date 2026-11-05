@@ -45,13 +45,16 @@ public static class GameMenu
     [
         ("Back To Game", GameMenuChoice.Resume),
         ("Difficulty", GameMenuChoice.Resume),
+        ("VSync", GameMenuChoice.Resume),
         ("Frame Rate", GameMenuChoice.Resume),
         ("Back To Game Selection", GameMenuChoice.BackToGameSelection),
         ("Exit Game", GameMenuChoice.ExitGame),
     ];
 
     private const int DIFFICULTY_ENTRY = 1;
-    private const int FRAME_RATE_ENTRY = 2;
+    private const int VSYNC_ENTRY = 2;
+    private const int FRAME_RATE_ENTRY = 3;
+    private const string VSYNC_LABEL = "VSync: ";
     private const string FRAME_RATE_LABEL = "Frame Rate: ";
     private const string DIFFICULTY_LABEL = "Difficulty: ";
 
@@ -79,7 +82,7 @@ public static class GameMenu
 
             if (hovered is { } entry && InputHandler.LeftButtonDown)
             {
-                if (entry == DIFFICULTY_ENTRY || entry == FRAME_RATE_ENTRY)
+                if (entry is DIFFICULTY_ENTRY or VSYNC_ENTRY or FRAME_RATE_ENTRY)
                 {
                     ChangeSetting(game, video, entry);
 
@@ -107,7 +110,7 @@ public static class GameMenu
     }
 
     // A click on the difficulty entry makes it the next level (after Extreme comes Explorer), a click
-    // on the frame rate entry the next rate (after the highest comes the lowest). They are kept for
+    // on the vsync entry turns it on or off, one on the frame rate entry gives the next fixed rate. They are kept for
     // the rest of the session. The click is waited out so it counts once.
     private static void ChangeSetting(Data.Game game, Video video, int entry)
     {
@@ -115,6 +118,10 @@ public static class GameMenu
         {
             game.Difficulty = Difficulty.Next(game.Difficulty);
             Difficulty.Chosen = game.Difficulty;
+        }
+        else if (entry == VSYNC_ENTRY)
+        {
+            WindowControls.ToggleVSync();
         }
         else
         {
@@ -190,6 +197,7 @@ public static class GameMenu
     private static string LabelOf(Data.Game game, int index) => index switch
     {
         DIFFICULTY_ENTRY => DIFFICULTY_LABEL + Difficulty.NameOf(game.Difficulty),
+        VSYNC_ENTRY => VSYNC_LABEL + WindowControls.VSyncText,
         FRAME_RATE_ENTRY => FRAME_RATE_LABEL + WindowControls.FrameRateText,
         _ => ENTRIES[index].Label,
     };

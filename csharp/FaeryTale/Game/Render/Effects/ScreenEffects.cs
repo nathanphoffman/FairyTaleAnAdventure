@@ -158,6 +158,20 @@ public static class ScreenEffects
                 output.Print("Take What?");
                 break;
         }
+
+        KeepFrameLength(game, output);
+    }
+
+    // The original's frame took two ticks when the world had its turn (the print queue routine
+    // waited) and only one when it handled a request or when the map scrolled a tile, so the game
+    // ran twice as fast for those frames. Remastered and Reimagined wait the missing tick, so
+    // every frame is the same length and walking stays at one even speed.
+    public static void KeepFrameLength(Data.Game game, IOutput output)
+    {
+        if (game.Experience != Experience.Original)
+        {
+            Display.Delay(game, output, 1);
+        }
     }
 
     /// The size of the picture during the intro's zoom: x is half the width in pixels (0 to 160),

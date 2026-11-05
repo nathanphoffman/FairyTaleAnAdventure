@@ -84,6 +84,19 @@ public sealed class WorldRenderer
     {
         view.CenterX = capture.HeroNow.X + capture.HeroDelta.X * (1 - alpha);
         view.CenterY = capture.HeroNow.Y + capture.HeroDelta.Y * (1 - alpha) - CAMERA_LIFT;
+        LogCamera(view, capture, alpha);
+    }
+
+    // FTA_CAMERA_LOG=file: one line per picture (milliseconds, camera x, game step, alpha) to see
+    // whether the camera moves evenly from picture to picture.
+    private static readonly string? cameraLogPath = Environment.GetEnvironmentVariable("FTA_CAMERA_LOG");
+
+    private static void LogCamera(WorldView view, WorldCapture capture, double alpha)
+    {
+        if (cameraLogPath is not null)
+        {
+            File.AppendAllText(cameraLogPath, $"{System.Diagnostics.Stopwatch.GetTimestamp() * 1000.0 / System.Diagnostics.Stopwatch.Frequency:F2} {view.CenterX:F2} {capture.Tick} {alpha:F3}\n");
+        }
     }
 
     // The world pixel under every column and every row of the picture.

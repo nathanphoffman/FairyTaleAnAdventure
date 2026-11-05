@@ -133,8 +133,8 @@ internal sealed class NativeComposer
 
         (double x, double y) = view.ToScreen(marker.World.X, marker.World.Y);
 
-        new Overlay { Images = { ClickRing.PictureAt((0, 0), marker.Walkable) } }
-            .DrawAt(picture, width, new Overlay.Placement((int)Math.Round(x), (int)Math.Round(y), Scale));
+        new Overlay { Images = { ClickRing.PictureAtPixel(((int)Math.Round(x), (int)Math.Round(y)), marker.Walkable, view.Scale) } }
+            .Draw(picture, width);
     }
 
     // The bottom of the old picture, each game pixel a Scale wide and 2 x Scale tall. Each line is

@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Diagnostics;
 using FaeryTale.Game.Remastered;
 using FaeryTale.Game.Render;
@@ -24,17 +25,22 @@ public sealed partial class SdlDisplay
     private bool nativeApplied;
     private int lastCaptureTick = -1;
     private double slotStartMs;
+    private readonly FrameSpan frameSpan = new();
     private bool vsyncActive;
     private double nextPictureMs;
-    private double lastFlipMs;
 
     /// What a monitor is taken to be when its refresh rate cannot be asked.
     private const double DEFAULT_REFRESH_HZ = 60;
-    private const double MIN_PICTURE_SPACING_MS = 4.0;
     private readonly bool logFrameRate = Environment.GetEnvironmentVariable("FTA_FPS_LOG") is not null;
     private int framesShown;
     private int ticksCounted;
     private double lastLogMs;
+
+    // FTA_NO_SMOOTHING=1 draws every picture where the game has things now, with no in-between
+    // positions (to tell whether the smoothing is what looks wrong).
+    private readonly bool noSmoothing = Environment.GetEnvironmentVariable("FTA_NO_SMOOTHING") is not null;
+    private readonly FrameTimings timings = new();
+    private long stepStart = Stopwatch.GetTimestamp();
 
     // Switches the window between the old 640 x 400 picture and the native size when the game asks:
     // the native size goes borderless fullscreen with the fullscreen zoom.
@@ -93,6 +99,18 @@ public sealed partial class SdlDisplay
         SDL_DestroyRenderer(renderer);
         renderer = CreateRenderer(wanted);
         SDL_RenderSetLogicalSize(renderer, 0, 0);
+        LogRenderer(wanted);
+    }
+
+    // FTA_FPS_LOG=1: which renderer SDL gave and whether it really has vsync.
+    private void LogRenderer(bool asked)
+    {
+        if (logFrameRate && SDL_GetRendererInfo(renderer, out SDL_RendererInfo info) == 0)
+        {
+            bool granted = (info.flags & (uint)SDL_RendererFlags.SDL_RENDERER_PRESENTVSYNC) != 0;
+
+            Console.Error.WriteLine($"renderer {Marshal.PtrToStringAnsi(info.name)}: vsync asked {asked}, granted {granted}");
+        }
     }
 
     // One game tick's time, shown as many pictures as the monitor (or the chosen rate) allows. Each
@@ -105,6 +123,9 @@ public sealed partial class SdlDisplay
         bool monitorSync = WindowControls.FrameRate == WindowControls.MONITOR_SYNC;
 
         ticksCounted++;
+
+        // The time since the last wait ended is the game step (and anything else between pictures).
+        timings.RecordStep(FrameTimings.Since(stepStart));
 
         EnsureVSync(monitorSync);
 
@@ -122,44 +143,36 @@ public sealed partial class SdlDisplay
             ShowPicture(scene, video, width, height, 1.0);
             WaitUntil(tickEnd);
             AdvanceSlot();
+            stepStart = Stopwatch.GetTimestamp();
 
             return;
         }
 
-        // Pictures keep to their own rhythm from one game step to the next.
+        if (fresh)
+        {
+            frameSpan.Begin(slotStartMs);
+        }
+
+        // Pictures keep to their own rhythm from one game step to the next, so a monitor that does
+        // not divide 50 evenly (60 Hz, say) gets some steps with two pictures and some with one.
         double scheduled = Math.Max(nextPictureMs, clock.Elapsed.TotalMilliseconds);
 
-        do
+        while (scheduled < tickEnd)
         {
-            // When this picture will be on the screen: the next refresh of the monitor, or the moment
-            // it is scheduled for.
-            double shownAt = monitorSync ? lastFlipMs + interval : scheduled;
-            double alpha = fresh ? Math.Clamp((shownAt - slotStartMs) / TICK_MS, 0.0, 1.0) : 1.0;
+            double alpha = noSmoothing ? 1.0 : frameSpan.AlphaAt(scheduled);
 
-            if (!monitorSync)
-            {
-                WaitUntil(scheduled);
-            }
-
+            WaitUntil(scheduled);
             ShowPicture(scene, video, width, height, alpha);
-            lastFlipMs = clock.Elapsed.TotalMilliseconds;
-
-            // Without a real vsync (a software renderer) pictures would otherwise be made flat out.
-            if (monitorSync)
-            {
-                WaitUntil(lastFlipMs + MIN_PICTURE_SPACING_MS);
-            }
-
             scheduled = Math.Max(scheduled + interval, clock.Elapsed.TotalMilliseconds);
             HandleEvents();
         }
-        while ((monitorSync ? lastFlipMs + interval : scheduled) < tickEnd);
 
         // The next game step starts at the end of this one's time, not earlier: its movement is drawn
         // from that moment on.
         nextPictureMs = scheduled;
         WaitUntil(tickEnd);
         AdvanceSlot();
+        stepStart = Stopwatch.GetTimestamp();
     }
 
     // Makes and shows one picture.
@@ -167,7 +180,13 @@ public sealed partial class SdlDisplay
     {
         NativeComposer composer = nativePresenter.Composer;
 
-        nativePresenter.Show(renderer, composer.Compose(width, height, scene, overlay, video, alpha, composer.Pointer), width, height);
+        long start = Stopwatch.GetTimestamp();
+        uint[] pixels = composer.Compose(width, height, scene, overlay, video, alpha, composer.Pointer);
+
+        timings.RecordMake(FrameTimings.Since(start));
+        start = Stopwatch.GetTimestamp();
+        nativePresenter.Show(renderer, pixels, width, height);
+        timings.RecordShow(FrameTimings.Since(start));
         LogFrameRate(width, height);
     }
 
@@ -194,6 +213,7 @@ public sealed partial class SdlDisplay
         if (logFrameRate && now - lastLogMs >= 1000)
         {
             Console.Error.WriteLine($"{framesShown} pictures and {ticksCounted} game steps a second at {width}x{height}, zoom {WorldView.Current.Zoom:F2}");
+            Console.Error.WriteLine("    " + timings.TakeReport());
             framesShown = 0;
             ticksCounted = 0;
             lastLogMs = now;

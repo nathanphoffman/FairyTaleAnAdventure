@@ -270,6 +270,7 @@ public static class GameLoop
         if (ScrollDirection(scrollX, scrollY) is { } direction)
         {
             MapTiles.ScrollMap(video.Screen, direction);
+            ScreenEffects.KeepFrameLength(game, video);
 
             return (scrollX, scrollY, false);
         }
@@ -284,6 +285,7 @@ public static class GameLoop
 
         // Moved too far to scroll: redraw the whole map.
         MapTiles.DrawMap(game, video);
+        ScreenEffects.KeepFrameLength(game, video);
 
         return (0, 0, false);
     }

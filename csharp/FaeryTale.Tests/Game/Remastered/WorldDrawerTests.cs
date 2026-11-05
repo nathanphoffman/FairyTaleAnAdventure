@@ -109,7 +109,7 @@ public class WorldDrawerTests
     }
 
     [Fact]
-    public void TheFrameRateCyclesFromTheMonitorsOwnThroughFixedRates()
+    public void VSyncTurnsOnAndOffAndTheFixedRateGoesRound()
     {
         int saved = WindowControls.FrameRate;
 
@@ -117,12 +117,19 @@ public class WorldDrawerTests
         {
             WindowControls.FrameRate = WindowControls.MONITOR_SYNC;
             WindowControls.CycleFrameRate();
-            Assert.Equal(50, WindowControls.FrameRate);
+            Assert.Equal(WindowControls.MONITOR_SYNC, WindowControls.FrameRate);
+            Assert.Equal("Monitor", WindowControls.FrameRateText);
+
+            WindowControls.ToggleVSync();
+            Assert.False(WindowControls.VSync);
+            Assert.Equal(150, WindowControls.FrameRate);
 
             WindowControls.FrameRate = 300;
             WindowControls.CycleFrameRate();
-            Assert.Equal(WindowControls.MONITOR_SYNC, WindowControls.FrameRate);
-            Assert.Equal("Monitor", WindowControls.FrameRateText);
+            Assert.Equal(50, WindowControls.FrameRate);
+
+            WindowControls.ToggleVSync();
+            Assert.True(WindowControls.VSync);
         }
         finally
         {
@@ -288,5 +295,14 @@ public class WorldDrawerTests
                 Environment.SetEnvironmentVariable("FTA_DATA", null);
             }
         }
+    }
+
+    [Fact]
+    public void TheClickRingGrowsWithTheZoom()
+    {
+        var small = FaeryTale.Game.Remastered.ClickRing.PictureAtPixel((100, 100), true, 2);
+        var big = FaeryTale.Game.Remastered.ClickRing.PictureAtPixel((100, 100), true, 8);
+
+        Assert.InRange(big.Width / (double)small.Width, 3.8, 4.2);
     }
 }

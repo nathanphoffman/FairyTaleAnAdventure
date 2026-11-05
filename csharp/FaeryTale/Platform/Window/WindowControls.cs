@@ -16,14 +16,45 @@ public static class WindowControls
     public const int MONITOR_SYNC = 0;
     public const int TICKS_PER_SECOND = 50;
 
-    private static readonly int[] FRAME_RATES = [MONITOR_SYNC, 50, 100, 150, 200, 250, 300];
+    private const int DEFAULT_FIXED_RATE = 150;
+
+    private static readonly int[] FIXED_RATES = [50, 100, 150, 200, 250, 300];
+
+    // The fixed rate to go back to when vsync is turned off again.
+    private static int lastFixedRate = DEFAULT_FIXED_RATE;
+
+    /// Whether pictures wait for the monitor's refresh (vsync).
+    public static bool VSync => FrameRate == MONITOR_SYNC;
+
+    /// "On" or "Off" for the menu.
+    public static string VSyncText => VSync ? "On" : "Off";
 
     /// The text of the frame rate for the menu.
-    public static string FrameRateText => FrameRate == MONITOR_SYNC ? "Monitor" : $"{FrameRate} fps";
+    public static string FrameRateText => VSync ? "Monitor" : $"{FrameRate} fps";
 
-    /// The next rate in the list, going round from the highest to the first (the monitor's own).
-    public static void CycleFrameRate() =>
-        FrameRate = FRAME_RATES[(Array.IndexOf(FRAME_RATES, FrameRate) + 1) % FRAME_RATES.Length];
+    /// Turns vsync on, or off (back to the last fixed rate).
+    public static void ToggleVSync()
+    {
+        if (VSync)
+        {
+            FrameRate = lastFixedRate;
+        }
+        else
+        {
+            lastFixedRate = FrameRate;
+            FrameRate = MONITOR_SYNC;
+        }
+    }
+
+    /// The next fixed rate, going round from the highest to the lowest. With vsync on the monitor
+    /// sets the rate, so nothing changes.
+    public static void CycleFrameRate()
+    {
+        if (!VSync)
+        {
+            FrameRate = FIXED_RATES[(Array.IndexOf(FIXED_RATES, FrameRate) + 1) % FIXED_RATES.Length];
+        }
+    }
 
     /// Shows or hides the ordinary mouse arrow (the game draws its own while playing).
     public static bool SystemCursorShown { get; set; }
