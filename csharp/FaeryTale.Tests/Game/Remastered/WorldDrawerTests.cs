@@ -43,7 +43,22 @@ public class WorldDrawerTests
     }
 
     [Fact]
-    public void ZoomOutShowsFourTimesAsMuchAndInTwiceAsClose()
+    public void TheScaleIsAlwaysAWholeNumberSoPixelsStaySquare()
+    {
+        WorldView view = new();
+
+        view.Resize(1920, 1080, 228);
+
+        foreach (double zoom in new[] { 0.25, 0.37, 0.5, 0.8, 1.0, 1.3, 2.0 })
+        {
+            view.SetZoom(zoom);
+
+            Assert.InRange(view.Scale, view.MinScale, view.MaxScale);
+        }
+    }
+
+    [Fact]
+    public void ZoomOutShowsAboutFourTimesAsMuchAndInTwiceAsClose()
     {
         WorldView view = new();
 
@@ -53,10 +68,10 @@ public class WorldDrawerTests
         double normal = view.Scale;
 
         view.SetZoom(0.01);
-        Assert.Equal(normal / 4, view.Scale, 6);
+        Assert.InRange(view.Scale / normal, 0.2, 0.34);
 
         view.SetZoom(100);
-        Assert.Equal(normal * 2, view.Scale, 6);
+        Assert.InRange(view.Scale / normal, 1.8, 2.2);
     }
 
     [Fact]
@@ -64,34 +79,54 @@ public class WorldDrawerTests
     {
         WorldView view = new();
 
+        view.Resize(1920, 1080, 228);
         view.SetZoom(1);
+
+        int normal = view.Scale;
+
         view.ZoomBySteps(-1);
-        Assert.True(view.Zoom < 1);
+        Assert.True(view.Scale < normal);
 
         view.ZoomBySteps(-50);
-        Assert.Equal(WorldView.MIN_ZOOM, view.Zoom);
+        Assert.Equal(view.MinScale, view.Scale);
 
         view.ZoomBySteps(50);
-        Assert.Equal(WorldView.MAX_ZOOM, view.Zoom);
+        Assert.Equal(view.MaxScale, view.Scale);
     }
 
     [Fact]
-    public void TheFrameRateCyclesThroughWholePicturesPerTick()
+    public void EveryZoomStepChangesTheScaleEvenWhenTheScaleIsSmall()
     {
-        int saved = WindowControls.FramesPerTick;
+        WorldView view = new();
+
+        view.Resize(1280, 720, 114);
+        view.SetZoom(0.5);
+
+        int before = view.Scale;
+
+        view.ZoomBySteps(1);
+        Assert.True(view.Scale > before);
+    }
+
+    [Fact]
+    public void TheFrameRateCyclesFromTheMonitorsOwnThroughFixedRates()
+    {
+        int saved = WindowControls.FrameRate;
 
         try
         {
-            WindowControls.FramesPerTick = WindowControls.MAX_FRAMES_PER_TICK;
+            WindowControls.FrameRate = WindowControls.MONITOR_SYNC;
             WindowControls.CycleFrameRate();
-            Assert.Equal(WindowControls.MIN_FRAMES_PER_TICK, WindowControls.FramesPerTick);
+            Assert.Equal(50, WindowControls.FrameRate);
 
+            WindowControls.FrameRate = 300;
             WindowControls.CycleFrameRate();
-            Assert.Equal(2 * WindowControls.TICKS_PER_SECOND, WindowControls.FramesPerSecond);
+            Assert.Equal(WindowControls.MONITOR_SYNC, WindowControls.FrameRate);
+            Assert.Equal("Monitor", WindowControls.FrameRateText);
         }
         finally
         {
-            WindowControls.FramesPerTick = saved;
+            WindowControls.FrameRate = saved;
         }
     }
 

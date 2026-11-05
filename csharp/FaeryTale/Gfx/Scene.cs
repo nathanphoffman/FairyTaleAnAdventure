@@ -85,6 +85,18 @@ public sealed class Scene
         }
     }
 
+    /// Draws only the view ports that reach down to a line of the frame or below (the text panel,
+    /// when the play field is drawn some other way); the rest of the frame is cleared.
+    public void ComposeFromLine(uint[] frame, int firstLine)
+    {
+        Array.Fill(frame, 0u);
+
+        foreach (ViewPort viewPort in ViewPorts.Where(viewPort => viewPort.Position.Y + viewPort.Size.Height > firstLine))
+        {
+            DrawViewPort(viewPort, frame);
+        }
+    }
+
     /// Draws the pointer on a frame FRAME_WIDTH wide whose rows are rowScale times as many as the
     /// scene's (the overlay's grid has every row twice).
     public void DrawPointerOn(uint[] frame, int rowScale)

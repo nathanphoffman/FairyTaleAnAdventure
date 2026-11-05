@@ -47,8 +47,9 @@ check this).
   and the pointer together at the window's own size; story pages and the item list are the old picture
   scaled up and centred. `SdlDisplay.Native` runs borderless fullscreen, the zoom (wheel, + and -),
   and several pictures per game tick: the ones between ticks draw the camera and the characters part
-  of the way along their last move. Pictures per tick (1 to 6, 50 to 300 a second, default 3) is
-  set in the Esc menu or with `FTA_FPS`.
+  of the way along their last move, worked out from the clock for the moment each picture is shown.
+  The rate is the monitor's own refresh (vsync, default) or a fixed 50 to 300, set in the Esc menu or
+  with `FTA_FPS`. The scale is always a whole number (no shimmer) and the map is drawn on all cores.
 - Test hooks for the headless build: `FTA_NATIVE=1920x1080` and `FTA_ZOOM=0.5` size and zoom the
   screenshots of a Remastered run; `FTA_FPS_LOG=1` prints the pictures a second of the real window.
 - Not done: objects and enemies far from the old screen are only loaded by the game when they are

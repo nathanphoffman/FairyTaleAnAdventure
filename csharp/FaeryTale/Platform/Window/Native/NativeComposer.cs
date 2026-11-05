@@ -26,6 +26,7 @@ internal sealed class NativeComposer
     private readonly WorldRenderer renderer = new();
     private readonly uint[] legacyFrame = new uint[Scene.FRAME_WIDTH * Scene.FRAME_HEIGHT];
     private uint[] picture = [];
+    private uint[] scaledRow = [];
 
     /// Window pixels per grid pixel, and where the grid's top left corner is in the window.
     public int Scale { get; private set; } = 1;
@@ -71,18 +72,20 @@ internal sealed class NativeComposer
     {
         Pointer = (pixelX, pixelY);
 
+        (int x, int y) = ToGrid(pixelX, pixelY);
+
         if (ShowsWorld && !IsOverPanel(pixelX, pixelY))
         {
             InputHandler.NativeMouseMoved(pixelX, pixelY);
-
-            return;
+        }
+        else
+        {
+            InputHandler.NativeMouseLeftWorld();
+            InputBridge.MouseMove(Math.Clamp(x, 0, GRID_WIDTH - 1), Math.Clamp(y, 0, GRID_HEIGHT - 1) / GRID_ROWS_PER_LINE);
         }
 
-        InputHandler.NativeMouseLeftWorld();
-
-        (int x, int y) = ToGrid(pixelX, pixelY);
-
-        InputBridge.MouseMove(Math.Clamp(x, 0, GRID_WIDTH - 1), Math.Clamp(y, 0, GRID_HEIGHT - 1) / GRID_ROWS_PER_LINE);
+        // The menus are on the grid whatever is under the pointer.
+        InputHandler.NativeGridMoved(x, y);
     }
 
     /// Where a window pixel is on the 640 x 400 grid (not clamped).
@@ -106,7 +109,7 @@ internal sealed class NativeComposer
         renderer.Draw(picture, view, video.Capture, video, alpha);
         DrawMarker(width, view, video.Capture);
 
-        scene.ComposeWithoutPointer(legacyFrame);
+        scene.ComposeFromLine(legacyFrame, PANEL_FIRST_LINE);
         DrawPanel(width);
         overlay.DrawAt(picture, width, new Overlay.Placement(GridLeft, GridTop, Scale));
 
@@ -134,32 +137,46 @@ internal sealed class NativeComposer
             .DrawAt(picture, width, new Overlay.Placement((int)Math.Round(x), (int)Math.Round(y), Scale));
     }
 
-    // The bottom of the old picture, each game pixel a Scale wide and 2 x Scale tall.
+    // The bottom of the old picture, each game pixel a Scale wide and 2 x Scale tall. Each line is
+    // scaled across once and then copied down.
     private void DrawPanel(int width)
     {
         int height = picture.Length / width;
+        int scaledWidth = Scene.FRAME_WIDTH * Scale;
+
+        if (scaledRow.Length != scaledWidth)
+        {
+            scaledRow = new uint[scaledWidth];
+        }
 
         for (int line = PANEL_FIRST_LINE; line < Scene.FRAME_HEIGHT; line++)
         {
+            for (int x = 0; x < Scene.FRAME_WIDTH; x++)
+            {
+                Array.Fill(scaledRow, legacyFrame[line * Scene.FRAME_WIDTH + x], x * Scale, Scale);
+            }
+
             for (int copy = 0; copy < GRID_ROWS_PER_LINE * Scale; copy++)
             {
                 int y = GridTop + line * GRID_ROWS_PER_LINE * Scale + copy;
 
-                if (y < 0 || y >= height)
+                if (y >= 0 && y < height)
                 {
-                    continue;
-                }
-
-                for (int x = 0; x < Scene.FRAME_WIDTH * Scale; x++)
-                {
-                    int screenX = GridLeft + x;
-
-                    if (screenX >= 0 && screenX < width)
-                    {
-                        picture[y * width + screenX] = legacyFrame[line * Scene.FRAME_WIDTH + x / Scale];
-                    }
+                    CopyRowInto(y, width, scaledWidth);
                 }
             }
+        }
+    }
+
+    // Puts the scaled row on a line of the picture, where it is on the picture.
+    private void CopyRowInto(int y, int width, int scaledWidth)
+    {
+        int from = Math.Max(0, -GridLeft);
+        int to = Math.Min(scaledWidth, width - GridLeft);
+
+        if (to > from)
+        {
+            Array.Copy(scaledRow, from, picture, y * width + GridLeft + from, to - from);
         }
     }
 

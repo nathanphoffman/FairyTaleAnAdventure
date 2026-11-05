@@ -25,7 +25,7 @@ public sealed partial class SdlDisplay : IDisplayDevice, IDisposable
     private const int BYTES_PER_PIXEL = 4;
 
     private readonly IntPtr window;
-    private readonly IntPtr renderer;
+    private IntPtr renderer;
     private readonly uint[] frame = new uint[Scene.FRAME_WIDTH * Scene.FRAME_HEIGHT];
     private readonly bool fast = Environment.GetEnvironmentVariable("FTA_FAST") is not null;
     private readonly PadInput pad = new();
@@ -41,13 +41,7 @@ public sealed partial class SdlDisplay : IDisplayDevice, IDisposable
         }
 
         window = SDL_CreateWindow(WINDOW_TITLE, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WindowFlags.SDL_WINDOW_RESIZABLE);
-        renderer = SDL_CreateRenderer(window, -1, SDL_RendererFlags.SDL_RENDERER_ACCELERATED);
-
-        // Without a graphics card (or a real video driver) the software renderer still works.
-        if (renderer == IntPtr.Zero)
-        {
-            renderer = SDL_CreateRenderer(window, -1, SDL_RendererFlags.SDL_RENDERER_SOFTWARE);
-        }
+        renderer = CreateRenderer(false);
 
         if (window == IntPtr.Zero || renderer == IntPtr.Zero)
         {

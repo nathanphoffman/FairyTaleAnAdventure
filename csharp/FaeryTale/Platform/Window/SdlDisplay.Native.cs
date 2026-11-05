@@ -24,8 +24,16 @@ public sealed partial class SdlDisplay
     private bool nativeApplied;
     private int lastCaptureTick = -1;
     private double slotStartMs;
+    private bool vsyncActive;
+    private double nextPictureMs;
+    private double lastFlipMs;
+
+    /// What a monitor is taken to be when its refresh rate cannot be asked.
+    private const double DEFAULT_REFRESH_HZ = 60;
+    private const double MIN_PICTURE_SPACING_MS = 4.0;
     private readonly bool logFrameRate = Environment.GetEnvironmentVariable("FTA_FPS_LOG") is not null;
     private int framesShown;
+    private int ticksCounted;
     private double lastLogMs;
 
     // Switches the window between the old 640 x 400 picture and the native size when the game asks:
@@ -61,35 +69,119 @@ public sealed partial class SdlDisplay
         }
     }
 
-    // One game tick's time: FramesPerTick pictures, the last one the present state of the game. The
-    // ones before it are drawn with the movement of the last tick only part way done. Waiting for the
-    // moment of each picture keeps them evenly spaced.
+    // Makes the SDL renderer; with vsync every picture waits for the monitor's next refresh (without
+    // a graphics card or a real video driver the software renderer still works).
+    private IntPtr CreateRenderer(bool vsync)
+    {
+        SDL_RendererFlags flags = SDL_RendererFlags.SDL_RENDERER_ACCELERATED | (vsync ? SDL_RendererFlags.SDL_RENDERER_PRESENTVSYNC : 0);
+        IntPtr made = SDL_CreateRenderer(window, -1, flags);
+
+        return made != IntPtr.Zero ? made : SDL_CreateRenderer(window, -1, SDL_RendererFlags.SDL_RENDERER_SOFTWARE);
+    }
+
+    // The renderer's vsync can only be chosen when it is made, so a change of the frame rate setting
+    // between the monitor's own rate and a fixed one makes a new renderer.
+    private void EnsureVSync(bool wanted)
+    {
+        if (wanted == vsyncActive)
+        {
+            return;
+        }
+
+        vsyncActive = wanted;
+        nativePresenter.Release();
+        SDL_DestroyRenderer(renderer);
+        renderer = CreateRenderer(wanted);
+        SDL_RenderSetLogicalSize(renderer, 0, 0);
+    }
+
+    // One game tick's time, shown as many pictures as the monitor (or the chosen rate) allows. Each
+    // picture draws the camera and the characters where they will be at the moment it is shown: part
+    // of the way from where the last tick had them to where this tick has them, worked out from the
+    // clock. That keeps the movement even whatever the picture rate is, and when the machine cannot
+    // keep up there are simply fewer pictures, never a slower game.
     private void WaitFrameNative(Scene scene)
     {
+        bool monitorSync = WindowControls.FrameRate == WindowControls.MONITOR_SYNC;
+
+        ticksCounted++;
+
+        EnsureVSync(monitorSync);
+
         (int width, int height) = NativePresenter.OutputSize(renderer);
         Video? video = Source;
         bool world = video?.Capture is { Enabled: true, WorldVisible: true };
         bool fresh = world && video!.Capture.Tick != lastCaptureTick;
-        int frames = world ? WindowControls.FramesPerTick : 1;
+        double tickEnd = slotStartMs + TICK_MS;
+        double interval = monitorSync ? RefreshIntervalMs() : 1000.0 / WindowControls.FrameRate;
 
         lastCaptureTick = video?.Capture.Tick ?? lastCaptureTick;
 
-        for (int frame = 1; frame <= frames; frame++)
+        if (!world)
         {
-            double alpha = fresh ? frame / (double)frames : 1.0;
-            NativeComposer composer = nativePresenter.Composer;
+            ShowPicture(scene, video, width, height, 1.0);
+            WaitUntil(tickEnd);
+            AdvanceSlot();
 
-            nativePresenter.Show(renderer, composer.Compose(width, height, scene, overlay, video, alpha, composer.Pointer), width, height);
-            LogFrameRate(width, height);
-            WaitUntil(slotStartMs + frame * TICK_MS / frames);
-
-            if (frame < frames)
-            {
-                HandleEvents();
-            }
+            return;
         }
 
+        // Pictures keep to their own rhythm from one game step to the next.
+        double scheduled = Math.Max(nextPictureMs, clock.Elapsed.TotalMilliseconds);
+
+        do
+        {
+            // When this picture will be on the screen: the next refresh of the monitor, or the moment
+            // it is scheduled for.
+            double shownAt = monitorSync ? lastFlipMs + interval : scheduled;
+            double alpha = fresh ? Math.Clamp((shownAt - slotStartMs) / TICK_MS, 0.0, 1.0) : 1.0;
+
+            if (!monitorSync)
+            {
+                WaitUntil(scheduled);
+            }
+
+            ShowPicture(scene, video, width, height, alpha);
+            lastFlipMs = clock.Elapsed.TotalMilliseconds;
+
+            // Without a real vsync (a software renderer) pictures would otherwise be made flat out.
+            if (monitorSync)
+            {
+                WaitUntil(lastFlipMs + MIN_PICTURE_SPACING_MS);
+            }
+
+            scheduled = Math.Max(scheduled + interval, clock.Elapsed.TotalMilliseconds);
+            HandleEvents();
+        }
+        while ((monitorSync ? lastFlipMs + interval : scheduled) < tickEnd);
+
+        // The next game step starts at the end of this one's time, not earlier: its movement is drawn
+        // from that moment on.
+        nextPictureMs = scheduled;
+        WaitUntil(tickEnd);
         AdvanceSlot();
+    }
+
+    // Makes and shows one picture.
+    private void ShowPicture(Scene scene, Video? video, int width, int height, double alpha)
+    {
+        NativeComposer composer = nativePresenter.Composer;
+
+        nativePresenter.Show(renderer, composer.Compose(width, height, scene, overlay, video, alpha, composer.Pointer), width, height);
+        LogFrameRate(width, height);
+    }
+
+    // How long a refresh of the monitor the window is on takes (60 Hz if it cannot be asked).
+    private double RefreshIntervalMs()
+    {
+        int display = Math.Max(SDL_GetWindowDisplayIndex(window), 0);
+
+        if (SDL_GetCurrentDisplayMode(display, out SDL_DisplayMode mode) == 0 && mode.refresh_rate > 0)
+        {
+            return 1000.0 / mode.refresh_rate;
+        }
+
+        return 1000.0 / DEFAULT_REFRESH_HZ;
     }
 
     // FTA_FPS_LOG=1 prints how many pictures a second were shown (to see if the machine keeps up).
@@ -101,8 +193,9 @@ public sealed partial class SdlDisplay
 
         if (logFrameRate && now - lastLogMs >= 1000)
         {
-            Console.Error.WriteLine($"{framesShown} pictures a second at {width}x{height}, zoom {WorldView.Current.Zoom:F2}");
+            Console.Error.WriteLine($"{framesShown} pictures and {ticksCounted} game steps a second at {width}x{height}, zoom {WorldView.Current.Zoom:F2}");
             framesShown = 0;
+            ticksCounted = 0;
             lastLogMs = now;
         }
     }
@@ -186,12 +279,18 @@ public sealed partial class SdlDisplay
         }
     }
 
-    // FTA_FPS=100 starts with a picture rate of 100 a second (rounded to a whole number of pictures per tick).
+    // FTA_FPS=100 starts with 100 pictures a second; FTA_FPS=monitor (the default) waits for the monitor.
     private static void ReadFrameRateSetting()
     {
-        if (int.TryParse(Environment.GetEnvironmentVariable("FTA_FPS"), out int rate))
+        string? setting = Environment.GetEnvironmentVariable("FTA_FPS");
+
+        if (int.TryParse(setting, out int rate) && rate > 0)
         {
-            WindowControls.FramesPerTick = Math.Clamp((int)Math.Round(rate / (double)WindowControls.TICKS_PER_SECOND), WindowControls.MIN_FRAMES_PER_TICK, WindowControls.MAX_FRAMES_PER_TICK);
+            WindowControls.FrameRate = rate;
+        }
+        else if (setting is not null && setting.Equals("monitor", StringComparison.OrdinalIgnoreCase))
+        {
+            WindowControls.FrameRate = WindowControls.MONITOR_SYNC;
         }
     }
 }

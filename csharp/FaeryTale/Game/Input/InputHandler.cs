@@ -87,6 +87,31 @@ public static class InputHandler
     private const int NATIVE_PLACEHOLDER_X = 160;
     private const int NATIVE_PLACEHOLDER_Y = 60;
 
+    private static (int X, int Y)? gridPointer;
+
+    /// Where the pointer is on the 640 x 400 grid the menus are drawn on. With the old picture that
+    /// is the game pointer doubled; with the native size picture it is worked out from the window
+    /// pixel, whether the pointer is over the world or the panel.
+    public static (int X, int Y) GridPointer
+    {
+        get
+        {
+            lock (padlock)
+            {
+                return gridPointer ?? (rawPointer.X * 2, rawPointer.Y * 2);
+            }
+        }
+    }
+
+    /// The pointer moved, to a place of the menu grid (native size drawing).
+    public static void NativeGridMoved(int gridX, int gridY)
+    {
+        lock (padlock)
+        {
+            gridPointer = (gridX, gridY);
+        }
+    }
+
     /// The pointer moved over the world, to a pixel of the window.
     public static void NativeMouseMoved(int pixelX, int pixelY)
     {
@@ -178,6 +203,7 @@ public static class InputHandler
             lastMenu = 0;
             pendingClick = null;
             NativePointer = null;
+            gridPointer = null;
             RemasteredControls = false;
             JoystickFire = false;
         }
@@ -217,6 +243,7 @@ public static class InputHandler
     {
         lock (padlock)
         {
+            gridPointer = null;
             rawPointer = ((short)x, (short)y);
             pointer = ((short)Math.Clamp(x, POINTER_MIN_X, POINTER_MAX_X), (short)Math.Clamp(y, POINTER_MIN_Y, POINTER_MAX_Y));
         }

@@ -55,11 +55,15 @@ internal sealed class NativePresenter : IDisposable
         SDL_RenderPresent(renderer);
     }
 
-    public void Dispose()
+    public void Dispose() => Release();
+
+    /// Lets go of the texture (it belongs to a renderer that is about to be replaced).
+    public void Release()
     {
         if (texture != IntPtr.Zero)
         {
             SDL_DestroyTexture(texture);
+            texture = IntPtr.Zero;
         }
     }
 

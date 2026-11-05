@@ -72,8 +72,8 @@ public static class GameMenu
 
         while (true)
         {
-            (int pointerX, int pointerY) = InputHandler.RawPointer;
-            int? hovered = EntryAt(areas, pointerX * 2, pointerY * 2);
+            (int pointerX, int pointerY) = InputHandler.GridPointer;
+            int? hovered = EntryAt(areas, pointerX, pointerY);
 
             video.SetOverlay(Draw(game, heading, boards, hovered));
 
@@ -190,7 +190,7 @@ public static class GameMenu
     private static string LabelOf(Data.Game game, int index) => index switch
     {
         DIFFICULTY_ENTRY => DIFFICULTY_LABEL + Difficulty.NameOf(game.Difficulty),
-        FRAME_RATE_ENTRY => $"{FRAME_RATE_LABEL}{WindowControls.FramesPerSecond} fps",
+        FRAME_RATE_ENTRY => FRAME_RATE_LABEL + WindowControls.FrameRateText,
         _ => ENTRIES[index].Label,
     };
 

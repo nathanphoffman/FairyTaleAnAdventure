@@ -12,7 +12,7 @@ public sealed class WorldView
     public const double MIN_ZOOM = 0.25;
     public const double MAX_ZOOM = 2.0;
 
-    /// Each step of the zoom keys or the mouse wheel multiplies the zoom by this.
+    /// Each step of the zoom keys or the mouse wheel is about this much closer or further.
     public const double ZOOM_STEP = 1.25;
 
     /// The zoom a window starts at, and the one fullscreen starts at (twice as far out).
@@ -28,14 +28,20 @@ public sealed class WorldView
     public int Height { get; private set; } = 360;
     public int GroundY { get; private set; } = 180;
 
+    /// How far zoomed: 1 shows as much across as the original game's play field.
     public double Zoom { get; private set; } = WINDOW_ZOOM;
 
     /// The world position the camera looks at.
     public double CenterX { get; set; }
     public double CenterY { get; set; }
 
-    /// Screen pixels to a world pixel.
-    public double Scale => Width * Zoom / ORIGINAL_VISIBLE_WIDTH;
+    /// Screen pixels to a world pixel. It is always a whole number, so every pixel of the game is the
+    /// same size square on the screen and nothing shimmers as the camera moves.
+    public int Scale { get; private set; } = 2;
+
+    /// The smallest and largest scale the zoom limits allow at this window width.
+    public int MinScale => Math.Max(1, ScaleFor(MIN_ZOOM));
+    public int MaxScale => Math.Max(MinScale, ScaleFor(MAX_ZOOM));
 
     /// Sets the size of the picture and how much of its bottom the text panel covers.
     public void Resize(int width, int height, int panelHeight)
@@ -43,12 +49,31 @@ public sealed class WorldView
         Width = Math.Max(width, 1);
         Height = Math.Max(height, 1);
         GroundY = Math.Max((Height - panelHeight) / 2, 0);
+        SetZoom(Zoom);
     }
 
-    public void SetZoom(double zoom) => Zoom = Math.Clamp(zoom, MIN_ZOOM, MAX_ZOOM);
+    /// Sets the zoom (kept between the limits); the scale is the nearest whole number to it.
+    public void SetZoom(double zoom)
+    {
+        Zoom = Math.Clamp(zoom, MIN_ZOOM, MAX_ZOOM);
+        Scale = Math.Clamp(ScaleFor(Zoom), MinScale, MaxScale);
+    }
 
-    /// Zooms in (steps above 0) or out (below 0) by whole steps.
-    public void ZoomBySteps(int steps) => SetZoom(Zoom * Math.Pow(ZOOM_STEP, steps));
+    /// Zooms in (steps above 0) or out (below 0) by whole steps: each one makes the scale about a
+    /// quarter bigger or smaller, and never less than one whole number.
+    public void ZoomBySteps(int steps)
+    {
+        int scale = Scale;
+
+        for (int step = 0; step < Math.Abs(steps); step++)
+        {
+            scale = steps > 0 ? Math.Max((int)Math.Round(scale * ZOOM_STEP), scale + 1) : Math.Min((int)Math.Round(scale / ZOOM_STEP), scale - 1);
+            scale = Math.Clamp(scale, MinScale, MaxScale);
+        }
+
+        Scale = scale;
+        Zoom = Scale * ORIGINAL_VISIBLE_WIDTH / Width;
+    }
 
     /// The world position under a pixel of the picture.
     public (double X, double Y) ToWorld(double pixelX, double pixelY) =>
@@ -57,4 +82,7 @@ public sealed class WorldView
     /// The pixel of the picture a world position is drawn at.
     public (double X, double Y) ToScreen(double worldX, double worldY) =>
         ((worldX - CenterX) * Scale + Width / 2.0, (worldY - CenterY) * Scale + GroundY);
+
+    // The whole number of screen pixels to a world pixel that fits a zoom.
+    private int ScaleFor(double zoom) => (int)Math.Round(Width * zoom / ORIGINAL_VISIBLE_WIDTH);
 }

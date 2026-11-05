@@ -52,7 +52,7 @@ tests/regress.sh; tests/state_regress.sh                            # scenario r
 - **Difficulty (Remastered and Reimagined):** Esc opens the game menu; click "Difficulty" to step through Explorer, Easy, Normal (the default), Hard (the original game's numbers), Very Hard and Extreme. It changes enemy health and damage and your health and damage, on the fly. Original is always the original numbers.
 - **Fullscreen:** F11 or Alt+Enter. The window can also be resized. Remastered and Reimagined start in borderless fullscreen at the monitor's own resolution.
 - **Zoom (Remastered and Reimagined):** mouse wheel, or `+` and `-`. Out to 4 times as far as Original shows, in to 2 times as close; fullscreen starts 2 times out.
-- **Frame rate (Remastered and Reimagined):** 150 pictures a second by default (the game itself runs 50 steps a second; the pictures in between show the movement part of the way along). Change it in the Esc menu (50 to 300), or start with `FTA_FPS=100`.
+- **Frame rate (Remastered and Reimagined):** one picture for every refresh of the monitor by default ("Monitor"). The game itself runs 50 steps a second; each picture draws the movement part of the way along, worked out from the clock, so it is smooth at any refresh rate. Change it in the Esc menu (Monitor, or a fixed 50 to 300), or start with `FTA_FPS=100` or `FTA_FPS=monitor`.
 - **Remap keys:** copy `controls.cfg.example` to `controls.cfg` and edit it (`W = Up`).
 - **Esc:** skips the intro. In a game, Original returns to the game selection; Remastered and Reimagined open the game menu. Closing the window quits.
 

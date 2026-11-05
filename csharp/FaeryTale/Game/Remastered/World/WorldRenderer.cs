@@ -19,8 +19,14 @@ public sealed class WorldRenderer
 
     private const int TILE_COLUMN_WRAP = 0x7ff;
     private const int TILE_ROW_WRAP = 0x7fff;
-    private const int WORLD_SIZE = 0x8000;
+    // Outdoors the world is 32768 pixels across and high, but the rooms inside buildings are further
+    // down the same map (their y positions go past 32768, up to 65536).
+    private const int WORLD_WIDTH = 0x8000;
+    private const int WORLD_HEIGHT = 0x10000;
     private const int PALETTE_SIZE = 32;
+
+    /// The most bands of rows the map is drawn in at the same time.
+    private const int MAX_BANDS = 16;
     private const uint OFF_MAP_COLOR = 0xff000000;
     private const uint OPAQUE = 0xff000000;
 
@@ -43,7 +49,6 @@ public sealed class WorldRenderer
     private readonly uint[] palette = new uint[PALETTE_SIZE];
     private int[] columnToWorld = [];
     private int[] rowToWorld = [];
-    private int[] tileRow = [];
 
     /// Draws the world into frame (view.Width x view.Height pixels).
     public void Draw(uint[] frame, WorldView view, WorldCapture capture, Video video, double alpha)
@@ -105,23 +110,37 @@ public sealed class WorldRenderer
         }
     }
 
-    // The map: one row of the picture at a time (rows that fall on the same world row are copied).
+    // The map. The picture is cut into bands of rows that are drawn at the same time on the machine's
+    // cores; within a band rows that fall on the same world row are copied instead of drawn again.
     private void DrawTiles(uint[] frame, WorldView view, Data.Game game, Graphics graphics)
     {
         int firstColumn = columnToWorld[0] >> TILE_WIDTH_SHIFT;
         int lastColumn = columnToWorld[view.Width - 1] >> TILE_WIDTH_SHIFT;
+        int bands = Math.Clamp(Environment.ProcessorCount, 1, MAX_BANDS);
+        int rowsPerBand = (view.Height + bands - 1) / bands;
+
+        // The decoded tiles are looked after once here, so the bands only ever add to them.
+        images.Tile(graphics, 0);
+
+        Parallel.For(0, bands, band =>
+        {
+            int top = band * rowsPerBand;
+
+            DrawTileBand(frame, view, game, graphics, (top, Math.Min(top + rowsPerBand, view.Height)), (firstColumn, lastColumn));
+        });
+    }
+
+    // The rows from top up to (not including) bottom of the picture.
+    private void DrawTileBand(uint[] frame, WorldView view, Data.Game game, Graphics graphics, (int Top, int Bottom) rows, (int First, int Last) columns)
+    {
+        int[] tileNumbers = new int[columns.Last - columns.First + 1];
         int previousWorldRow = int.MinValue;
 
-        if (tileRow.Length < lastColumn - firstColumn + 1)
-        {
-            tileRow = new int[lastColumn - firstColumn + 1];
-        }
-
-        for (int y = 0; y < view.Height; y++)
+        for (int y = rows.Top; y < rows.Bottom; y++)
         {
             int worldRow = rowToWorld[y];
 
-            if (y > 0 && worldRow == previousWorldRow)
+            if (y > rows.Top && worldRow == previousWorldRow)
             {
                 Array.Copy(frame, (y - 1) * view.Width, frame, y * view.Width, view.Width);
 
@@ -129,17 +148,17 @@ public sealed class WorldRenderer
             }
 
             previousWorldRow = worldRow;
-            FillTileRow(game, firstColumn, lastColumn, worldRow >> TILE_HEIGHT_SHIFT);
-            DrawTileLine(frame, view, graphics, y, worldRow, firstColumn);
+            FillTileRow(game, tileNumbers, columns.First, worldRow >> TILE_HEIGHT_SHIFT);
+            DrawTileLine(frame, view, graphics, (y, worldRow), tileNumbers, columns.First);
         }
     }
 
     // The tile numbers of one row of tiles across the picture (-1 where there is no map).
-    private void FillTileRow(Data.Game game, int firstColumn, int lastColumn, int row)
+    private static void FillTileRow(Data.Game game, int[] tileNumbers, int firstColumn, int row)
     {
-        for (int column = firstColumn; column <= lastColumn; column++)
+        for (int index = 0; index < tileNumbers.Length; index++)
         {
-            tileRow[column - firstColumn] = TileAt(game, column, row);
+            tileNumbers[index] = TileAt(game, firstColumn + index, row);
         }
     }
 
@@ -147,7 +166,7 @@ public sealed class WorldRenderer
     // (its pictures are not in memory).
     private static int TileAt(Data.Game game, int column, int row)
     {
-        if (column < 0 || row < 0 || (column << TILE_WIDTH_SHIFT) >= WORLD_SIZE || (row << TILE_HEIGHT_SHIFT) >= WORLD_SIZE)
+        if (column < 0 || row < 0 || (column << TILE_WIDTH_SHIFT) >= WORLD_WIDTH || (row << TILE_HEIGHT_SHIFT) >= WORLD_HEIGHT)
         {
             return -1;
         }
@@ -164,10 +183,10 @@ public sealed class WorldRenderer
     }
 
     // One line of the picture from the tiles.
-    private void DrawTileLine(uint[] frame, WorldView view, Graphics graphics, int y, int worldRow, int firstTileColumn)
+    private void DrawTileLine(uint[] frame, WorldView view, Graphics graphics, (int Y, int WorldRow) line, int[] tileNumbers, int firstTileColumn)
     {
-        int line = worldRow & (WorldImages.TILE_HEIGHT - 1);
-        int rowStart = y * view.Width;
+        int tileLine = line.WorldRow & (WorldImages.TILE_HEIGHT - 1);
+        int rowStart = line.Y * view.Width;
         int lastTile = int.MinValue;
         byte[]? tile = null;
 
@@ -179,12 +198,12 @@ public sealed class WorldRenderer
             if (tileColumn != lastTile)
             {
                 lastTile = tileColumn;
-                int number = tileRow[tileColumn - firstTileColumn];
+                int number = tileNumbers[tileColumn - firstTileColumn];
 
                 tile = number < 0 ? null : images.Tile(graphics, number);
             }
 
-            frame[rowStart + x] = tile is null ? OFF_MAP_COLOR : palette[tile[line * WorldImages.TILE_WIDTH + (worldColumn & (WorldImages.TILE_WIDTH - 1))]];
+            frame[rowStart + x] = tile is null ? OFF_MAP_COLOR : palette[tile[tileLine * WorldImages.TILE_WIDTH + (worldColumn & (WorldImages.TILE_WIDTH - 1))]];
         }
     }
 
