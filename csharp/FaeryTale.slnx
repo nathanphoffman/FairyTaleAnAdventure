@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="FaeryTale.Tests/FaeryTale.Tests.csproj" />
+  <Project Path="FaeryTale/FaeryTale.csproj" />
+</Solution>
