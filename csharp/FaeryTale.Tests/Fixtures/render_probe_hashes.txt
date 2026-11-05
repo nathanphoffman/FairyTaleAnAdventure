@@ -1,0 +1,6 @@
+village map 550366ef1975dde2
+village sprites ae22929ed3ac3471 used 8
+village undone 550366ef1975dde2
+north map 057f2252357e88e9
+north sprites c6c6719af02eeac8 used 8
+north undone 057f2252357e88e9
