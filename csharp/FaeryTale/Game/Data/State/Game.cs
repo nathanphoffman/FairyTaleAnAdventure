@@ -1,0 +1,31 @@
+namespace FaeryTale.Game.Data;
+
+/// Everything that changes while the game runs, in one value that is passed down from the main
+/// loop. It starts out zero apart from the few values set here.
+public sealed class Game
+{
+    public const ushort STARTING_REGION = 3;
+
+    public Experience Experience;
+    public Witch Witch = new();
+    public Ui Ui = new();
+    public EncounterState Encounter = new();
+    public MapData Map = new();
+    public ushort[] SavePadding = new ushort[3];
+    public Rng Rng = new();
+    public Extent[] Extents = (Extent[])Tables.InitialExtents.Clone();
+    public Menu[] Menus = Tables.InitialMenus.Select(menu => menu.Copy()).ToArray();
+    public ObjectLists Objects = new();
+
+    /// The palette of the play field at full light; the fades start from it.
+    public ushort[] PageColors = (ushort[])ObjectTables.InitialPageColors.Clone();
+    public Actors Actors = new();
+    public World World = new() { Region = STARTING_REGION };
+    public Hero Hero = new();
+
+    /// The actor r names.
+    public Shape Actor(ActorRef r) => Actors.Actor(r);
+
+    /// The missile r names.
+    public Missile Missile(MissileRef r) => Actors.Missile(r);
+}
