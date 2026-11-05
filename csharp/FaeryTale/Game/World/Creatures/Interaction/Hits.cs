@@ -1,5 +1,6 @@
 using FaeryTale.Game.Data;
 using FaeryTale.Game.Output;
+using FaeryTale.Game.Remastered;
 using FaeryTale.Game.Ui;
 
 namespace FaeryTale.Game.Creatures.Interaction;
@@ -85,6 +86,8 @@ public static class Hits
             return;
         }
 
+        // Remastered and Reimagined scale the damage by the difficulty (Original is left as it was).
+        wt = Difficulty.ScaleDamage(game, index, j, wt);
         target.Vitality = VitalityAfterHit(target.Vitality, wt);
         PlayHitSound(game, HitSoundFor(index, j));
 

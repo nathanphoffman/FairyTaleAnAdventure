@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using FaeryTale.Game.Remastered;
 using FaeryTale.Game.Render;
 using FaeryTale.Gfx;
 using static SDL2.SDL;
@@ -9,7 +10,7 @@ namespace FaeryTale.Platform;
 /// mouse and gamepad events to the input bridge. Closing the window quits; Escape is passed on to
 /// the game (it skips the intro, leaves a game, or opens the game menu). F11 or Alt+Enter switch
 /// fullscreen.
-public sealed class SdlDisplay : IDisplayDevice, IDisposable
+public sealed partial class SdlDisplay : IDisplayDevice, IDisposable
 {
     private const string WINDOW_TITLE = "Fairy Tale: An Adventure";
     private const int WINDOW_WIDTH = 1280;
@@ -56,21 +57,40 @@ public sealed class SdlDisplay : IDisplayDevice, IDisposable
         SDL_RenderSetLogicalSize(renderer, Scene.FRAME_WIDTH, Scene.FRAME_HEIGHT * ROW_SCALE);
         SDL_ShowCursor(0); // the game draws its own pointer
         KeyRemap.Load();
+        ReadFrameRateSetting();
     }
+
+    public Video? Source { get; set; }
 
     public uint Ticks { get; private set; }
 
     public void Present(Scene scene)
     {
-        Draw(scene);
+        ApplyNativeMode();
+
+        // The native size drawing shows its pictures in WaitFrame, between the game's ticks.
+        if (!WindowControls.NativeRendering)
+        {
+            Draw(scene);
+        }
+
         HandleEvents();
     }
 
     public void WaitFrame(Scene scene)
     {
+        ApplyNativeMode();
         HandleEvents();
         Ticks++;
         ApplyCursorSetting();
+
+        if (WindowControls.NativeRendering)
+        {
+            WaitFrameNative(scene);
+
+            return;
+        }
+
         Pace();
         Draw(scene);
     }
@@ -79,6 +99,7 @@ public sealed class SdlDisplay : IDisplayDevice, IDisposable
 
     public void Dispose()
     {
+        nativePresenter.Dispose();
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
     }
@@ -171,6 +192,10 @@ public sealed class SdlDisplay : IDisplayDevice, IDisposable
                 MouseMovedTo(windowEvent.motion.x, windowEvent.motion.y);
                 break;
 
+            case SDL_EventType.SDL_MOUSEWHEEL:
+                ZoomWithWheel(windowEvent.wheel.y);
+                break;
+
             case SDL_EventType.SDL_MOUSEBUTTONDOWN:
             case SDL_EventType.SDL_MOUSEBUTTONUP:
                 HandleMouseButton(windowEvent.button);
@@ -190,6 +215,10 @@ public sealed class SdlDisplay : IDisplayDevice, IDisposable
         {
             ToggleFullscreen();
         }
+        else if (down && ZoomWithKey(SDL_GetKeyName(key.keysym.sym)))
+        {
+            // Handled: the zoom keys do not reach the game.
+        }
         else if (key.repeat == 0)
         {
             InputBridge.KeyEvent(KeyRemap.Apply(SDL_GetKeyName(key.keysym.sym)), down);
@@ -204,13 +233,15 @@ public sealed class SdlDisplay : IDisplayDevice, IDisposable
     {
         bool isFullscreen = (SDL_GetWindowFlags(window) & (uint)SDL_WindowFlags.SDL_WINDOW_FULLSCREEN_DESKTOP) != 0;
 
-        if (SDL_SetWindowFullscreen(window, isFullscreen ? 0 : (uint)SDL_WindowFlags.SDL_WINDOW_FULLSCREEN_DESKTOP) != 0)
+        SetFullscreen(!isFullscreen);
+
+        if (WindowControls.NativeRendering)
         {
-            Console.Error.WriteLine($"Could not change fullscreen: {SDL_GetError()}");
+            WorldView.Current.SetZoom(isFullscreen ? WorldView.WINDOW_ZOOM : WorldView.FULLSCREEN_ZOOM);
         }
     }
 
-    private static void HandleMouseButton(SDL_MouseButtonEvent button)
+    private void HandleMouseButton(SDL_MouseButtonEvent button)
     {
         bool down = button.type == SDL_EventType.SDL_MOUSEBUTTONDOWN;
 
@@ -225,7 +256,20 @@ public sealed class SdlDisplay : IDisplayDevice, IDisposable
         }
     }
 
-    // SDL reports mouse positions in the 640x400 logical screen (it handles the letterboxing), so
-    // only the doubled rows need undoing.
-    private static void MouseMovedTo(int logicalX, int logicalY) => InputBridge.MouseMove(logicalX, logicalY / ROW_SCALE);
+    // With the old picture SDL reports mouse positions in the 640x400 logical screen (it handles the
+    // letterboxing), so only the doubled rows need undoing. With the native size picture they are
+    // pixels of the window.
+    private void MouseMovedTo(int x, int y)
+    {
+        if (WindowControls.NativeRendering)
+        {
+            (int pixelX, int pixelY) = ToOutputPixels(x, y);
+
+            nativePresenter.Composer.RouteMouse(pixelX, pixelY);
+
+            return;
+        }
+
+        InputBridge.MouseMove(x, y / ROW_SCALE);
+    }
 }

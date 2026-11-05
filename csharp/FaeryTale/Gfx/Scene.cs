@@ -147,6 +147,53 @@ public sealed class Scene
         }
     }
 
+    /// Draws the pointer on a frame of any size with its top left corner at a pixel, each pixel of
+    /// the sprite a square of pixelSize frame pixels (used by the native size drawing).
+    public void DrawPointerAtPixel(uint[] frame, int width, (int X, int Y) at, int pixelSize)
+    {
+        ViewPort? pointerColors = ViewPorts.FirstOrDefault(viewPort => viewPort.ShowsPointer);
+
+        if (Pointer is null || pointerColors is null)
+        {
+            return;
+        }
+
+        int height = frame.Length / width;
+
+        for (int line = 0; line < POINTER_MAX_LINES; line++)
+        {
+            uint word = 1 + line < Pointer.Image.Length ? Pointer.Image[1 + line] : 0;
+
+            if (word == 0)
+            {
+                break;
+            }
+
+            for (int bit = 0; bit < POINTER_WIDTH; bit++)
+            {
+                int shift = POINTER_WIDTH - 1 - bit;
+                int value = (((ushort)(word >> HIGH_WORD_SHIFT) >> shift) & 1) | ((((ushort)word >> shift) & 1) << 1);
+
+                if (value != 0 && POINTER_FIRST_COLOR + value < pointerColors.Colors.Length)
+                {
+                    FillSquare(frame, (width, height), (at.X + bit * pixelSize, at.Y + line * pixelSize), pixelSize, Rgb4(pointerColors.Colors[POINTER_FIRST_COLOR + value]));
+                }
+            }
+        }
+    }
+
+    // A square of one colour (opaque), where it is on the frame.
+    private static void FillSquare(uint[] frame, (int Width, int Height) size, (int X, int Y) at, int side, uint color)
+    {
+        for (int y = Math.Max(at.Y, 0); y < Math.Min(at.Y + side, size.Height); y++)
+        {
+            int start = Math.Min(Math.Max(at.X, 0), size.Width);
+            int end = Math.Clamp(at.X + side, start, size.Width);
+
+            Array.Fill(frame, 0xff00_0000 | color, y * size.Width + start, end - start);
+        }
+    }
+
     // Draws the mouse pointer: a 16 pixel wide sprite, 2 frame pixels per sprite pixel.
     private static void DrawPointer(uint[] frame, ushort[] colors, Pointer pointer, int rowScale)
     {

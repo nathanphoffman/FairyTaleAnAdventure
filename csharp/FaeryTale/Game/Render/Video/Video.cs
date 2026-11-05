@@ -36,6 +36,11 @@ public sealed class Graphics
     /// Where the next sprite sheet loads in Shape.
     public int NextShape;
 
+    /// Counted up whenever the tile pictures or the sprite sheets are loaded, so drawers that keep
+    /// decoded copies of them know when to throw them away.
+    public int TileVersion;
+    public int SpriteVersion;
+
     public SeqInfo[] SeqList = new SeqInfo[SPRITE_SHEETS];
 }
 
@@ -61,4 +66,7 @@ public sealed partial class Video
     /// Where finished frames go. The platform phase supplies the real window; until then frames
     /// are only counted.
     public IDisplayDevice Device = new NullDisplayDevice();
+
+    /// What the new world drawer of Remastered and Reimagined is told about each frame.
+    public Remastered.WorldCapture Capture = new();
 }

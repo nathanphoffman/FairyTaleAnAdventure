@@ -36,8 +36,23 @@ public sealed class Overlay
     /// The game's mouse pointer is not drawn at all (something else, such as a door icon, takes its place).
     public bool HidePointer { get; init; }
 
+    /// Where the overlay's grid is on a frame: the pixel of the frame its top left corner is at, and
+    /// how many frame pixels each grid pixel is (the grid is 640 x 400).
+    public readonly record struct Placement(int OriginX, int OriginY, int Scale)
+    {
+        public static readonly Placement Identity = new(0, 0, 1);
+    }
+
+    /// The height of the overlay grid.
+    public const int HEIGHT = 400;
+
     /// Draws the overlay on a frame width pixels wide (and so many rows tall).
-    public void Draw(uint[] frame, int width)
+    public void Draw(uint[] frame, int width) => DrawAt(frame, width, Placement.Identity);
+
+    /// Draws the overlay with its grid placed and scaled on a frame (a larger frame than the grid:
+    /// the part of the frame outside the grid is only touched by a shade that covers the whole grid,
+    /// which darkens all of the frame).
+    public void DrawAt(uint[] frame, int width, Placement placement)
     {
         if (width == 0)
         {
@@ -46,17 +61,17 @@ public sealed class Overlay
 
         foreach (Shade shade in Shades)
         {
-            DrawShade(frame, width, shade);
+            DrawShade(frame, width, shade, placement);
         }
 
         foreach (Image image in Images)
         {
-            DrawImage(frame, width, image);
+            DrawImage(frame, width, image, placement);
         }
 
         foreach (Text text in Texts)
         {
-            DrawText(frame, width, text);
+            DrawText(frame, width, text, placement);
         }
     }
 
@@ -86,13 +101,14 @@ public sealed class Overlay
     }
 
     // Darkens the pixels of a shade.
-    private static void DrawShade(uint[] frame, int width, Shade shade)
+    private static void DrawShade(uint[] frame, int width, Shade shade, Placement placement)
     {
         int height = frame.Length / width;
-        int left = Math.Clamp(shade.X, 0, width);
-        int right = Math.Clamp(shade.X + shade.Width, 0, width);
-        int top = Math.Clamp(shade.Y, 0, height);
-        int bottom = Math.Clamp(shade.Y + shade.Height, 0, height);
+        bool coversGrid = shade.X <= 0 && shade.Y <= 0 && shade.X + shade.Width >= WIDTH && shade.Y + shade.Height >= HEIGHT;
+        int left = coversGrid ? 0 : Math.Clamp(placement.OriginX + shade.X * placement.Scale, 0, width);
+        int right = coversGrid ? width : Math.Clamp(placement.OriginX + (shade.X + shade.Width) * placement.Scale, 0, width);
+        int top = coversGrid ? 0 : Math.Clamp(placement.OriginY + shade.Y * placement.Scale, 0, height);
+        int bottom = coversGrid ? height : Math.Clamp(placement.OriginY + (shade.Y + shade.Height) * placement.Scale, 0, height);
 
         for (int row = top; row < bottom; row++)
         {
@@ -104,26 +120,32 @@ public sealed class Overlay
     }
 
     // Draws a picture: opaque pixels replace what is below, see-through ones are blended with it.
-    private static void DrawImage(uint[] frame, int width, Image image)
+    // Each pixel of the picture is a square of Scale pixels on the frame.
+    private static void DrawImage(uint[] frame, int width, Image image, Placement placement)
     {
         int height = frame.Length / width;
+        int scale = placement.Scale;
 
         for (int row = 0; row < image.Height; row++)
         {
-            int y = image.Y + row;
-
-            if (y < 0 || y >= height)
-            {
-                continue;
-            }
+            int rowTop = placement.OriginY + (image.Y + row) * scale;
 
             for (int column = 0; column < image.Width; column++)
             {
-                int x = image.X + column;
+                uint color = image.Pixels[row * image.Width + column];
+                int columnLeft = placement.OriginX + (image.X + column) * scale;
 
-                if (x >= 0 && x < width)
+                if (color >> 24 == 0)
                 {
-                    frame[y * width + x] = Blend(frame[y * width + x], image.Pixels[row * image.Width + column]);
+                    continue;
+                }
+
+                for (int y = Math.Max(rowTop, 0); y < Math.Min(rowTop + scale, height); y++)
+                {
+                    for (int x = Math.Max(columnLeft, 0); x < Math.Min(columnLeft + scale, width); x++)
+                    {
+                        frame[y * width + x] = Blend(frame[y * width + x], color);
+                    }
                 }
             }
         }
@@ -166,15 +188,16 @@ public sealed class Overlay
     }
 
     // Draws a line of text with the built-in font.
-    private static void DrawText(uint[] frame, int width, Text text)
+    private static void DrawText(uint[] frame, int width, Text text, Placement placement)
     {
         int height = frame.Length / width;
-        int top = text.Y - GLYPH_BASELINE * text.Scale;
+        int block = text.Scale * placement.Scale;
+        int top = placement.OriginY + (text.Y - GLYPH_BASELINE * text.Scale) * placement.Scale;
 
         for (int index = 0; index < text.Content.Length; index++)
         {
             byte[] glyph = Font8x8.BasicLegacy[text.Content[index] & 0x7f];
-            int left = text.X + index * GLYPH_SIZE * text.Scale;
+            int left = placement.OriginX + (text.X + index * GLYPH_SIZE * text.Scale) * placement.Scale;
 
             for (int row = 0; row < glyph.Length; row++)
             {
@@ -183,22 +206,22 @@ public sealed class Overlay
                     // Bit 0 of each row is the leftmost pixel.
                     if (((glyph[row] >> column) & 1) != 0)
                     {
-                        FillBlock(frame, (width, height), (left + column * text.Scale, top + row * text.Scale), text);
+                        FillBlock(frame, (width, height), (left + column * block, top + row * block), (block, text.Color));
                     }
                 }
             }
         }
     }
 
-    // Fills a square of text.Scale pixels at at with the text colour, where it is on the frame.
-    private static void FillBlock(uint[] frame, (int Width, int Height) size, (int X, int Y) at, Text text)
+    // Fills a square of the given size at at with a colour, where it is on the frame.
+    private static void FillBlock(uint[] frame, (int Width, int Height) frameSize, (int X, int Y) at, (int Size, uint Color) block)
     {
-        for (int y = Math.Max(at.Y, 0); y < Math.Min(at.Y + text.Scale, size.Height); y++)
+        for (int y = Math.Max(at.Y, 0); y < Math.Min(at.Y + block.Size, frameSize.Height); y++)
         {
-            int start = Math.Min(Math.Max(at.X, 0), size.Width);
-            int end = Math.Clamp(at.X + text.Scale, start, size.Width);
+            int start = Math.Min(Math.Max(at.X, 0), frameSize.Width);
+            int end = Math.Clamp(at.X + block.Size, start, frameSize.Width);
 
-            Array.Fill(frame, text.Color, y * size.Width + start, end - start);
+            Array.Fill(frame, block.Color, y * frameSize.Width + start, end - start);
         }
     }
 }

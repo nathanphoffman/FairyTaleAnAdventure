@@ -48,6 +48,9 @@ public static class InputHandler
     private const int MENU_ROW_HEIGHT = 9;
     private const int MENU_FIRST_KEY = 0x61; // 'a'
 
+    /// The menu has 6 rows of 2 entries; the pointer can only be below them when it is free to roam.
+    private const int MENU_ROWS = 6;
+
     // The on-screen compass.
     private const int COMPASS_MIN_X = 265;
     private const int COMPASS_LEFT_END_X = 292;
@@ -69,7 +72,40 @@ public static class InputHandler
     private static (short X, short Y) rawPointer = (POINTER_START, POINTER_START);
     private static short qualifier;
     private static sbyte lastMenu;
-    private static (int X, int Y)? pendingClick;
+    private static Click? pendingClick;
+
+    /// A left click on the play field, kept for click to move: lores pixels and screen lines, or
+    /// (Native) pixels of the window when the world is drawn at the window's own size.
+    public readonly record struct Click(int X, int Y, bool Native);
+
+    /// Where the pointer is in the window, in pixels, while it is over the world drawn at the
+    /// window's own size (null otherwise).
+    public static (int X, int Y)? NativePointer { get; private set; }
+
+    // While the pointer is over the world, the game's own pointer position is put somewhere on the
+    // play field (clear of the panel's menus and compass).
+    private const int NATIVE_PLACEHOLDER_X = 160;
+    private const int NATIVE_PLACEHOLDER_Y = 60;
+
+    /// The pointer moved over the world, to a pixel of the window.
+    public static void NativeMouseMoved(int pixelX, int pixelY)
+    {
+        lock (padlock)
+        {
+            NativePointer = (pixelX, pixelY);
+            rawPointer = (NATIVE_PLACEHOLDER_X, NATIVE_PLACEHOLDER_Y);
+            pointer = (NATIVE_PLACEHOLDER_X, NATIVE_PLACEHOLDER_Y);
+        }
+    }
+
+    /// The pointer is not over the world any more (the next move is a normal one on the panel).
+    public static void NativeMouseLeftWorld()
+    {
+        lock (padlock)
+        {
+            NativePointer = null;
+        }
+    }
 
     /// The play field ends and the text panel starts at this screen line.
     private const int PLAY_FIELD_BOTTOM = 143;
@@ -141,6 +177,7 @@ public static class InputHandler
             qualifier = 0;
             lastMenu = 0;
             pendingClick = null;
+            NativePointer = null;
             RemasteredControls = false;
             JoystickFire = false;
         }
@@ -314,15 +351,20 @@ public static class InputHandler
         int row = (y - MENU_TOP_Y) / MENU_ROW_HEIGHT;
         int right = x >= MENU_RIGHT_COLUMN_X ? 1 : 0;
 
+        if (row >= MENU_ROWS)
+        {
+            return null;
+        }
+
         return row * 2 + MENU_FIRST_KEY + right;
     }
 
     /// The play field position (lores pixels) of a left click not yet used by click to move.
-    public static (int X, int Y)? TakeClick()
+    public static Click? TakeClick()
     {
         lock (padlock)
         {
-            (int X, int Y)? click = pendingClick;
+            Click? click = pendingClick;
 
             pendingClick = null;
 
@@ -333,9 +375,18 @@ public static class InputHandler
     // Keeps a left click on the play field for click to move (called with the lock held).
     private static void RememberPlayFieldClick(int x, int y)
     {
-        if (RemasteredControls && y < PLAY_FIELD_BOTTOM)
+        if (!RemasteredControls)
         {
-            pendingClick = (x, y);
+            return;
+        }
+
+        if (NativePointer is { } native)
+        {
+            pendingClick = new Click(native.X, native.Y, true);
+        }
+        else if (y < PLAY_FIELD_BOTTOM)
+        {
+            pendingClick = new Click(x, y, false);
         }
     }
 

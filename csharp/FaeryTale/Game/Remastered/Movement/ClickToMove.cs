@@ -79,7 +79,7 @@ public static class ClickToMove
 
         if (InputHandler.TakeClick() is { } click && game.Ui.ViewStatus == VIEW_NORMAL)
         {
-            Plan(game, ScreenMap.ToWorld(game.World, click));
+            Plan(game, PointerWorld.OfClick(game, click));
         }
 
         if (!Active)

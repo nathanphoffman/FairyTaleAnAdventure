@@ -21,6 +21,8 @@ public static class SpriteSheets
     /// The check makes sure that all of it, with room to spare, fits in the scratch area.
     public static void LoadSpriteFile(Video video, int num)
     {
+        video.Graphics.SpriteVersion++;
+
         CFileInfo file = SpriteFiles.All[num];
         int next = video.Graphics.NextShape;
         ref SeqInfo slot = ref video.Graphics.SeqList[file.SeqNum];
@@ -50,6 +52,8 @@ public static class SpriteSheets
     /// Builds the masks for slot slot (reads have already finished).
     public static void FinishSpriteLoad(Video video, short slot)
     {
+        video.Graphics.SpriteVersion++;
+
         SeqInfo s = video.Graphics.SeqList[slot];
 
         SpriteBlitter.MakeSpriteMasks(video.Graphics, s.Location, s.MaskLoc, s.Width, s.Height, s.Count);

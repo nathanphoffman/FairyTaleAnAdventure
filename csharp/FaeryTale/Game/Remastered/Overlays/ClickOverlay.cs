@@ -1,6 +1,8 @@
 using FaeryTale.Game.Input;
 using FaeryTale.Game.Output;
+using FaeryTale.Game.Render;
 using FaeryTale.Gfx;
+using FaeryTale.Platform;
 
 namespace FaeryTale.Game.Remastered;
 
@@ -27,13 +29,19 @@ public static class ClickOverlay
     {
         bool overDoor = IsPointerOverDoor(game);
 
+        // The new world drawer draws the marker and the door icon itself, in its own pixels.
+        if (output is Video video && WindowControls.NativeRendering && video.Capture.Enabled)
+        {
+            video.Capture.Marker = ClickToMove.Marker;
+            video.Capture.DoorHover = overDoor;
+            ClearOverlay(output);
+
+            return;
+        }
+
         if (ClickToMove.Marker is null && !overDoor)
         {
-            if (shown)
-            {
-                output.SetOverlay(new Overlay());
-                shown = false;
-            }
+            ClearOverlay(output);
 
             return;
         }
@@ -64,9 +72,17 @@ public static class ClickOverlay
             return false;
         }
 
-        (int x, int y) = InputHandler.RawPointer;
+        return PointerWorld.UnderPointer(game) is { } ground && DoorTargets.DoorAt(game, ground) is not null;
+    }
 
-        return y < PLAY_FIELD_BOTTOM && DoorTargets.DoorAt(game, ScreenMap.ToWorld(game.World, (x, y))) is not null;
+    // Takes off an overlay this class put up.
+    private static void ClearOverlay(IOutput output)
+    {
+        if (shown)
+        {
+            output.SetOverlay(new Overlay());
+            shown = false;
+        }
     }
 
     private static (int X, int Y) ToOverlay(Data.Game game, (int X, int Y) world)

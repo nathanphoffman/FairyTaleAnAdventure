@@ -15,6 +15,10 @@ public interface IDisplayDevice
     /// Waits one tick of 1/50 second, showing the scene as it is now.
     void WaitFrame(Scene scene);
 
+    /// The video the frames come from: the new world drawer reads the game's tiles and sprites
+    /// from it. Set when a game starts.
+    Video? Source { get; set; }
+
     /// Sets the text and dark panels drawn over the picture (an empty overlay removes them).
     void SetOverlay(Overlay overlay);
 }
@@ -22,6 +26,8 @@ public interface IDisplayDevice
 /// A display that shows nothing and only counts ticks, for runs without a window.
 public sealed class NullDisplayDevice : IDisplayDevice
 {
+    public Video? Source { get; set; }
+
     public uint Ticks { get; private set; }
 
     public void Present(Scene scene)

@@ -215,7 +215,7 @@ public static class MapLookup
     }
 
     // The tile number at tile column x and row y of the world.
-    private static byte TileNumber(Data.Game game, ushort x, ushort y)
+    public static byte TileNumber(Data.Game game, ushort x, ushort y)
     {
         // Tile column to sector column: 16 tiles to a sector.
         ushort column = (ushort)(WrapSectorColumn((ushort)((x >> SECTOR_WIDTH_SHIFT) - game.World.OriginX)) + game.World.OriginX);

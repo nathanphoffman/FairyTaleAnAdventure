@@ -1,4 +1,5 @@
 using FaeryTale.Game;
+using FaeryTale.Game.Remastered;
 using FaeryTale.Game.Render;
 using FaeryTale.Gfx;
 using FaeryTale.Testing;
@@ -23,6 +24,8 @@ public sealed class HeadlessDisplay : IDisplayDevice
     private const int LORES_TO_FRAME = 2;
 
     /// Scripted Space press that skips the intro: (press tick, release tick).
+    private const int DEFAULT_NATIVE_WIDTH = 1280;
+    private const int DEFAULT_NATIVE_HEIGHT = 720;
     private const uint SKIP_INTRO_PRESS = 5;
     private const uint SKIP_INTRO_RELEASE = 9;
 
@@ -33,7 +36,10 @@ public sealed class HeadlessDisplay : IDisplayDevice
     private readonly bool fast = Environment.GetEnvironmentVariable("FTA_FAST") is not null;
     private readonly DateTime started = DateTime.UtcNow;
     private Overlay overlay = new();
-    private (uint[] Pixels, int Height) shown;
+    private (uint[] Pixels, int Width, int Height) shown;
+    private readonly NativeComposer composer = new();
+    private readonly (int Width, int Height) nativeSize = NativeSizeFromEnvironment();
+    private bool zoomApplied;
     private DateTime nextTick = DateTime.UtcNow.AddMilliseconds(TICK_MILLISECONDS);
 
     public HeadlessDisplay(bool launchSkipped)
@@ -46,6 +52,8 @@ public sealed class HeadlessDisplay : IDisplayDevice
             keys.Add(new KeyEvent(SKIP_INTRO_RELEASE, "Space", false));
         }
     }
+
+    public Video? Source { get; set; }
 
     public uint Ticks { get; private set; }
 
@@ -67,7 +75,41 @@ public sealed class HeadlessDisplay : IDisplayDevice
     public void SetOverlay(Overlay overlay) => this.overlay = overlay;
 
     // Turns the scene into the pixels on screen, with the overlay on top.
-    private void Draw(Scene scene) => shown = FrameComposer.Build(scene, overlay, frame);
+    private void Draw(Scene scene)
+    {
+        if (WindowControls.NativeRendering)
+        {
+            // Remastered and Reimagined: the picture of a window of FTA_NATIVE size (default 1280x720),
+            // drawn by the new world drawer, with the zoom of FTA_ZOOM.
+            ApplyZoomFromEnvironment();
+            shown = (composer.Compose(nativeSize.Width, nativeSize.Height, scene, overlay, Source, 1.0, composer.Pointer), nativeSize.Width, nativeSize.Height);
+
+            return;
+        }
+
+        (uint[] pixels, int rows) = FrameComposer.Build(scene, overlay, frame);
+
+        shown = (pixels, Scene.FRAME_WIDTH, rows);
+    }
+
+    // FTA_NATIVE=1920x1080 sets the size of the native picture.
+    private static (int Width, int Height) NativeSizeFromEnvironment()
+    {
+        string[] parts = (Environment.GetEnvironmentVariable("FTA_NATIVE") ?? "").Split('x');
+
+        return parts.Length == 2 && int.TryParse(parts[0], out int width) && int.TryParse(parts[1], out int height) ? (width, height) : (DEFAULT_NATIVE_WIDTH, DEFAULT_NATIVE_HEIGHT);
+    }
+
+    // FTA_ZOOM=0.5 sets the zoom (once).
+    private void ApplyZoomFromEnvironment()
+    {
+        if (!zoomApplied && double.TryParse(Environment.GetEnvironmentVariable("FTA_ZOOM"), System.Globalization.CultureInfo.InvariantCulture, out double zoom))
+        {
+            WorldView.Current.SetZoom(zoom);
+        }
+
+        zoomApplied = true;
+    }
 
     // Waits for the next 50 Hz tick (the original's vertical blank).
     private void Pace()
@@ -96,7 +138,7 @@ public sealed class HeadlessDisplay : IDisplayDevice
         {
             if (click.Tick == Ticks)
             {
-                InputBridge.MouseMove(click.X * LORES_TO_FRAME, click.Y);
+                MoveMouseTo(click);
                 InputBridge.MouseButton(true, true);
             }
             else if (click.Tick + CLICK_HOLD_TICKS == Ticks)
@@ -111,6 +153,20 @@ public sealed class HeadlessDisplay : IDisplayDevice
         }
     }
 
+    // A scripted click is at a place of the old 320 x 200 picture: in the native picture that is the
+    // same place on the 640 x 400 grid, scaled.
+    private void MoveMouseTo(Click click)
+    {
+        if (!WindowControls.NativeRendering)
+        {
+            InputBridge.MouseMove(click.X * LORES_TO_FRAME, click.Y);
+
+            return;
+        }
+
+        composer.RouteMouse(composer.GridLeft + click.X * LORES_TO_FRAME * composer.Scale, composer.GridTop + click.Y * 2 * composer.Scale);
+    }
+
     // FTA_SHOT=file.ppm saves the screen after FTA_SHOT_AFTER ticks and quits; FTA_SECONDS=n
     // quits after n seconds.
     private void TestHooks()
@@ -119,11 +175,11 @@ public sealed class HeadlessDisplay : IDisplayDevice
 
         if (path is not null && Ticks >= TicksFromEnvironment("FTA_SHOT_AFTER"))
         {
-            (uint[] pixels, int height) = shown;
+            (uint[] pixels, int width, int height) = shown;
 
             try
             {
-                File.WriteAllBytes(path, PpmWriter.FrameAsPpm(pixels, Scene.FRAME_WIDTH, height));
+                File.WriteAllBytes(path, PpmWriter.FrameAsPpm(pixels, width, height));
             }
             catch (IOException error)
             {

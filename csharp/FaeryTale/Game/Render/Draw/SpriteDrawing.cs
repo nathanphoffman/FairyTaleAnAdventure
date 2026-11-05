@@ -62,6 +62,7 @@ public static class SpriteDrawing
 
         page.ObCount = 0;
         page.SaveUsed = 0;
+        video.Capture.BeginFrame(game);
 
         Frame frame = new() { Crack = 0, BackAlloc = page.BackSave };
 
@@ -123,7 +124,16 @@ public static class SpriteDrawing
 
         sbyte bytesWide = PlaceOnScreen(game.World, video, sprite);
 
-        if (!SpriteImages.AdjustForDepth(game.Actors, game.Hero, actor, slot, cycle, passmode, sprite) || IsOffScreen(sprite))
+        if (!SpriteImages.AdjustForDepth(game.Actors, game.Hero, actor, slot, cycle, passmode, sprite))
+        {
+            return Drawn.Done;
+        }
+
+        // The new world drawer of Remastered shows more than the old screen does, so it is told
+        // about sprites that are off the old screen too.
+        video.Capture.Record(game, video, actor, slot, passmode, sprite);
+
+        if (IsOffScreen(sprite))
         {
             return Drawn.Done;
         }

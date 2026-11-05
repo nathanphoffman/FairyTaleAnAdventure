@@ -7,6 +7,13 @@ public sealed class Game
     public const ushort STARTING_REGION = 3;
 
     public Experience Experience;
+
+    /// The difficulty of Remastered and Reimagined (it can be changed in the game menu).
+    public DifficultyLevel Difficulty = DifficultyLevel.Normal;
+
+    /// The part of a point of damage not yet dealt to each actor, when a difficulty scales damage
+    /// down: 0.4 of a point three times in a row makes one point.
+    public double[] DamageCarry = new double[Actors.ACTOR_SLOTS];
     public Witch Witch = new();
     public Ui Ui = new();
     public EncounterState Encounter = new();

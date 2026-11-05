@@ -113,6 +113,8 @@ public sealed partial class Video : IOutput
 
     public void LoadImageBank(int bank, short firstBlock)
     {
+        Graphics.TileVersion++;
+
         for (int plane = 0; plane < PLANES; plane++)
         {
             int from = bank * QUARTER_PLANE_SIZE + plane * IMAGE_PLANE_SIZE;
@@ -164,10 +166,15 @@ public sealed partial class Video : IOutput
 
     public void DrawCompass(short dir) => ScreenEffects.DrawCompass(Screen, dir);
 
-    public void DrawItemList(Hero hero) => ScreenEffects.DrawItemList(this, hero);
+    public void DrawItemList(Hero hero)
+    {
+        Capture.WorldVisible = false;
+        ScreenEffects.DrawItemList(this, hero);
+    }
 
     public void DrawOverviewMap(MapData map, World world, int mx, int my)
     {
+        Capture.WorldVisible = false;
         Screen.DrawTarget = Screen.DrawingBitmapId;
         OverviewMap.DrawOverviewMap(this, map, world, mx, my);
     }
@@ -187,6 +194,7 @@ public sealed partial class Video : IOutput
 
     public void ClearDrawingPage()
     {
+        Capture.WorldVisible = false;
         Screen.GetPort(PortId.Map).Target = Screen.DrawingBitmapId;
         Screen.Clear(PortId.Map, PEN_BLACK);
         Screen.GetPort(PortId.Map).Target = Screen.ViewingBitmapId;
@@ -202,6 +210,7 @@ public sealed partial class Video : IOutput
 
     public void PrepareMessagePage()
     {
+        Capture.WorldVisible = false;
         Screen.CurrentPort = PortId.Map;
         Screen.GetPort(PortId.Map).Target = Screen.DrawingBitmapId;
         Screen.SetDrawMode(PortId.Map, Drawing.JAM1);

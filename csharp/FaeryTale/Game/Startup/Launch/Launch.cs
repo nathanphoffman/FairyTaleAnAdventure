@@ -90,6 +90,7 @@ public static class Launch
         Data.Game game = new();
         Video video = new() { Device = device };
 
+        device.Source = video;
         ForgetLastGame();
         game.World.LightTimer = 0;
 
@@ -121,8 +122,10 @@ public static class Launch
     {
         InputHandler.Reset();
         ClickToMove.Cancel();
+        EnemyPathing.Reset();
         ClickOverlay.Reset();
         WindowControls.SystemCursorShown = false;
+        WindowControls.NativeRendering = false;
     }
 
     /// Whether the intro is being skipped. Once Space or Escape has been seen the skip sticks (the
@@ -225,11 +228,17 @@ public static class Launch
                 return false;
             }
 
-            ChooseExperience(game, experience);
+            ChooseExperience(game, video, experience);
         }
         else if (Environment.GetEnvironmentVariable("FTA_EXPERIENCE") is { } name && Enum.TryParse(name, true, out Experience scripted))
         {
-            ChooseExperience(game, scripted); // lets the test scripts start in another mode
+            // Lets the test scripts start in another mode, and at another difficulty.
+            if (Enum.TryParse(Environment.GetEnvironmentVariable("FTA_DIFFICULTY"), true, out DifficultyLevel scriptedLevel))
+            {
+                Difficulty.Chosen = scriptedLevel;
+            }
+
+            ChooseExperience(game, video, scripted);
         }
 
         ShowPlayScreenBackground(game, video);
@@ -245,10 +254,15 @@ public static class Launch
     }
 
     // Remembers the chosen mode. Remastered and Reimagined let the pointer roam the whole screen.
-    private static void ChooseExperience(Data.Game game, Experience experience)
+    private static void ChooseExperience(Data.Game game, Video video, Experience experience)
     {
         game.Experience = experience;
+        game.Difficulty = Difficulty.Chosen;
         InputHandler.RemasteredControls = experience != Experience.Original;
+
+        // Remastered and Reimagined draw the world with the new world drawer at the window's own size.
+        video.Capture.Enabled = experience != Experience.Original;
+        WindowControls.NativeRendering = experience != Experience.Original;
     }
 
     // The skip message plus the caption of the original title screen.

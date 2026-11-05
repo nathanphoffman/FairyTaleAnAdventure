@@ -1,4 +1,5 @@
 using FaeryTale.Game.Data;
+using FaeryTale.Game.Remastered;
 
 namespace FaeryTale.Game.Creatures;
 
@@ -43,6 +44,12 @@ public static class Steering
     {
         mode &= MODE_MASK;
         Shape actor = game.Actors.List[objectSlot];
+
+        // Remastered: an enemy whose straight way is blocked is aimed at the next point of a route.
+        if (mode <= STEER_WOBBLE_NEAR)
+        {
+            (targetX, targetY) = EnemyPathing.AimPoint(game, objectSlot, (targetX, targetY));
+        }
         short xDifference = mode == STEER_OFFSET ? (short)targetX : (short)(actor.AbsX - targetX);
         short yDifference = mode == STEER_OFFSET ? (short)targetY : (short)(actor.AbsY - targetY);
 
