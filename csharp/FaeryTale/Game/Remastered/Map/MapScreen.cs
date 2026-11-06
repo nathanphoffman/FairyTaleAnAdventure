@@ -38,6 +38,7 @@ public static class MapScreen
     // The eight directions of the keys, clockwise from up-left (as the compass numbers them).
     private static readonly (int X, int Y)[] DIRECTIONS = [(-1, -1), (0, -1), (1, -1), (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0)];
 
+    private static Image? board;
     private static readonly object padlock = new();
     private static bool requested;
     private static int zoomSteps;
@@ -83,9 +84,10 @@ public static class MapScreen
         (int X, int Y)? dragFrom = null;
         int held = -1;
         int frame = 0;
+        (double, double, double, bool) drawn = default;
 
         view.CenterOn(HeroTile(game));
-        ClickToMove.Cancel();
+        ClickToMove.CancelAll();
         IsOpen = true;
 
         while (true)
@@ -106,7 +108,7 @@ public static class MapScreen
 
             dragFrom = Pan(view, held, dragFrom);
             view.ZoomBySteps(TakeZoom());
-            video.SetOverlay(Draw(view, HeroTile(game), frame++ / BLINK_FRAMES % 2 == 0));
+            drawn = Redraw(video, view, HeroTile(game), frame++ / BLINK_FRAMES % 2 == 0, drawn);
             Display.Delay(game, video, 1);
         }
 
@@ -165,19 +167,37 @@ public static class MapScreen
         }
     }
 
+    // Puts the map on the screen again, but only when the view or the blinking mark changed (making
+    // the picture takes a while, and the screen keeps the last one). Returns what was drawn.
+    private static (double, double, double, bool) Redraw(Video video, MapView view, (int Column, int Row) hero, bool markShown, (double, double, double, bool) drawn)
+    {
+        (double, double, double, bool) now = (view.CenterColumn, view.CenterRow, view.Scale, markShown);
+
+        if (now != drawn)
+        {
+            video.SetOverlay(Draw(view, hero, markShown));
+        }
+
+        return now;
+    }
+
     // The darkened game with the map in a frame, a title and a line of help.
     private static Overlay Draw(MapView view, (int Column, int Row) hero, bool markShown)
     {
         Overlay overlay = new() { Shades = { new Shade(0, 0, Overlay.WIDTH, Overlay.HEIGHT, BACKGROUND_DARKNESS) }, PointerOnTop = true, CenterOnScreen = true };
         Image land = view.Picture(WorldOverview.Pixels, hero, markShown);
 
-        overlay.Images.Add(MenuStyle.Board((FRAME_LEFT - BORDER, FRAME_TOP - BORDER, MapView.WIDTH + 2 * BORDER, MapView.HEIGHT + 2 * BORDER), BOARD_SEED)[0]);
+        overlay.Images.Add(Board());
         overlay.Images.Add(land with { X = FRAME_LEFT, Y = FRAME_TOP });
         MenuStyle.AddCentered(overlay, TITLE, TITLE_BASELINE, MenuStyle.HEADING_COLOR, TEXT_SCALE * 2);
         MenuStyle.AddCentered(overlay, HINT, HINT_BASELINE, MenuStyle.DESCRIPTION_COLOR, TEXT_SCALE);
 
         return overlay;
     }
+
+    // The wooden board the map lies on, made once (it takes a moment).
+    private static Image Board() =>
+        board ??= MenuStyle.Board((FRAME_LEFT - BORDER, FRAME_TOP - BORDER, MapView.WIDTH + 2 * BORDER, MapView.HEIGHT + 2 * BORDER), BOARD_SEED)[0];
 
     // Takes the map off the screen, and keeps the click or key that closed it out of the game.
     private static void Leave(Data.Game game, Video video)

@@ -8,10 +8,11 @@ public static class WindowControls
     public static bool NativeRendering { get; set; }
 
     /// How many pictures a second the new world drawer makes: MONITOR_SYNC (0) makes one for every
-    /// refresh of the monitor and waits for it (the smoothest, and the default); a number makes that
-    /// many. The game itself moves 50 times a second; the pictures between its steps draw the camera
-    /// and the characters part of the way along their last move.
-    public static int FrameRate { get; set; } = MONITOR_SYNC;
+    /// refresh of the monitor and waits for it (vsync, the smoothest but it can hold the game back);
+    /// a number makes that many (the default is 150, so vsync starts off). The game itself moves 50
+    /// times a second; the pictures between its steps draw the camera and the characters part of the
+    /// way along their last move.
+    public static int FrameRate { get; set; } = DEFAULT_FIXED_RATE;
 
     public const int MONITOR_SYNC = 0;
     public const int TICKS_PER_SECOND = 50;

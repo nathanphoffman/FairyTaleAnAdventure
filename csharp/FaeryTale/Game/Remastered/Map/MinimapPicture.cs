@@ -7,9 +7,16 @@ namespace FaeryTale.Game.Remastered;
 /// one unit wide and two tall, as a tile is twice as high as it is wide.
 public static class MinimapPicture
 {
-    /// How much land it shows, in tiles.
+    /// The size of the map area in units: columns across and rows down (a row is two units tall).
     public const int COLUMNS = 112;
     public const int ROWS = 40;
+
+    /// How much more land than one tile to a unit it shows (zoomed out by this much).
+    public const double ZOOM_OUT = 1.5;
+
+    // The land shown, in tiles.
+    private const int TILES_ACROSS = (int)(COLUMNS * ZOOM_OUT);
+    private const int TILES_DOWN = (int)(ROWS * ZOOM_OUT);
 
     private const int ROW_HEIGHT = 2;
     private const int FRAME = 2;
@@ -29,8 +36,8 @@ public static class MinimapPicture
     /// The picture for a hero standing on a tile of the world overview.
     public static Image Of(uint[] world, (int Column, int Row) hero)
     {
-        int left = Math.Clamp(hero.Column - COLUMNS / 2, 0, WorldOverview.COLUMNS - COLUMNS);
-        int top = Math.Clamp(hero.Row - ROWS / 2, 0, WorldOverview.ROWS - ROWS);
+        int left = Math.Clamp(hero.Column - TILES_ACROSS / 2, 0, WorldOverview.COLUMNS - TILES_ACROSS);
+        int top = Math.Clamp(hero.Row - TILES_DOWN / 2, 0, WorldOverview.ROWS - TILES_DOWN);
         uint[] pixels = new uint[WIDTH * HEIGHT];
 
         for (int y = 0; y < HEIGHT; y++)
@@ -41,7 +48,7 @@ public static class MinimapPicture
             }
         }
 
-        DrawMark(pixels, (FRAME + hero.Column - left, FRAME + (hero.Row - top) * ROW_HEIGHT + 1));
+        DrawMark(pixels, (FRAME + (int)((hero.Column - left) / ZOOM_OUT), FRAME + (int)((hero.Row - top) * ROW_HEIGHT / ZOOM_OUT) + 1));
 
         return new Image(0, 0, WIDTH, HEIGHT, pixels);
     }
@@ -56,8 +63,9 @@ public static class MinimapPicture
             return depth == 0 ? OUTER_FRAME : INNER_FRAME;
         }
 
-        int column = corner.Column + x - FRAME;
-        int row = corner.Row + (y - FRAME) / ROW_HEIGHT;
+        // Each unit is more than a tile wide on the map, so the land is sampled (nearest tile).
+        int column = corner.Column + (int)((x - FRAME) * ZOOM_OUT);
+        int row = corner.Row + (int)((y - FRAME) / (double)ROW_HEIGHT * ZOOM_OUT);
 
         return world[row * WorldOverview.COLUMNS + column];
     }

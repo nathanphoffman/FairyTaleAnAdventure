@@ -2,8 +2,8 @@ using FaeryTale.Gfx;
 
 namespace FaeryTale.Game.Remastered;
 
-/// The circle that shows where the player clicked: green when the hero can stand there, red when
-/// not. Drawn as a picture that is made once.
+/// The circle that shows where the player clicked: green when the hero can stand there, yellow when
+/// not (red is for attacking). Drawn as a picture that is made once.
 internal static class ClickRing
 {
     /// The play field ends at this screen line; the ring is not drawn over the text panel.
@@ -16,7 +16,7 @@ internal static class ClickRing
     private const int RING_WIDTH = 4;
     private const float EDGE_SOFTNESS = 1.2f;
     private const uint GREEN = 0x3cdc50;
-    private const uint RED = 0xe83c3c;
+    private const uint YELLOW = 0xf0d020;
     private const uint OUTLINE = 0x101010;
 
     /// Alpha (0-255) of the ring, the see-through middle, and the dark line round the ring.
@@ -29,7 +29,7 @@ internal static class ClickRing
     private const float OLD_PICTURE_UNIT = 1f;
 
     private static readonly uint[] greenPixels = Draw(GREEN, OLD_PICTURE_UNIT);
-    private static readonly uint[] redPixels = Draw(RED, OLD_PICTURE_UNIT);
+    private static readonly uint[] yellowPixels = Draw(YELLOW, OLD_PICTURE_UNIT);
 
     // Rings already drawn for the zoom steps, so one is made once per size.
     private static readonly Dictionary<(float Unit, bool Walkable), Image> sized = new();
@@ -44,7 +44,7 @@ internal static class ClickRing
         {
             int radius = (int)MathF.Ceiling(OUTER_RADIUS * unit);
 
-            ring = new Image(0, 0, radius * 2 + 1, radius * 2 + 1, Draw(walkable ? GREEN : RED, unit));
+            ring = new Image(0, 0, radius * 2 + 1, radius * 2 + 1, Draw(walkable ? GREEN : YELLOW, unit));
             sized[(unit, walkable)] = ring;
         }
 
@@ -57,7 +57,7 @@ internal static class ClickRing
         int size = OUTER_RADIUS * 2 + 1;
         int visibleRows = Math.Clamp(PLAY_FIELD_BOTTOM * OVERLAY_SCALE - (center.Y - OUTER_RADIUS), 0, size);
 
-        return new Image(center.X - OUTER_RADIUS, center.Y - OUTER_RADIUS, size, visibleRows, walkable ? greenPixels : redPixels);
+        return new Image(center.X - OUTER_RADIUS, center.Y - OUTER_RADIUS, size, visibleRows, walkable ? greenPixels : yellowPixels);
     }
 
     // The ring as pixels: a coloured band with a dark line outside it and a faint fill inside,

@@ -2,6 +2,7 @@ using FaeryTale.Game.Creatures;
 using FaeryTale.Game.Creatures.Interaction;
 using FaeryTale.Game.Data;
 using FaeryTale.Game.Output;
+using FaeryTale.Game.Remastered;
 using FaeryTale.Game.Ui;
 using FaeryTale.Game.Ui.Options;
 
@@ -172,6 +173,12 @@ public static class KeyHandler
             return;
         }
 
+        // A greyed out box (Remastered and Reimagined) cannot be pressed.
+        if (valid && MenuGreying.IsGreyed(game, menu, chosenEntry))
+        {
+            return;
+        }
+
         game.Ui.MenuHitEnabled = 1;
 
         if (valid)
@@ -238,6 +245,11 @@ public static class KeyHandler
             }
 
             if (shortcut.Menu == SAVEX && game.Ui.CurrentMenu != SAVEX)
+            {
+                break;
+            }
+
+            if (MenuGreying.BlocksShortcut(game, shortcut.Menu, shortcut.Choice))
             {
                 break;
             }

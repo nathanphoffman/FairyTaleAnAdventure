@@ -1,5 +1,6 @@
 using FaeryTale.Game.Data;
 using FaeryTale.Game.Files;
+using FaeryTale.Game.Input;
 using FaeryTale.Game.Output;
 using FaeryTale.Game.Remastered;
 using FaeryTale.Game.Ui;
@@ -109,6 +110,11 @@ public sealed partial class Video : IOutput
         }
 
         History.ScrollBy(MessageScrollRequests.Take());
+
+        if (MessageScrollBar.DragTarget(History, InputHandler.GridPointer, InputHandler.LeftButtonDown) is { } dragged)
+        {
+            History.ScrollBy(dragged - History.Scrolled);
+        }
 
         if (shownScroll != History.Scrolled)
         {

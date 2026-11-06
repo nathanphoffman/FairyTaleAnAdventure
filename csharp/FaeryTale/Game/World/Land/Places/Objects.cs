@@ -48,15 +48,19 @@ public static class Objects
     private const short OBJECT_INDEX_MASK = 0x7f;
     private const short GLOBAL_LIST_BIT = 0x80;
 
-    // How far (in pixels around the screen) people and objects are looked at.
-    private const short PERSON_LOAD_X_LOW = -100;
-    private const short PERSON_LOAD_X_HIGH = 400;
-    private const short PERSON_LOAD_Y_LOW = -100;
-    private const short PERSON_LOAD_Y_HIGH = 300;
-    private const short SHOWN_X_LOW = -20;
-    private const short SHOWN_X_HIGH = 340;
-    private const short SHOWN_Y_LOW = -20;
-    private const short SHOWN_Y_HIGH = 190;
+    /// How far from the old screen (in pixels) something is looked at: low and high limits across
+    /// and down.
+    private readonly record struct Reach(short XLow, short XHigh, short YLow, short YHigh);
+
+    // The original: people are looked at a little beyond the screen, and shown on it.
+    private static readonly Reach ORIGINAL_PERSON_LOAD = new(-100, 400, -100, 300);
+    private static readonly Reach ORIGINAL_SHOWN = new(-20, 340, -20, 190);
+
+    // Remastered and Reimagined show more than the old screen (zoomed out the window shows several
+    // times as much), so people and things come out further: well past where enemies come from
+    // (150 to 213 pixels from the hero), about 460 pixels either side of the hero and 340 up and down.
+    private static readonly Reach WIDE_PERSON_LOAD = new(-400, 700, -350, 500);
+    private static readonly Reach WIDE_SHOWN = new(-300, 620, -260, 420);
     private const short SPRITE_CENTER_OFFSET = 8;
 
     /// People stand this much higher than their position.
@@ -83,6 +87,7 @@ public static class Objects
     public static void SpawnObjectActors(Data.Game game, IOutput output)
     {
         game.Actors.FreeSlot = FIRST_OBJECT_ACTOR;
+        ChooseSetfigFile(game);
         AddObjectsNear(game, output, ObjectList.Global, ObjectTables.Glbobs, GLOBAL_LIST_BIT);
 
         int region = game.World.Region;
@@ -155,6 +160,63 @@ public static class Objects
             AddObject(game, output, ref copy, index, f);
             list[index] = copy;
         }
+    }
+
+    // The people's pictures come in a few files and only one is in memory at a time. With people loaded
+    // from so far out, several kinds can be in range at once; so Remastered and Reimagined load the
+    // people of one file only: the file the nearest person needs, keeping the one in memory while
+    // any of its people is on the old screen (so it does not swap back and forth between two people).
+    private static int setfigFileId = -1;
+
+    private static void ChooseSetfigFile(Data.Game game)
+    {
+        setfigFileId = -1;
+
+        if (game.Experience == Experience.Original)
+        {
+            return;
+        }
+
+        Shape hero = game.Actors.List[0];
+        int loaded = SpriteFiles.All[game.Actors.LoadedSetfigFile].FileId;
+        int nearestDistance = int.MaxValue;
+
+        foreach ((WorldObject[] list, int length) in new[] { (game.Objects.List(ObjectList.Global), (int)ObjectTables.Glbobs), (game.Objects.Region(game.World.Region), (int)game.Objects.Used[game.World.Region]) })
+        {
+            for (int index = 0; index < length; index++)
+            {
+                WorldObject item = list[index];
+
+                if (item.ObStat is not (STAT_PERSON or STAT_DEAD_PERSON) || !InReach(game, item, WIDE_PERSON_LOAD))
+                {
+                    continue;
+                }
+
+                int fileId = SpriteFiles.All[Tables.Entry(Tables.SetfigTable, item.ObId).CfileEntry].FileId;
+                int distance = Math.Max(Math.Abs(item.Xc - hero.AbsX), Math.Abs(item.Yc - hero.AbsY));
+
+                if (fileId == loaded && InReach(game, item, ORIGINAL_PERSON_LOAD))
+                {
+                    setfigFileId = loaded;
+
+                    return;
+                }
+
+                if (distance < nearestDistance)
+                {
+                    (nearestDistance, setfigFileId) = (distance, fileId);
+                }
+            }
+        }
+    }
+
+    // Whether an object is inside a reach from the old screen.
+    private static bool InReach(Data.Game game, WorldObject item, Reach reach)
+    {
+        short xStart = (short)(item.Xc - game.World.MapX - SPRITE_CENTER_OFFSET);
+        short yStart = (short)(item.Yc - game.World.MapY - SPRITE_CENTER_OFFSET);
+
+        return Inside(xStart, reach.XLow, reach.XHigh) && Inside(yStart, reach.YLow, reach.YHigh);
     }
 
     // Whether value is strictly between the two limits.
@@ -230,7 +292,9 @@ public static class Objects
             return;
         }
 
-        if (!(Inside(xStart, SHOWN_X_LOW, SHOWN_X_HIGH) && Inside(yStart, SHOWN_Y_LOW, SHOWN_Y_HIGH)))
+        Reach shown = game.Experience == Experience.Original ? ORIGINAL_SHOWN : WIDE_SHOWN;
+
+        if (!(Inside(xStart, shown.XLow, shown.XHigh) && Inside(yStart, shown.YLow, shown.YHigh)))
         {
             return;
         }
@@ -261,7 +325,14 @@ public static class Objects
     // as on screen). Returns false if the person is too far away.
     private static bool LoadPersonIfNear(Data.Game game, IOutput output, WorldObject item, short xStart, short yStart)
     {
-        if (!(Inside(xStart, PERSON_LOAD_X_LOW, PERSON_LOAD_X_HIGH) && Inside(yStart, PERSON_LOAD_Y_LOW, PERSON_LOAD_Y_HIGH)))
+        Reach reach = game.Experience == Experience.Original ? ORIGINAL_PERSON_LOAD : WIDE_PERSON_LOAD;
+
+        if (!(Inside(xStart, reach.XLow, reach.XHigh) && Inside(yStart, reach.YLow, reach.YHigh)))
+        {
+            return false;
+        }
+
+        if (game.Experience != Experience.Original && SpriteFiles.All[Tables.Entry(Tables.SetfigTable, item.ObId).CfileEntry].FileId != setfigFileId)
         {
             return false;
         }

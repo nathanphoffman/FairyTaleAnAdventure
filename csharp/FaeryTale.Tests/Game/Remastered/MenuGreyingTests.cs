@@ -60,4 +60,14 @@ public class MenuGreyingTests
 
         Assert.False(MenuGreying.IsGreyed(game, ITEMS_MENU, BUY_ENTRY));
     }
+
+    [Fact]
+    public void ShortcutsForGreyedBoxesAndTheBuyMenuAreBlockedWithNobodyNear()
+    {
+        FaeryTale.Game.Data.Game game = RemasteredGame();
+
+        Assert.True(MenuGreying.BlocksShortcut(game, ITEMS_MENU, GIVE_ENTRY));
+        Assert.True(MenuGreying.BlocksShortcut(game, 3, 5));
+        Assert.False(MenuGreying.BlocksShortcut(game, 2, 5));
+    }
 }

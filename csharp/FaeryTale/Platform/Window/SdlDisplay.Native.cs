@@ -315,7 +315,7 @@ public sealed partial class SdlDisplay
         }
     }
 
-    // FTA_FPS=100 starts with 100 pictures a second; FTA_FPS=monitor (the default) waits for the monitor.
+    // FTA_FPS=100 starts with 100 pictures a second; FTA_FPS=monitor waits for the monitor (vsync, off by default).
     private static void ReadFrameRateSetting()
     {
         string? setting = Environment.GetEnvironmentVariable("FTA_FPS");

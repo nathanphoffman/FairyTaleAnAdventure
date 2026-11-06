@@ -76,6 +76,15 @@ public sealed class WorldCapture
     /// The pointer is over something that can be picked up: it is a hand.
     public bool ItemHover { get; set; }
 
+    /// The pointer is over an enemy that can be attacked (a red crosshair), and the world position
+    /// of the enemy being attacked (a red crosshair over it).
+    public bool EnemyHover { get; set; }
+
+    public (int X, int Y)? AttackTarget { get; set; }
+
+    /// The classic buttons that get a red square (what the new controls are doing).
+    public PanelButtons LitButtons { get; set; }
+
     /// Shift is held: the pointer is an eye.
     public bool LookMode { get; set; }
 

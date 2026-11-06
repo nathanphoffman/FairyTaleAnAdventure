@@ -18,14 +18,14 @@ internal static class Splash
     /// short and plain.
     internal static readonly Page[] PAGES =
     [
-        new("A note from Nathan Hoffman",
+        new("Credit and Thanks",
         [
-            "When I was just a few years old I would gaze over my sister's shoulder watching her play Faery Tale Adventure in the early-90s on one of my dad's Commodore Amiga computers. My childhood memories of the Amiga and this game would drive me into a programming career into a time in the early 2020s wondering how I might convert the game's original source code (released by David Joiner the creator) into a remastered version. Today, with the advent of AI I am at a special place and time that has allowed me to achieve that dream.",
-            "I hope you enjoy,",
+            "When I was just a few years old I would gaze over my sister's shoulder watching her play Faery Tale Adventure on my dad's Commodore Amiga. My childhood memories of this game and that Amiga would drive me into a programming career and in 2022 I wondered how I might convert the game's original source code (released by David Joiner the creator) into a remastered version. In 2026-2027, with the advent of AI I am at a special place and time that has allowed me to achieve that dream.",
             "-Nathan Hoffman",
+            "P.S. Many thanks to David Joiner for designing this iconic game and releasing the source code.",
             "#About the license",
             "Fairy Tale: An Adventure is an adaptation by Nathan Hoffman of The Faery Tale Adventure, written by David Joiner (Talin) and published by MicroIllusions in 1987. In 2022 he sent a \"termination of transfer\" notice to Hollyware, Inc., the successors to MicroIllusions' rights, to reclaim his copyright, and has had no response. In his words: \"I cannot say for certain exactly what the copyright status of this code is. However, whatever rights I do have, I hereby make freely available under an MIT-style permissive license.\"",
-            "Nathan Hoffman grants the MIT License on this adaptation, along with whatever rights the license above allows. The original game's art, music and data come from David Joiner's GitHub release, under his license above.",
+            "The author grants the MIT License on this adaptation, along with whatever rights the license above allows. The original game's art, music and data come from David Joiner's GitHub release, under his license above.",
         ]),
     ];
 

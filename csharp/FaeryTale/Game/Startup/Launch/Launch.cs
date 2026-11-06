@@ -109,7 +109,7 @@ public static class Launch
         if (begin(game, video))
         {
             GameLoop.Run(game, video);
-            Music.Player.StopScore();
+            StopMusic();
             video.SetOverlay(new Overlay());
             backToMenu = !game.Ui.ExitProgram;
         }
@@ -123,7 +123,7 @@ public static class Launch
     private static void ForgetLastGame()
     {
         InputHandler.Reset();
-        ClickToMove.Cancel();
+        ClickToMove.CancelAll();
         Conversation.Close();
         EnemyPathing.Reset();
         ClickOverlay.Reset();
@@ -182,7 +182,7 @@ public static class Launch
     // intro) but keep the intro's timing.
     private static bool StartUp(Data.Game game, Video video)
     {
-        Music.Player.StopScore();
+        StopMusic();
         bool launching = !LaunchSkipped;
 
         if (launching)
@@ -214,7 +214,7 @@ public static class Launch
     // when the player chose Quit.
     private static bool ReturnToMenu(Data.Game game, Video video)
     {
-        Music.Player.StopScore();
+        StopMusic();
         PrepareBluePage(game, video);
         SetUpStoryText(video.Screen);
 
@@ -255,12 +255,35 @@ public static class Launch
         return true;
     }
 
+    // Whether the menu's tune (the intro tune) is playing. The menu is shown again after the book, the
+    // prologue and every game, and the tune must be there each time, so it is started when it is not.
+    private static bool menuMusicPlaying;
+
+    // Starts the menu's tune.
+    private static void StartMenuMusic()
+    {
+        Music.Player.PlayScore(INTRO_TUNE);
+        menuMusicPlaying = true;
+    }
+
+    // Stops whatever music is playing.
+    private static void StopMusic()
+    {
+        Music.Player.StopScore();
+        menuMusicPlaying = false;
+    }
+
     // Shows the launch menu until the player picks a version to play (true) or Quit (false). The
     // book and the prologue are replayed on the way, and the menu comes back after each.
     private static bool AskWhatToDo(Data.Game game, Video video)
     {
         while (true)
         {
+            if (!menuMusicPlaying)
+            {
+                StartMenuMusic();
+            }
+
             (LaunchAction action, Experience experience) = LaunchMenu.Choose(game, video);
 
             switch (action)
@@ -371,7 +394,7 @@ public static class Launch
     private static void BackToBluePage(Data.Game game, Video video)
     {
         video.SetOverlay(new Overlay());
-        Music.Player.StopScore();
+        StopMusic();
         PrepareBluePage(game, video);
         SetUpStoryText(video.Screen);
         game.Ui.IntroSkipRequested = 0;
@@ -452,7 +475,7 @@ public static class Launch
     internal static void PrepareIntro(Data.Game game, Video video)
     {
         video.Screen.VpPage.Ras = 0;
-        Music.Player.PlayScore(INTRO_TUNE);
+        StartMenuMusic();
         video.Screen.LoadColors(ViewPortId.Text, Tables.BlackColors);
         video.Screen.Pages[1].Ras = 1;
         ScreenEffects.SetIntroZoom(game, video, 0);
@@ -501,7 +524,7 @@ public static class Launch
             video.Screen.Ras[ras].Y = 0;
         }
 
-        Music.Player.StopScore();
+        StopMusic();
         Creatures.Revive.Revival.Revive(game, video, 1);
 
         video.Screen.GetPort(PortId.Map).Target = video.Screen.DrawingBitmapId;

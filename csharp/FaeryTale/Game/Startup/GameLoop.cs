@@ -129,6 +129,8 @@ public static class GameLoop
 
         if ((game.Menus[GAME_MENU].Enabled[PAUSE_ENTRY] & 1) != 0)
         {
+            ClickToMove.GiveOrdersWhilePaused(game);
+            ClickOverlay.Update(game, video);
             Display.Delay(game, video, 1);
 
             return;
@@ -160,7 +162,7 @@ public static class GameLoop
     // M (Remastered and Reimagined) opens the big map where there is an outdoor world to show.
     private static void OpenMapIfAsked(Data.Game game, Video video)
     {
-        if (MapScreen.TakeRequest() && game.Experience != Experience.Original && game.World.Region < Regions.FIRST_INDOOR_REGION)
+        if (MapScreen.TakeRequest() && MapSettings.Enabled && game.Experience != Experience.Original && game.World.Region < Regions.FIRST_INDOOR_REGION)
         {
             MapScreen.Show(game, video);
         }

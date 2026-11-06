@@ -114,13 +114,15 @@ public sealed class Overlay
         int top = coversGrid ? 0 : Math.Clamp(placement.OriginY + shade.Y * placement.Scale, 0, height);
         int bottom = coversGrid ? height : Math.Clamp(placement.OriginY + (shade.Y + shade.Height) * placement.Scale, 0, height);
 
-        for (int row = top; row < bottom; row++)
+        // The rows are independent, so they are darkened on all the cores (the dark overlay of the
+        // menus and the map covers the whole window, many pixels every frame).
+        Parallel.For(top, Math.Max(bottom, top), row =>
         {
             for (int column = left; column < Math.Max(right, left); column++)
             {
                 frame[row * width + column] = Darken(frame[row * width + column], shade.Darkness);
             }
-        }
+        });
     }
 
     // Draws a picture: opaque pixels replace what is below, see-through ones are blended with it.
@@ -144,9 +146,15 @@ public sealed class Overlay
                     continue;
                 }
 
-                for (int y = Math.Max(rowTop, 0); y < Math.Min(rowTop + scale, height); y++)
+                // The square of frame pixels this picture pixel covers, cut to the frame.
+                int firstY = Math.Max(rowTop, 0);
+                int lastY = Math.Min(rowTop + scale, height);
+                int firstX = Math.Max(columnLeft, 0);
+                int lastX = Math.Min(columnLeft + scale, width);
+
+                for (int y = firstY; y < lastY; y++)
                 {
-                    for (int x = Math.Max(columnLeft, 0); x < Math.Min(columnLeft + scale, width); x++)
+                    for (int x = firstX; x < lastX; x++)
                     {
                         frame[y * width + x] = Blend(frame[y * width + x], color);
                     }

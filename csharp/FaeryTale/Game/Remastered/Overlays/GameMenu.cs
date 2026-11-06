@@ -13,7 +13,7 @@ public enum GameMenuChoice
     /// Close the menu and carry on playing.
     Resume,
 
-    /// Leave this game and go back to the choice of Original, Remastered or Reimagined.
+    /// Leave this game and go back to the main menu (the choice of Original, Remastered or Reimagined).
     BackToGameSelection,
 
     /// Leave the program.
@@ -26,8 +26,8 @@ public static class GameMenu
 {
     private const string HEADING = "Game Menu";
     // The menu is laid out from the heading down, and the whole block is centred on the screen.
-    private const int FIRST_ENTRY_BELOW_HEADING = 66;
-    private const int ENTRY_SPACING = 44;
+    private const int FIRST_ENTRY_BELOW_HEADING = 58;
+    private const int ENTRY_SPACING = 40;
     private const int BOARD_BELOW_BASELINE = 16;
     private const int DESCRIPTION_BELOW_BOARDS = 24;
     private const int DESCRIPTION_DESCENT = 2;
@@ -50,13 +50,19 @@ public static class GameMenu
         ("Difficulty", GameMenuChoice.Resume),
         ("VSync", GameMenuChoice.Resume),
         ("Frame Rate", GameMenuChoice.Resume),
-        ("Back To Game Selection", GameMenuChoice.BackToGameSelection),
+        ("Map", GameMenuChoice.Resume),
+        ("Back To Main Menu", GameMenuChoice.BackToGameSelection),
         ("Exit Game", GameMenuChoice.ExitGame),
     ];
 
     private const int DIFFICULTY_ENTRY = 1;
     private const int VSYNC_ENTRY = 2;
     private const int FRAME_RATE_ENTRY = 3;
+    private const int MAP_ENTRY = 4;
+
+    // The two entries that leave the game come last, set apart from the settings by this much room.
+    private const int FIRST_LEAVING_ENTRY = 5;
+    private const int LEAVING_MARGIN = 22;
     private const string VSYNC_LABEL = "VSync: ";
     private const string FRAME_RATE_LABEL = "Frame Rate: ";
     private const string DIFFICULTY_LABEL = "Difficulty: ";
@@ -73,7 +79,7 @@ public static class GameMenu
         Image heading = Board(HeadingArea(), HEADING_SEED)[0];
         GameMenuChoice choice;
 
-        ClickToMove.Cancel();
+        ClickToMove.CancelAll();
 
         while (true)
         {
@@ -84,7 +90,7 @@ public static class GameMenu
 
             if (hovered is { } entry && InputHandler.LeftButtonDown)
             {
-                if (entry is DIFFICULTY_ENTRY or VSYNC_ENTRY or FRAME_RATE_ENTRY)
+                if (entry is DIFFICULTY_ENTRY or VSYNC_ENTRY or FRAME_RATE_ENTRY or MAP_ENTRY)
                 {
                     ChangeSetting(game, video, entry);
 
@@ -124,6 +130,10 @@ public static class GameMenu
         else if (entry == VSYNC_ENTRY)
         {
             WindowControls.ToggleVSync();
+        }
+        else if (entry == MAP_ENTRY)
+        {
+            MapSettings.Toggle();
         }
         else
         {
@@ -170,12 +180,13 @@ public static class GameMenu
 
     private static int HeadingBoardAbove => TITLE_ASCENT + PANEL_PADDING;
 
-    private static int DescriptionBelowHeading => FIRST_ENTRY_BELOW_HEADING + (ENTRIES.Length - 1) * ENTRY_SPACING + BOARD_BELOW_BASELINE + DESCRIPTION_BELOW_BOARDS;
+    private static int DescriptionBelowHeading => FIRST_ENTRY_BELOW_HEADING + (ENTRIES.Length - 1) * ENTRY_SPACING + LEAVING_MARGIN + BOARD_BELOW_BASELINE + DESCRIPTION_BELOW_BOARDS;
 
     private static int DescriptionY => HeadingY + DescriptionBelowHeading;
 
     // The baseline of an entry's label.
-    private static int EntryBaseline(int index) => HeadingY + FIRST_ENTRY_BELOW_HEADING + index * ENTRY_SPACING;
+    private static int EntryBaseline(int index) =>
+        HeadingY + FIRST_ENTRY_BELOW_HEADING + index * ENTRY_SPACING + (index >= FIRST_LEAVING_ENTRY ? LEAVING_MARGIN : 0);
 
     private static (int Left, int Top, int Width, int Height) HeadingArea()
     {
@@ -211,6 +222,7 @@ public static class GameMenu
         DIFFICULTY_ENTRY => DIFFICULTY_LABEL + Difficulty.NameOf(game.Difficulty),
         VSYNC_ENTRY => VSYNC_LABEL + WindowControls.VSyncText,
         FRAME_RATE_ENTRY => FRAME_RATE_LABEL + WindowControls.FrameRateText,
+        MAP_ENTRY => MapSettings.MenuText,
         _ => ENTRIES[index].Label,
     };
 

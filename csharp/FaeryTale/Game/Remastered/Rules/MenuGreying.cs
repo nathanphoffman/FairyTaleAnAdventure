@@ -15,6 +15,7 @@ public static class MenuGreying
     // Menus before this one start with the five main names; Buy is the fourth of them.
     private const int FIRST_NON_MAIN_MENU = 8;
     private const int BUY_ENTRY = 3;
+    private const int BUY_MENU = 3;
 
     // Give is the last entry of the first menu (the Items menu).
     private const int ITEMS_MENU = 0;
@@ -47,6 +48,11 @@ public static class MenuGreying
 
         return menu == ITEMS_MENU && entry == GIVE_ENTRY && game.Actors.NearestPerson == 0;
     }
+
+    /// Whether a letter shortcut is blocked: it picks a greyed out box, or something in the Buy menu
+    /// while Buy is greyed out.
+    public static bool BlocksShortcut(Data.Game game, int menu, int entry) =>
+        IsGreyed(game, menu, entry) || menu == BUY_MENU && IsGreyed(game, ITEMS_MENU, BUY_ENTRY);
 
     /// Draws the panel's menu again when Buy or Give has just become usable or not. Called every frame.
     public static void Refresh(Data.Game game, IOutput output)

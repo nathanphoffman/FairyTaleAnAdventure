@@ -39,6 +39,9 @@ public static class ClickOverlay
             video.Capture.TalkingTo = Conversation.Person;
             video.Capture.LookMode = IsLookMode(game);
             video.Capture.ItemHover = IsPointerOverItem(game, video.Capture);
+            video.Capture.LitButtons = ButtonsInUse(video.Capture);
+            video.Capture.EnemyHover = IsPointerOverEnemy(game);
+            video.Capture.AttackTarget = ClickToAttack.TargetAt(game);
             ClearOverlay(output);
 
             return;
@@ -84,6 +87,21 @@ public static class ClickOverlay
     // Shift is held in a game with click to move: the pointer is an eye.
     private static bool IsLookMode(Data.Game game) =>
         InputHandler.ShiftHeld && game.Experience != Data.Experience.Original && game.Ui.ViewStatus == VIEW_NORMAL;
+
+    // The classic buttons the new controls are using now: Look with shift held, Take over an item,
+    // Talk with a conversation open; and the ones a walk in progress is for.
+    private static PanelButtons ButtonsInUse(WorldCapture capture) =>
+        ClickToMove.WalkingFor
+        | (capture.LookMode ? PanelButtons.Look : 0)
+        | (capture.ItemHover ? PanelButtons.Take : 0)
+        | (Conversation.Person is not null ? PanelButtons.Talk : 0);
+
+    // Whether the mouse is over an enemy that can be attacked (the new drawer only).
+    private static bool IsPointerOverEnemy(Data.Game game) =>
+        game.Experience != Data.Experience.Original
+        && game.Ui.ViewStatus == VIEW_NORMAL
+        && PointerWorld.UnderPointer(game) is { } ground
+        && EnemyTargets.EnemyAt(game, ground) is not null;
 
     // Whether the mouse is over something Take would pick up (the new drawer only).
     private static bool IsPointerOverItem(Data.Game game, WorldCapture capture) =>

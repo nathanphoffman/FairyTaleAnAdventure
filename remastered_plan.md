@@ -48,7 +48,7 @@ check this).
   scaled up and centred. `SdlDisplay.Native` runs borderless fullscreen, the zoom (wheel, + and -),
   and several pictures per game tick: the ones between ticks draw the camera and the characters part
   of the way along their last move, worked out from the clock for the moment each picture is shown.
-  The rate is the monitor's own refresh (vsync, default) or a fixed 50 to 300, set in the Esc menu or
+  The rate is a fixed 50 to 300 (default 150) or the monitor's own refresh (vsync, off by default), set in the Esc menu or
   with `FTA_FPS`. The scale is always a whole number (no shimmer) and the map is drawn on all cores.
 - Test hooks for the headless build: `FTA_NATIVE=1920x1080` and `FTA_ZOOM=0.5` size and zoom the
   screenshots of a Remastered run; `FTA_FPS_LOG=1` prints the pictures a second of the real window.
@@ -71,4 +71,16 @@ check this).
 - `Game/Remastered/Map`: `WorldOverview` paints the whole outdoor world once (a pixel a tile, from the
   game's own overview colours); `MinimapPicture` is the corner map; M opens `MapScreen` (drag or arrows
   scroll, wheel zooms, C finds the hero, M or Esc closes). The music key moved from M to J in these modes.
+- Red squares round the classic Talk, Take and Look boxes while the shortcut for them is in use (`PanelButtonOutline`).
+  Greyed Buy and Give boxes cannot be pressed (mouse or letter). The message window has a scroll bar.
+- Indoors only the building the hero is in is drawn, however far out the view is zoomed (`InteriorMask`).
+- The minimap shows 1.5 times more land than one tile to a unit. Vsync starts off (150 pictures a second).
+- Click to attack (`Game/Remastered/Combat`): a click on an enemy walks the hero up and holds the fight button
+  (`Ui.PathFighting`) until it is dead; a click on another enemy changes the target, any other click ends it.
+  A red crosshair is the pointer over an attackable enemy and sits on the one being attacked. The blocked
+  click circle is yellow now. A click while the game is paused gives the walk or attack order, carried out
+  when the game goes on.
+- The game menu has Disable Map / Enable Map (`MapSettings`), and "Back To Main Menu" and "Exit Game" are set apart
+  at the bottom. People and things load much further out (`Objects.WIDE_*`), all from one picture file at a time.
+  The menu music starts again whenever the main menu comes back.
 - Not done: a map of the indoors; the minimap and big map show the daylight colours only.

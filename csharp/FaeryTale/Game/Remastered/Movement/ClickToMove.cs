@@ -38,7 +38,7 @@ public static class ClickToMove
 
     /// Probes for terrain are this far below the hero's position (as in the collision check).
     private const int FEET_OFFSET = 2;
-    private const short NOT_WALKING = 9;
+    internal const short NOT_WALKING = 9;
     private const sbyte VIEW_NORMAL = 0;
 
     private static readonly List<(int X, int Y)> route = [];
@@ -71,10 +71,48 @@ public static class ClickToMove
 
     /// Where the walk is heading (a world position) and whether the hero can stand there, while a
     /// route is being followed.
-    public static ((int X, int Y) World, bool Walkable)? Marker => Active ? (doorPoint ?? goal, goalWalkable) : null;
+    public static ((int X, int Y) World, bool Walkable)? Marker => Active && !ClickToAttack.Active ? (doorPoint ?? goal, goalWalkable) : null;
+
+    /// The classic buttons the walk in progress is for (Talk to a person, Take an item, Look).
+    public static PanelButtons WalkingFor =>
+        (personToTalkTo is not null ? PanelButtons.Talk : 0) | (itemToTake is not null ? PanelButtons.Take : 0) | (lookWhenThere ? PanelButtons.Look : 0);
 
     /// Whether a route is being followed.
     public static bool Active => route.Count > 0 || doorPoint is not null;
+
+    /// While the game is paused a click still gives an order (a walk, or an attack on an enemy) that
+    /// the hero carries out when the game goes on. Remastered and Reimagined only.
+    public static void GiveOrdersWhilePaused(Data.Game game)
+    {
+        if (game.Experience == Experience.Original || game.Ui.ViewStatus != VIEW_NORMAL || InputHandler.TakeClick() is not { } click)
+        {
+            return;
+        }
+
+        (int X, int Y) target = PointerWorld.OfClick(game, click);
+
+        if (click.Native && EnemyTargets.EnemyAt(game, target) is { } enemy)
+        {
+            Cancel();
+            ClickToAttack.Order(enemy);
+        }
+        else
+        {
+            ClickToAttack.Clear();
+            Plan(game, target);
+        }
+    }
+
+    /// Forgets the route and any attack order (the hero stops).
+    public static void CancelAll()
+    {
+        Cancel();
+        ClickToAttack.Clear();
+    }
+
+    /// Plans a walk to a world position without ending an attack order (the attack goes on after the
+    /// enemy).
+    internal static void RouteTo(Data.Game game, (int X, int Y) goalPoint) => StartRoute(game, goalPoint, null);
 
     /// Forgets the route (the hero stops).
     public static void Cancel()
@@ -91,6 +129,7 @@ public static class ClickToMove
     public static void Drive(Data.Game game, IOutput output)
     {
         game.Ui.PathWalking = false;
+        game.Ui.PathFighting = false;
         game.Ui.PathDirection = NOT_WALKING;
 
         if (game.Experience == Experience.Original)
@@ -103,6 +142,11 @@ public static class ClickToMove
         if (InputHandler.TakeClick() is { } click && game.Ui.ViewStatus == VIEW_NORMAL)
         {
             Click(game, output, click);
+        }
+
+        if (ClickToAttack.Update(game))
+        {
+            return;
         }
 
         if (!Active)
@@ -178,9 +222,16 @@ public static class ClickToMove
 
         (int X, int Y) target = PointerWorld.OfClick(game, click);
 
+        ClickToAttack.Clear();
+
         if (InputHandler.ShiftHeld)
         {
             WalkToLook(game, output, target);
+        }
+        else if (click.Native && EnemyTargets.EnemyAt(game, target) is { } enemy)
+        {
+            Cancel();
+            ClickToAttack.Order(enemy);
         }
         else if (click.Native && PersonTargets.PersonAt(game, target) is { } person)
         {
@@ -349,7 +400,7 @@ public static class ClickToMove
     }
 
     // The player is steering by hand: keys, the compass, the fight button, or riding something.
-    private static bool PlayerSteers(Data.Game game) =>
+    internal static bool PlayerSteers(Data.Game game) =>
         InputHandler.UserDirection(game.Ui) < NOT_WALKING
         || game.Ui.FightKeyHeld != 0
         || InputHandler.JoystickFire

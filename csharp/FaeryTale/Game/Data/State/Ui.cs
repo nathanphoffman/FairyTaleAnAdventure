@@ -46,6 +46,9 @@ public sealed class Ui
     /// A click to move route is steering the hero this frame (Remastered and Reimagined only).
     public bool PathWalking;
 
+    /// Click to attack holds the fight button down for the hero (Remastered and Reimagined).
+    public bool PathFighting;
+
     /// The direction (0-7, 9 = none) click to move is walking in; the compass shows it.
     public short PathDirection = NO_COMPASS_DIRECTION;
 }

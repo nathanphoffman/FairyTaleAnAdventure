@@ -28,6 +28,10 @@ internal sealed class NativeComposer
     private const double UNIT_HEIGHT = 400.0;
     private const int MINIMAP_MARGIN = 6;
 
+    // The crosshair as the pointer (in overlay units) and over the target (in world pixels).
+    private const int POINTER_CROSSHAIR_RADIUS = 7;
+    private const int TARGET_RADIUS_WORLD_PIXELS = 11;
+
     private readonly WorldRenderer renderer = new();
     private readonly uint[] legacyFrame = new uint[Scene.FRAME_WIDTH * Scene.FRAME_HEIGHT];
     private uint[] picture = [];
@@ -120,9 +124,12 @@ internal sealed class NativeComposer
         renderer.Draw(picture, view, video.Capture, video, alpha);
         DrawMarker(width, view, video.Capture);
         DrawMinimap(width, view, video.Capture);
+        DrawAttackTarget(width, view, video.Capture);
 
         scene.ComposeFromLine(legacyFrame, PANEL_FIRST_LINE);
         DrawPanel(width);
+        DrawLitButtons(width, video.Capture);
+        MessageScrollBar.Of(video.History).DrawAt(picture, width, new Overlay.Placement(GridLeft, GridTop, Scale));
         overlay.DrawAt(picture, width, new Overlay.Placement(GridLeft, OverlayTop, Scale));
 
         DrawConversation(width, video, pointer);
@@ -143,6 +150,10 @@ internal sealed class NativeComposer
         if (capture.LookMode)
         {
             new Overlay { Images = { EyeCursor.At((0, 0)) } }.DrawAt(picture, width, new Overlay.Placement(pointer.X, pointer.Y, Scale));
+        }
+        else if (capture.EnemyHover)
+        {
+            new Overlay { Images = { Crosshair.At((0, 0), POINTER_CROSSHAIR_RADIUS) } }.DrawAt(picture, width, new Overlay.Placement(pointer.X, pointer.Y, Scale));
         }
         else if (capture.ItemHover && capture.TalkingTo is null)
         {
@@ -189,10 +200,32 @@ internal sealed class NativeComposer
             : null;
     }
 
+    // The red crosshair over the enemy being attacked.
+    private void DrawAttackTarget(int width, WorldView view, WorldCapture capture)
+    {
+        if (capture.AttackTarget is not { } target)
+        {
+            return;
+        }
+
+        (double x, double y) = view.ToScreen(target.X, target.Y);
+
+        new Overlay { Images = { Crosshair.At(((int)Math.Round(x), (int)Math.Round(y)), TARGET_RADIUS_WORLD_PIXELS * view.Scale) } }.Draw(picture, width);
+    }
+
+    // A red square round each classic button the new controls are using.
+    private void DrawLitButtons(int width, WorldCapture capture)
+    {
+        if (capture.Game is { } game)
+        {
+            PanelButtonOutline.Of(game, capture.LitButtons).DrawAt(picture, width, new Overlay.Placement(GridLeft, GridTop, Scale));
+        }
+    }
+
     // The small map in the top right corner of the world (outdoors only).
     private void DrawMinimap(int width, WorldView view, WorldCapture capture)
     {
-        if (capture.Game is not { } game || game.World.Region >= Regions.FIRST_INDOOR_REGION)
+        if (!MapSettings.Enabled || capture.Game is not { } game || game.World.Region >= Regions.FIRST_INDOOR_REGION)
         {
             return;
         }

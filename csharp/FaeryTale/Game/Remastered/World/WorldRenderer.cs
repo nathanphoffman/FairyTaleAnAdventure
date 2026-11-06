@@ -47,6 +47,7 @@ public sealed class WorldRenderer
 
     private readonly WorldImages images = new();
     private readonly NeighborRegions neighbors = new();
+    private readonly InteriorMask interior = new();
     private readonly uint[] palette = new uint[PALETTE_SIZE];
     private int[] columnToWorld = [];
     private int[] rowToWorld = [];
@@ -71,6 +72,7 @@ public sealed class WorldRenderer
         LoadPalette(video);
         PlaceCamera(view, capture, alpha);
         MapPositions(view);
+        interior.Prepare(game);
         DrawTiles(frame, view, game, video.Graphics);
         DrawSprites(frame, view, capture, game, video, alpha);
     }
@@ -182,9 +184,10 @@ public sealed class WorldRenderer
         for (int index = 0; index < tileNumbers.Length; index++)
         {
             int column = firstColumn + index;
-            int number = TileAt(game, column, row);
+            bool hidden = interior.Hides(column, row);
+            int number = hidden ? -1 : TileAt(game, column, row);
 
-            tileNumbers[index] = number >= 0 || column < 0 || row < 0 ? number : neighbors.TileAt(game, column, row);
+            tileNumbers[index] = number >= 0 || hidden || column < 0 || row < 0 ? number : neighbors.TileAt(game, column, row);
         }
     }
 
@@ -238,7 +241,7 @@ public sealed class WorldRenderer
     {
         foreach (CapturedSprite sprite in capture.Sprites)
         {
-            if (images.Sprite(video.Graphics, sprite.Sheet, sprite.Inum) is { } image)
+            if (!interior.HidesPosition(sprite.ActorX, sprite.ActorY) && images.Sprite(video.Graphics, sprite.Sheet, sprite.Inum) is { } image)
             {
                 DrawSprite(frame, view, game, video, sprite, image, alpha);
             }

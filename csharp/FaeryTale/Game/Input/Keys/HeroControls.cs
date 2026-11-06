@@ -87,7 +87,7 @@ public static class HeroControls
         {
             // Nothing to do.
         }
-        else if ((InputHandler.MouseButtons & RIGHT_BUTTON) != 0 || game.Ui.FightKeyHeld != 0 || InputHandler.JoystickFire)
+        else if ((InputHandler.MouseButtons & RIGHT_BUTTON) != 0 || game.Ui.FightKeyHeld != 0 || InputHandler.JoystickFire || game.Ui.PathFighting)
         {
             state = FightingState(game, output, state);
         }

@@ -20,6 +20,9 @@ public sealed class MessageHistory
     /// How many lines back from the newest the window is scrolled (0 shows the newest).
     public int Scrolled { get; private set; }
 
+    /// How many lines are kept.
+    public int LineCount => lines.Count;
+
     /// How far back the window can be scrolled.
     public int MaxScroll => Math.Max(0, lines.Count - VISIBLE_LINES);
 
