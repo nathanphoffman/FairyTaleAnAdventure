@@ -58,6 +58,11 @@ public sealed class WorldRenderer
     /// The picture of a captured sprite, decoded (null when it is not in memory).
     public SpriteImage? PictureOf(Video video, CapturedSprite sprite) => images.Sprite(video.Graphics, sprite.Sheet, sprite.Inum);
 
+    /// The picture of an object by its number (the pictures of the items lying about and of the pack),
+    /// decoded (null when it is not in memory).
+    public SpriteImage? ObjectPicture(Video video, int number) =>
+        images.Sprite(video.Graphics, SpriteImages.SpriteSheet(video, SpriteImages.OBJECTS), number);
+
     /// Draws the world into frame (view.Width x view.Height pixels).
     public void Draw(uint[] frame, WorldView view, WorldCapture capture, Video video, double alpha)
     {

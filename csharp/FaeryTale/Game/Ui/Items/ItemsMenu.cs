@@ -2,6 +2,7 @@ using FaeryTale.Game.Creatures.Interaction;
 using FaeryTale.Game.Data;
 using FaeryTale.Game.Land;
 using FaeryTale.Game.Output;
+using FaeryTale.Game.Remastered;
 using FaeryTale.Game.Render;
 
 namespace FaeryTale.Game.Ui;
@@ -72,6 +73,14 @@ public static class ItemsMenu
     // Draws every item the hero has, stacked, on a black page and shows it.
     private static void ShowItemList(Data.Game game, IOutput output)
     {
+        // Remastered and Reimagined have the new inventory screen instead of this list.
+        if (game.Experience != Experience.Original)
+        {
+            Inventory.Toggle();
+
+            return;
+        }
+
         output.DrawItemList(game.Hero);
         MessagePage.ShowStillScreen(game, output);
         output.LoadPageColors(game.PageColors);

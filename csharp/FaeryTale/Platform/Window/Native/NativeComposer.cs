@@ -33,6 +33,7 @@ internal sealed class NativeComposer
     private const int TARGET_RADIUS_WORLD_PIXELS = 11;
 
     private readonly WorldRenderer renderer = new();
+    private readonly PanelBackground panelBackground = new(Scene.FRAME_WIDTH, Scene.FRAME_HEIGHT - PANEL_FIRST_LINE);
     private readonly uint[] legacyFrame = new uint[Scene.FRAME_WIDTH * Scene.FRAME_HEIGHT];
     private uint[] picture = [];
     private uint[] scaledRow = [];
@@ -130,6 +131,7 @@ internal sealed class NativeComposer
         DrawPanel(width);
         DrawLitButtons(width, video.Capture);
         DrawBackButton(width, video.Capture);
+        DrawInventory(width, video);
         MessageScrollBar.Of(video.History).DrawAt(picture, width, new Overlay.Placement(GridLeft, GridTop, Scale));
         overlay.DrawAt(picture, width, new Overlay.Placement(GridLeft, OverlayTop, Scale));
 
@@ -214,6 +216,18 @@ internal sealed class NativeComposer
         new Overlay { Images = { Crosshair.At(((int)Math.Round(x), (int)Math.Round(y)), TARGET_RADIUS_WORLD_PIXELS * view.Scale) } }.Draw(picture, width);
     }
 
+    // The inventory screen over the world, while it is open (the game goes on behind it).
+    private void DrawInventory(int width, Video video)
+    {
+        if (!Inventory.IsOpen || video.Capture.Game is not { } game)
+        {
+            return;
+        }
+
+        InventoryPicture.Of(game, number => renderer.ObjectPicture(video, number), InputHandler.GridPointer)
+            .DrawAt(picture, width, new Overlay.Placement(GridLeft, GridTop, Scale));
+    }
+
     // The "< Back" button above the classic buttons while a submenu is open.
     private void DrawBackButton(int width, WorldCapture capture)
     {
@@ -273,11 +287,13 @@ internal sealed class NativeComposer
             scaledRow = new uint[scaledWidth];
         }
 
+        panelBackground.Prepare(legacyFrame, Scene.FRAME_WIDTH, PANEL_FIRST_LINE);
+
         for (int line = PANEL_FIRST_LINE; line < Scene.FRAME_HEIGHT; line++)
         {
             for (int x = 0; x < Scene.FRAME_WIDTH; x++)
             {
-                Array.Fill(scaledRow, legacyFrame[line * Scene.FRAME_WIDTH + x], x * Scale, Scale);
+                Array.Fill(scaledRow, panelBackground.Pixel(legacyFrame, Scene.FRAME_WIDTH, PANEL_FIRST_LINE, x, line - PANEL_FIRST_LINE), x * Scale, Scale);
             }
 
             for (int copy = 0; copy < GRID_ROWS_PER_LINE * Scale; copy++)

@@ -25,6 +25,7 @@ public static class InputBridge
     private static readonly bool[] arrows = new bool[4];
     private static int heldDirection;
     private const string MAP_KEY = "M";
+    private const string INVENTORY_KEY = "I";
     private const string PAGE_UP = "PageUp";
     private const string PAGE_DOWN = "PageDown";
 
@@ -56,6 +57,13 @@ public static class InputBridge
             return;
         }
 
+        if (InputHandler.RemasteredControls && name == INVENTORY_KEY)
+        {
+            OpenOrCloseInventory(down);
+
+            return;
+        }
+
         KeyNames.Key key = KeyNames.Lookup(InputHandler.RemasteredControls ? RemasteredKeys.Translate(name) : name);
 
         switch (key.Kind)
@@ -71,6 +79,15 @@ public static class InputBridge
             case KeyNames.KeyKind.Code:
                 InputHandler.KeyEvent(key.Value | (down ? 0 : RELEASED));
                 break;
+        }
+    }
+
+    // I opens the inventory and closes it again; the game does not see the key.
+    private static void OpenOrCloseInventory(bool down)
+    {
+        if (down)
+        {
+            Inventory.Toggle();
         }
     }
 

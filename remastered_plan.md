@@ -83,4 +83,11 @@ check this).
 - The game menu has Disable Map / Enable Map (`MapSettings`), and "Back To Main Menu" and "Exit Game" are set apart
   at the bottom. People and things load much further out (`Objects.WIDE_*`), all from one picture file at a time.
   The menu music starts again whenever the main menu comes back.
+- A "< Back" button above the classic buttons while a submenu is open (`PanelBackButton`). The black behind the
+  text panel is a wooden board (`PanelBackground`; the black labels inside the menu boxes stay).
+- Inventory (`Game/Remastered/Inventory`): I or the classic List button opens a stone panel over the running game
+  (the old full-screen list never shows in these modes). Weapons, Magic, Supplies, Keys and Treasures, each item in a
+  square with a checkerboard edge and a large picture (`ItemIcons`, from the object pictures); not carried is dim, the
+  weapon in hand has a gold ring. A click equips a weapon, casts a stone, tries a key or uses the shell and sun stone
+  through the game's own menus; X or I closes it; clicks outside it go to the world.
 - Not done: a map of the indoors; the minimap and big map show the daylight colours only.
