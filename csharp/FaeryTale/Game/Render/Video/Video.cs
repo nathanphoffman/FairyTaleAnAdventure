@@ -42,6 +42,27 @@ public sealed class Graphics
     public int SpriteVersion;
 
     public SeqInfo[] SeqList = new SeqInfo[SPRITE_SHEETS];
+
+    /// The size of the tile pictures: five planes, each holding the 64 tiles of all four banks.
+    public const int IMAGE_BYTES = PLANES * IMAGE_PLANE_SIZE;
+
+    private const int PLANES = 5;
+    private const int IMAGE_PLANE_SIZE = 16384;
+    private const int BANK_PLANE_SIZE = 4096;
+    private const short BANK_PLANE_BLOCKS = 8;
+
+    /// Loads one of the four image banks (the tiles) from the disk, starting at a block.
+    public void LoadImageBank(int bank, short firstBlock)
+    {
+        TileVersion++;
+
+        for (int plane = 0; plane < PLANES; plane++)
+        {
+            int from = bank * BANK_PLANE_SIZE + plane * IMAGE_PLANE_SIZE;
+
+            Files.Disk.LoadTrackRange((short)(firstBlock + plane * BANK_PLANE_BLOCKS), BANK_PLANE_BLOCKS, Image.AsSpan(from));
+        }
+    }
 }
 
 /// The sprite blitter's work values for the sprite being drawn.

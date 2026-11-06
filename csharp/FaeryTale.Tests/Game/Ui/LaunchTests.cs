@@ -50,7 +50,7 @@ public class LaunchTests
         Assert.True(blocks[^1].PanelSpan.Bottom < quit.Top);
         Assert.True(quit.Top + quit.Height <= 400);
         Assert.Equal(3, LaunchMenu.OptionAt(blocks, Overlay.WIDTH - 24, 376));
-        Assert.Null(LaunchMenu.OptionAt(blocks, 40, 376));
+        Assert.Null(LaunchMenu.OptionAt(blocks, 470, 376));
         Assert.Equal(3, LaunchMenu.OptionForKey('Q'));
     }
 
@@ -142,5 +142,19 @@ public class LaunchTests
         Assert.Equal(22, KeyNames.DirectionCode(true, false, false, true));
         Assert.Equal(0, KeyNames.DirectionCode(false, false, false, false));
         Assert.Equal(0, KeyNames.DirectionCode(true, true, false, false));
+    }
+
+    [Fact]
+    public void TheReplayEntriesAreInTheBottomLeftAndHaveKeys()
+    {
+        var blocks = LaunchMenu.Layout();
+        var book = LaunchMenu.BookArea();
+        var prologue = LaunchMenu.PrologueArea();
+
+        Assert.Equal(4, LaunchMenu.OptionAt(blocks, book.Left + 4, book.Top + 4));
+        Assert.Equal(5, LaunchMenu.OptionAt(blocks, prologue.Left + 4, prologue.Top + 4));
+        Assert.True(prologue.Left >= book.Left + book.Width);
+        Assert.Equal(4, LaunchMenu.OptionForKey('B'));
+        Assert.Equal(5, LaunchMenu.OptionForKey('P'));
     }
 }

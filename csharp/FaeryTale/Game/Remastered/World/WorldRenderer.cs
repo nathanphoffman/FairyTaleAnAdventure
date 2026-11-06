@@ -46,6 +46,7 @@ public sealed class WorldRenderer
     private const int RAFT_SLOT = 1;
 
     private readonly WorldImages images = new();
+    private readonly NeighborRegions neighbors = new();
     private readonly uint[] palette = new uint[PALETTE_SIZE];
     private int[] columnToWorld = [];
     private int[] rowToWorld = [];
@@ -132,7 +133,10 @@ public sealed class WorldRenderer
         int bands = Math.Clamp(Environment.ProcessorCount, 1, MAX_BANDS);
         int rowsPerBand = (view.Height + bands - 1) / bands;
 
-        // The decoded tiles are looked after once here, so the bands only ever add to them.
+        // The land past the loaded region comes from the regions next to it, read once when it comes
+        // into view. The decoded tiles are looked after once here, so the bands only ever add to them.
+        neighbors.Prepare(game, (firstColumn, lastColumn), (rowToWorld[0] >> TILE_HEIGHT_SHIFT, rowToWorld[view.Height - 1] >> TILE_HEIGHT_SHIFT));
+        neighbors.WarmUp();
         images.Tile(graphics, 0);
 
         Parallel.For(0, bands, band =>
@@ -167,11 +171,14 @@ public sealed class WorldRenderer
     }
 
     // The tile numbers of one row of tiles across the picture (-1 where there is no map).
-    private static void FillTileRow(Data.Game game, int[] tileNumbers, int firstColumn, int row)
+    private void FillTileRow(Data.Game game, int[] tileNumbers, int firstColumn, int row)
     {
         for (int index = 0; index < tileNumbers.Length; index++)
         {
-            tileNumbers[index] = TileAt(game, firstColumn + index, row);
+            int column = firstColumn + index;
+            int number = TileAt(game, column, row);
+
+            tileNumbers[index] = number >= 0 || column < 0 || row < 0 ? number : neighbors.TileAt(game, column, row);
         }
     }
 
@@ -213,7 +220,7 @@ public sealed class WorldRenderer
                 lastTile = tileColumn;
                 int number = tileNumbers[tileColumn - firstTileColumn];
 
-                tile = number < 0 ? null : images.Tile(graphics, number);
+                tile = number < 0 ? null : number >= NeighborRegions.REGION_STEP ? neighbors.Picture(number) : images.Tile(graphics, number);
             }
 
             frame[rowStart + x] = tile is null ? OFF_MAP_COLOR : palette[tile[tileLine * WorldImages.TILE_WIDTH + (worldColumn & (WorldImages.TILE_WIDTH - 1))]];

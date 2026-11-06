@@ -19,13 +19,6 @@ public sealed partial class Video : IOutput
     private const int LINE_HEIGHT = 10;
     private const int NEW_LINE_Y = 42;
 
-    // The tile images are in 5 planes of 16384 bytes; a bank is a quarter of each plane. A plane
-    // of a bank is 8 disk blocks.
-    private const int PLANES = 5;
-    private const int IMAGE_PLANE_SIZE = 16384;
-    private const int QUARTER_PLANE_SIZE = 4096;
-    private const short IMAGE_PLANE_BLOCKS = 8;
-
     /// The colour the hero's "+" is drawn in on the overview map.
     private const byte MAP_MARK_PEN = 31;
 
@@ -119,18 +112,7 @@ public sealed partial class Video : IOutput
 
     public void FinishSpriteLoad(short slot) => SpriteSheets.FinishSpriteLoad(this, slot);
 
-    public void LoadImageBank(int bank, short firstBlock)
-    {
-        Graphics.TileVersion++;
-
-        for (int plane = 0; plane < PLANES; plane++)
-        {
-            int from = bank * QUARTER_PLANE_SIZE + plane * IMAGE_PLANE_SIZE;
-            short block = (short)(firstBlock + plane * IMAGE_PLANE_BLOCKS);
-
-            Disk.LoadTrackRange(block, IMAGE_PLANE_BLOCKS, Graphics.Image.AsSpan(from));
-        }
-    }
+    public void LoadImageBank(int bank, short firstBlock) => Graphics.LoadImageBank(bank, firstBlock);
 
     public void SetTextPosition(int x, int y) => Screen.MoveTo(Screen.CurrentPort, x, y);
 

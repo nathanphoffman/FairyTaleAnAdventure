@@ -33,6 +33,10 @@ public sealed class Overlay
     /// The game's mouse pointer is drawn over the overlay instead of under it (menus that cover the game).
     public bool PointerOnTop { get; init; }
 
+    /// With the world shown the overlay's grid is centred on the window instead of sitting at the
+    /// bottom of it (above the text panel): for menus that cover the whole game.
+    public bool CenterOnScreen { get; init; }
+
     /// The game's mouse pointer is not drawn at all (something else, such as a door icon, takes its place).
     public bool HidePointer { get; init; }
 

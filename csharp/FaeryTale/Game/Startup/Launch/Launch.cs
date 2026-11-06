@@ -60,6 +60,8 @@ public static class Launch
 
     /// The message in the corner while the intro plays.
     private const string SKIP_HINT = "Press ESC to skip";
+    private const string CLICK_HINT = "Click to continue";
+    private const string BOOK_HINT = "Click to turn the page, Esc to skip";
 
     // A caption under the original title screen, so it is clear that screen is the original game's
     // own (its text is left exactly as it was, copyright notice included).
@@ -191,7 +193,7 @@ public static class Launch
 
         if (launching)
         {
-            video.SetOverlay(Overlay.CornerHint(SKIP_HINT));
+            video.SetOverlay(Overlay.CornerHint(BOOK_HINT));
         }
 
         PrepareIntro(game, video);
@@ -223,12 +225,10 @@ public static class Launch
     {
         if (!LaunchSkipped)
         {
-            if (LaunchMenu.ChooseExperience(game, video) is not { } experience)
+            if (!AskWhatToDo(game, video))
             {
                 return false;
             }
-
-            ChooseExperience(game, video, experience);
         }
         else if (Environment.GetEnvironmentVariable("FTA_EXPERIENCE") is { } name && Enum.TryParse(name, true, out Experience scripted))
         {
@@ -251,6 +251,129 @@ public static class Launch
         StartFirstBrother(game, video);
 
         return true;
+    }
+
+    // Shows the launch menu until the player picks a version to play (true) or Quit (false). The
+    // book and the prologue are replayed on the way, and the menu comes back after each.
+    private static bool AskWhatToDo(Data.Game game, Video video)
+    {
+        while (true)
+        {
+            (LaunchAction action, Experience experience) = LaunchMenu.Choose(game, video);
+
+            switch (action)
+            {
+                case LaunchAction.Quit:
+                    return false;
+
+                case LaunchAction.ShowBook:
+                    ReplayBook(game, video);
+                    break;
+
+                case LaunchAction.ShowPrologue:
+                    ReplayPrologue(game, video);
+                    break;
+
+                default:
+                    ChooseExperience(game, video, experience);
+
+                    return true;
+            }
+        }
+    }
+
+    // The story book of the intro again (Space or Escape skips it).
+    private static void ReplayBook(Data.Game game, Video video)
+    {
+        game.Ui.IntroSkipRequested = 0;
+        PrepareBluePage(game, video);
+        video.SetOverlay(Overlay.CornerHint(BOOK_HINT));
+        PrepareIntro(game, video);
+        StoryPages.PlayIntro(game, video);
+        BackToBluePage(game, video);
+    }
+
+    // The text that flashes up when the original game starts: the copyright notice and the first
+    // brother's story page, drawn the way the original game draws them. Each screen stays until the
+    // player clicks (or presses a key); Escape leaves.
+    private static void ReplayPrologue(Data.Game game, Video video)
+    {
+        game.Experience = Experience.Original;
+        ShowPlayScreenBackground(game, video);
+
+        if (WaitForClick(game, video))
+        {
+            Creatures.Revive.Brothers.ShowOpeningPlacard(game, video);
+            WaitForClick(game, video);
+        }
+
+        BackToBluePage(game, video);
+    }
+
+    // Waits for a click or a key, with a hint in the corner. Returns false if the player pressed
+    // Escape.
+    private static bool WaitForClick(Data.Game game, Video video)
+    {
+        video.SetOverlay(Overlay.CornerHint(CLICK_HINT));
+        InputHandler.ResetKeyBuffer();
+
+        while (!InputHandler.LeftButtonDown)
+        {
+            int key = InputHandler.NextKey();
+
+            if (key != 0)
+            {
+                return key != InputHandler.ESCAPE_KEY;
+            }
+
+            Display.Delay(game, video, 1);
+        }
+
+        WaitForButtonUp(game, video);
+
+        return true;
+    }
+
+    // Waits until the mouse button is let go, so one click counts once.
+    private static void WaitForButtonUp(Data.Game game, Video video)
+    {
+        while (InputHandler.LeftButtonDown)
+        {
+            Display.Delay(game, video, 1);
+        }
+    }
+
+    /// Like SkippableDelay, but a click also ends the wait (a real launch only, so scripted tests
+    /// keep their timing). Used by the story book: a click turns the page.
+    public static void PageDelay(Data.Game game, Video video, int ticks)
+    {
+        for (int tick = 0; tick < Math.Max(ticks, 1); tick++)
+        {
+            if (LeaveIntroNow(game.Ui))
+            {
+                return;
+            }
+
+            if (!LaunchSkipped && InputHandler.LeftButtonDown)
+            {
+                WaitForButtonUp(game, video);
+
+                return;
+            }
+
+            Display.Delay(game, video, 1);
+        }
+    }
+
+    // The blue page of the launch menu again after a replay.
+    private static void BackToBluePage(Data.Game game, Video video)
+    {
+        video.SetOverlay(new Overlay());
+        Music.Player.StopScore();
+        PrepareBluePage(game, video);
+        SetUpStoryText(video.Screen);
+        game.Ui.IntroSkipRequested = 0;
+        InputHandler.ResetKeyBuffer();
     }
 
     // Remembers the chosen mode. Remastered and Reimagined let the pointer roam the whole screen.

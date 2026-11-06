@@ -7,9 +7,19 @@ using FaeryTale.Platform;
 
 namespace FaeryTale.Game.Startup;
 
+/// What the player chose on the launch menu.
+internal enum LaunchAction
+{
+    Play,
+    ShowBook,
+    ShowPrologue,
+    Quit,
+}
+
 /// The launch menu, shown after the intro: the player picks which version of the game to play.
 /// For now all three start the same game; the choice is kept in Game.Experience. A Quit entry in
-/// the bottom right corner leaves the game.
+/// the bottom right corner leaves the game, and two entries in the bottom left corner replay the
+/// story book and the opening text.
 internal static class LaunchMenu
 {
     /// Where one option sits: the baseline of its title and the lines of its description.
@@ -26,8 +36,8 @@ internal static class LaunchMenu
     private static readonly (string Label, string Description, Experience Experience)[] OPTIONS =
     [
         ("Original Experience", "The way David Joiner made the game (converted for modern PCs).", Experience.Original),
-        ("Remastered Experience", "The original experience with modern conveniences (maps, menus, visual upscales, etc.).", Experience.Remastered),
-        ("Reimagined Experience", "The remastered experience with additional content by Nathan Hoffman to extend and reimagine the game with more TTRPG flair, story, spells, monsters, and places.", Experience.Reimagined),
+        ("Remastered Experience", "The original experience with modern conveniences.", Experience.Remastered),
+        ("Reimagined Experience", "The remastered experience with reworked content.", Experience.Reimagined),
     ];
 
     private const string HEADING = "Choose your adventure";
@@ -41,6 +51,13 @@ internal static class LaunchMenu
     private const int QUIT = 3;
     private const int QUIT_Y = 380;
     private const int QUIT_RIGHT = Overlay.WIDTH - 16;
+
+    // The replay entries sit in the bottom left corner, numbered after Quit.
+    private const string BOOK_LABEL = "Show Book";
+    private const string PROLOGUE_LABEL = "Show Prologue";
+    private const int BOOK = 4;
+    private const int PROLOGUE = 5;
+    private const int REPLAY_LEFT = 16;
 
     // Descriptions are wrapped to this many characters, and sit this far apart.
     private const int DESCRIPTION_WIDTH = 64;
@@ -59,11 +76,11 @@ internal static class LaunchMenu
 
     /// The wooden boards behind the heading, each option and Quit, made once. Each entry has a
     /// plain board and a lit one (for when the pointer is on it).
-    private sealed record Planks(Image Heading, Image[][] Options, Image[] Quit);
+    private sealed record Planks(Image Heading, Image[][] Options, Image[] Quit, Image[] Book, Image[] Prologue);
 
-    /// Shows the menu and waits for a click on an option (or its number key); returns the choice,
-    /// or null when the player chose Quit.
-    public static Experience? ChooseExperience(Data.Game game, Video video)
+    /// Shows the menu and waits for a click on an option (or its number key); returns what was
+    /// chosen and, for Play, which version of the game.
+    public static (LaunchAction Action, Experience Experience) Choose(Data.Game game, Video video)
     {
         List<Block> blocks = Layout();
 
@@ -123,7 +140,13 @@ internal static class LaunchMenu
         InputHandler.ResetKeyBuffer();
         InputHandler.ForgetLastMenu();
 
-        return choice < OPTIONS.Length ? OPTIONS[choice].Experience : null;
+        return choice switch
+        {
+            QUIT => (LaunchAction.Quit, Experience.Original),
+            BOOK => (LaunchAction.ShowBook, Experience.Original),
+            PROLOGUE => (LaunchAction.ShowPrologue, Experience.Original),
+            _ => (LaunchAction.Play, OPTIONS[choice].Experience),
+        };
     }
 
     /// Breaks text into lines of at most width characters, between words.
@@ -174,11 +197,12 @@ internal static class LaunchMenu
     /// block is hit anywhere from side margin to side margin.
     internal static int? OptionAt(List<Block> blocks, int x, int y)
     {
-        (int left, int top, int _, int height) = QuitArea();
-
-        if (x >= left && y >= top && y < top + height)
+        foreach ((int entry, (int Left, int Top, int Width, int Height) area) in new[] { (QUIT, QuitArea()), (BOOK, BookArea()), (PROLOGUE, PrologueArea()) })
         {
-            return QUIT;
+            if (x >= area.Left && x < area.Left + area.Width && y >= area.Top && y < area.Top + area.Height)
+            {
+                return entry;
+            }
         }
 
         for (int index = 0; index < blocks.Count; index++)
@@ -194,12 +218,19 @@ internal static class LaunchMenu
         return null;
     }
 
-    /// The option a key chooses: 1, 2 or 3, or Q to quit.
+    /// The option a key chooses: 1, 2 or 3, Q to quit, B for the book or P for the prologue.
     internal static int? OptionForKey(int key)
     {
-        if (key == 'Q')
+        switch (key)
         {
-            return QUIT;
+            case 'Q':
+                return QUIT;
+
+            case 'B':
+                return BOOK;
+
+            case 'P':
+                return PROLOGUE;
         }
 
         int number = key - '1';
@@ -215,6 +246,20 @@ internal static class LaunchMenu
         return (left, QUIT_Y - TITLE_ASCENT - PANEL_PADDING, Overlay.WIDTH - left, TITLE_ASCENT + PANEL_PADDING * 2 + Overlay.GLYPH_SIZE);
     }
 
+    /// The areas behind the two replay entries, side by side from the left margin.
+    internal static (int Left, int Top, int Width, int Height) BookArea() => ReplayArea(BOOK_LABEL, REPLAY_LEFT);
+
+    internal static (int Left, int Top, int Width, int Height) PrologueArea()
+    {
+        (int left, int _, int width, int _) = BookArea();
+
+        return ReplayArea(PROLOGUE_LABEL, left + width + PANEL_GAP);
+    }
+
+    // One replay entry: its text on a board starting at left.
+    private static (int Left, int Top, int Width, int Height) ReplayArea(string label, int left) =>
+        (left, QUIT_Y - TITLE_ASCENT - PANEL_PADDING, Overlay.TextWidth(label, TITLE_SCALE) + PANEL_PADDING * 2, TITLE_ASCENT + PANEL_PADDING * 2 + Overlay.GLYPH_SIZE);
+
     /// The description of option number (for tests).
     internal static string DescriptionOf(int number) => OPTIONS[number].Description;
 
@@ -226,7 +271,7 @@ internal static class LaunchMenu
     {
         Image[][] options = blocks.Select((block, index) => Board(BlockArea(block, OPTIONS[index].Label), 21u + (uint)index)).ToArray();
 
-        return new Planks(Board(HeadingArea(), 11)[0], options, Board(QuitArea(), 31));
+        return new Planks(Board(HeadingArea(), 11)[0], options, Board(QuitArea(), 31), Board(BookArea(), 32), Board(PrologueArea(), 33));
     }
 
     // The heading, the options and Quit as text on wooden boards, the hovered one lit.
@@ -255,8 +300,17 @@ internal static class LaunchMenu
 
         overlay.Images.Add(planks.Quit[quitLit ? 1 : 0]);
         AddText(overlay, QUIT_LABEL, (QuitLeft(), QUIT_Y), quitLit ? HOVER_COLOR : TITLE_COLOR, TITLE_SCALE);
+        AddReplayEntry(overlay, (planks.Book, BOOK_LABEL, BookArea().Left), hovered == BOOK);
+        AddReplayEntry(overlay, (planks.Prologue, PROLOGUE_LABEL, PrologueArea().Left), hovered == PROLOGUE);
 
         return overlay;
+    }
+
+    // A replay entry: its board (lit or not) and its label.
+    private static void AddReplayEntry(Overlay overlay, (Image[] Boards, string Label, int Left) entry, bool lit)
+    {
+        overlay.Images.Add(entry.Boards[lit ? 1 : 0]);
+        AddText(overlay, entry.Label, (entry.Left + PANEL_PADDING, QUIT_Y), lit ? HOVER_COLOR : TITLE_COLOR, TITLE_SCALE);
     }
 
     // The area behind the heading.

@@ -164,18 +164,21 @@ public static class Regions
         world.OriginY = (ushort)(regionRow << REGION_HEIGHT_SHIFT);
     }
 
+    /// Loads the sector table and the region map of a region into a map of its own (the new world
+    /// drawer shows regions next to the loaded one this way).
+    public static void LoadMapTables(MapData map, Need need)
+    {
+        Disk.LoadTrackRange((short)need.Sector, SECTOR_BLOCKS, map.Sector.AsSpan(0, MapData.MAP_OFFSET));
+        Disk.LoadTrackRange((short)need.Region, REGION_MAP_BLOCKS, map.Sector.AsSpan(MapData.MAP_OFFSET));
+    }
+
     // Loads the sector table and the region map if they changed.
     private static void LoadChangedMapTables(MapData map, Need need)
     {
-        if (need.Sector != map.LoadedBlocks.Sector)
+        if (need.Sector != map.LoadedBlocks.Sector || need.Region != map.LoadedBlocks.Region)
         {
-            Disk.LoadTrackRange((short)need.Sector, SECTOR_BLOCKS, map.Sector.AsSpan(0, MapData.MAP_OFFSET));
+            LoadMapTables(map, need);
             map.LoadedBlocks.Sector = need.Sector;
-        }
-
-        if (need.Region != map.LoadedBlocks.Region)
-        {
-            Disk.LoadTrackRange((short)need.Region, REGION_MAP_BLOCKS, map.Sector.AsSpan(MapData.MAP_OFFSET));
             map.LoadedBlocks.Region = need.Region;
         }
     }

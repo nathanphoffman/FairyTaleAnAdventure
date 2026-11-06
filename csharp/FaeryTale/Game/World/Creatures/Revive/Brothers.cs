@@ -133,6 +133,17 @@ public static class Brothers
         body.Weapon = 1;
     }
 
+    /// The first brother's opening story page on its own, as the original shows it when a game
+    /// starts but without the wait after it (for the launch menu's Show Prologue).
+    public static void ShowOpeningPlacard(Data.Game game, IOutput output)
+    {
+        MessagePage.MapMessage(game, output);
+        output.UseStoryFont();
+        TextRoutines.PlacardText(output, PLACARD_JULIAN);
+        output.ClearDrawingPage();
+        output.DrawPlacardBorder();
+    }
+
     /// The story pages between brothers (and the game over page after the last).
     public static void ShowBrotherPlacards(Data.Game game, IOutput output)
     {

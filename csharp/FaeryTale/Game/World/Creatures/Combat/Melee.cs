@@ -2,6 +2,7 @@ using FaeryTale.Game.Creatures.Interaction;
 using FaeryTale.Game.Data;
 using FaeryTale.Game.Land.Map;
 using FaeryTale.Game.Output;
+using FaeryTale.Game.Remastered;
 using FaeryTale.Game.Ui;
 
 namespace FaeryTale.Game.Creatures.Combat;
@@ -143,7 +144,7 @@ public static class Melee
             return false;
         }
 
-        SwingFacts facts = new(attackerIndex == 0, DistanceToPoint(other, tip.X, tip.Y), reach, game.World.FreezeTimer != 0, strength);
+        SwingFacts facts = new(attackerIndex == 0, DistanceToTarget(game, attacker, other, facing, (reach, strength), tip), reach, game.World.FreezeTimer != 0, strength);
 
         switch (SwingResultFor(facts, game.Hero.Brave, () => game.Rng.Rand256()))
         {
@@ -160,6 +161,16 @@ public static class Melee
             default:
                 return false;
         }
+    }
+
+    // How far the target is from the weapon tip. Remastered and Reimagined count a target the hero
+    // could reach anywhere in front of him as at the tip.
+    private static short DistanceToTarget(Data.Game game, Shape attacker, Shape other, int facing, (short Reach, short Strength) weapon, (short X, short Y) tip)
+    {
+        bool inArc = game.Experience != Experience.Original && attacker == game.Actors.List[0]
+            && SwingArc.Covers(attacker, other, facing, weapon.Strength * 2 + weapon.Reach);
+
+        return inArc ? (short)0 : DistanceToPoint(other, tip.X, tip.Y);
     }
 
     // Where the tip of the weapon is: twice the weapon's strength in front of the attacker, with a

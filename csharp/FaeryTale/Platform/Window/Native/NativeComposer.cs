@@ -33,6 +33,10 @@ internal sealed class NativeComposer
     public int GridLeft { get; private set; }
     public int GridTop { get; private set; }
 
+    /// Where the overlay's grid starts: the same as GridTop, or centred on the window for an
+    /// overlay that asks for that.
+    public int OverlayTop { get; private set; }
+
     /// Where the pointer was last, in window pixels (the pointer is drawn there).
     public (int X, int Y) Pointer { get; private set; } = (GRID_WIDTH / 2, GRID_HEIGHT / 2);
 
@@ -55,11 +59,13 @@ internal sealed class NativeComposer
         if (ShowsWorld)
         {
             GridTop = height - GRID_HEIGHT * Scale;
+            OverlayTop = overlay.CenterOnScreen ? (height - GRID_HEIGHT * Scale) / 2 : GridTop;
             ComposeWorld(width, height, scene, overlay, video!, alpha, pointer);
         }
         else
         {
             GridTop = (height - GRID_HEIGHT * Scale) / 2;
+            OverlayTop = GridTop;
             ComposePage(width, height, scene, overlay);
         }
 
@@ -85,7 +91,7 @@ internal sealed class NativeComposer
         }
 
         // The menus are on the grid whatever is under the pointer.
-        InputHandler.NativeGridMoved(x, y);
+        InputHandler.NativeGridMoved(x, FloorDivide(pixelY - OverlayTop, Scale));
     }
 
     /// Where a window pixel is on the 640 x 400 grid (not clamped).
@@ -111,7 +117,7 @@ internal sealed class NativeComposer
 
         scene.ComposeFromLine(legacyFrame, PANEL_FIRST_LINE);
         DrawPanel(width);
-        overlay.DrawAt(picture, width, new Overlay.Placement(GridLeft, GridTop, Scale));
+        overlay.DrawAt(picture, width, new Overlay.Placement(GridLeft, OverlayTop, Scale));
 
         if (video.Capture.DoorHover && !overlay.HidePointer)
         {

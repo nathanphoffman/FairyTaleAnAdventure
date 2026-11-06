@@ -25,9 +25,12 @@ public enum GameMenuChoice
 public static class GameMenu
 {
     private const string HEADING = "Game Menu";
-    private const int HEADING_Y = 84;
-    private const int FIRST_ENTRY_Y = 150;
+    // The menu is laid out from the heading down, and the whole block is centred on the screen.
+    private const int FIRST_ENTRY_BELOW_HEADING = 66;
     private const int ENTRY_SPACING = 44;
+    private const int BOARD_BELOW_BASELINE = 16;
+    private const int DESCRIPTION_BELOW_BOARDS = 24;
+    private const int DESCRIPTION_DESCENT = 2;
 
     /// How dark the game looks behind the menu (0-255).
     private const byte BACKGROUND_DARKNESS = 170;
@@ -58,8 +61,7 @@ public static class GameMenu
     private const string FRAME_RATE_LABEL = "Frame Rate: ";
     private const string DIFFICULTY_LABEL = "Difficulty: ";
 
-    /// The line under the entries that says what the difficulty does, and where it goes.
-    private const int DESCRIPTION_Y = 372;
+    /// The line under the entries that says what the difficulty does.
     private const int DESCRIPTION_SCALE = 1;
     private const uint DESCRIPTION_COLOR = 0xffee_dcb8;
 
@@ -162,23 +164,33 @@ public static class GameMenu
         return ENTRIES.Select((_, index) => ((Overlay.WIDTH - width) / 2, EntryBaseline(index) - TITLE_ASCENT - PANEL_PADDING, width, TITLE_ASCENT + PANEL_PADDING * 2 + Overlay.GLYPH_SIZE)).ToArray();
     }
 
+    // Where the heading, the entries and the description go, so that all of them together (the top
+    // of the heading's board to the bottom of the description) are in the middle of the screen.
+    private static int HeadingY => (FULL_HEIGHT - (DescriptionBelowHeading + DESCRIPTION_DESCENT + HeadingBoardAbove)) / 2 + HeadingBoardAbove;
+
+    private static int HeadingBoardAbove => TITLE_ASCENT + PANEL_PADDING;
+
+    private static int DescriptionBelowHeading => FIRST_ENTRY_BELOW_HEADING + (ENTRIES.Length - 1) * ENTRY_SPACING + BOARD_BELOW_BASELINE + DESCRIPTION_BELOW_BOARDS;
+
+    private static int DescriptionY => HeadingY + DescriptionBelowHeading;
+
     // The baseline of an entry's label.
-    private static int EntryBaseline(int index) => FIRST_ENTRY_Y + index * ENTRY_SPACING;
+    private static int EntryBaseline(int index) => HeadingY + FIRST_ENTRY_BELOW_HEADING + index * ENTRY_SPACING;
 
     private static (int Left, int Top, int Width, int Height) HeadingArea()
     {
         int width = Overlay.TextWidth(HEADING, TITLE_SCALE) + PANEL_PADDING * 2;
 
-        return ((Overlay.WIDTH - width) / 2, HEADING_Y - TITLE_ASCENT - PANEL_PADDING, width, TITLE_ASCENT + PANEL_PADDING * 2);
+        return ((Overlay.WIDTH - width) / 2, HeadingY - TITLE_ASCENT - PANEL_PADDING, width, TITLE_ASCENT + PANEL_PADDING * 2);
     }
 
     // The darkened game, the heading and the entries (the one under the pointer lit).
     private static Overlay Draw(Data.Game game, Image heading, Image[][] boards, int? hovered)
     {
-        Overlay overlay = new() { Shades = { new Shade(0, 0, Overlay.WIDTH, FULL_HEIGHT, BACKGROUND_DARKNESS) }, PointerOnTop = true };
+        Overlay overlay = new() { Shades = { new Shade(0, 0, Overlay.WIDTH, FULL_HEIGHT, BACKGROUND_DARKNESS) }, PointerOnTop = true, CenterOnScreen = true };
 
         overlay.Images.Add(heading);
-        AddCentered(overlay, HEADING, HEADING_Y, HEADING_COLOR, TITLE_SCALE);
+        AddCentered(overlay, HEADING, HeadingY, HEADING_COLOR, TITLE_SCALE);
 
         for (int index = 0; index < ENTRIES.Length; index++)
         {
@@ -188,7 +200,7 @@ public static class GameMenu
             AddCentered(overlay, LabelOf(game, index), EntryBaseline(index), lit ? HOVER_COLOR : TITLE_COLOR, TITLE_SCALE);
         }
 
-        AddCentered(overlay, DescriptionOf(game.Difficulty), DESCRIPTION_Y, DESCRIPTION_COLOR, DESCRIPTION_SCALE);
+        AddCentered(overlay, DescriptionOf(game.Difficulty), DescriptionY, DESCRIPTION_COLOR, DESCRIPTION_SCALE);
 
         return overlay;
     }

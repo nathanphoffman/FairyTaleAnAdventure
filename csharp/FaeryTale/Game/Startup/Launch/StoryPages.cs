@@ -67,7 +67,7 @@ internal static class StoryPages
 
             if (game.Ui.IntroSkipRequested == 0)
             {
-                Launch.SkippableDelay(game, video, INTRO_PAGES_WAIT);
+                Launch.PageDelay(game, video, INTRO_PAGES_WAIT);
             }
         }
 
@@ -93,7 +93,7 @@ internal static class StoryPages
             return;
         }
 
-        Launch.SkippableDelay(game, video, PAGE_DELAY);
+        Launch.PageDelay(game, video, PAGE_DELAY);
 
         if (Launch.LeaveIntroNow(game.Ui))
         {
