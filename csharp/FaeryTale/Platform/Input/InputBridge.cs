@@ -1,4 +1,5 @@
 using FaeryTale.Game.Input;
+using FaeryTale.Game.Remastered;
 
 namespace FaeryTale.Platform;
 
@@ -23,6 +24,18 @@ public static class InputBridge
 
     private static readonly bool[] arrows = new bool[4];
     private static int heldDirection;
+    private const string MAP_KEY = "M";
+    private const string PAGE_UP = "PageUp";
+    private const string PAGE_DOWN = "PageDown";
+
+    /// A page is one line less than the window shows, so the eye can follow.
+    private const int PAGE_LINES = MessageHistory.VISIBLE_LINES - 1;
+
+    private const string LEFT_SHIFT = "Left Shift";
+    private const string RIGHT_SHIFT = "Right Shift";
+
+    private static bool leftShiftDown;
+    private static bool rightShiftDown;
     private static bool leftDown;
     private static bool rightDown;
 
@@ -33,6 +46,16 @@ public static class InputBridge
     /// key code. A name SDL does not know does nothing.
     public static void KeyEvent(string name, bool down)
     {
+        TrackShift(name, down);
+        ScrollMessagesWithKey(name, down);
+
+        if (InputHandler.RemasteredControls && name == MAP_KEY)
+        {
+            AskForMap(down);
+
+            return;
+        }
+
         KeyNames.Key key = KeyNames.Lookup(InputHandler.RemasteredControls ? RemasteredKeys.Translate(name) : name);
 
         switch (key.Kind)
@@ -49,6 +72,48 @@ public static class InputBridge
                 InputHandler.KeyEvent(key.Value | (down ? 0 : RELEASED));
                 break;
         }
+    }
+
+    // M opens the big map (and closes it again); the game does not see the key.
+    private static void AskForMap(bool down)
+    {
+        if (down)
+        {
+            MapScreen.Request();
+        }
+    }
+
+    // Page Up and Page Down scroll the message window back and forward (Remastered and Reimagined).
+    private static void ScrollMessagesWithKey(string name, bool down)
+    {
+        if (!down || !InputHandler.RemasteredControls)
+        {
+            return;
+        }
+
+        if (name == PAGE_UP)
+        {
+            MessageScrollRequests.Add(PAGE_LINES);
+        }
+        else if (name == PAGE_DOWN)
+        {
+            MessageScrollRequests.Add(-PAGE_LINES);
+        }
+    }
+
+    // Remembers whether either shift key is down (SDL's names for them).
+    private static void TrackShift(string name, bool down)
+    {
+        if (name == LEFT_SHIFT)
+        {
+            leftShiftDown = down;
+        }
+        else if (name == RIGHT_SHIFT)
+        {
+            rightShiftDown = down;
+        }
+
+        InputHandler.ShiftHeld = leftShiftDown || rightShiftDown;
     }
 
     /// The mouse moved to a position in the 640x200 frame.

@@ -182,6 +182,9 @@ public static class InputHandler
         }
     }
 
+    /// Whether a shift key is held (Remastered: shift and click to look).
+    public static bool ShiftHeld { get; set; }
+
     /// Key event from the platform layer. code is the game's key code, bit 7 set = key released.
     public static void KeyEvent(int code)
     {
@@ -201,6 +204,7 @@ public static class InputHandler
             rawPointer = (POINTER_START, POINTER_START);
             qualifier = 0;
             lastMenu = 0;
+            ShiftHeld = false;
             pendingClick = null;
             NativePointer = null;
             gridPointer = null;

@@ -1,6 +1,7 @@
 using FaeryTale.Game.Data;
 using FaeryTale.Game.Files;
 using FaeryTale.Game.Output;
+using FaeryTale.Game.Remastered;
 using FaeryTale.Game.Ui;
 using FaeryTale.Gfx;
 
@@ -50,24 +51,104 @@ public sealed partial class Video : IOutput
 
     public uint Ticks => Device.Ticks;
 
+    /// The lines the message window has shown, for scrolling back (kept in Remastered and Reimagined).
+    public MessageHistory History { get; } = new();
+
+    // The message window is showing lines this far back (0 is the live window).
+    private int shownScroll;
+
     /// The old lines scroll up by one text line (10 pixels) inside the message area.
     public void PrintBytes(ReadOnlySpan<byte> text)
     {
+        ShowNewestMessages();
+
         Rect area = new(TEXT_X_MIN, TEXT_Y_MIN, TEXT_X_MAX - TEXT_X_MIN + 1, TEXT_Y_MAX - TEXT_Y_MIN + 1);
 
         Screen.Scroll(Screen.CurrentPort, area, (0, LINE_HEIGHT));
         TextRoutines.MoveTo(this, TEXT_X_MIN, NEW_LINE_Y);
         Screen.Text(Screen.CurrentPort, text);
+
+        if (Capture.Enabled)
+        {
+            History.StartLine(text);
+        }
     }
 
-    public void PrintContBytes(ReadOnlySpan<byte> text) => Screen.Text(Screen.CurrentPort, text);
+    public void PrintContBytes(ReadOnlySpan<byte> text)
+    {
+        ShowNewestMessages();
+        Screen.Text(Screen.CurrentPort, text);
+
+        if (Capture.Enabled)
+        {
+            History.Append(text);
+        }
+    }
 
     public void PrintNumber(int value, int length)
     {
         byte[] text = TextRoutines.FormatNumber((uint)value);
         int from = Math.Max(NUMBER_FIELD - length, 0);
 
+        ShowNewestMessages();
         Screen.Text(Screen.CurrentPort, text.AsSpan(from));
+
+        if (Capture.Enabled)
+        {
+            History.Append(text.AsSpan(from));
+        }
+    }
+
+    /// Scrolls the message window the way the player asked (mouse wheel, Page Up and Page Down).
+    /// Called every frame; the classic game never asks.
+    public void ShowAskedMessageScroll()
+    {
+        if (!Capture.Enabled)
+        {
+            return;
+        }
+
+        History.ScrollBy(MessageScrollRequests.Take());
+
+        if (shownScroll != History.Scrolled)
+        {
+            DrawMessageWindow();
+        }
+    }
+
+    // Before anything new is printed the window goes back to the newest lines.
+    private void ShowNewestMessages()
+    {
+        if (!Capture.Enabled)
+        {
+            return;
+        }
+
+        History.ScrollToNewest();
+
+        if (shownScroll != 0)
+        {
+            DrawMessageWindow();
+        }
+    }
+
+    // Draws the lines of the history the window shows now, the newest at the bottom, and leaves the
+    // text position at the end of the bottom line.
+    private void DrawMessageWindow()
+    {
+        Rect area = new(TEXT_X_MIN, TEXT_Y_MIN, TEXT_X_MAX - TEXT_X_MIN + 1, TEXT_Y_MAX - TEXT_Y_MIN + 1);
+        IReadOnlyList<byte[]> window = History.Window();
+
+        shownScroll = History.Scrolled;
+        Screen.Scroll(PortId.Text, area, (0, area.Height));
+
+        for (int index = 0; index < window.Count; index++)
+        {
+            int rowsFromBottom = window.Count - 1 - index;
+
+            Screen.MoveTo(PortId.Text, TEXT_X_MIN, NEW_LINE_Y - rowsFromBottom * LINE_HEIGHT);
+            Screen.Text(PortId.Text, window[index]);
+        }
     }
 
     public void LoadPageColors(ReadOnlySpan<ushort> colors) => Screen.LoadColors(ViewPortId.Page, colors);
@@ -114,7 +195,11 @@ public sealed partial class Video : IOutput
 
     public void LoadImageBank(int bank, short firstBlock) => Graphics.LoadImageBank(bank, firstBlock);
 
-    public void SetTextPosition(int x, int y) => Screen.MoveTo(Screen.CurrentPort, x, y);
+    public void SetTextPosition(int x, int y)
+    {
+        History.OnMessageLine = y == NEW_LINE_Y;
+        Screen.MoveTo(Screen.CurrentPort, x, y);
+    }
 
     public void UseStoryFont() => Screen.SetFontKind(Screen.CurrentPort, FontKind.Story);
 

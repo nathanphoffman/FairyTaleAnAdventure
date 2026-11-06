@@ -55,3 +55,20 @@ check this).
 - Not done: objects and enemies far from the old screen are only loaded by the game when they are
   near the old screen's area, so at 4x zoom out some stay out of sight until you get closer; the world
   outside the loaded region is black.
+
+## Talking, looking, taking, maps (DONE; Remastered and Reimagined only)
+- `Game/Remastered/Conversation`: hover a person for their face (cut from their sprite), click to walk up
+  (to under 35 pixels, so a Yell is told off as in the original) and open a bubble with Yell, Say, Ask and,
+  for a bartender, Buy (a list of the things for sale, greyed when too dear, on a different wood).
+- Shift: the pointer is an eye (`EyeCursor`); a shift click walks to the spot (not through a door) and
+  does the Look action.
+- Click on water swims in; click on the black outside of a room indoors walks to the exit door.
+- `Game/Remastered/Interaction`: a hand pointer over a chest or anything Take picks up; a click walks
+  over and takes that one.
+- `MenuGreying`: the classic Buy and Give boxes are dark grey with no bartender / nobody near.
+- `Game/Remastered/Messages`: `MessageHistory` keeps the printed lines; the mouse wheel over the text
+  panel, Page Up and Page Down scroll the beige message window back through them.
+- `Game/Remastered/Map`: `WorldOverview` paints the whole outdoor world once (a pixel a tile, from the
+  game's own overview colours); `MinimapPicture` is the corner map; M opens `MapScreen` (drag or arrows
+  scroll, wheel zooms, C finds the hero, M or Esc closes). The music key moved from M to J in these modes.
+- Not done: a map of the indoors; the minimap and big map show the daylight colours only.

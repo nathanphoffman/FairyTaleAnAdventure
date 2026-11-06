@@ -262,10 +262,26 @@ public sealed partial class SdlDisplay
         return (x * outputWidth / Math.Max(windowWidth, 1), y * outputHeight / Math.Max(windowHeight, 1));
     }
 
-    // The mouse wheel zooms the world in (up) and out (down).
-    private static void ZoomWithWheel(int steps)
+    // The mouse wheel zooms the world in (up) and out (down), or over the text panel scrolls the
+    // messages back (up) and forward (down).
+    private void ZoomWithWheel(int steps)
     {
-        if (WindowControls.NativeRendering && steps != 0)
+        if (!WindowControls.NativeRendering || steps == 0)
+        {
+            return;
+        }
+
+        (int x, int y) = nativePresenter.Composer.Pointer;
+
+        if (MapScreen.IsOpen)
+        {
+            MapScreen.ZoomBy(Math.Sign(steps));
+        }
+        else if (nativePresenter.Composer.IsOverPanel(x, y))
+        {
+            MessageScrollRequests.Add(Math.Sign(steps));
+        }
+        else
         {
             WorldView.Current.ZoomBySteps(Math.Sign(steps));
         }

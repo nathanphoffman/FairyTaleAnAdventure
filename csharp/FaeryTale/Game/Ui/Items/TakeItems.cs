@@ -73,7 +73,7 @@ public static class TakeItems
     private const short GOLD_FOUND = 50;
 
     /// Search range for the nearest thing to take.
-    private const short TAKE_RANGE = 30;
+    public const short TAKE_RANGE = 30;
     private const int PRQ_NOTHING_NEAR = 10;
     private const int PRQ_STATS_LINE = 7;
     private const int EVENT_PAPER = 17;
@@ -108,6 +108,38 @@ public static class TakeItems
             return;
         }
 
+        TakeNearestActor(game, output);
+    }
+
+    /// Takes one chosen object instead of the nearest (Remastered: the one clicked on).
+    public static void TakeFromActor(Data.Game game, IOutput output, int actorNumber)
+    {
+        TextRoutines.QueuePrint(game.Ui, PRQ_STATS_LINE);
+        game.Hero.Stuff[ItemsMenu.ARROWBASE] = 0;
+        game.Actors.NearestObject = (short)actorNumber;
+        TakeNearestActor(game, output);
+    }
+
+    /// Whether taking an actor would do anything: it is an object that can be picked up or opened
+    /// (a chest, a pile of gold, a weapon lying about), not scenery.
+    public static bool CanTake(Shape actor)
+    {
+        if (actor.Kind != ActorKind.OBJECTS)
+        {
+            return false;
+        }
+
+        return ClassifyTake((byte)actor.Index, 0, 0) switch
+        {
+            Take.Eggs or Take.Left => false,
+            Take.Plain => ItemSlot((byte)actor.Index, ObjectTables.Itrans) is not null,
+            _ => true,
+        };
+    }
+
+    // Takes the object or searches the body NearestObject.
+    private static void TakeNearestActor(Data.Game game, IOutput output)
+    {
         Shape actor = game.Actors.List[game.Actors.NearestObject];
 
         if (actor.Kind == ActorKind.OBJECTS)

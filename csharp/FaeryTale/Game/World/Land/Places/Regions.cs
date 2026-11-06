@@ -172,6 +172,14 @@ public static class Regions
         Disk.LoadTrackRange((short)need.Region, REGION_MAP_BLOCKS, map.Sector.AsSpan(MapData.MAP_OFFSET));
     }
 
+    /// Loads the two terrain tables of a region into a map of its own (the world overview of the
+    /// minimap reads each tile's colour from them).
+    public static void LoadTerrainTables(MapData map, Need need)
+    {
+        Disk.LoadTrackRange((short)(TERRA_BLOCK + need.Terra1), 1, map.Terrain.AsSpan(0, TERRA_TABLE_SIZE));
+        Disk.LoadTrackRange((short)(TERRA_BLOCK + need.Terra2), 1, map.Terrain.AsSpan(TERRA_TABLE_SIZE));
+    }
+
     // Loads the sector table and the region map if they changed.
     private static void LoadChangedMapTables(MapData map, Need need)
     {

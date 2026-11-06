@@ -1,4 +1,5 @@
 using FaeryTale.Game.Input;
+using FaeryTale.Game.Land;
 using FaeryTale.Game.Remastered;
 using FaeryTale.Game.Render;
 using FaeryTale.Gfx;
@@ -22,6 +23,10 @@ internal sealed class NativeComposer
     private const int GRID_HEIGHT = Overlay.HEIGHT;
     private const int PANEL_FIRST_ROW = PANEL_FIRST_LINE * GRID_ROWS_PER_LINE;
     private const int POINTER_PIXELS_PER_GAME_PIXEL = 2;
+
+    // The small map's units are a whole number of pixels, one for each 400 of the window's height.
+    private const double UNIT_HEIGHT = 400.0;
+    private const int MINIMAP_MARGIN = 6;
 
     private readonly WorldRenderer renderer = new();
     private readonly uint[] legacyFrame = new uint[Scene.FRAME_WIDTH * Scene.FRAME_HEIGHT];
@@ -114,12 +119,13 @@ internal sealed class NativeComposer
         view.Resize(width, height, (GRID_HEIGHT - PANEL_FIRST_ROW) * Scale);
         renderer.Draw(picture, view, video.Capture, video, alpha);
         DrawMarker(width, view, video.Capture);
+        DrawMinimap(width, view, video.Capture);
 
         scene.ComposeFromLine(legacyFrame, PANEL_FIRST_LINE);
         DrawPanel(width);
         overlay.DrawAt(picture, width, new Overlay.Placement(GridLeft, OverlayTop, Scale));
 
-        DrawConversation(width, view, video, pointer);
+        DrawConversation(width, video, pointer);
         DrawPointer(width, scene, overlay, video, pointer);
     }
 
@@ -134,7 +140,15 @@ internal sealed class NativeComposer
             return;
         }
 
-        if (face is not null)
+        if (capture.LookMode)
+        {
+            new Overlay { Images = { EyeCursor.At((0, 0)) } }.DrawAt(picture, width, new Overlay.Placement(pointer.X, pointer.Y, Scale));
+        }
+        else if (capture.ItemHover && capture.TalkingTo is null)
+        {
+            new Overlay { Images = { HandCursor.At((0, 0)) } }.DrawAt(picture, width, new Overlay.Placement(pointer.X, pointer.Y, Scale));
+        }
+        else if (face is not null)
         {
             new Overlay { Images = { face with { X = -face.Width / 2, Y = -face.Height / 2 } } }
                 .DrawAt(picture, width, new Overlay.Placement(pointer.X, pointer.Y, Scale));
@@ -150,17 +164,19 @@ internal sealed class NativeComposer
     }
 
     // The conversation bubble over the person the hero is talking to.
-    private void DrawConversation(int width, WorldView view, Video video, (int X, int Y) pointer)
+    private void DrawConversation(int width, Video video, (int X, int Y) pointer)
     {
         if (video.Capture.TalkingTo is not { } number || FaceOf(video, number) is not { } face)
         {
             return;
         }
 
-        CapturedSprite sprite = video.Capture.Sprites.Find(found => found.Slot == number)!;
-        BubbleLayout layout = BubbleLayout.For(view, (sprite.ActorX, sprite.ActorY));
+        FaeryTale.Game.Data.Game game = video.Capture.Game!;
+        BubbleLayout layout = Conversation.Layout(game);
+        List<Row> rows = Conversation.Rows(game);
+        Overlay bubble = ConversationPicture.Draw(face, rows, layout.RowAt(pointer.X, pointer.Y, rows));
 
-        ConversationPicture.Draw(face, layout.ButtonAt(pointer.X, pointer.Y)).DrawAt(picture, width, new Overlay.Placement(layout.Left, layout.Top, layout.Scale));
+        bubble.DrawAt(picture, width, new Overlay.Placement(layout.Left, layout.Top, layout.Scale));
     }
 
     // The face of the person with an actor number, from the sprite just drawn.
@@ -171,6 +187,21 @@ internal sealed class NativeComposer
         return sprite is not null && renderer.PictureOf(video, sprite) is { } sheetPicture
             ? FacePicture.Face(renderer.Palette, sheetPicture)
             : null;
+    }
+
+    // The small map in the top right corner of the world (outdoors only).
+    private void DrawMinimap(int width, WorldView view, WorldCapture capture)
+    {
+        if (capture.Game is not { } game || game.World.Region >= Regions.FIRST_INDOOR_REGION)
+        {
+            return;
+        }
+
+        int unit = Math.Max(1, (int)Math.Round(view.Height / UNIT_HEIGHT));
+        (int column, int row) = WorldOverview.TileOf(capture.HeroNow.X, capture.HeroNow.Y);
+        Image map = MinimapPicture.Of(WorldOverview.Pixels, (column, row));
+
+        new Overlay { Images = { map } }.DrawAt(picture, width, new Overlay.Placement(width - (MinimapPicture.WIDTH + MINIMAP_MARGIN) * unit, MINIMAP_MARGIN * unit, unit));
     }
 
     // The circle where the player clicked, over the ground it is on.

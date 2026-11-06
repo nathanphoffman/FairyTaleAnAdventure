@@ -9,7 +9,7 @@ public static class RemasteredKeys
 {
     // What a key press turns into. W, A, S, D become the arrow keys; the old shortcut letters of
     // Say (S), Ask (A) and the sword in the Buy menu (W) are given to H (hello), N (the other
-    // way to ask, "N" for "name") and Z.
+    // way to ask, "N" for "name") and Z. M opens the big map, so the music key (M) moves to J.
     private static readonly Dictionary<string, string> TRANSLATION = new()
     {
         ["W"] = "Up",
@@ -19,6 +19,7 @@ public static class RemasteredKeys
         ["H"] = "S",
         ["N"] = "A",
         ["Z"] = "W",
+        ["J"] = "M",
     };
 
     /// The key name the game should see for a key that was pressed (names are SDL's).

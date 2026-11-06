@@ -45,11 +45,34 @@ public static class ShopOptions
     private const int FOOD_HUNGER = 50;
     private const byte ARROWS_BOUGHT = 10;
 
+    /// How many things the bartender sells.
+    public const int ITEM_COUNT = LAST_BUY_ENTRY - FIRST_MENU_ENTRY + 1;
+
     /// Buys what the bartender sells, if the hero can pay.
     public static bool BuyOption(Data.Game game, IOutput output, short chosenEntry)
     {
         game.Actors.NearestObject = game.Actors.NearestPerson;
-        short near = game.Actors.NearestObject;
+
+        return Trade(game, output, game.Actors.NearestObject, chosenEntry);
+    }
+
+    /// Buys the thing number itemNumber (0 is the first on the list) from one chosen person (Remastered:
+    /// the one clicked on) instead of the nearest.
+    public static void BuyFromActor(Data.Game game, IOutput output, int actorNumber, int itemNumber)
+    {
+        game.Actors.NearestObject = (short)actorNumber;
+        Trade(game, output, (short)actorNumber, (short)(FIRST_MENU_ENTRY + itemNumber));
+    }
+
+    /// Whether a person sells things.
+    public static bool IsBartender(Shape actor) => actor.Race == BARTENDER_RACE;
+
+    /// What thing number itemNumber on the list costs (in gold).
+    public static short PriceOf(int itemNumber) => ObjectTables.Jtrans[itemNumber * 2 + 1];
+
+    // Does what a click on a Buy entry means with the person near.
+    private static bool Trade(Data.Game game, IOutput output, short near, short chosenEntry)
+    {
         byte race = near == 0 ? (byte)0 : game.Actors.List[near].Race;
 
         switch (BuyGateFor(near, race, chosenEntry, ObjectTables.Jtrans))

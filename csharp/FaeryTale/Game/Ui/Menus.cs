@@ -1,6 +1,7 @@
 using FaeryTale.Game.Data;
 using FaeryTale.Game.Input;
 using FaeryTale.Game.Output;
+using FaeryTale.Game.Remastered;
 
 namespace FaeryTale.Game.Ui;
 
@@ -166,6 +167,11 @@ public static class Menus
     private static byte EntryBoxPen(Data.Game game, int entry)
     {
         int menu = game.Ui.CurrentMenu;
+
+        if (MenuGreying.IsGreyed(game, menu, entry))
+        {
+            return MenuGreying.GREY_PEN;
+        }
 
         if (menu == USE)
         {

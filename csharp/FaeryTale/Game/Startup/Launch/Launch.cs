@@ -127,6 +127,7 @@ public static class Launch
         Conversation.Close();
         EnemyPathing.Reset();
         ClickOverlay.Reset();
+        MenuGreying.Reset();
         WindowControls.SystemCursorShown = false;
         WindowControls.NativeRendering = false;
     }

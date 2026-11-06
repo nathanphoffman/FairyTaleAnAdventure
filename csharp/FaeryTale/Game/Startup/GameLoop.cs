@@ -118,6 +118,7 @@ public static class GameLoop
         TestCommands.RunPendingCommand(game, video); // test commands, does nothing normally
 
         ReadKeyboard(game, video);
+        OpenMapIfAsked(game, video);
 
         if (HandleViewStatus(game, video))
         {
@@ -135,6 +136,8 @@ public static class GameLoop
 
         ClickToMove.Drive(game, video);
         ClickOverlay.Update(game, video);
+        MenuGreying.Refresh(game, video);
+        video.ShowAskedMessageScroll();
         HeroControls.UpdateHero(game, video, state.Cycle);
         MoveEverything(game, video, state);
         Bed.CheckBed(game, video);
@@ -152,6 +155,15 @@ public static class GameLoop
         }
 
         DrawFrame(game, video, state, scrollX, scrollY);
+    }
+
+    // M (Remastered and Reimagined) opens the big map where there is an outdoor world to show.
+    private static void OpenMapIfAsked(Data.Game game, Video video)
+    {
+        if (MapScreen.TakeRequest() && game.Experience != Experience.Original && game.World.Region < Regions.FIRST_INDOOR_REGION)
+        {
+            MapScreen.Show(game, video);
+        }
     }
 
     // Reads one key and handles it.

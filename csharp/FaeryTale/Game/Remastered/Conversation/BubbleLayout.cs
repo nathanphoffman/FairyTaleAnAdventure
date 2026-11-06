@@ -1,15 +1,15 @@
 namespace FaeryTale.Game.Remastered;
 
-/// Where the parts of the conversation bubble are: a face over the person's head and a board of
-/// three choices to the right of it. The drawing and the click test both ask this one class, so a
+/// Where the parts of the conversation bubble are: a face over the person's head and a column of
+/// boards (the choices and, for a bartender, the things for sale) to the right of it. The drawing and the click test both ask this one class, so a
 /// button is where it is drawn. Sizes are in "units": each is Scale screen pixels.
 public readonly record struct BubbleLayout(int Left, int Top, int Scale)
 {
     public const int FACE_SIZE = 40;
     public const int BUTTON_WIDTH = 44;
+    public const int ITEM_WIDTH = 96;
     public const int BUTTON_HEIGHT = 14;
     public const int BUTTON_GAP = 3;
-    public const int BUTTON_COUNT = 3;
 
     /// Space between the face and the buttons, and between the bubble and the person's head.
     private const int SIDE_GAP = 6;
@@ -22,11 +22,17 @@ public readonly record struct BubbleLayout(int Left, int Top, int Scale)
     /// so the bubble is about as big on any screen.
     private const double PIXELS_PER_UNIT_HEIGHT = 400.0;
 
-    /// The full width and height of the bubble in units.
-    public static int Width => FACE_SIZE + SIDE_GAP + BUTTON_WIDTH;
+    /// The full width of the bubble in units (with the wide boards of the things for sale).
+    public static int Width => FACE_SIZE + SIDE_GAP + ITEM_WIDTH;
+
+    /// How tall the bubble is with rowCount boards in units.
+    public static int HeightOf(int rowCount) => Math.Max(FACE_SIZE, ButtonTop(rowCount));
+
+    /// How wide a board is in units: the things for sale have longer words.
+    public static int WidthOf(Row row) => row.Kind == RowKind.Item ? ITEM_WIDTH : BUTTON_WIDTH;
 
     /// Where the bubble goes for a person standing at a world position, kept inside the window.
-    public static BubbleLayout For(WorldView view, (int X, int Y) person)
+    public static BubbleLayout For(WorldView view, (int X, int Y) person, int rowCount)
     {
         int scale = Math.Max(1, (int)Math.Round((double)view.Height / PIXELS_PER_UNIT_HEIGHT));
         (double headX, double headY) = view.ToScreen(person.X, person.Y - HEAD_HEIGHT);
@@ -35,7 +41,7 @@ public readonly record struct BubbleLayout(int Left, int Top, int Scale)
 
         return new BubbleLayout(
             Math.Clamp(left, 0, Math.Max(0, view.Width - Width * scale)),
-            Math.Clamp(top, 0, Math.Max(0, view.Height - FACE_SIZE * scale)),
+            Math.Clamp(top, 0, Math.Max(0, view.Height - HeightOf(rowCount) * scale)),
             scale);
     }
 
@@ -45,15 +51,15 @@ public readonly record struct BubbleLayout(int Left, int Top, int Scale)
     /// The left of the buttons, in units from the left of the bubble.
     public static int ButtonLeft => FACE_SIZE + SIDE_GAP;
 
-    /// Which button a window pixel is on, if any.
-    public int? ButtonAt(int pixelX, int pixelY)
+    /// Which row a window pixel is on, if any.
+    public int? RowAt(int pixelX, int pixelY, IReadOnlyList<Row> rows)
     {
         int x = FloorDivide(pixelX - Left, Scale) - ButtonLeft;
         int y = FloorDivide(pixelY - Top, Scale);
 
-        for (int index = 0; index < BUTTON_COUNT; index++)
+        for (int index = 0; index < rows.Count; index++)
         {
-            if (x >= 0 && x < BUTTON_WIDTH && y >= ButtonTop(index) && y < ButtonTop(index) + BUTTON_HEIGHT)
+            if (x >= 0 && x < WidthOf(rows[index]) && y >= ButtonTop(index) && y < ButtonTop(index) + BUTTON_HEIGHT)
             {
                 return index;
             }

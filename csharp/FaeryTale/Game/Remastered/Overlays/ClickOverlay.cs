@@ -8,7 +8,7 @@ namespace FaeryTale.Game.Remastered;
 
 /// What click to move draws over the play field: the circle where the player clicked (it stays
 /// on the same spot of ground as the map scrolls), and a door icon in place of the pointer while
-/// the mouse is over a door.
+/// the mouse is over a door, and an eye while shift is held.
 public static class ClickOverlay
 {
     /// The overlay grid is twice as wide and twice as tall as the game's screen.
@@ -28,6 +28,7 @@ public static class ClickOverlay
     public static void Update(Data.Game game, IOutput output)
     {
         bool overDoor = IsPointerOverDoor(game);
+        bool looking = IsLookMode(game);
 
         // The new world drawer draws the marker and the door icon itself, in its own pixels.
         if (output is Video video && WindowControls.NativeRendering && video.Capture.Enabled)
@@ -36,30 +37,33 @@ public static class ClickOverlay
             video.Capture.DoorHover = overDoor;
             video.Capture.HoverPerson = PersonUnderPointer(game);
             video.Capture.TalkingTo = Conversation.Person;
+            video.Capture.LookMode = IsLookMode(game);
+            video.Capture.ItemHover = IsPointerOverItem(game, video.Capture);
             ClearOverlay(output);
 
             return;
         }
 
-        if (ClickToMove.Marker is null && !overDoor)
+        if (ClickToMove.Marker is null && !overDoor && !looking)
         {
             ClearOverlay(output);
 
             return;
         }
 
-        Overlay overlay = new() { HidePointer = overDoor };
+        Overlay overlay = new() { HidePointer = overDoor || looking };
 
         if (ClickToMove.Marker is { } marker)
         {
             overlay.Images.Add(ClickRing.PictureAt(ToOverlay(game, marker.World), marker.Walkable));
         }
 
-        if (overDoor)
+        if (overDoor || looking)
         {
             (int x, int y) = InputHandler.RawPointer;
+            (int X, int Y) at = (x * OVERLAY_SCALE, y * OVERLAY_SCALE);
 
-            overlay.Images.Add(DoorCursor.At((x * OVERLAY_SCALE, y * OVERLAY_SCALE)));
+            overlay.Images.Add(looking ? EyeCursor.At(at) : DoorCursor.At(at));
         }
 
         output.SetOverlay(overlay);
@@ -76,6 +80,17 @@ public static class ClickOverlay
 
         return PointerWorld.UnderPointer(game) is { } ground && DoorTargets.DoorAt(game, ground) is not null;
     }
+
+    // Shift is held in a game with click to move: the pointer is an eye.
+    private static bool IsLookMode(Data.Game game) =>
+        InputHandler.ShiftHeld && game.Experience != Data.Experience.Original && game.Ui.ViewStatus == VIEW_NORMAL;
+
+    // Whether the mouse is over something Take would pick up (the new drawer only).
+    private static bool IsPointerOverItem(Data.Game game, WorldCapture capture) =>
+        game.Experience != Data.Experience.Original
+        && game.Ui.ViewStatus == VIEW_NORMAL
+        && PointerWorld.UnderPointer(game) is { } ground
+        && ItemTargets.ItemAt(capture, ground) is not null;
 
     // The person the mouse is over, if the new drawer can show their face.
     private static int? PersonUnderPointer(Data.Game game)

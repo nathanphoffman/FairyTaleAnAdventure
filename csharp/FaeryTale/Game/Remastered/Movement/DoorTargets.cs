@@ -1,4 +1,5 @@
 using FaeryTale.Game.Data;
+using FaeryTale.Game.Land.Map;
 using FaeryTale.Game.Land.TravelDoors;
 
 namespace FaeryTale.Game.Remastered;
@@ -27,6 +28,14 @@ public static class DoorTargets
     private const int FRONT_GAP = 6;
     private const int TILE_HEIGHT = 32;
 
+    // The black outside of the rooms is tile 0.
+    private const int TILE_X_SHIFT = 4;
+    private const int TILE_Y_SHIFT = 5;
+    private const int BLACK_TILE = 0;
+
+    /// An exit further than this from the hero is not the exit of this room.
+    private const int MAX_EXIT_DISTANCE = 512;
+
     /// The number of the door at a world position, if there is one: outdoors an entrance, indoors
     /// the way out.
     public static int? DoorAt(Data.Game game, (int X, int Y) world)
@@ -48,6 +57,20 @@ public static class DoorTargets
         }
 
         return null;
+    }
+
+    /// When indoors and the world position is the black outside of the rooms (tile 0), the door that
+    /// leads out of the hero's room, so a click there means "leave".
+    public static int? ExitForBlackClick(Data.Game game, (int X, int Y) world)
+    {
+        bool indoors = game.World.Region >= EnteringDoors.REGION_INSIDE;
+
+        if (!indoors || MapLookup.TileNumber(game, (ushort)(world.X >> TILE_X_SHIFT), (ushort)(world.Y >> TILE_Y_SHIFT)) != BLACK_TILE)
+        {
+            return null;
+        }
+
+        return NearestExit(game);
     }
 
     /// Where to walk to before pushing into the door at an entry point. A closed outdoor door only
@@ -84,5 +107,26 @@ public static class DoorTargets
         return horizontal
             ? (door.Xc2 + HORIZONTAL_MIDDLE_X, door.Yc2 + LOWER_HALF_Y)
             : (door.Xc2 + VERTICAL_SIDE_X_IN, door.Yc2 + VERTICAL_MIDDLE_Y);
+    }
+
+    // The door out of the building that is nearest to the hero, if one is close enough.
+    private static int? NearestExit(Data.Game game)
+    {
+        Shape hero = game.Actors.List[0];
+        int? nearest = null;
+        int nearestDistance = MAX_EXIT_DISTANCE;
+
+        for (int index = 0; index < TravelDoors.DOOR_COUNT; index++)
+        {
+            (int x, int y) = EntryPoint(game, index);
+            int distance = Math.Max(Math.Abs(x - hero.AbsX), Math.Abs(y - hero.AbsY));
+
+            if (distance < nearestDistance)
+            {
+                (nearest, nearestDistance) = (index, distance);
+            }
+        }
+
+        return nearest;
     }
 }

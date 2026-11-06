@@ -73,6 +73,12 @@ public sealed class WorldCapture
 
     public int? TalkingTo { get; set; }
 
+    /// The pointer is over something that can be picked up: it is a hand.
+    public bool ItemHover { get; set; }
+
+    /// Shift is held: the pointer is an eye.
+    public bool LookMode { get; set; }
+
     public List<CapturedSprite> Sprites { get; private set; } = [];
 
     public (int X, int Y) HeroNow { get; private set; }

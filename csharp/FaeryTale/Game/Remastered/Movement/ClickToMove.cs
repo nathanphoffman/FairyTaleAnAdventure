@@ -3,6 +3,8 @@ using FaeryTale.Game.Data;
 using FaeryTale.Game.Input;
 using FaeryTale.Game.Land.Map;
 using FaeryTale.Game.Output;
+using FaeryTale.Game.Render;
+using FaeryTale.Game.Ui;
 
 namespace FaeryTale.Game.Remastered;
 
@@ -46,8 +48,20 @@ public static class ClickToMove
     private static int replans;
     private static bool goalWalkable;
 
+    // The click was on water: the hero may swim through deep water to get there (as with the keys).
+    private static bool swimming;
+
     // A click on a person: the actor to walk up to before the choices of the conversation appear.
     private static int? personToTalkTo;
+
+    // A click on something to pick up: the actor to walk to, and the one to take now that the walk
+    // ended near it (set when the walk ends, used on the next step).
+    private static int? itemToTake;
+    private static int? arrivedToTake;
+
+    // A shift click: look around when the walk is over (arrivedToLook is that moment).
+    private static bool lookWhenThere;
+    private static bool arrivedToLook;
 
     // A click on a door: where to push towards once the route ends, how many frames have been spent
     // pushing, and the region the walk started in (the walk is over when the hero is somewhere else).
@@ -68,6 +82,8 @@ public static class ClickToMove
         route.Clear();
         doorPoint = null;
         personToTalkTo = null;
+        itemToTake = null;
+        lookWhenThere = false;
     }
 
     /// Called every frame after the keyboard and mouse were read. Takes a new click, and while a
@@ -103,6 +119,8 @@ public static class ClickToMove
 
         Follow(game);
         OpenConversationWhenNear(game);
+        LookIfArrived(game, output);
+        TakeItemWhenThere(game, output);
     }
 
     /// What entering the world position costs the planner: blocked (-1), open (0), or open but
@@ -118,11 +136,15 @@ public static class ClickToMove
 
         if (terrain == DEEP_WATER)
         {
-            return -1;
+            return swimming ? WADING_COST : -1;
         }
 
         return terrain is >= WADING_FIRST and <= WADING_LAST ? WADING_COST : 0;
     }
+
+    // Whether a world position is water (wading or deep).
+    private static bool IsWater(Data.Game game, (int X, int Y) place) =>
+        MapLookup.TerrainAt(game, place.X, place.Y + FEET_OFFSET) is >= WADING_FIRST and <= DEEP_WATER;
 
     /// The walk direction (0-7, clockwise from north-west) towards a point that is (dx, dy) away,
     /// or 9 when already there.
@@ -149,18 +171,24 @@ public static class ClickToMove
     // to, else a place (or door) to walk to. Persons and the bubble only exist in the new drawer.
     private static void Click(Data.Game game, IOutput output, InputHandler.Click click)
     {
-        BubbleLayout layout = ConversationLayout(game);
-
-        if (Conversation.TakeButtonClick(game, output, click, layout))
+        if (Conversation.TakeButtonClick(game, output, click))
         {
             return;
         }
 
         (int X, int Y) target = PointerWorld.OfClick(game, click);
 
-        if (click.Native && PersonTargets.PersonAt(game, target) is { } person)
+        if (InputHandler.ShiftHeld)
+        {
+            WalkToLook(game, output, target);
+        }
+        else if (click.Native && PersonTargets.PersonAt(game, target) is { } person)
         {
             WalkToPerson(game, person);
+        }
+        else if (click.Native && output is Video video && ItemTargets.ItemAt(video.Capture, target) is { } item)
+        {
+            WalkToItem(game, output, item);
         }
         else
         {
@@ -168,12 +196,76 @@ public static class ClickToMove
         }
     }
 
-    // Where the conversation bubble is now (it does not matter when none is open).
-    private static BubbleLayout ConversationLayout(Data.Game game)
+    // Walks up to something lying about and takes it, or takes it at once when already near.
+    private static void WalkToItem(Data.Game game, IOutput output, int number)
     {
-        Shape person = game.Actors.List[Conversation.Person ?? 0];
+        Cancel();
 
-        return BubbleLayout.For(WorldView.Current, (person.AbsX, person.AbsY));
+        if (ItemTargets.IsCloseEnough(game, number))
+        {
+            TakeItems.TakeFromActor(game, output, number);
+
+            return;
+        }
+
+        Shape item = game.Actors.List[number];
+
+        StartRoute(game, (item.AbsX, item.AbsY), null);
+        itemToTake = Active ? number : null;
+
+        if (!Active && ItemTargets.IsCloseEnough(game, number))
+        {
+            TakeItems.TakeFromActor(game, output, number);
+        }
+    }
+
+    // Takes the object walked to once the hero is near it, or when the walk ends short of it.
+    private static void TakeItemWhenThere(Data.Game game, IOutput output)
+    {
+        if (itemToTake is { } number && ItemTargets.IsCloseEnough(game, number))
+        {
+            Cancel();
+            TakeIfStillThere(game, output, number);
+        }
+        else if (arrivedToTake is { } arrived)
+        {
+            arrivedToTake = null;
+            TakeIfStillThere(game, output, arrived);
+        }
+    }
+
+    private static void TakeIfStillThere(Data.Game game, IOutput output, int number)
+    {
+        if (ItemTargets.StillThere(game, number))
+        {
+            TakeItems.TakeFromActor(game, output, number);
+        }
+    }
+
+    // Shift and click: walks to the spot (not through a door there) and then looks around.
+    private static void WalkToLook(Data.Game game, IOutput output, (int X, int Y) target)
+    {
+        Cancel();
+        StartRoute(game, target, null);
+
+        if (Active)
+        {
+            lookWhenThere = true;
+        }
+        else
+        {
+            ItemsMenu.LookAround(game, output);
+        }
+    }
+
+    // Looks around once a walk that was meant to end with a look is over.
+    private static void LookIfArrived(Data.Game game, IOutput output)
+    {
+        if (arrivedToLook)
+        {
+            arrivedToLook = false;
+            ItemsMenu.LookAround(game, output);
+        }
     }
 
     // Walks towards a person, or opens the conversation at once when already near.
@@ -192,6 +284,11 @@ public static class ClickToMove
 
         Plan(game, (person.AbsX, person.AbsY));
         personToTalkTo = Active ? number : null;
+
+        if (!Active && PersonTargets.IsInTalkRange(game, number))
+        {
+            Conversation.Open(game, number);
+        }
     }
 
     // Once the hero is near the person walked to, stops and opens the conversation.
@@ -206,8 +303,13 @@ public static class ClickToMove
         Conversation.Open(game, number);
     }
 
-    // Plans a new route from where the hero stands to a world position.
-    private static void Plan(Data.Game game, (int X, int Y) target)
+    // A click on a door walks to the door and the hero pushes his way through. So does a click on
+    // the black outside of the room the hero is in: it means "get me out of here".
+    private static void Plan(Data.Game game, (int X, int Y) target) =>
+        StartRoute(game, target, DoorTargets.DoorAt(game, target) ?? DoorTargets.ExitForBlackClick(game, target));
+
+    // Starts a walk to a world position (or, for a door, to the way in).
+    private static void StartRoute(Data.Game game, (int X, int Y) target, int? door)
     {
         Shape hero = game.Actors.List[0];
 
@@ -216,10 +318,10 @@ public static class ClickToMove
             return;
         }
 
-        // A click on a door walks to the door; the hero then pushes his way in.
-        int? door = DoorTargets.DoorAt(game, target);
-
         personToTalkTo = null;
+        itemToTake = null;
+        lookWhenThere = false;
+        swimming = IsWater(game, target);
         doorPoint = door is { } found ? DoorTargets.EntryPoint(game, found) : null;
         goal = door is { } doorToApproach ? DoorTargets.ApproachPoint(game, doorToApproach) : target;
         goalWalkable = doorPoint is not null || CellCost(game, target.X, target.Y) >= 0;
@@ -288,7 +390,7 @@ public static class ClickToMove
     {
         if (doorPoint is not { } door || pushFrames++ >= MAX_PUSH_FRAMES)
         {
-            Cancel();
+            EndWalk(game);
 
             return;
         }
@@ -296,6 +398,23 @@ public static class ClickToMove
         game.Ui.PathDirection = DirectionTo(door.X - hero.AbsX, door.Y - hero.AbsY);
         game.Ui.CompassLitDirection = game.Ui.PathDirection;
         game.Ui.PathWalking = game.Ui.PathDirection < NOT_WALKING;
+    }
+
+    // The route is over: a walk to a person that ended in talking range still opens the conversation.
+    private static void EndWalk(Data.Game game)
+    {
+        int? person = personToTalkTo;
+        int? item = itemToTake;
+        bool look = lookWhenThere;
+
+        Cancel();
+        arrivedToLook = look;
+        arrivedToTake = item is { } itemNumber && ItemTargets.IsCloseEnough(game, itemNumber) ? item : null;
+
+        if (person is { } number && PersonTargets.IsInTalkRange(game, number))
+        {
+            Conversation.Open(game, number);
+        }
     }
 
     // Counts frames without progress. After a while the route is planned again; after a few
@@ -315,7 +434,7 @@ public static class ClickToMove
 
         if (replans > MAX_REPLANS)
         {
-            Cancel();
+            EndWalk(game);
 
             return true;
         }

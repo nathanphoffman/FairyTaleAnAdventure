@@ -80,8 +80,8 @@ public static class ItemsMenu
         TextRoutines.QueuePrint(game.Ui, PRQ_LIST);
     }
 
-    // Reveals hidden objects within reach.
-    private static void LookAround(Data.Game game, IOutput output)
+    /// Reveals hidden objects within reach (the Look entry).
+    public static void LookAround(Data.Game game, IOutput output)
     {
         bool found = false;
 
