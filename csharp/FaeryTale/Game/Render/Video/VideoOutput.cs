@@ -101,6 +101,14 @@ public sealed partial class Video : IOutput
 
     public void SetOverlay(Overlay overlay) => Device.SetOverlay(overlay);
 
+    public double AnimationFrameMs => Device.AnimationFrameMs;
+
+    public void ShowAnimationFrame()
+    {
+        Screen.PointerPosition = Platform.InputBridge.Pointer;
+        Device.ShowAnimationFrame(Screen.ToScene());
+    }
+
     public void ForgetSprites() => Graphics.NextShape = 0;
 
     public void RewindSpritesTo(byte slot) => Graphics.NextShape = Graphics.SeqList[slot].Location;

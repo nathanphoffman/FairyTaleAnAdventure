@@ -35,6 +35,11 @@ public interface IOutput
     /// Waits one tick of 1/50 second, showing the screen as it is now.
     void WaitFrame();
 
+    /// How long a picture of an animation lasts, and showing the next one (see IDisplayDevice).
+    double AnimationFrameMs { get; }
+
+    void ShowAnimationFrame();
+
     /// Ticks waited since the game started.
     uint Ticks { get; }
 

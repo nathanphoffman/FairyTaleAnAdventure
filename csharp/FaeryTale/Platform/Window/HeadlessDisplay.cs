@@ -74,6 +74,10 @@ public sealed class HeadlessDisplay : IDisplayDevice
 
     public void SetOverlay(Overlay overlay) => this.overlay = overlay;
 
+    public double AnimationFrameMs => TICK_MILLISECONDS;
+
+    public void ShowAnimationFrame(Scene scene) => WaitFrame(scene);
+
     // Turns the scene into the pixels on screen, with the overlay on top.
     private void Draw(Scene scene)
     {

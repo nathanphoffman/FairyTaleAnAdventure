@@ -51,6 +51,10 @@ public sealed class Recorder : IOutput
         Record("WaitFrame");
     }
 
+    public double AnimationFrameMs => 20;
+
+    public void ShowAnimationFrame() => WaitFrame();
+
     public void SetOverlay(Overlay overlay) =>
         Record("SetOverlay", $"{overlay.Shades.Count} shades", $"{overlay.Images.Count} images", $"{overlay.Texts.Count} texts");
 

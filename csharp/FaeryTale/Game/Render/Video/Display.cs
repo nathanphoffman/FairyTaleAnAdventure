@@ -23,6 +23,13 @@ public static class Display
         }
     }
 
+    /// Shows the next picture of an animation (one a refresh of the monitor in the window).
+    public static void AnimationFrame(Data.Game game, IOutput output)
+    {
+        StateDump.DumpIfDue(game, output);
+        output.ShowAnimationFrame();
+    }
+
     /// Swaps the page being drawn with the one being shown, and shows the one just finished.
     public static void FlipPages(Data.Game game, IOutput output)
     {

@@ -1,4 +1,3 @@
-using FaeryTale.Game.Land.Map;
 using FaeryTale.Game.Render;
 using FaeryTale.Gfx;
 
@@ -9,6 +8,7 @@ namespace FaeryTale.Game.Startup;
 internal static class StoryPages
 {
     private const uint ALL_PLANES = 0x1f;
+    private const uint OPAQUE = 0xff00_0000;
     private const int SCREEN_WIDTH = 320;
     private const int SCREEN_HEIGHT = 200;
 
@@ -34,25 +34,8 @@ internal static class StoryPages
     /// Ticks to show a page before turning it.
     private const int PAGE_DELAY = 350;
 
-    // The page-turn animation, 22 frames: strip step, strip width and delay for each.
-    private static readonly short[] FLIP_RATE = [8, 6, 5, 4, 3, 2, 3, 5, 13, 0, 0, 13, 5, 3, 2, 3, 4, 5, 6, 8, 0, 0];
-    private static readonly int[] FLIP_WIDE = [7, 5, 4, 3, 2, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 2, 3, 4, 5, 7, 0, 0];
-    private static readonly int[] FLIP_DELAY = [12, 9, 6, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 6, 9, 0, 0];
-
-    /// The first half of the frames turn the right page up, the rest lay the left one down.
-    private const int FIRST_HALF = 11;
-    private const int PAGE_HALF_WIDTH = 135;
-    private const short PAGE_STRIP_END = 136;
-
-    // The page turn is drawn around the book's spine at x = 160 (the right page starts one pixel
-    // later); the left page starts at x = 24 and the outer edge of the right page is at x = 296.
-    // The last strip is a pixel wide, 7 lines in from the top and bottom, which leaves 186 lines.
-    private const int SPINE = 160;
-    private const int SPINE_RIGHT = SPINE + 1;
-    private const int PAGE_LEFT_EDGE = 24;
-    private const int PAGE_RIGHT_EDGE = 296;
-    private const int EDGE_INSET = 7;
-    private const int PAGE_EDGE_HEIGHT = 186;
+    /// How long the page turn takes (it turns at one picture for every refresh of the monitor).
+    private const double TURN_MS = 1100;
 
     /// The story pictures with the zoom in and out (skipped if the player presses Space).
     public static void PlayIntro(Data.Game game, Video video)
@@ -133,99 +116,50 @@ internal static class StoryPages
         Launch.IntroSkipped(game.Ui);
     }
 
-    // The page turn animation, 22 frames.
-    //
-    // The first 11 frames lift the right page: the old page is drawn as thin vertical strips that
-    // get narrower and shorter (using PageTurnInset for the curl), on top of the new page. The
-    // last 11 frames lay the curling page down on the left. FLIP_RATE, FLIP_WIDE and FLIP_DELAY
-    // give the strip step, strip width and pause for each frame.
+    // The page turn: the pictures of PageTurn from the old page (PageA) to the new one (PageB),
+    // shown over the screen one for every refresh of the monitor, with an easy start and end.
     private static void TurnPage(Data.Game game, Video video)
     {
-        for (int frame = 0; frame < FLIP_RATE.Length; frame++)
+        ushort[] colors = video.Screen.GetViewPort(ViewPortId.Page).Colors;
+        PageTurn turn = new(DecodePage(video.Screen.GetBitmap(BitmapId.PageA), colors), DecodePage(video.Screen.GetBitmap(BitmapId.PageB), colors));
+        int frames = Math.Max(2, (int)Math.Ceiling(TURN_MS / video.AnimationFrameMs));
+
+        for (int frame = 1; frame < frames; frame++)
         {
             if (Launch.LeaveIntroNow(game.Ui))
             {
-                return;
+                break;
             }
 
-            BitmapId temp = video.Screen.DrawingBitmapId;
+            double progress = frame / (double)frames;
+            uint[] pixels = turn.Render(progress * progress * (3 - 2 * progress));
 
-            if (frame < FIRST_HALF)
-            {
-                TurnRightPageFrame(video, temp, FLIP_RATE[frame], FLIP_WIDE[frame]);
-            }
-            else
-            {
-                TurnLeftPageFrame(video, temp, FLIP_RATE[frame], FLIP_WIDE[frame]);
-            }
-
-            Display.FlipPages(game, video);
-
-            if (FLIP_DELAY[frame] != 0)
-            {
-                Display.Delay(game, video, FLIP_DELAY[frame]);
-            }
+            video.SetOverlay(new Overlay { Images = { new Image(0, 0, PageTurn.OUTPUT_WIDTH, PageTurn.OUTPUT_HEIGHT, pixels) } });
+            Display.AnimationFrame(game, video);
         }
+
+        video.SetOverlay(new Overlay());
+        CopyRect(video, BitmapId.PageB, (PageTurn.BOOK_LEFT_EDGE, 0), video.Screen.DrawingBitmapId, (PageTurn.BOOK_LEFT_EDGE, 0), (PageTurn.BOOK_RIGHT_EDGE - PageTurn.BOOK_LEFT_EDGE, SCREEN_HEIGHT));
+        Display.FlipPages(game, video);
     }
 
-    // One frame of the first half of the page turn: the right page B stays and the strips of the
-    // old page A bend away from the spine, each wide pixels wide and rate apart.
-    private static void TurnRightPageFrame(Video video, BitmapId temp, short rate, int wide)
+    // A story page as colours (0xAARRGGBB), 320 x 200.
+    private static uint[] DecodePage(Bitmap page, ushort[] colors)
     {
-        int bColumn = SPINE_RIGHT - wide;
-        int dColumn = 0;
+        uint[] pixels = new uint[SCREEN_WIDTH * SCREEN_HEIGHT];
 
-        CopyHalfPage(video, BitmapId.PageB, temp, SPINE);
-
-        if (rate == 0)
+        for (int y = 0; y < SCREEN_HEIGHT; y++)
         {
-            return;
+            for (int x = 0; x < SCREEN_WIDTH; x++)
+            {
+                int index = page.Pixel(x, y);
+
+                pixels[y * SCREEN_WIDTH + x] = OPAQUE | Scene.Rgb4(index < colors.Length ? colors[index] : (ushort)0);
+            }
         }
 
-        int inset = 0;
-
-        for (short sColumn = (short)wide; sColumn < PAGE_STRIP_END; sColumn += rate)
-        {
-            inset = MapCamera.PageTurnInset(sColumn);
-            CopyStrip(video, BitmapId.PageA, temp, (bColumn + sColumn, SPINE_RIGHT + dColumn), inset, wide);
-            dColumn += wide;
-        }
-
-        CopyRect(video, BitmapId.PageA, (PAGE_RIGHT_EDGE, EDGE_INSET), temp, (SPINE_RIGHT + dColumn, inset), (1, PAGE_EDGE_HEIGHT));
+        return pixels;
     }
-
-    // One frame of the second half of the page turn: the strips of the new page B land on the left.
-    private static void TurnLeftPageFrame(Video video, BitmapId temp, short rate, int wide)
-    {
-        if (rate == 0)
-        {
-            CopyHalfPage(video, BitmapId.PageB, temp, PAGE_LEFT_EDGE);
-
-            return;
-        }
-
-        CopyHalfPage(video, BitmapId.PageA, temp, PAGE_LEFT_EDGE);
-        int dColumn = 0;
-
-        for (short sColumn = (short)wide; sColumn < PAGE_STRIP_END; sColumn += rate)
-        {
-            int inset = MapCamera.PageTurnInset(sColumn);
-
-            dColumn += wide;
-            CopyStrip(video, BitmapId.PageB, temp, (SPINE - sColumn, SPINE - dColumn), inset, wide);
-        }
-
-        CopyStrip(video, BitmapId.PageB, temp, (PAGE_LEFT_EDGE, SPINE - 1 - dColumn), EDGE_INSET, 1);
-    }
-
-    // Copies the half page that starts at column column onto the screen, in the same place.
-    private static void CopyHalfPage(Video video, BitmapId source, BitmapId temp, int column) =>
-        CopyRect(video, source, (column, 0), temp, (column, 0), (PAGE_HALF_WIDTH, SCREEN_HEIGHT));
-
-    // Copies a strip wide columns wide from one column to another, inset lines in from the top and
-    // bottom (the curl of the page).
-    private static void CopyStrip(Video video, BitmapId source, BitmapId temp, (int From, int To) columns, int inset, int wide) =>
-        CopyRect(video, source, (columns.From, inset), temp, (columns.To, inset), (wide, SCREEN_HEIGHT - inset - inset));
 
     // Copies a rectangle between bitmaps (all five planes, plain copy).
     private static void CopyRect(Video video, BitmapId source, (int X, int Y) from, BitmapId destination, (int X, int Y) to, (int Width, int Height) size) =>

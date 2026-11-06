@@ -21,6 +21,13 @@ public interface IDisplayDevice
 
     /// Sets the text and dark panels drawn over the picture (an empty overlay removes them).
     void SetOverlay(Overlay overlay);
+
+    /// How long a picture of an animation lasts: a refresh of the monitor in the window, a tick otherwise.
+    double AnimationFrameMs { get; }
+
+    /// Shows the scene with its overlay now and waits for the next picture of an animation, which
+    /// does not keep to the game's 50 ticks a second.
+    void ShowAnimationFrame(Scene scene);
 }
 
 /// A display that shows nothing and only counts ticks, for runs without a window.
@@ -39,4 +46,8 @@ public sealed class NullDisplayDevice : IDisplayDevice
     public void SetOverlay(Overlay overlay)
     {
     }
+
+    public double AnimationFrameMs => 20;
+
+    public void ShowAnimationFrame(Scene scene) => Ticks++;
 }
