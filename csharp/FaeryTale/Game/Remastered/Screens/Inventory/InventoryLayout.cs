@@ -29,9 +29,9 @@ public static class InventoryLayout
 
     /// The line under the squares, for what the pointer is on.
     public const int DETAIL_LEFT = 22;
-    public const int DETAIL_TOP = 256;
+    public const int DETAIL_TOP = 255;
     public const int DETAIL_WIDTH = 590;
-    public const int DETAIL_HEIGHT = 20;
+    public const int DETAIL_HEIGHT = 26;
 
     // Squares are in rows of five, a little apart.
     private const int PER_ROW = 5;

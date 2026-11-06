@@ -33,10 +33,9 @@ internal sealed class NativeComposer
     private const int TARGET_RADIUS_WORLD_PIXELS = 11;
 
     private readonly WorldRenderer renderer = new();
-    private readonly PanelBackground panelBackground = new(Scene.FRAME_WIDTH, Scene.FRAME_HEIGHT - PANEL_FIRST_LINE);
+    private readonly PanelLayout panelLayout = new(Scene.FRAME_WIDTH, Scene.FRAME_HEIGHT - PANEL_FIRST_LINE);
     private readonly uint[] legacyFrame = new uint[Scene.FRAME_WIDTH * Scene.FRAME_HEIGHT];
     private uint[] picture = [];
-    private uint[] scaledRow = [];
 
     /// Window pixels per grid pixel, and where the grid's top left corner is in the window.
     public int Scale { get; private set; } = 1;
@@ -96,12 +95,23 @@ internal sealed class NativeComposer
         }
         else
         {
+            (int classicX, int classicY) = ShowsWorld ? ToClassicPanel(x, y) : (x, y);
+
             InputHandler.NativeMouseLeftWorld();
-            InputBridge.MouseMove(Math.Clamp(x, 0, GRID_WIDTH - 1), Math.Clamp(y, 0, GRID_HEIGHT - 1) / GRID_ROWS_PER_LINE);
+            InputBridge.MouseMove(Math.Clamp(classicX, 0, GRID_WIDTH - 1), Math.Clamp(classicY, 0, GRID_HEIGHT - 1) / GRID_ROWS_PER_LINE);
         }
 
         // The menus are on the grid whatever is under the pointer.
         InputHandler.NativeGridMoved(x, FloorDivide(pixelY - OverlayTop, Scale));
+    }
+
+    // A place of the grid over the panel, turned back into where it is on the classic panel (the pieces of
+    // the panel are not where they were, but the menus and the compass still think in the old places).
+    private static (int X, int Y) ToClassicPanel(int x, int y)
+    {
+        (int classicX, int classicRows) = PanelLayout.ToClassic(x, y - PANEL_FIRST_ROW);
+
+        return (classicX, classicRows + PANEL_FIRST_ROW);
     }
 
     /// Where a window pixel is on the 640 x 400 grid (not clamped).
@@ -275,48 +285,55 @@ internal sealed class NativeComposer
             .Draw(picture, width);
     }
 
-    // The bottom of the old picture, each game pixel a Scale wide and 2 x Scale tall. Each line is
-    // scaled across once and then copied down.
+    // The text panel, cut into its pieces and put together over the terrain (see PanelLayout): each game
+    // pixel a Scale wide and 2 x Scale tall. Pixels the layout leaves empty let the terrain show.
     private void DrawPanel(int width)
     {
         int height = picture.Length / width;
-        int scaledWidth = Scene.FRAME_WIDTH * Scale;
+        panelLayout.Prepare(legacyFrame, Scene.FRAME_WIDTH, PANEL_FIRST_LINE);
+        DrawPanelWood(width, height);
 
-        if (scaledRow.Length != scaledWidth)
+        for (int line = 0; line < panelLayout.ArrangedLines; line++)
         {
-            scaledRow = new uint[scaledWidth];
-        }
-
-        panelBackground.Prepare(legacyFrame, Scene.FRAME_WIDTH, PANEL_FIRST_LINE);
-
-        for (int line = PANEL_FIRST_LINE; line < Scene.FRAME_HEIGHT; line++)
-        {
-            for (int x = 0; x < Scene.FRAME_WIDTH; x++)
+            for (int x = 0; x < panelLayout.ArrangedWidth; x++)
             {
-                Array.Fill(scaledRow, panelBackground.Pixel(legacyFrame, Scene.FRAME_WIDTH, PANEL_FIRST_LINE, x, line - PANEL_FIRST_LINE), x * Scale, Scale);
-            }
+                uint color = panelLayout.Arranged[line * panelLayout.ArrangedWidth + x];
 
-            for (int copy = 0; copy < GRID_ROWS_PER_LINE * Scale; copy++)
-            {
-                int y = GridTop + line * GRID_ROWS_PER_LINE * Scale + copy;
-
-                if (y >= 0 && y < height)
+                if (color != 0)
                 {
-                    CopyRowInto(y, width, scaledWidth);
+                    FillPanelBlock(width, height, (GridLeft + x * Scale, GridTop + (PANEL_FIRST_LINE - PanelLayout.TOP_PAD_LINES + line) * GRID_ROWS_PER_LINE * Scale), color);
                 }
             }
         }
     }
 
-    // Puts the scaled row on a line of the picture, where it is on the picture.
-    private void CopyRowInto(int y, int width, int scaledWidth)
+    // The board of dark wood under the panel's pieces, a little wider than they are, reaching up past
+    // the old panel's top and down to the bottom of the window.
+    private void DrawPanelWood(int width, int height)
     {
-        int from = Math.Max(0, -GridLeft);
-        int to = Math.Min(scaledWidth, width - GridLeft);
+        int boardColumns = panelLayout.ArrangedWidth + 2 * PanelLayout.PAD_SIDE;
 
-        if (to > from)
+        for (int line = 0; line < panelLayout.ArrangedLines; line++)
         {
-            Array.Copy(scaledRow, from, picture, y * width + GridLeft + from, to - from);
+            for (int x = 0; x < boardColumns; x++)
+            {
+                FillPanelBlock(width, height, (GridLeft + (x - PanelLayout.PAD_SIDE) * Scale, GridTop + (PANEL_FIRST_LINE - PanelLayout.TOP_PAD_LINES + line) * GRID_ROWS_PER_LINE * Scale), panelLayout.BoardPixel(x, line));
+            }
+        }
+    }
+
+    // One game pixel of the panel as a block of Scale x (2 x Scale) window pixels, cut to the window.
+    private void FillPanelBlock(int width, int height, (int X, int Y) corner, uint color)
+    {
+        for (int y = Math.Max(corner.Y, 0); y < Math.Min(corner.Y + GRID_ROWS_PER_LINE * Scale, height); y++)
+        {
+            int left = Math.Max(corner.X, 0);
+            int right = Math.Min(corner.X + Scale, width);
+
+            if (right > left)
+            {
+                Array.Fill(picture, color, y * width + left, right - left);
+            }
         }
     }
 

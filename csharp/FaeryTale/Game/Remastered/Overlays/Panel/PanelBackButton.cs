@@ -11,7 +11,7 @@ namespace FaeryTale.Game.Remastered;
 public static class PanelBackButton
 {
     // Just above the two columns of classic buttons, as wide as both.
-    private const int LEFT = 430;
+    private const int LEFT = 434;
     private const int TOP = 266;
     private const int WIDTH = 100;
     private const int HEIGHT = 18;

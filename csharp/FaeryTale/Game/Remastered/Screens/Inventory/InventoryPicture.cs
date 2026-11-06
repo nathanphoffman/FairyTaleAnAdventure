@@ -4,8 +4,8 @@ using FaeryTale.Gfx;
 namespace FaeryTale.Game.Remastered;
 
 /// The inventory screen as an overlay on the 640 x 400 grid: a slab of stone with the sections of
-/// items on it, each item in a square edged like a checkerboard, an item that is not carried dim, the
-/// weapon in hand edged in gold, the close button, and a line that says what the square under the
+/// items on it, each item in a square edged like a checkerboard (an item that is not carried leaves
+/// its square empty, so nothing shows what is still to be found), the weapon in hand edged in gold, the close button, and a line that says what the square under the
 /// pointer is. The panel and the squares are made once.
 public static class InventoryPicture
 {
@@ -21,9 +21,6 @@ public static class InventoryPicture
     private const uint EDGE_DARK = 0xff5a_5a62;
     private const uint GOLD = 0xffe0_b040;
 
-    // How much of its colour an item not carried keeps (out of 100).
-    private const int DIM_PERCENT = 30;
-
     private const int TITLE_SCALE = 2;
     private const int TEXT_SCALE = 1;
     private const int GLYPH_ASCENT = 7;
@@ -33,12 +30,15 @@ public static class InventoryPicture
     private const int COUNT_INSET = 3;
     private const uint DETAIL_BACKGROUND = 0xff2a_2a30;
 
+    // The detail area's two lines: where the first one's baseline is and how far apart they are.
+    private const int DETAIL_FIRST_BASELINE = 10;
+    private const int DETAIL_LINE_HEIGHT = 11;
+
     private static Image? panel;
     private static Image? close;
     private static Image? litClose;
     private static Image? detailBar;
     private static readonly Dictionary<(bool Lit, bool Equipped), Image> cells = [];
-    private static readonly Dictionary<int, Image> dimmed = [];
 
     /// The screen for what the hero carries; pictureOf gives the picture of an object by number, and
     /// pointer is where the mouse is on the grid.
@@ -90,11 +90,9 @@ public static class InventoryPicture
 
         overlay.Images.Add(CellPicture(lit, equipped) with { X = cell.X, Y = cell.Y });
 
-        if (ItemIcons.Of(cell.Item.Slot, pictureOf) is { } icon)
+        if (count > 0 && ItemIcons.Of(cell.Item.Slot, pictureOf) is { } icon)
         {
-            Image shown = count > 0 ? icon : Dim(cell.Item.Slot, icon);
-
-            overlay.Images.Add(shown with { X = cell.X + (InventoryLayout.CELL_WIDTH - icon.Width) / 2, Y = cell.Y + (InventoryLayout.CELL_HEIGHT - icon.Height) / 2 });
+            overlay.Images.Add(icon with { X = cell.X + (InventoryLayout.CELL_WIDTH - icon.Width) / 2, Y = cell.Y + (InventoryLayout.CELL_HEIGHT - icon.Height) / 2 });
         }
 
         if (count > 1)
@@ -105,39 +103,44 @@ public static class InventoryPicture
         }
     }
 
-    // The line under the squares: the name, how many, whether it is in hand, and what a click does.
+    // The two lines under the squares: the name (how many, whether it is in hand) and what a click does,
+    // then what the item does.
     private static void AddDetail(Overlay overlay, Data.Game game, InventoryCell? hovered)
     {
         overlay.Images.Add(DetailBar());
 
-        string text = hovered is { } cell ? DetailText(game, cell.Item) : "Move the pointer over an item";
+        if (hovered is not { } cell || InventoryActions.CountOf(game, cell.Item.Slot) == 0)
+        {
+            AddDetailLine(overlay, "Move the pointer over an item", 0);
 
-        MenuStyle.AddText(overlay, text, (InventoryLayout.DETAIL_LEFT + 8, InventoryLayout.DETAIL_TOP + (InventoryLayout.DETAIL_HEIGHT - Overlay.GLYPH_SIZE) / 2 + GLYPH_ASCENT), MenuStyle.DESCRIPTION_COLOR, TEXT_SCALE);
+            return;
+        }
+
+        AddDetailLine(overlay, DetailText(game, cell.Item), 0);
+        AddDetailLine(overlay, ItemStats.For(cell.Item.Slot), 1);
     }
+
+    // One line of the detail area (0 is the first).
+    private static void AddDetailLine(Overlay overlay, string text, int line) =>
+        MenuStyle.AddText(overlay, text, (InventoryLayout.DETAIL_LEFT + 8, InventoryLayout.DETAIL_TOP + DETAIL_FIRST_BASELINE + line * DETAIL_LINE_HEIGHT), line == 0 ? MenuStyle.DESCRIPTION_COLOR : MenuStyle.HEADING_COLOR, TEXT_SCALE);
 
     private static string DetailText(Data.Game game, InventoryItem item)
     {
         int count = InventoryActions.CountOf(game, item.Slot);
         string name = Tables.ItemList[item.Slot].Name;
-
-        if (count == 0)
-        {
-            return $"{name} - you do not have one";
-        }
-
         string state = InventoryActions.IsEquipped(game, item.Slot) ? "  (in hand)" : count > 1 ? $"  x{count}" : "";
 
         return $"{name}{state}   {InventoryActions.HintFor(item)}";
     }
 
     private static Image Panel() =>
-        panel ??= new Image(InventoryLayout.PANEL_LEFT, InventoryLayout.PANEL_TOP, InventoryLayout.PANEL_WIDTH, InventoryLayout.PANEL_HEIGHT, Stone.Slab(InventoryLayout.PANEL_WIDTH, InventoryLayout.PANEL_HEIGHT, PANEL_SEED, false));
+        panel ??= new Image(InventoryLayout.PANEL_LEFT, InventoryLayout.PANEL_TOP, InventoryLayout.PANEL_WIDTH, InventoryLayout.PANEL_HEIGHT, Stone.Slab(InventoryLayout.PANEL_WIDTH, InventoryLayout.PANEL_HEIGHT, PANEL_SEED));
 
     private static Image Close() =>
-        close ??= new Image(0, 0, InventoryLayout.CLOSE_WIDTH, InventoryLayout.CLOSE_HEIGHT, Stone.Slab(InventoryLayout.CLOSE_WIDTH, InventoryLayout.CLOSE_HEIGHT, CLOSE_SEED, false));
+        close ??= new Image(0, 0, InventoryLayout.CLOSE_WIDTH, InventoryLayout.CLOSE_HEIGHT, Stone.Slab(InventoryLayout.CLOSE_WIDTH, InventoryLayout.CLOSE_HEIGHT, CLOSE_SEED));
 
     private static Image LitClose() =>
-        litClose ??= new Image(0, 0, InventoryLayout.CLOSE_WIDTH, InventoryLayout.CLOSE_HEIGHT, Stone.Slab(InventoryLayout.CLOSE_WIDTH, InventoryLayout.CLOSE_HEIGHT, CLOSE_SEED, true));
+        litClose ??= new Image(0, 0, InventoryLayout.CLOSE_WIDTH, InventoryLayout.CLOSE_HEIGHT, Stone.LitSlab(InventoryLayout.CLOSE_WIDTH, InventoryLayout.CLOSE_HEIGHT, CLOSE_SEED));
 
     // A dark recess for the line of words.
     private static Image DetailBar()
@@ -160,7 +163,7 @@ public static class InventoryPicture
         {
             int width = InventoryLayout.CELL_WIDTH;
             int height = InventoryLayout.CELL_HEIGHT;
-            uint[] stone = Stone.Slab(width, height, CELL_SEED, lit);
+            uint[] stone = lit ? Stone.LitSlab(width, height, CELL_SEED) : Stone.Slab(width, height, CELL_SEED);
             uint[] pixels = new uint[width * height];
 
             for (int y = 0; y < height; y++)
@@ -189,25 +192,5 @@ public static class InventoryPicture
         }
 
         return equipped && depth < EDGE + RING ? GOLD : stone;
-    }
-
-    // The picture dimmed, for an item the hero does not have.
-    private static Image Dim(int slot, Image icon)
-    {
-        if (!dimmed.TryGetValue(slot, out Image? dim))
-        {
-            dim = icon with { Pixels = icon.Pixels.Select(DimPixel).ToArray() };
-            dimmed[slot] = dim;
-        }
-
-        return dim;
-    }
-
-    // A colour with each of red, green and blue cut down (see-through pixels stay see-through).
-    private static uint DimPixel(uint pixel)
-    {
-        uint Part(int shift) => ((pixel >> shift) & 0xff) * DIM_PERCENT / 100 << shift;
-
-        return (pixel & 0xff00_0000) | Part(16) | Part(8) | Part(0);
     }
 }

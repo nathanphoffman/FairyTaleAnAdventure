@@ -127,7 +127,11 @@ public static class GameLoop
 
         InputHandler.ReadWalkDirection(game.Ui, video);
 
-        if ((game.Menus[GAME_MENU].Enabled[PAUSE_ENTRY] & 1) != 0)
+        bool paused = (game.Menus[GAME_MENU].Enabled[PAUSE_ENTRY] & 1) != 0;
+
+        PauseMenu.Update(game, video, paused);
+
+        if (paused)
         {
             ClickToMove.GiveOrdersWhilePaused(game);
             ClickOverlay.Update(game, video);

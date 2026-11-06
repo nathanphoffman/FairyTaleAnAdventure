@@ -17,8 +17,10 @@ public abstract class Font
         {
             return FromHunkFile(File.ReadAllBytes(path));
         }
-        catch (IOException)
+        catch (IOException problem)
         {
+            Console.Error.WriteLine($"Could not read the font file {path}: {problem.Message}");
+
             return null;
         }
     }

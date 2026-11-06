@@ -7,7 +7,8 @@ namespace FaeryTale.Game.Remastered;
 public static class PanelButtonOutline
 {
     // The boxes: 48 wide and 16 tall, in two columns, one every 18 rows, the first at row 290.
-    private const int LEFT_COLUMN_X = 430;
+    // 430 in the classic panel; the menu is 4 pixels further right here (see PanelLayout).
+    private const int LEFT_COLUMN_X = 434;
     private const int COLUMN_SPACING = 52;
     private const int FIRST_ROW_Y = 290;
     private const int ROW_SPACING = 18;

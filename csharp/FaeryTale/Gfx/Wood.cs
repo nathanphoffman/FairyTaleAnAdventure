@@ -12,8 +12,22 @@ public static class Wood
     private static readonly (float R, float G, float B) DARK_GRAIN = (88f, 52f, 24f);
     private static readonly (float R, float G, float B) LIGHT_GRAIN = (176f, 118f, 66f);
 
-    /// A hovered board is lit: brighter and a little warmer.
-    private const float LIT_BRIGHTNESS = 1.22f;
+    /// How bright a board is and how much of its blue is kept: a hovered board is lit, brighter and a
+    /// little warmer.
+    private readonly record struct Tone(float Brightness, float BlueShare);
+
+    private static readonly Tone PLAIN = new(1f, 1f);
+    private static readonly Tone LIT = new(1.22f, 0.92f);
+
+    // The bevel makes the lit edges (top and left) lighter and the others darker by this much.
+    private const float LIT_EDGE_STEP = 32f;
+    private const float SHADED_EDGE_STEP = -46f;
+
+    private const float MAX_CHANNEL = 255f;
+    private const uint OPAQUE = 255;
+    private const int ALPHA_SHIFT = 24;
+    private const int RED_SHIFT = 16;
+    private const int GREEN_SHIFT = 8;
 
     // Width of the bevelled edge, and the outline colour.
     private const int BEVEL = 2;
@@ -25,7 +39,13 @@ public static class Wood
 
     /// A board width x height pixels, with room for its shadow, as 0xAARRGGBB pixels (so width +
     /// SHADOW wide and height + SHADOW tall). seed makes each board's grain different.
-    public static uint[] Plank(int width, int height, uint seed, bool lit)
+    public static uint[] Plank(int width, int height, uint seed) => Make(width, height, seed, PLAIN);
+
+    /// The same board lit (the one under the pointer): brighter and a little warmer.
+    public static uint[] LitPlank(int width, int height, uint seed) => Make(width, height, seed, LIT);
+
+    // The board, with grain and shadow, in a tone.
+    private static uint[] Make(int width, int height, uint seed, Tone tone)
     {
         int fullWidth = width + SHADOW;
         int fullHeight = height + SHADOW;
@@ -35,7 +55,7 @@ public static class Wood
         {
             for (int x = 0; x < fullWidth; x++)
             {
-                pixels[y * fullWidth + x] = x < width && y < height ? BoardPixel(x, y, width, height, seed, lit) : ShadowPixel(x, y, width, height);
+                pixels[y * fullWidth + x] = x < width && y < height ? BoardPixel(x, y, width, height, seed, tone) : ShadowPixel(x, y, width, height);
             }
         }
 
@@ -43,7 +63,7 @@ public static class Wood
     }
 
     // One pixel of the board: grain, then the bevel and outline.
-    private static uint BoardPixel(int x, int y, int width, int height, uint seed, bool lit)
+    private static uint BoardPixel(int x, int y, int width, int height, uint seed, Tone tone)
     {
         if (x == 0 || y == 0 || x == width - 1 || y == height - 1)
         {
@@ -53,16 +73,11 @@ public static class Wood
         (float r, float g, float b) = Grain(x, y, seed);
 
         // Light falls from the top left: those edges are lit, the others in shade.
-        float bevel = y <= BEVEL || x <= BEVEL ? 32f : y >= height - 1 - BEVEL || x >= width - 1 - BEVEL ? -46f : 0f;
+        float bevel = y <= BEVEL || x <= BEVEL ? LIT_EDGE_STEP : y >= height - 1 - BEVEL || x >= width - 1 - BEVEL ? SHADED_EDGE_STEP : 0f;
 
         (r, g, b) = (r + bevel, g + bevel, b + bevel);
 
-        if (lit)
-        {
-            (r, g, b) = (r * LIT_BRIGHTNESS, g * LIT_BRIGHTNESS, b * LIT_BRIGHTNESS * 0.92f);
-        }
-
-        return Pack(r, g, b, 255);
+        return Pack(r * tone.Brightness, g * tone.Brightness, b * tone.Brightness * tone.BlueShare, OPAQUE);
     }
 
     // The colour of the wood at a point: streaks that run along the board and wander a little,
@@ -98,7 +113,7 @@ public static class Wood
             return 0;
         }
 
-        return (uint)(SHADOW_ALPHA * MathF.Min(inside / SHADOW_SOFT_EDGE, 1f)) << 24;
+        return (uint)(SHADOW_ALPHA * MathF.Min(inside / SHADOW_SOFT_EDGE, 1f)) << ALPHA_SHIFT;
     }
 
     // Smooth random values between 0 and 1: each whole-number point has a fixed random value and
@@ -136,8 +151,8 @@ public static class Wood
     // Red, green and blue (0 to 255, clamped) and an alpha as 0xAARRGGBB.
     private static uint Pack(float red, float green, float blue, uint alpha)
     {
-        static uint Channel(float value) => (uint)Math.Clamp(value, 0f, 255f);
+        static uint Channel(float value) => (uint)Math.Clamp(value, 0f, MAX_CHANNEL);
 
-        return alpha << 24 | Channel(red) << 16 | Channel(green) << 8 | Channel(blue);
+        return alpha << ALPHA_SHIFT | Channel(red) << RED_SHIFT | Channel(green) << GREEN_SHIFT | Channel(blue);
     }
 }

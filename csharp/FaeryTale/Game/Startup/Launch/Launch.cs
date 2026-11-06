@@ -128,6 +128,7 @@ public static class Launch
         EnemyPathing.Reset();
         ClickOverlay.Reset();
         MenuGreying.Reset();
+        PauseMenu.Reset();
         WindowControls.SystemCursorShown = false;
         WindowControls.NativeRendering = false;
     }

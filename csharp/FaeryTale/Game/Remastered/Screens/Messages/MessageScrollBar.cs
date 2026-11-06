@@ -6,9 +6,9 @@ namespace FaeryTale.Game.Remastered;
 /// older lines to scroll back to and how far back the window is. Drawn on the 640 x 400 overlay grid.
 public static class MessageScrollBar
 {
-    // The track: a thin bar beside the four lines of messages (the lines start at row 296).
+    // The track: a thin bar beside the four lines of messages (the lines start at row 288, the message box being raised 4 lines).
     private const int LEFT = 406;
-    private const int TOP = 296;
+    private const int TOP = 288;
     private const int WIDTH = 7;
     private const int HEIGHT = 78;
 

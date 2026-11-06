@@ -89,7 +89,7 @@ public class LaunchTests
     [Fact]
     public void TheBoardIsSolidAndTheFarCornerIsClear()
     {
-        uint[] pixels = Wood.Plank(60, 30, 1, false);
+        uint[] pixels = Wood.Plank(60, 30, 1);
         int fullWidth = 60 + Wood.SHADOW;
 
         Assert.Equal(fullWidth * (30 + Wood.SHADOW), pixels.Length);
@@ -107,11 +107,11 @@ public class LaunchTests
     [Fact]
     public void BoardsAreTheSameEveryTimeAndDifferBySeedAndALitBoardIsBrighter()
     {
-        Assert.Equal(Wood.Plank(50, 20, 4, false), Wood.Plank(50, 20, 4, false));
-        Assert.NotEqual(Wood.Plank(50, 20, 4, false), Wood.Plank(50, 20, 5, false));
+        Assert.Equal(Wood.Plank(50, 20, 4), Wood.Plank(50, 20, 4));
+        Assert.NotEqual(Wood.Plank(50, 20, 4), Wood.Plank(50, 20, 5));
 
-        uint[] plain = Wood.Plank(80, 40, 3, false);
-        uint[] lit = Wood.Plank(80, 40, 3, true);
+        uint[] plain = Wood.Plank(80, 40, 3);
+        uint[] lit = Wood.LitPlank(80, 40, 3);
         int row = 20 * (80 + Wood.SHADOW);
 
         static uint Brightness(uint[] pixels, int from, int to) =>

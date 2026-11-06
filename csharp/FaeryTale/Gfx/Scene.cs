@@ -50,6 +50,9 @@ public sealed class Scene
     private const int POINTER_MAX_LINES = 32;
     private const int HIGH_WORD_SHIFT = 16;
 
+    // The alpha part of a 0xAARRGGBB pixel for a fully solid colour.
+    private const uint OPAQUE_ALPHA = 0xff00_0000;
+
     public List<ViewPort> ViewPorts { get; init; } = [];
 
     public Pointer? Pointer { get; init; }
@@ -183,6 +186,10 @@ public sealed class Scene
 
             for (int bit = 0; bit < POINTER_WIDTH; bit++)
             {
+                // How the colour number of one pointer pixel is found: the word holds two bitplanes, the
+                // high half is the colour's low bit and the low half is its high bit. The leftmost pixel
+                // is the highest bit of each half, so shift counts down from the left; "& 1" keeps that
+                // one bit, and "<< 1" moves the high-bit plane up to where the second bit belongs.
                 int shift = POINTER_WIDTH - 1 - bit;
                 int value = (((ushort)(word >> HIGH_WORD_SHIFT) >> shift) & 1) | ((((ushort)word >> shift) & 1) << 1);
 
@@ -202,7 +209,7 @@ public sealed class Scene
             int start = Math.Min(Math.Max(at.X, 0), size.Width);
             int end = Math.Clamp(at.X + side, start, size.Width);
 
-            Array.Fill(frame, 0xff00_0000 | color, y * size.Width + start, end - start);
+            Array.Fill(frame, OPAQUE_ALPHA | color, y * size.Width + start, end - start);
         }
     }
 

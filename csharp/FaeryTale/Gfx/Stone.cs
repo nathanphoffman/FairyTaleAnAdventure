@@ -18,11 +18,19 @@ public static class Stone
     private const int BEVEL = 2;
     private const int BEVEL_STEP = 34;
 
+    // How much lighter a lit slab is.
+    private const int LIT_LIFT = BEVEL_STEP / 2;
+
     private const uint OUTLINE = 0xff1c_1c20;
 
-    /// A slab width x height pixels as 0xAARRGGBB. seed makes each slab's pattern different; a
-    /// lit slab is lighter (the one under the pointer).
-    public static uint[] Slab(int width, int height, uint seed, bool lit)
+    /// A slab width x height pixels as 0xAARRGGBB. seed makes each slab's pattern different.
+    public static uint[] Slab(int width, int height, uint seed) => Make(width, height, seed, 0);
+
+    /// The same slab lit (the one under the pointer): lighter.
+    public static uint[] LitSlab(int width, int height, uint seed) => Make(width, height, seed, LIT_LIFT);
+
+    // The slab, every grey level raised by lift.
+    private static uint[] Make(int width, int height, uint seed, int lift)
     {
         uint[] pixels = new uint[width * height];
 
@@ -30,7 +38,7 @@ public static class Stone
         {
             for (int x = 0; x < width; x++)
             {
-                pixels[y * width + x] = PixelAt(x, y, (width, height), seed, lit);
+                pixels[y * width + x] = PixelAt(x, y, (width, height), seed, lift);
             }
         }
 
@@ -38,14 +46,14 @@ public static class Stone
     }
 
     // One pixel: the outline round the slab, the bevel inside it, then the stone itself.
-    private static uint PixelAt(int x, int y, (int Width, int Height) size, uint seed, bool lit)
+    private static uint PixelAt(int x, int y, (int Width, int Height) size, uint seed, int lift)
     {
         if (x == 0 || y == 0 || x == size.Width - 1 || y == size.Height - 1)
         {
             return OUTLINE;
         }
 
-        int grey = BASE_GREY + Blotch(x, y, seed) + Speckle(x, y, seed) + (lit ? BEVEL_STEP / 2 : 0);
+        int grey = BASE_GREY + Blotch(x, y, seed) + Speckle(x, y, seed) + lift;
 
         if (x <= BEVEL || y <= BEVEL)
         {

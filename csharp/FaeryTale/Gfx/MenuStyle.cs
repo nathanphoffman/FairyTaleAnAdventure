@@ -25,9 +25,9 @@ internal static class MenuStyle
     /// A plain and a lit board for an area (left, top, width, height).
     public static Image[] Board((int Left, int Top, int Width, int Height) area, uint seed)
     {
-        Image Make(bool lit) => new(area.Left, area.Top, area.Width + Wood.SHADOW, area.Height + Wood.SHADOW, Wood.Plank(area.Width, area.Height, seed, lit));
+        Image Make(uint[] pixels) => new(area.Left, area.Top, area.Width + Wood.SHADOW, area.Height + Wood.SHADOW, pixels);
 
-        return [Make(false), Make(true)];
+        return [Make(Wood.Plank(area.Width, area.Height, seed)), Make(Wood.LitPlank(area.Width, area.Height, seed))];
     }
 
     /// Adds a line of text in the middle of the screen with its baseline at y.

@@ -84,7 +84,12 @@ check this).
   at the bottom. People and things load much further out (`Objects.WIDE_*`), all from one picture file at a time.
   The menu music starts again whenever the main menu comes back.
 - A "< Back" button above the classic buttons while a submenu is open (`PanelBackButton`). The black behind the
-  text panel is a wooden board (`PanelBackground`; the black labels inside the menu boxes stay).
+  text panel is a board of dark wood with the message box, the menu and the compass on it (`PanelLayout` cuts the
+  classic panel into those pieces, leaves a little room between them, raises the message box so the menu and the
+  compass are level with its middle, and puts a thick black frame round the menu boxes; the black labels inside the
+  boxes stay, and the mouse is turned back to the classic places so the buttons and the compass still work).
+  When the game is unpaused the panel goes back to the first menu (`PauseMenu`). Empty inventory squares are empty
+  (nothing shows what is still to be found) and a carried item shows what it does (`ItemStats`).
 - Inventory (`Game/Remastered/Inventory`): I or the classic List button opens a stone panel over the running game
   (the old full-screen list never shows in these modes). Weapons, Magic, Supplies, Keys and Treasures, each item in a
   square with a checkerboard edge and a large picture (`ItemIcons`, from the object pictures); not carried is dim, the
