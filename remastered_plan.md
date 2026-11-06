@@ -105,5 +105,7 @@ check this).
   none). Spells are not cast from the inventory.
 - The bird totem is gone in these modes (the minimap and big map do its job): wherever one would be given (lying about,
   chest, body, shop) a random other stone comes instead (`MagicSwap`); the inventory and hotbar have no place for it.
+- Click to attack with a bow or wand keeps shooting while the enemy is in range with a clear line (the fight is
+  let go for a moment between shots, `ClickToAttack.ShotHeld`); it ends when the arrows run out.
 - Cheat: typing GRAPHIX while playing gives every item (not the talisman) and some gold, for testing (`CheatCode`).
 - Not done: a map of the indoors; the minimap and big map show the daylight colours only.

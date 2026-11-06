@@ -17,6 +17,20 @@ public static class ClickToAttack
     // The route to a moving enemy is worked out again this often (in frames).
     private const int REPLAN_FRAMES = 12;
 
+    // A bow shoots when the fight is let go, so the fight is held while the bow is drawn and let go for
+    // a moment to loose the arrow, over and over. A wand fires when the fight starts, so it is let go
+    // for a while between shots. (Frames: each is a fiftieth of a second.)
+    private const int BOW_PERIOD = 16;
+    private const int BOW_HOLD = 14;
+    private const int WAND_PERIOD = 14;
+    private const int WAND_HOLD = 2;
+
+    // Whether a shot has a clear line is looked at every this many pixels, leaving out the last few
+    // next to the enemy (who stands in the way of himself).
+    private const int SIGHT_STEP = 8;
+    private const int SIGHT_END_MARGIN = 12;
+    private const int ARROW_SLOT = 8;
+
     private const sbyte WEAPON_BOW = 4;
     private const sbyte WEAPON_WAND = 5;
 
@@ -25,6 +39,7 @@ public static class ClickToAttack
 
     private static int? target;
     private static int frames;
+    private static int shotFrames;
 
     /// Whether an enemy is being attacked.
     public static bool Active => target is not null;
@@ -34,6 +49,7 @@ public static class ClickToAttack
     {
         target = enemy;
         frames = 0;
+        shotFrames = 0;
     }
 
     /// Ends the order.
@@ -73,7 +89,17 @@ public static class ClickToAttack
         Shape hero = game.Actors.List[0];
         Shape enemy = game.Actors.List[number];
 
-        if (Blocking.ActorDistance(game, number, 0) <= ReachOf(hero))
+        bool ranged = IsRanged(hero);
+
+        if (ranged && hero.Weapon == WEAPON_BOW && game.Hero.Stuff[ARROW_SLOT] == 0)
+        {
+            Clear();
+            ClickToMove.Cancel();
+
+            return false;
+        }
+
+        if (Blocking.ActorDistance(game, number, 0) <= ReachOf(hero) && (!ranged || HasClearShot(game, hero, enemy)))
         {
             Fight(game, hero, enemy);
 
@@ -85,8 +111,41 @@ public static class ClickToAttack
         return false;
     }
 
+    // A bow or a wand shoots, the rest of the weapons are swung.
+    private static bool IsRanged(Shape hero) => hero.Weapon is WEAPON_BOW or WEAPON_WAND;
+
     // How far the hero's weapon takes him from an enemy.
-    private static int ReachOf(Shape hero) => hero.Weapon is WEAPON_BOW or WEAPON_WAND ? RANGED_DISTANCE : MELEE_DISTANCE;
+    private static int ReachOf(Shape hero) => IsRanged(hero) ? RANGED_DISTANCE : MELEE_DISTANCE;
+
+    /// Whether the fight is held down at a frame of a run of shots (a frame count from the first). A
+    /// weapon that is swung is held all the time.
+    internal static bool ShotHeld(sbyte weapon, int frame) => weapon switch
+    {
+        WEAPON_BOW => frame % BOW_PERIOD < BOW_HOLD,
+        WEAPON_WAND => frame % WAND_PERIOD < WAND_HOLD,
+        _ => true,
+    };
+
+    // Whether nothing solid lies between the hero and the enemy (a shot goes in a straight line).
+    private static bool HasClearShot(Data.Game game, Shape hero, Shape enemy)
+    {
+        int dx = enemy.AbsX - hero.AbsX;
+        int dy = enemy.AbsY - hero.AbsY;
+        int steps = (Math.Max(Math.Abs(dx), Math.Abs(dy)) - SIGHT_END_MARGIN) / SIGHT_STEP;
+
+        for (int step = 1; step <= steps; step++)
+        {
+            int x = hero.AbsX + dx * step * SIGHT_STEP / Math.Max(Math.Abs(dx), Math.Abs(dy));
+            int y = hero.AbsY + dy * step * SIGHT_STEP / Math.Max(Math.Abs(dx), Math.Abs(dy));
+
+            if (Blocking.BlockedAt(game, (short)x, (short)y, 0) != 0)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     // Stands and fights, turned towards the enemy.
     private static void Fight(Data.Game game, Shape hero, Shape enemy)
@@ -101,7 +160,7 @@ public static class ClickToAttack
             game.Ui.CompassLitDirection = direction;
         }
 
-        game.Ui.PathFighting = true;
+        game.Ui.PathFighting = ShotHeld(hero.Weapon, shotFrames++);
     }
 
     // Keeps a route to the enemy, worked out again now and then as the enemy moves.

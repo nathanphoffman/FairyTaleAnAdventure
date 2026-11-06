@@ -49,6 +49,11 @@ public static class InputBridge
     {
         TrackShift(name, down);
         TypeCheatLetter(name, down);
+
+        if (down && InputHandler.RemasteredControls && CheatCode.ShouldReleaseHeldInventoryKey(name))
+        {
+            Inventory.Toggle();
+        }
         ScrollMessagesWithKey(name, down);
 
         if (InputHandler.RemasteredControls && name == MAP_KEY)
@@ -86,7 +91,7 @@ public static class InputBridge
     // I opens the inventory and closes it again; the game does not see the key.
     private static void OpenOrCloseInventory(bool down)
     {
-        if (down)
+        if (down && !CheatCode.HoldInventoryKey())
         {
             Inventory.Toggle();
         }

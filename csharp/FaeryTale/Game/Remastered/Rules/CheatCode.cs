@@ -26,7 +26,11 @@ public static class CheatCode
 
     private const int GOLD_GIVEN = 200;
 
+    // Names of keys that are only held down with another (they do not end a word being typed).
+    private static readonly string[] MODIFIER_KEYS = ["Left Shift", "Right Shift", "Left Ctrl", "Right Ctrl", "Left Alt", "Right Alt", "Left GUI", "Right GUI", "CapsLock"];
+
     private static readonly object padlock = new();
+    private static bool inventoryHeld;
     private static string typed = "";
     private static bool completed;
 
@@ -42,6 +46,36 @@ public static class CheatCode
                 completed = true;
                 typed = "";
             }
+        }
+    }
+
+    /// Whether a press of the I key should wait to see if it is the I of the word: it is held back when the
+    /// letters typed so far are the word up to and including its I, and the inventory opens (or closes)
+    /// only if the word is not finished. A second I (as in GRAPHII) is then the one that opens it.
+    public static bool HoldInventoryKey()
+    {
+        lock (padlock)
+        {
+            inventoryHeld = typed.EndsWith(WORD[..(WORD.IndexOf('I') + 1)], StringComparison.Ordinal);
+
+            return inventoryHeld;
+        }
+    }
+
+    /// Whether a key that came after a held I means the I was a real press of the key (so the inventory
+    /// should now be opened or closed): any key but another I or the last letter of the word.
+    public static bool ShouldReleaseHeldInventoryKey(string key)
+    {
+        lock (padlock)
+        {
+            if (!inventoryHeld || key.Equals("I", StringComparison.OrdinalIgnoreCase) || MODIFIER_KEYS.Contains(key))
+            {
+                return false;
+            }
+
+            inventoryHeld = false;
+
+            return !completed;
         }
     }
 
@@ -71,6 +105,7 @@ public static class CheatCode
 
         game.Hero.Wealth += GOLD_GIVEN;
         Menus.UpdateMenuAvailability(game);
-        output.Print("All items unlocked.");
+        output.Print("All Items Unlocked:");
+        output.Print("You're like a kid in an Amiga store in 1988");
     }
 }

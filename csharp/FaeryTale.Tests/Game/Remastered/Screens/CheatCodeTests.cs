@@ -49,4 +49,38 @@ public class CheatCodeTests
         Assert.Equal(0, game.Hero.Stuff[22]);
         Assert.True(game.Hero.Wealth > goldBefore);
     }
+
+    [Fact]
+    public void TheIOfTheWordDoesNotOpenTheInventoryButASecondIDoes()
+    {
+        CheatCode.TakeCompleted();
+
+        TypeWord("graphi");
+        Assert.True(CheatCode.HoldInventoryKey());
+
+        // The word is finished by the X: the held I never opens anything.
+        CheatCode.Type('x');
+        Assert.False(CheatCode.ShouldReleaseHeldInventoryKey("X"));
+        CheatCode.TakeCompleted();
+
+        // GRAPHII: the first I is held, the second is a real press (it opens at once).
+        TypeWord("graphi");
+        Assert.True(CheatCode.HoldInventoryKey());
+        CheatCode.Type('i');
+        Assert.False(CheatCode.ShouldReleaseHeldInventoryKey("I"));
+        Assert.False(CheatCode.HoldInventoryKey());
+    }
+
+    [Fact]
+    public void AnotherKeyAfterAHeldIMakesItARealPress()
+    {
+        CheatCode.TakeCompleted();
+
+        TypeWord("graphi");
+        Assert.True(CheatCode.HoldInventoryKey());
+
+        CheatCode.Type('q');
+
+        Assert.True(CheatCode.ShouldReleaseHeldInventoryKey("Q"));
+    }
 }
