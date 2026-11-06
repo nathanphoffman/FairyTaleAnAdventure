@@ -57,6 +57,75 @@ public static class WindowControls
         }
     }
 
+    /// A choice for the size of the window: a size, and whether it fills the monitor with no border
+    /// (the monitor's own size) or is a window.
+    public readonly record struct Resolution(int Width, int Height, bool Borderless)
+    {
+        /// The words in the menu, such as "1920x1080 (borderless)" or "800x600 (windowed)".
+        public string Text => $"{Width}x{Height} ({(Borderless ? "borderless" : "windowed")})";
+    }
+
+    // The sizes offered besides the monitor's own, largest first; the smallest is the lowest choice.
+    private static readonly (int Width, int Height)[] WINDOW_SIZES =
+    [
+        (3840, 2160), (2560, 1440), (1920, 1080), (1600, 900), (1366, 768), (1280, 720), (1024, 768), (800, 600), (640, 480),
+    ];
+
+    private static readonly object resolutionPadlock = new();
+    private static Resolution? requested;
+
+    /// The monitor's own size (the real window reads it; until then a common one, for tests).
+    public static (int Width, int Height) Monitor { get; set; } = (1920, 1080);
+
+    /// What the window is now: its size and whether it is the borderless full screen.
+    public static (int Width, int Height, bool Fullscreen) WindowState { get; set; } = (1920, 1080, true);
+
+    /// The choices for the window, from the monitor's own size (borderless) down to 640x480 (windowed),
+    /// in that order. Only sizes that fit on the monitor are offered.
+    public static List<Resolution> ResolutionChoices()
+    {
+        List<Resolution> choices = [new Resolution(Monitor.Width, Monitor.Height, true)];
+
+        foreach ((int width, int height) in WINDOW_SIZES)
+        {
+            bool fits = width <= Monitor.Width && height <= Monitor.Height;
+            bool isMonitorSize = width == Monitor.Width && height == Monitor.Height;
+
+            if (fits && !isMonitorSize)
+            {
+                choices.Add(new Resolution(width, height, false));
+            }
+        }
+
+        return choices;
+    }
+
+    /// The words for the window as it is now, for the game menu.
+    public static string ResolutionText =>
+        WindowState.Fullscreen ? new Resolution(Monitor.Width, Monitor.Height, true).Text : new Resolution(WindowState.Width, WindowState.Height, false).Text;
+
+    /// Asks the window to take a size (the window carries it out on its own thread).
+    public static void RequestResolution(Resolution choice)
+    {
+        lock (resolutionPadlock)
+        {
+            requested = choice;
+        }
+    }
+
+    /// The size asked for since the last call, if any.
+    public static Resolution? TakeResolutionRequest()
+    {
+        lock (resolutionPadlock)
+        {
+            Resolution? asked = requested;
+
+            requested = null;
+
+            return asked;
+        }
+    }
+
     /// Shows or hides the ordinary mouse arrow (the game draws its own while playing).
     public static bool SystemCursorShown { get; set; }
 }

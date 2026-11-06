@@ -11,7 +11,7 @@ internal static class MenuStyle
     public const int TITLE_ASCENT = 14 * TITLE_SCALE / 2;
 
     /// Space between the text and the edge of its board.
-    public const int PANEL_PADDING = 8;
+    public const int PANEL_PADDING = 6;
 
     // Colours of the text on the wood: cream, gold for the heading, yellow under the pointer, with
     // a dark shadow behind each letter so it can be read on the grain.

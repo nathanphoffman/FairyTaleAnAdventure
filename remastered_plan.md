@@ -95,4 +95,7 @@ check this).
   square with a checkerboard edge and a large picture (`ItemIcons`, from the object pictures); not carried is dim, the
   weapon in hand has a gold ring. A click equips a weapon, casts a stone, tries a key or uses the shell and sun stone
   through the game's own menus; X or I closes it; clicks outside it go to the world.
+- The game menu (Esc) has a Resolution entry (`ResolutionMenu`): a list from the monitor's own size (borderless) down to
+  640x480 (windowed); the window carries out the choice (`WindowControls.RequestResolution`). While the inventory is
+  open the classic List button has a red square.
 - Not done: a map of the indoors; the minimap and big map show the daylight colours only.

@@ -89,12 +89,13 @@ public static class ClickOverlay
         InputHandler.ShiftHeld && game.Experience != Data.Experience.Original && game.Ui.ViewStatus == VIEW_NORMAL;
 
     // The classic buttons the new controls are using now: Look with shift held, Take over an item,
-    // Talk with a conversation open; and the ones a walk in progress is for.
+    // Talk with a conversation open, List with the inventory open; and the ones a walk in progress is for.
     private static PanelButtons ButtonsInUse(WorldCapture capture) =>
         ClickToMove.WalkingFor
         | (capture.LookMode ? PanelButtons.Look : 0)
         | (capture.ItemHover ? PanelButtons.Take : 0)
-        | (Conversation.Person is not null ? PanelButtons.Talk : 0);
+        | (Conversation.Person is not null ? PanelButtons.Talk : 0)
+        | (Inventory.IsOpen ? PanelButtons.List : 0);
 
     // Whether the mouse is over an enemy that can be attacked (the new drawer only).
     private static bool IsPointerOverEnemy(Data.Game game) =>

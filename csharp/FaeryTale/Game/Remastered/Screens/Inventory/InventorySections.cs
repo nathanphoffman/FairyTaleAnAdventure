@@ -9,7 +9,7 @@ public enum ItemUse
     /// A weapon: clicking it takes it in hand.
     Equip,
 
-    /// A magic stone: clicking it casts it.
+    /// A magic stone: it is cast from the hotbar, not from the inventory.
     Cast,
 
     /// A key: clicking it tries it on the doors and chests round the hero.

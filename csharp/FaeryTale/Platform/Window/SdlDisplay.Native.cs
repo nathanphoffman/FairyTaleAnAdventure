@@ -46,6 +46,8 @@ public sealed partial class SdlDisplay
     // the native size goes borderless fullscreen with the fullscreen zoom.
     private void ApplyNativeMode()
     {
+        ApplyResolutionRequest();
+
         if (WindowControls.NativeRendering == nativeApplied)
         {
             return;
@@ -64,6 +66,30 @@ public sealed partial class SdlDisplay
         {
             SDL_RenderSetLogicalSize(renderer, Scene.FRAME_WIDTH, Scene.FRAME_HEIGHT * ROW_SCALE);
         }
+    }
+
+    // Carries out a size the game menu asked for (the monitor's own size is borderless full screen,
+    // smaller sizes are a window in the middle of the screen) and tells the game what the window is now.
+    private void ApplyResolutionRequest()
+    {
+        if (WindowControls.TakeResolutionRequest() is { } choice)
+        {
+            SetFullscreen(choice.Borderless);
+
+            if (!choice.Borderless)
+            {
+                SDL_SetWindowSize(window, choice.Width, choice.Height);
+                SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+            }
+
+            if (WindowControls.NativeRendering)
+            {
+                WorldView.Current.SetZoom(choice.Borderless ? WorldView.FULLSCREEN_ZOOM : WorldView.WINDOW_ZOOM);
+            }
+        }
+
+        SDL_GetWindowSize(window, out int width, out int height);
+        WindowControls.WindowState = (width, height, (SDL_GetWindowFlags(window) & (uint)SDL_WindowFlags.SDL_WINDOW_FULLSCREEN_DESKTOP) != 0);
     }
 
     // Borderless fullscreen at the monitor's own size, or back to the window.

@@ -50,8 +50,18 @@ public sealed partial class SdlDisplay : IDisplayDevice, IDisposable
 
         SDL_RenderSetLogicalSize(renderer, Scene.FRAME_WIDTH, Scene.FRAME_HEIGHT * ROW_SCALE);
         SDL_ShowCursor(0); // the game draws its own pointer
+        RememberMonitorSize();
         KeyRemap.Load();
         ReadFrameRateSetting();
+    }
+
+    // The monitor's own size is what the borderless choice of the game menu uses.
+    private static void RememberMonitorSize()
+    {
+        if (SDL_GetDesktopDisplayMode(0, out SDL_DisplayMode mode) == 0 && mode.w > 0 && mode.h > 0)
+        {
+            WindowControls.Monitor = (mode.w, mode.h);
+        }
     }
 
     public Video? Source { get; set; }

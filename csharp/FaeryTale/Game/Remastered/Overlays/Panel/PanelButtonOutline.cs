@@ -27,6 +27,7 @@ public static class PanelButtonOutline
     private const int TALK_ENTRY = 2;
     private const int TAKE_ENTRY = 6;
     private const int LOOK_ENTRY = 7;
+    private const int LIST_ENTRY = 5;
     private const int ITEMS_MENU = 0;
     private const int FIRST_NON_MAIN_MENU = 8;
 
@@ -39,6 +40,7 @@ public static class PanelButtonOutline
         AddIf(overlay, game, lit.HasFlag(PanelButtons.Talk), TALK_ENTRY, game.Ui.CurrentMenu < FIRST_NON_MAIN_MENU);
         AddIf(overlay, game, lit.HasFlag(PanelButtons.Take), TAKE_ENTRY, game.Ui.CurrentMenu == ITEMS_MENU);
         AddIf(overlay, game, lit.HasFlag(PanelButtons.Look), LOOK_ENTRY, game.Ui.CurrentMenu == ITEMS_MENU);
+        AddIf(overlay, game, lit.HasFlag(PanelButtons.List), LIST_ENTRY, game.Ui.CurrentMenu == ITEMS_MENU);
 
         return overlay;
     }

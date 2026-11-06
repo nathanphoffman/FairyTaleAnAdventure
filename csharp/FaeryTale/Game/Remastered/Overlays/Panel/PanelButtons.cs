@@ -15,4 +15,7 @@ public enum PanelButtons
 
     /// Looking (shift is held, or the hero is walking to a spot to look).
     Look = 4,
+
+    /// The list of what the hero carries (the inventory screen is open).
+    List = 8,
 }

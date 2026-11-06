@@ -26,10 +26,10 @@ public static class GameMenu
 {
     private const string HEADING = "Game Menu";
     // The menu is laid out from the heading down, and the whole block is centred on the screen.
-    private const int FIRST_ENTRY_BELOW_HEADING = 58;
-    private const int ENTRY_SPACING = 40;
+    private const int FIRST_ENTRY_BELOW_HEADING = 52;
+    private const int ENTRY_SPACING = 38;
     private const int BOARD_BELOW_BASELINE = 16;
-    private const int DESCRIPTION_BELOW_BOARDS = 24;
+    private const int DESCRIPTION_BELOW_BOARDS = 16;
     private const int DESCRIPTION_DESCENT = 2;
 
     /// How dark the game looks behind the menu (0-255).
@@ -40,6 +40,9 @@ public static class GameMenu
 
     /// "300 fps", the longest the frame rate entry gets.
     private const int MAX_RATE_TEXT_LENGTH = 7;
+
+    /// "1920x1080 (borderless)", the longest the resolution entry gets.
+    private const int MAX_RESOLUTION_TEXT_LENGTH = 22;
     private const int ENTRY_SEED = 51;
 
     // The entries, top to bottom, and what each does. The difficulty entry (DIFFICULTY_ENTRY) shows
@@ -51,6 +54,7 @@ public static class GameMenu
         ("VSync", GameMenuChoice.Resume),
         ("Frame Rate", GameMenuChoice.Resume),
         ("Map", GameMenuChoice.Resume),
+        ("Resolution", GameMenuChoice.Resume),
         ("Back To Main Menu", GameMenuChoice.BackToGameSelection),
         ("Exit Game", GameMenuChoice.ExitGame),
     ];
@@ -59,13 +63,15 @@ public static class GameMenu
     private const int VSYNC_ENTRY = 2;
     private const int FRAME_RATE_ENTRY = 3;
     private const int MAP_ENTRY = 4;
+    private const int RESOLUTION_ENTRY = 5;
 
     // The two entries that leave the game come last, set apart from the settings by this much room.
-    private const int FIRST_LEAVING_ENTRY = 5;
-    private const int LEAVING_MARGIN = 22;
+    private const int FIRST_LEAVING_ENTRY = 6;
+    private const int LEAVING_MARGIN = 14;
     private const string VSYNC_LABEL = "VSync: ";
     private const string FRAME_RATE_LABEL = "Frame Rate: ";
     private const string DIFFICULTY_LABEL = "Difficulty: ";
+    private const string RESOLUTION_LABEL = "Resolution: ";
 
     /// The line under the entries that says what the difficulty does.
     private const int DESCRIPTION_SCALE = 1;
@@ -90,7 +96,7 @@ public static class GameMenu
 
             if (hovered is { } entry && InputHandler.LeftButtonDown)
             {
-                if (entry is DIFFICULTY_ENTRY or VSYNC_ENTRY or FRAME_RATE_ENTRY or MAP_ENTRY)
+                if (entry is DIFFICULTY_ENTRY or VSYNC_ENTRY or FRAME_RATE_ENTRY or MAP_ENTRY or RESOLUTION_ENTRY)
                 {
                     ChangeSetting(game, video, entry);
 
@@ -135,6 +141,10 @@ public static class GameMenu
         {
             MapSettings.Toggle();
         }
+        else if (entry == RESOLUTION_ENTRY)
+        {
+            ResolutionMenu.Show(game, video);
+        }
         else
         {
             WindowControls.CycleFrameRate();
@@ -169,6 +179,7 @@ public static class GameMenu
         int widest = Math.Max(ENTRIES.Max(entry => entry.Label.Length), DIFFICULTY_LABEL.Length + longestLevel);
 
         widest = Math.Max(widest, FRAME_RATE_LABEL.Length + MAX_RATE_TEXT_LENGTH);
+        widest = Math.Max(widest, RESOLUTION_LABEL.Length + MAX_RESOLUTION_TEXT_LENGTH);
         int width = widest * Overlay.GLYPH_SIZE * TITLE_SCALE + PANEL_PADDING * 2;
 
         return ENTRIES.Select((_, index) => ((Overlay.WIDTH - width) / 2, EntryBaseline(index) - TITLE_ASCENT - PANEL_PADDING, width, TITLE_ASCENT + PANEL_PADDING * 2 + Overlay.GLYPH_SIZE)).ToArray();
@@ -223,6 +234,7 @@ public static class GameMenu
         VSYNC_ENTRY => VSYNC_LABEL + WindowControls.VSyncText,
         FRAME_RATE_ENTRY => FRAME_RATE_LABEL + WindowControls.FrameRateText,
         MAP_ENTRY => MapSettings.MenuText,
+        RESOLUTION_ENTRY => RESOLUTION_LABEL + WindowControls.ResolutionText,
         _ => ENTRIES[index].Label,
     };
 

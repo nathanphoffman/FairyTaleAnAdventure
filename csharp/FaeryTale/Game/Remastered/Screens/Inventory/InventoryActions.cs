@@ -10,11 +10,9 @@ namespace FaeryTale.Game.Remastered;
 public static class InventoryActions
 {
     // The menus the choices belong to, and the entries of each.
-    private const int MAGIC_MENU = 1;
     private const int KEYS_MENU = 6;
     private const int USE_MENU = 8;
     private const int FIRST_ITEM_ENTRY = 5;
-    private const int FIRST_MAGIC_SLOT = 9;
     private const int FIRST_KEY_SLOT = 16;
     private const int SEA_SHELL = 6;
     private const int SUN_STONE = 7;
@@ -35,7 +33,7 @@ public static class InventoryActions
     public static string HintFor(InventoryItem item) => item.Use switch
     {
         ItemUse.Equip => "Click to equip",
-        ItemUse.Cast => "Click to cast",
+        ItemUse.Cast => "To cast, use the hotbar",
         ItemUse.Unlock => "Click to try it on a door or chest",
         ItemUse.UseSpecial => "Click to use",
         _ => "",
@@ -55,8 +53,8 @@ public static class InventoryActions
                 game.Actors.List[0].Weapon = (sbyte)(item.Slot + 1);
                 break;
 
+            // A magic stone is not cast from here: the hotbar casts it (so there is no click to use up).
             case ItemUse.Cast:
-                ChooseIn(game, output, MAGIC_MENU, (short)(FIRST_ITEM_ENTRY + item.Slot - FIRST_MAGIC_SLOT));
                 break;
 
             case ItemUse.Unlock:
