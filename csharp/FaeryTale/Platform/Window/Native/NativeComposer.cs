@@ -129,6 +129,7 @@ internal sealed class NativeComposer
         scene.ComposeFromLine(legacyFrame, PANEL_FIRST_LINE);
         DrawPanel(width);
         DrawLitButtons(width, video.Capture);
+        DrawBackButton(width, video.Capture);
         MessageScrollBar.Of(video.History).DrawAt(picture, width, new Overlay.Placement(GridLeft, GridTop, Scale));
         overlay.DrawAt(picture, width, new Overlay.Placement(GridLeft, OverlayTop, Scale));
 
@@ -211,6 +212,15 @@ internal sealed class NativeComposer
         (double x, double y) = view.ToScreen(target.X, target.Y);
 
         new Overlay { Images = { Crosshair.At(((int)Math.Round(x), (int)Math.Round(y)), TARGET_RADIUS_WORLD_PIXELS * view.Scale) } }.Draw(picture, width);
+    }
+
+    // The "< Back" button above the classic buttons while a submenu is open.
+    private void DrawBackButton(int width, WorldCapture capture)
+    {
+        if (capture.Game is { } game && PanelBackButton.IsShown(game))
+        {
+            PanelBackButton.Of(PanelBackButton.Contains(InputHandler.GridPointer)).DrawAt(picture, width, new Overlay.Placement(GridLeft, GridTop, Scale));
+        }
     }
 
     // A red square round each classic button the new controls are using.
