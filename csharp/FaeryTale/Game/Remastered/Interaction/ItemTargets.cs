@@ -3,11 +3,12 @@ using FaeryTale.Game.Ui;
 
 namespace FaeryTale.Game.Remastered;
 
-/// Finding the things lying about (chests, gold, weapons) under the mouse that Take would pick up.
+/// Finding the things lying about (chests, gold, weapons) and the bodies that have not been searched
+/// under the mouse, that Take would pick up or search.
 public static class ItemTargets
 {
-    // Objects are one 16 pixel word wide.
-    private const int PICTURE_WIDTH = 16;
+    // A picture is a whole number of 16 pixel words wide (a chest one, a body maybe more).
+    private const int PIXELS_PER_WORD = 16;
 
     /// The actor number of the pick-up-able object drawn at a world position, if there is one. The
     /// one drawn last (in front) wins when pictures overlap.
@@ -36,6 +37,6 @@ public static class ItemTargets
 
     // Whether a world position is inside an object's picture.
     private static bool PictureHolds(CapturedSprite sprite, (int X, int Y) world) =>
-        world.X >= sprite.Left && world.X < sprite.Left + PICTURE_WIDTH
+        world.X >= sprite.Left && world.X < sprite.Left + Math.Max(1, (int)sprite.Sheet.Width) * PIXELS_PER_WORD
         && world.Y >= sprite.Top && world.Y < sprite.Top + sprite.Rows;
 }

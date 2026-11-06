@@ -27,6 +27,11 @@ public static class ClickToMove
     private const int STUCK_FRAMES = 20;
     private const int MAX_REPLANS = 3;
 
+    // A far goal takes several routes; the walk is over once the hero is this close to it (world
+    // pixels), and no more than this many routes are planned.
+    private const int LEG_END_TOLERANCE = 40;
+    private const int MAX_LEGS = 8;
+
     /// Walking into a closed door opens it first and takes a few frames; give up pushing after this many.
     private const int MAX_PUSH_FRAMES = 90;
 
@@ -67,6 +72,10 @@ public static class ClickToMove
     // pushing, and the region the walk started in (the walk is over when the hero is somewhere else).
     private static (int X, int Y)? doorPoint;
     private static int pushFrames;
+
+    // A far goal is reached in legs: how many have been planned, and where the present one began.
+    private static int legs;
+    private static (int X, int Y) legStart;
     private static ushort startRegion;
 
     /// Where the walk is heading (a world position) and whether the hero can stand there, while a
@@ -380,6 +389,8 @@ public static class ClickToMove
         replans = 0;
         stuckFrames = 0;
         pushFrames = 0;
+        legs = 0;
+        legStart = (hero.AbsX, hero.AbsY);
         PlanFrom(game, hero);
     }
 
@@ -420,7 +431,10 @@ public static class ClickToMove
 
         if (route.Count == 0)
         {
-            Push(game, hero);
+            if (!ContinueTowardsGoal(game, hero))
+            {
+                Push(game, hero);
+            }
 
             return;
         }
@@ -433,6 +447,27 @@ public static class ClickToMove
         game.Ui.PathDirection = DirectionTo(route[0].X - hero.AbsX, route[0].Y - hero.AbsY);
         game.Ui.CompassLitDirection = game.Ui.PathDirection;
         game.Ui.PathWalking = true;
+    }
+
+    // A route is only planned over a limited distance (PathFinder), so a goal that is far off is reached
+    // in several legs, each planned from where the last one ended. Returns true when another leg
+    // was planned. The walk is over when the goal is near, the last leg went nowhere, or after
+    // MAX_LEGS legs.
+    private static bool ContinueTowardsGoal(Data.Game game, Shape hero)
+    {
+        int distance = Math.Max(Math.Abs(goal.X - hero.AbsX), Math.Abs(goal.Y - hero.AbsY));
+        bool progressed = (hero.AbsX, hero.AbsY) != legStart;
+
+        if (distance <= LEG_END_TOLERANCE || !progressed || legs >= MAX_LEGS)
+        {
+            return false;
+        }
+
+        legs++;
+        legStart = (hero.AbsX, hero.AbsY);
+        PlanFrom(game, hero);
+
+        return route.Count > 0;
     }
 
     // At the end of a route to a door: keeps walking into the door, which opens when bumped and lets

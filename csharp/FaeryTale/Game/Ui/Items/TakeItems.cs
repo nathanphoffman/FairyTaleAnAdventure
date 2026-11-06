@@ -120,10 +120,23 @@ public static class TakeItems
         TakeNearestActor(game, output);
     }
 
+    /// Whether an actor is a body that has not been searched yet (a dead enemy or person; a searched
+    /// body has its weapon set to -1).
+    public static bool IsUnsearchedBody(Shape actor) =>
+        (actor.Kind == ActorKind.ENEMY || actor.Kind == ActorKind.SETFIG)
+        && actor.State == ActorState.DEAD
+        && actor.Weapon >= 0
+        && actor.Vitality == 0;
+
     /// Whether taking an actor would do anything: it is an object that can be picked up or opened
-    /// (a chest, a pile of gold, a weapon lying about), not scenery.
+    /// (a chest, a pile of gold, a weapon lying about), not scenery, or a body that can be searched.
     public static bool CanTake(Shape actor)
     {
+        if (IsUnsearchedBody(actor))
+        {
+            return true;
+        }
+
         if (actor.Kind != ActorKind.OBJECTS)
         {
             return false;
@@ -368,7 +381,7 @@ public static class TakeItems
         {
             if (loot.Weapon == 0)
             {
-                output.PrintCont("nothing");
+                output.PrintCont(game.Experience == Experience.Original ? "nothing" : "nothing in their pockets");
             }
 
             return;
