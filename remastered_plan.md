@@ -98,4 +98,10 @@ check this).
 - The game menu (Esc) has a Resolution entry (`ResolutionMenu`): a list from the monitor's own size (borderless) down to
   640x480 (windowed); the window carries out the choice (`WindowControls.RequestResolution`). While the inventory is
   open the classic List button has a red square.
+- Hotbar (`Game/Remastered/Screens/Hotbar`): the wood under the text panel grows out to each side. The weapons the hero
+  carries are on the left (the one in hand ringed in gold; a click takes it in hand) and the magic stones on the right
+  (a click casts it, and F1 to F7 do too, as in the classic game), in squares with a thick black border and the
+  inventory's pictures. It fills itself as things are picked up, and needs room beside the panel (a small window has
+  none). Spells are not cast from the inventory.
+- Cheat: typing GRAPHIX while playing gives every item (not the talisman) and some gold, for testing (`CheatCode`).
 - Not done: a map of the indoors; the minimap and big map show the daylight colours only.

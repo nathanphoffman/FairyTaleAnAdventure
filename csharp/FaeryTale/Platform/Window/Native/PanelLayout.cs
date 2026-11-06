@@ -36,6 +36,9 @@ internal sealed class PanelLayout
     /// raised pieces and for the wood above them.
     public const int TOP_PAD_LINES = 8;
 
+    /// The classic panel starts at this line of the 200 line picture.
+    public const int PANEL_FIRST_LINE = 143;
+
     /// The wood reaches this many pixels past the pieces on each side.
     public const int PAD_SIDE = 8;
 
@@ -274,7 +277,7 @@ internal sealed class PanelLayout
 
     // The board's pixels: a plank the width and height of the board, without the soft shadow that Wood
     // adds beside and below it, darkened.
-    private static uint[] BoardPixels(int boardWidth, int boardLines)
+    internal static uint[] BoardPixels(int boardWidth, int boardLines)
     {
         uint[] plank = Wood.Plank(boardWidth, boardLines, BOARD_SEED);
         uint[] board = new uint[boardWidth * boardLines];

@@ -120,6 +120,11 @@ public static class GameLoop
         ReadKeyboard(game, video);
         OpenMapIfAsked(game, video);
 
+        if (CheatCode.TakeCompleted() && game.Experience != Experience.Original)
+        {
+            CheatCode.GiveEverything(game, video);
+        }
+
         if (HandleViewStatus(game, video))
         {
             return;

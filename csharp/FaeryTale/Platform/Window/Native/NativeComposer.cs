@@ -33,6 +33,7 @@ internal sealed class NativeComposer
     private const int TARGET_RADIUS_WORLD_PIXELS = 11;
 
     private readonly WorldRenderer renderer = new();
+    private readonly Dictionary<(int Blocks, int Rows), uint[]> hotbarWood = [];
     private readonly PanelLayout panelLayout = new(Scene.FRAME_WIDTH, Scene.FRAME_HEIGHT - PANEL_FIRST_LINE);
     private readonly uint[] legacyFrame = new uint[Scene.FRAME_WIDTH * Scene.FRAME_HEIGHT];
     private uint[] picture = [];
@@ -141,6 +142,7 @@ internal sealed class NativeComposer
         DrawPanel(width);
         DrawLitButtons(width, video.Capture);
         DrawBackButton(width, video.Capture);
+        DrawHotbar(width, video, pointer);
         DrawInventory(width, video);
         MessageScrollBar.Of(video.History).DrawAt(picture, width, new Overlay.Placement(GridLeft, GridTop, Scale));
         overlay.DrawAt(picture, width, new Overlay.Placement(GridLeft, OverlayTop, Scale));
@@ -236,6 +238,57 @@ internal sealed class NativeComposer
 
         InventoryPicture.Of(game, number => renderer.ObjectPicture(video, number), InputHandler.GridPointer)
             .DrawAt(picture, width, new Overlay.Placement(GridLeft, GridTop, Scale));
+    }
+
+    // The hotbar: wood growing out of the text panel's board to each side, the weapons the hero carries
+    // on the left and the magic stones on the right, each in a square with a black border.
+    private void DrawHotbar(int width, Video video, (int X, int Y) pointer)
+    {
+        int height = picture.Length / width;
+
+        if (video.Capture.Game is not { } game || HotbarLayout.For(width, height) is not { } geometry)
+        {
+            return;
+        }
+
+        List<int> weapons = Hotbar.Weapons(game);
+        List<int> spells = Hotbar.Spells(game);
+
+        DrawWoodStrip(width, height, geometry, HotbarLayout.StripWidth(geometry, weapons.Count, HotbarLayout.WEAPON_COLUMNS), geometry.BoardLeft, true);
+        DrawWoodStrip(width, height, geometry, HotbarLayout.StripWidth(geometry, spells.Count, HotbarLayout.SPELL_COLUMNS), geometry.BoardRight, false);
+
+        List<HotbarSlot> slots = HotbarLayout.Slots(geometry, weapons, spells);
+
+        HotbarPicture.Of(game, geometry, slots, number => renderer.ObjectPicture(video, number), pointer).Draw(picture, width);
+    }
+
+    // A piece of the panel's wood joined to the board: strip pixels wide, ending at the board's edge on
+    // the left, starting at the board's edge on the right. Made once for each size.
+    private void DrawWoodStrip(int width, int height, HotbarGeometry geometry, int stripPixels, int edge, bool onLeft)
+    {
+        if (stripPixels == 0)
+        {
+            return;
+        }
+
+        int blocks = (stripPixels + Scale - 1) / Scale;
+        int rows = (height - geometry.BoardTop + GRID_ROWS_PER_LINE * Scale - 1) / (GRID_ROWS_PER_LINE * Scale);
+
+        if (!hotbarWood.TryGetValue((blocks, rows), out uint[]? wood))
+        {
+            wood = PanelLayout.BoardPixels(blocks, rows);
+            hotbarWood[(blocks, rows)] = wood;
+        }
+
+        int left = onLeft ? edge - blocks * Scale : edge;
+
+        for (int row = 0; row < rows; row++)
+        {
+            for (int block = 0; block < blocks; block++)
+            {
+                FillPanelBlock(width, height, (left + block * Scale, geometry.BoardTop + row * GRID_ROWS_PER_LINE * Scale), wood[row * blocks + block]);
+            }
+        }
     }
 
     // The "< Back" button above the classic buttons while a submenu is open.

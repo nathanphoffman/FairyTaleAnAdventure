@@ -224,7 +224,7 @@ public static class ClickToMove
     // to, else a place (or door) to walk to. Persons and the bubble only exist in the new drawer.
     private static void Click(Data.Game game, IOutput output, InputHandler.Click click)
     {
-        if (Inventory.TryClick(game, output, InputHandler.GridPointer) || Conversation.TakeButtonClick(game, output, click) || PanelBackButton.TryPress(game, output, InputHandler.GridPointer))
+        if (Hotbar.TryClick(game, output, click, WorldView.Current.Width, WorldView.Current.Height) || Inventory.TryClick(game, output, InputHandler.GridPointer) || Conversation.TakeButtonClick(game, output, click) || PanelBackButton.TryPress(game, output, InputHandler.GridPointer))
         {
             return;
         }

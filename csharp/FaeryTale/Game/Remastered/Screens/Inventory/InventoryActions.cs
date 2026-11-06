@@ -10,9 +10,11 @@ namespace FaeryTale.Game.Remastered;
 public static class InventoryActions
 {
     // The menus the choices belong to, and the entries of each.
+    private const int MAGIC_MENU = 1;
     private const int KEYS_MENU = 6;
     private const int USE_MENU = 8;
     private const int FIRST_ITEM_ENTRY = 5;
+    private const int FIRST_MAGIC_SLOT = 9;
     private const int FIRST_KEY_SLOT = 16;
     private const int SEA_SHELL = 6;
     private const int SUN_STONE = 7;
@@ -50,7 +52,7 @@ public static class InventoryActions
         switch (item.Use)
         {
             case ItemUse.Equip:
-                game.Actors.List[0].Weapon = (sbyte)(item.Slot + 1);
+                Equip(game, item.Slot);
                 break;
 
             // A magic stone is not cast from here: the hotbar casts it (so there is no click to use up).
@@ -64,6 +66,25 @@ public static class InventoryActions
             case ItemUse.UseSpecial:
                 UseSpecial(game, output, item.Slot);
                 break;
+        }
+    }
+
+    /// Takes a weapon of the pack in hand, if the hero has it.
+    public static void Equip(Data.Game game, int slot)
+    {
+        if (CountOf(game, slot) > 0 && slot < WEAPON_COUNT)
+        {
+            game.Actors.List[0].Weapon = (sbyte)(slot + 1);
+        }
+    }
+
+    /// Casts a magic stone of the pack, if the hero has one, as the Magic menu would (a spell that cannot
+    /// work here does not use the stone up).
+    public static void Cast(Data.Game game, IOutput output, int slot)
+    {
+        if (CountOf(game, slot) > 0)
+        {
+            ChooseIn(game, output, MAGIC_MENU, (short)(FIRST_ITEM_ENTRY + slot - FIRST_MAGIC_SLOT));
         }
     }
 

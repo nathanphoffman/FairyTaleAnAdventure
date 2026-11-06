@@ -48,6 +48,7 @@ public static class InputBridge
     public static void KeyEvent(string name, bool down)
     {
         TrackShift(name, down);
+        TypeCheatLetter(name, down);
         ScrollMessagesWithKey(name, down);
 
         if (InputHandler.RemasteredControls && name == MAP_KEY)
@@ -97,6 +98,15 @@ public static class InputBridge
         if (down)
         {
             MapScreen.Request();
+        }
+    }
+
+    // The letters typed are watched for the cheat word (Remastered and Reimagined).
+    private static void TypeCheatLetter(string name, bool down)
+    {
+        if (down && InputHandler.RemasteredControls && name.Length == 1 && char.IsAsciiLetter(name[0]))
+        {
+            CheatCode.Type(name[0]);
         }
     }
 
