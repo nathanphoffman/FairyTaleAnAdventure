@@ -1,6 +1,7 @@
 using FaeryTale.Game.Creatures.Interaction;
 using FaeryTale.Game.Data;
 using FaeryTale.Game.Output;
+using FaeryTale.Game.Remastered;
 
 namespace FaeryTale.Game.Ui.Options;
 
@@ -158,9 +159,11 @@ public static class ShopOptions
                 break;
 
             default:
-                ItemsMenu.AddStuff(game, item, 1);
+                int bought = MagicSwap.Resolve(game, item);
+
+                ItemsMenu.AddStuff(game, bought, 1);
                 Messages.PrintWrapped(game, output, "% bought a "u8);
-                output.PrintCont(ItemsMenu.ItemName(item));
+                output.PrintCont(ItemsMenu.ItemName(bought));
                 output.PrintCont(".");
                 break;
         }

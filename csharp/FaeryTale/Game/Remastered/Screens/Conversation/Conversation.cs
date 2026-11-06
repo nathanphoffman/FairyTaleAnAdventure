@@ -144,7 +144,7 @@ public static class Conversation
         for (int item = 0; item < ShopOptions.ITEM_COUNT; item++)
         {
             short price = ShopOptions.PriceOf(item);
-            string name = Encoding.Latin1.GetString(Tables.Label5, item * NAME_WIDTH, NAME_WIDTH).Trim();
+            string name = ObjectTables.Jtrans[item * 2] == MagicSwap.BIRD_TOTEM ? "Magic" : Encoding.Latin1.GetString(Tables.Label5, item * NAME_WIDTH, NAME_WIDTH).Trim();
 
             yield return new Row(name.PadRight(LABEL_NAME_WIDTH) + price.ToString().PadLeft(PRICE_WIDTH), RowKind.Item, item, ShopOptions.CanAfford(game.Hero.Wealth, price));
         }

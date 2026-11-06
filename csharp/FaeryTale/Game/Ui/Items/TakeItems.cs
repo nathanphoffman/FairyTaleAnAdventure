@@ -2,6 +2,7 @@ using FaeryTale.Game.Creatures.Interaction;
 using FaeryTale.Game.Data;
 using FaeryTale.Game.Land;
 using FaeryTale.Game.Output;
+using FaeryTale.Game.Remastered;
 using FaeryTale.Game.Render;
 
 namespace FaeryTale.Game.Ui;
@@ -317,10 +318,12 @@ public static class TakeItems
     // A single item lying about: the slot is found in the Itrans table. Unknown objects are left.
     private static bool TakePlainItem(Data.Game game, IOutput output, uint id)
     {
-        if (ItemSlot(id, ObjectTables.Itrans) is not { } slot)
+        if (ItemSlot(id, ObjectTables.Itrans) is not { } found)
         {
             return false;
         }
+
+        int slot = MagicSwap.Resolve(game, found);
 
         ItemsMenu.AddStuff(game, slot, 1);
         Messages.AnnounceTreasure(game, output, "a ");
@@ -392,20 +395,22 @@ public static class TakeItems
             output.PrintCont(" and ");
         }
 
-        if (loot.Treasure < ItemsMenu.GOLDBASE)
+        int treasure = MagicSwap.Resolve(game, (int)loot.Treasure);
+
+        if (treasure < ItemsMenu.GOLDBASE)
         {
             output.PrintCont("a ");
         }
 
-        output.PrintCont(ItemsMenu.ItemName((int)loot.Treasure));
+        output.PrintCont(ItemsMenu.ItemName(treasure));
 
-        if (loot.Treasure >= ItemsMenu.GOLDBASE)
+        if (treasure >= ItemsMenu.GOLDBASE)
         {
-            game.Hero.Wealth += Tables.ItemList[loot.Treasure].Maxshown;
+            game.Hero.Wealth += Tables.ItemList[treasure].Maxshown;
         }
         else
         {
-            ItemsMenu.AddStuff(game, (int)loot.Treasure, 1);
+            ItemsMenu.AddStuff(game, treasure, 1);
         }
     }
 

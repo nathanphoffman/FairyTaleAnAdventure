@@ -1,4 +1,5 @@
 using FaeryTale.Game.Output;
+using FaeryTale.Game.Remastered;
 
 namespace FaeryTale.Game.Ui;
 
@@ -50,10 +51,12 @@ public static class ContainerContents
                 break;
 
             case Contents.One one:
+                int found = MagicSwap.Resolve(game, one.Index);
+
                 output.Print("a ");
-                output.PrintCont(ItemsMenu.ItemName(one.Index));
+                output.PrintCont(ItemsMenu.ItemName(found));
                 output.PrintCont(".");
-                ItemsMenu.AddStuff(game, one.Index, 1);
+                ItemsMenu.AddStuff(game, found, 1);
                 break;
 
             case Contents.Two two:
@@ -71,10 +74,12 @@ public static class ContainerContents
                 break;
 
             case Contents.ThreeOf three:
+                int many = MagicSwap.Resolve(game, three.Index);
+
                 output.Print("3 ");
-                output.PrintCont(ItemsMenu.ItemName(three.Index));
+                output.PrintCont(ItemsMenu.ItemName(many));
                 output.PrintCont("s.");
-                ItemsMenu.AddStuff(game, three.Index, MANY);
+                ItemsMenu.AddStuff(game, many, MANY);
                 break;
         }
 
@@ -166,6 +171,9 @@ public static class ContainerContents
     // Tells what two things were found and adds them (the first may be 100 gold pieces).
     private static void TakeTwoThings(Data.Game game, IOutput output, int first, int second)
     {
+        first = MagicSwap.Resolve(game, first);
+        second = MagicSwap.Resolve(game, second);
+
         if (first == HUNDRED_GOLD)
         {
             game.Hero.Wealth += CONTAINER_GOLD;

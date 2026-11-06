@@ -25,7 +25,7 @@ public static class HotbarLayout
     /// The most spells a hero can carry, and how many squares go across in a row on each side (so the
     /// squares can be big): the stones are in two rows of up to four, the weapons two rows of up to three.
     public const int SPELL_SLOTS = 7;
-    public const int SPELL_COLUMNS = 4;
+    public const int SPELL_COLUMNS = 3;
     public const int WEAPON_COLUMNS = 3;
 
     // How the text panel sits in the window (as NativeComposer lays it out: the 640 x 400 grid is scaled

@@ -103,5 +103,7 @@ check this).
   (a click casts it, and F1 to F7 do too, as in the classic game), in squares with a thick black border and the
   inventory's pictures. It fills itself as things are picked up, and needs room beside the panel (a small window has
   none). Spells are not cast from the inventory.
+- The bird totem is gone in these modes (the minimap and big map do its job): wherever one would be given (lying about,
+  chest, body, shop) a random other stone comes instead (`MagicSwap`); the inventory and hotbar have no place for it.
 - Cheat: typing GRAPHIX while playing gives every item (not the talisman) and some gold, for testing (`CheatCode`).
 - Not done: a map of the indoors; the minimap and big map show the daylight colours only.

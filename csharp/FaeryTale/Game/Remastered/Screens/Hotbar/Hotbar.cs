@@ -17,7 +17,8 @@ public static class Hotbar
     public static List<int> Weapons(Data.Game game) => Carried(game, FIRST_WEAPON, WEAPON_COUNT);
 
     /// The slots of the magic stones the hero carries.
-    public static List<int> Spells(Data.Game game) => Carried(game, FIRST_SPELL, HotbarLayout.SPELL_SLOTS);
+    public static List<int> Spells(Data.Game game) =>
+        Carried(game, FIRST_SPELL, HotbarLayout.SPELL_SLOTS).Where(slot => slot != MagicSwap.BIRD_TOTEM).ToList();
 
     /// The key that casts a spell (F1 for the first stone of the pack, F2 for the next, and so on).
     public static string KeyOf(int slot) => $"F{slot - FIRST_SPELL + 1}";
