@@ -2,6 +2,7 @@ using FaeryTale.Game.Creatures.Interaction;
 using FaeryTale.Game.Data;
 using FaeryTale.Game.Input;
 using FaeryTale.Game.Land.Map;
+using FaeryTale.Game.Output;
 
 namespace FaeryTale.Game.Remastered;
 
@@ -45,6 +46,9 @@ public static class ClickToMove
     private static int replans;
     private static bool goalWalkable;
 
+    // A click on a person: the actor to walk up to before the choices of the conversation appear.
+    private static int? personToTalkTo;
+
     // A click on a door: where to push towards once the route ends, how many frames have been spent
     // pushing, and the region the walk started in (the walk is over when the hero is somewhere else).
     private static (int X, int Y)? doorPoint;
@@ -63,11 +67,12 @@ public static class ClickToMove
     {
         route.Clear();
         doorPoint = null;
+        personToTalkTo = null;
     }
 
     /// Called every frame after the keyboard and mouse were read. Takes a new click, and while a
     /// route is active sets the hero's walk direction to follow it.
-    public static void Drive(Data.Game game)
+    public static void Drive(Data.Game game, IOutput output)
     {
         game.Ui.PathWalking = false;
         game.Ui.PathDirection = NOT_WALKING;
@@ -77,9 +82,11 @@ public static class ClickToMove
             return;
         }
 
+        Conversation.CloseIfLost(game);
+
         if (InputHandler.TakeClick() is { } click && game.Ui.ViewStatus == VIEW_NORMAL)
         {
-            Plan(game, PointerWorld.OfClick(game, click));
+            Click(game, output, click);
         }
 
         if (!Active)
@@ -95,6 +102,7 @@ public static class ClickToMove
         }
 
         Follow(game);
+        OpenConversationWhenNear(game);
     }
 
     /// What entering the world position costs the planner: blocked (-1), open (0), or open but
@@ -137,6 +145,67 @@ public static class ClickToMove
         };
     }
 
+    // A click in the world: a button of an open conversation, else a person to walk up to and talk
+    // to, else a place (or door) to walk to. Persons and the bubble only exist in the new drawer.
+    private static void Click(Data.Game game, IOutput output, InputHandler.Click click)
+    {
+        BubbleLayout layout = ConversationLayout(game);
+
+        if (Conversation.TakeButtonClick(game, output, click, layout))
+        {
+            return;
+        }
+
+        (int X, int Y) target = PointerWorld.OfClick(game, click);
+
+        if (click.Native && PersonTargets.PersonAt(game, target) is { } person)
+        {
+            WalkToPerson(game, person);
+        }
+        else
+        {
+            Plan(game, target);
+        }
+    }
+
+    // Where the conversation bubble is now (it does not matter when none is open).
+    private static BubbleLayout ConversationLayout(Data.Game game)
+    {
+        Shape person = game.Actors.List[Conversation.Person ?? 0];
+
+        return BubbleLayout.For(WorldView.Current, (person.AbsX, person.AbsY));
+    }
+
+    // Walks towards a person, or opens the conversation at once when already near.
+    private static void WalkToPerson(Data.Game game, int number)
+    {
+        Cancel();
+
+        if (PersonTargets.IsCloseEnough(game, number))
+        {
+            Conversation.Open(game, number);
+
+            return;
+        }
+
+        Shape person = game.Actors.List[number];
+
+        Plan(game, (person.AbsX, person.AbsY));
+        personToTalkTo = Active ? number : null;
+    }
+
+    // Once the hero is near the person walked to, stops and opens the conversation.
+    private static void OpenConversationWhenNear(Data.Game game)
+    {
+        if (personToTalkTo is not { } number || !PersonTargets.IsCloseEnough(game, number))
+        {
+            return;
+        }
+
+        Cancel();
+        Conversation.Open(game, number);
+    }
+
     // Plans a new route from where the hero stands to a world position.
     private static void Plan(Data.Game game, (int X, int Y) target)
     {
@@ -150,6 +219,7 @@ public static class ClickToMove
         // A click on a door walks to the door; the hero then pushes his way in.
         int? door = DoorTargets.DoorAt(game, target);
 
+        personToTalkTo = null;
         doorPoint = door is { } found ? DoorTargets.EntryPoint(game, found) : null;
         goal = door is { } doorToApproach ? DoorTargets.ApproachPoint(game, doorToApproach) : target;
         goalWalkable = doorPoint is not null || CellCost(game, target.X, target.Y) >= 0;

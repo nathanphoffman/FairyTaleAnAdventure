@@ -124,6 +124,7 @@ public static class Launch
     {
         InputHandler.Reset();
         ClickToMove.Cancel();
+        Conversation.Close();
         EnemyPathing.Reset();
         ClickOverlay.Reset();
         WindowControls.SystemCursorShown = false;

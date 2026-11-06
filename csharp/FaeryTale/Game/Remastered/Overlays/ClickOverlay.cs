@@ -34,6 +34,8 @@ public static class ClickOverlay
         {
             video.Capture.Marker = ClickToMove.Marker;
             video.Capture.DoorHover = overDoor;
+            video.Capture.HoverPerson = PersonUnderPointer(game);
+            video.Capture.TalkingTo = Conversation.Person;
             ClearOverlay(output);
 
             return;
@@ -73,6 +75,17 @@ public static class ClickOverlay
         }
 
         return PointerWorld.UnderPointer(game) is { } ground && DoorTargets.DoorAt(game, ground) is not null;
+    }
+
+    // The person the mouse is over, if the new drawer can show their face.
+    private static int? PersonUnderPointer(Data.Game game)
+    {
+        if (game.Experience == Data.Experience.Original || game.Ui.ViewStatus != VIEW_NORMAL)
+        {
+            return null;
+        }
+
+        return PointerWorld.UnderPointer(game) is { } ground ? PersonTargets.PersonAt(game, ground) : null;
     }
 
     // Takes off an overlay this class put up.

@@ -119,14 +119,58 @@ internal sealed class NativeComposer
         DrawPanel(width);
         overlay.DrawAt(picture, width, new Overlay.Placement(GridLeft, OverlayTop, Scale));
 
-        if (video.Capture.DoorHover && !overlay.HidePointer)
+        DrawConversation(width, view, video, pointer);
+        DrawPointer(width, scene, overlay, video, pointer);
+    }
+
+    // The pointer: a door or a face when over one, else the game's own.
+    private void DrawPointer(int width, Scene scene, Overlay overlay, Video video, (int X, int Y) pointer)
+    {
+        WorldCapture capture = video.Capture;
+        Image? face = capture.TalkingTo is null && capture.HoverPerson is { } person ? FaceOf(video, person) : null;
+
+        if (overlay.HidePointer)
+        {
+            return;
+        }
+
+        if (face is not null)
+        {
+            new Overlay { Images = { face with { X = -face.Width / 2, Y = -face.Height / 2 } } }
+                .DrawAt(picture, width, new Overlay.Placement(pointer.X, pointer.Y, Scale));
+        }
+        else if (capture.DoorHover)
         {
             new Overlay { Images = { DoorCursor.At((0, 0)) } }.DrawAt(picture, width, new Overlay.Placement(pointer.X, pointer.Y, Scale));
         }
-        else if (!overlay.HidePointer)
+        else
         {
             scene.DrawPointerAtPixel(picture, width, pointer, POINTER_PIXELS_PER_GAME_PIXEL * Scale);
         }
+    }
+
+    // The conversation bubble over the person the hero is talking to.
+    private void DrawConversation(int width, WorldView view, Video video, (int X, int Y) pointer)
+    {
+        if (video.Capture.TalkingTo is not { } number || FaceOf(video, number) is not { } face)
+        {
+            return;
+        }
+
+        CapturedSprite sprite = video.Capture.Sprites.Find(found => found.Slot == number)!;
+        BubbleLayout layout = BubbleLayout.For(view, (sprite.ActorX, sprite.ActorY));
+
+        ConversationPicture.Draw(face, layout.ButtonAt(pointer.X, pointer.Y)).DrawAt(picture, width, new Overlay.Placement(layout.Left, layout.Top, layout.Scale));
+    }
+
+    // The face of the person with an actor number, from the sprite just drawn.
+    private Image? FaceOf(Video video, int number)
+    {
+        CapturedSprite? sprite = video.Capture.Sprites.Find(found => found.Slot == number && found.Pass == 0);
+
+        return sprite is not null && renderer.PictureOf(video, sprite) is { } sheetPicture
+            ? FacePicture.Face(renderer.Palette, sheetPicture)
+            : null;
     }
 
     // The circle where the player clicked, over the ground it is on.

@@ -75,13 +75,13 @@ public static class TalkOptions
 
     // FindNearestFigure search ranges for yelling and for the quieter talk options.
     private const short YELL_RANGE = 100;
-    private const short TALK_RANGE = 50;
+    internal const short TALK_RANGE = 50;
 
     /// Anyone closer than this is told off for yelling.
     internal const int TOO_CLOSE_TO_YELL = 35;
 
     // Talk menu entries and the carrier number of the turtle.
-    private const short YELL = 5;
+    internal const short YELL = 5;
     private const short CARRIER_TURTLE = 5;
 
     // The people (race & 0x7f).
@@ -153,13 +153,17 @@ public static class TalkOptions
             return true;
         }
 
-        Shape actor = game.Actors.List[game.Actors.NearestObject];
-        Target target = DescribeTarget(actor);
-        TalkAction action = TalkActionFor(target, chosenEntry == YELL, distance, game.Actors.ActiveCarrier, game.Hero.Stuff[SHELL] != 0);
-
-        CarryOut(game, output, action, actor);
+        Converse(game, output, game.Actors.NearestObject, chosenEntry, distance);
 
         return true;
+    }
+
+    /// Yell, say or ask something to one chosen actor instead of the nearest (Remastered: the person
+    /// that was clicked on).
+    public static void TalkToActor(Data.Game game, IOutput output, int actorNumber, short chosenEntry)
+    {
+        game.Actors.NearestObject = (short)actorNumber;
+        Converse(game, output, actorNumber, chosenEntry, Blocking.ActorDistance(game, actorNumber, 0));
     }
 
     /// What a Talk or Yell does to the figure nearby. The dead say nothing; people answer (but not
@@ -228,6 +232,16 @@ public static class TalkOptions
         }
 
         return new PriestAction.Bless(SPEECH_PRIEST_BLESSING_BASE + clock % PRIEST_BLESSINGS);
+    }
+
+    // Works out and does what a Talk or Yell to an actor at a distance means.
+    private static void Converse(Data.Game game, IOutput output, int actorNumber, short chosenEntry, int distance)
+    {
+        Shape actor = game.Actors.List[actorNumber];
+        Target target = DescribeTarget(actor);
+        TalkAction action = TalkActionFor(target, chosenEntry == YELL, distance, game.Actors.ActiveCarrier, game.Hero.Stuff[SHELL] != 0);
+
+        CarryOut(game, output, action, actor);
     }
 
     // What the Talk code needs to know about the actor the hero is talking to.

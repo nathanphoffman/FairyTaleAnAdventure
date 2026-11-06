@@ -133,7 +133,7 @@ public static class GameLoop
             return;
         }
 
-        ClickToMove.Drive(game);
+        ClickToMove.Drive(game, video);
         ClickOverlay.Update(game, video);
         HeroControls.UpdateHero(game, video, state.Cycle);
         MoveEverything(game, video, state);

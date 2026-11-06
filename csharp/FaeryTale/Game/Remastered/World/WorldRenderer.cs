@@ -51,6 +51,12 @@ public sealed class WorldRenderer
     private int[] columnToWorld = [];
     private int[] rowToWorld = [];
 
+    /// The colours of the play field now (colour number to 0xAARRGGBB).
+    public uint[] Palette => palette;
+
+    /// The picture of a captured sprite, decoded (null when it is not in memory).
+    public SpriteImage? PictureOf(Video video, CapturedSprite sprite) => images.Sprite(video.Graphics, sprite.Sheet, sprite.Inum);
+
     /// Draws the world into frame (view.Width x view.Height pixels).
     public void Draw(uint[] frame, WorldView view, WorldCapture capture, Video video, double alpha)
     {

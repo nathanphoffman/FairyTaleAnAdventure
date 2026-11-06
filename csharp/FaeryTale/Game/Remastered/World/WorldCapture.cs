@@ -67,6 +67,12 @@ public sealed class WorldCapture
 
     public bool DoorHover { get; set; }
 
+    /// The actor number of the person under the pointer, and of the one a conversation bubble is
+    /// open for (null for none).
+    public int? HoverPerson { get; set; }
+
+    public int? TalkingTo { get; set; }
+
     public List<CapturedSprite> Sprites { get; private set; } = [];
 
     public (int X, int Y) HeroNow { get; private set; }
