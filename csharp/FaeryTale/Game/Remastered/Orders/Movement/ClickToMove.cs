@@ -67,6 +67,7 @@ public static class ClickToMove
     // A shift click: look around when the walk is over (arrivedToLook is that moment).
     private static bool lookWhenThere;
     private static bool arrivedToLook;
+    private static (int X, int Y) lookSpot;
 
     // A click on a door: where to push towards once the route ends, how many frames have been spent
     // pushing, and the region the walk started in (the walk is over when the hero is somewhere else).
@@ -306,11 +307,12 @@ public static class ClickToMove
     private static void WalkToLook(Data.Game game, IOutput output, (int X, int Y) target)
     {
         Cancel();
+        lookSpot = target;
 
         // A spot within half the reach of a look is looked at from where the hero stands.
         if (LooksFromHere(game.Actors.List[0], target))
         {
-            ItemsMenu.LookAround(game, output);
+            ItemsMenu.LookAround(game, output, lookSpot);
 
             return;
         }
@@ -323,7 +325,7 @@ public static class ClickToMove
         }
         else
         {
-            ItemsMenu.LookAround(game, output);
+            ItemsMenu.LookAround(game, output, lookSpot);
         }
     }
 
@@ -338,7 +340,7 @@ public static class ClickToMove
         if (arrivedToLook)
         {
             arrivedToLook = false;
-            ItemsMenu.LookAround(game, output);
+            ItemsMenu.LookAround(game, output, lookSpot);
         }
     }
 

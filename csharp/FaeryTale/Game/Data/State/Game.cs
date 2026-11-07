@@ -8,6 +8,9 @@ public sealed class Game
 
     public Experience Experience;
 
+    /// The fireball and flames of the inferno skull (Reimagined); idle when none is burning.
+    public readonly Reimagined.InfernoBlast Inferno = new();
+
     /// The difficulty of Remastered and Reimagined (it can be changed in the game menu).
     public DifficultyLevel Difficulty = DifficultyLevel.Normal;
 

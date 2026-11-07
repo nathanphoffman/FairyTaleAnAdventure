@@ -1,3 +1,4 @@
+using FaeryTale.Game.Reimagined;
 using FaeryTale.Game.Data;
 using FaeryTale.Gfx;
 
@@ -86,7 +87,7 @@ public static class HotbarPicture
     // A box above the bar with the name of the square under the pointer and what it does.
     private static void AddTip(Overlay overlay, Data.Game game, HotbarGeometry geometry, HotbarSlot slot)
     {
-        string name = Tables.ItemList[slot.Item].Name;
+        string name = InfernoSkull.NameOf(game, slot.Item);
         string detail = slot.IsSpell ? $"{Hotbar.KeyOf(slot.Item)} or click to cast. {ItemStats.For(slot.Item)}" : $"Click to equip. {ItemStats.For(slot.Item)}";
         int width = Math.Max(Overlay.TextWidth(name, NAME_SCALE), Overlay.TextWidth(detail, 1)) + 2 * TIP_PADDING;
         int left = Math.Clamp(slot.X + geometry.SlotSize / 2 - width / 2, 0, Math.Max(0, geometry.WindowWidth - width));

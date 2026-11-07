@@ -1,3 +1,4 @@
+using FaeryTale.Game.Reimagined;
 using FaeryTale.Game.Data;
 using FaeryTale.Gfx;
 
@@ -127,7 +128,7 @@ public static class InventoryPicture
     private static string DetailText(Data.Game game, InventoryItem item)
     {
         int count = InventoryActions.CountOf(game, item.Slot);
-        string name = Tables.ItemList[item.Slot].Name;
+        string name = InfernoSkull.NameOf(game, item.Slot);
         string state = InventoryActions.IsEquipped(game, item.Slot) ? "  (in hand)" : count > 1 ? $"  x{count}" : "";
 
         return $"{name}{state}   {InventoryActions.HintFor(item)}";

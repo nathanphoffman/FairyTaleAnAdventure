@@ -79,3 +79,11 @@ and several enemies fighting at once are summarised ("3 wraiths attack: 1 hit, 2
 - Should dying and the good fairy stay as they are?
 - How much text is too much in the box: every enemy attack, or only attacks that hit the hero?
 - Is a critical hit for double sixes right, or do you want a different rule?
+
+## Built so far
+
+- **Inferno skull** (Reimagined only). It sits in the bird totem's place in the pack (slot 13, F5 on the hotbar, "Fire" in the
+  classic Magic menu), so the world's bird totem is a skull here. Casting sends a fireball the way the hero faces
+  (`Game/Reimagined/Magic/InfernoSkull.cs`). It bursts on an enemy, a wall, or after 40 frames, lights 14 animated flames and
+  does 30 to 37 damage to every enemy within 80 pixels. It never hurts the hero or friendly people. Each cast uses one
+  skull. The GRAPHIX cheat gives 5. The fireball and flames use the wand blast picture (a blue crystal) for now.

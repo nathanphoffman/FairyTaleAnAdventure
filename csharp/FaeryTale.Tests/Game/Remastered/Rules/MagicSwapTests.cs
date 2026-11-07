@@ -34,13 +34,14 @@ public class MagicSwapTests
     }
 
     [Fact]
-    public void TheInventoryAndTheBarHaveNoRoomForTheTotem()
+    public void InReimaginedTheTotemSlotHoldsTheInfernoSkullAndShowsInTheInventoryAndBar()
     {
-        FaeryTale.Game.Data.Game game = new();
+        FaeryTale.Game.Data.Game game = new() { Experience = Experience.Reimagined };
 
         game.Hero.Stuff[MagicSwap.BIRD_TOTEM] = 1;
 
-        Assert.DoesNotContain(InventoryLayout.CELLS, cell => cell.Item.Slot == MagicSwap.BIRD_TOTEM);
-        Assert.DoesNotContain(MagicSwap.BIRD_TOTEM, Hotbar.Spells(game));
+        Assert.Equal(MagicSwap.BIRD_TOTEM, MagicSwap.Resolve(game, MagicSwap.BIRD_TOTEM));
+        Assert.Contains(InventoryLayout.CELLS, cell => cell.Item.Slot == MagicSwap.BIRD_TOTEM);
+        Assert.Contains(MagicSwap.BIRD_TOTEM, Hotbar.Spells(game));
     }
 }

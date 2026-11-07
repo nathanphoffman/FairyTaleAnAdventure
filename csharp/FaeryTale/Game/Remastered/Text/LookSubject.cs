@@ -9,7 +9,9 @@ namespace FaeryTale.Game.Remastered;
 /// or object, else the scenery around him (trees, water, rock, wall). Bare ground gives nothing.
 public static class LookSubject
 {
-    private const int SCENERY_PROBE_DISTANCE = ItemsMenu.LOOK_RANGE / 2;
+    // Scenery is searched for this far round the spot looked at, in steps of one terrain sub-area (8 pixels).
+    private const int SCENERY_REACH = 16;
+    private const int PROBE_STEP = 8;
     private const int TURTLE_CARRIER = 5;
     private const int SETFIG_FIRST_RACE = 0x80;
     private const int TREE_FIRST_COLOR = 16;
@@ -32,35 +34,30 @@ public static class LookSubject
     private static readonly string[] PERSON_KEYS =
         ["wizard", "priest", "guard", "guard", "princess", "king", "noble", "sorceress", "bartender", "witch", "spectre", "ghost", "ranger", "beggar"];
 
-    // The probes: the hero's own spot and a ring of spots all round him.
-    private static readonly (int X, int Y)[] PROBES =
-    [
-        (0, 0), (SCENERY_PROBE_DISTANCE, 0), (-SCENERY_PROBE_DISTANCE, 0), (0, SCENERY_PROBE_DISTANCE), (0, -SCENERY_PROBE_DISTANCE),
-        (SCENERY_PROBE_DISTANCE, -SCENERY_PROBE_DISTANCE), (-SCENERY_PROBE_DISTANCE, -SCENERY_PROBE_DISTANCE),
-        (SCENERY_PROBE_DISTANCE, SCENERY_PROBE_DISTANCE), (-SCENERY_PROBE_DISTANCE, SCENERY_PROBE_DISTANCE),
-    ];
+    /// The key of the thing at a spot (where the hero clicked, or where he stands), or null when there
+    /// is nothing worth a line. A clicked spot is searched closely; the Look button casts wider.
+    public static string? Find(Data.Game game, (int X, int Y) spot, int range) =>
+        NearbyActorKey(game, spot, range) ?? SceneryKey(game, spot);
 
-    /// The key of the thing the hero is looking at, or null when there is nothing worth a line.
-    public static string? Find(Data.Game game) => NearbyActorKey(game) ?? SceneryKey(game);
-
-    // The nearest actor within the look range, named by its kind and race.
-    private static string? NearbyActorKey(Data.Game game)
+    // The nearest actor to the spot within the range, named by its kind and race.
+    private static string? NearbyActorKey(Data.Game game, (int X, int Y) spot, int range)
     {
-        int nearest = 0;
-        int nearestDistance = ItemsMenu.LOOK_RANGE;
+        string? nearestKey = null;
+        int nearestDistance = range;
 
         for (int index = 1; index < game.Actors.Drawn; index++)
         {
-            int distance = Blocking.ActorDistance(game, index, 0);
+            Shape actor = game.Actors.List[index];
+            int distance = Math.Max(Math.Abs(actor.AbsX - spot.X), Math.Abs(actor.AbsY - spot.Y));
 
-            if (distance < nearestDistance && ActorKey(game, game.Actors.List[index]) != null)
+            if (distance < nearestDistance && ActorKey(game, actor) is { } key)
             {
-                nearest = index;
+                nearestKey = key;
                 nearestDistance = distance;
             }
         }
 
-        return nearest == 0 ? null : ActorKey(game, game.Actors.List[nearest]);
+        return nearestKey;
     }
 
     // What an actor is called in look_text.json, or null for the ones that get no line.
@@ -88,35 +85,40 @@ public static class LookSubject
         _ => "item",
     };
 
-    // The scenery that fills most of the probed spots round the hero; null when the ground is bare.
-    private static string? SceneryKey(Data.Game game)
+    // The scenery nearest to the spot: water or blocked ground, found by probing a grid of spots round it.
+    private static string? SceneryKey(Data.Game game, (int X, int Y) spot)
     {
-        Shape hero = game.Actors.List[0];
-        int water = 0;
-        int blocked = 0;
-        (int X, int Y)? firstBlocked = null;
+        int nearestDistance = int.MaxValue;
+        string? nearestKey = null;
 
-        foreach ((int dx, int dy) in PROBES)
+        for (int dx = -SCENERY_REACH; dx <= SCENERY_REACH; dx += PROBE_STEP)
         {
-            int terrain = MapLookup.TerrainAt(game, hero.AbsX + dx, hero.AbsY + dy);
+            for (int dy = -SCENERY_REACH; dy <= SCENERY_REACH; dy += PROBE_STEP)
+            {
+                int distance = Math.Max(Math.Abs(dx), Math.Abs(dy));
 
-            if (terrain >= FIRST_WATER_TERRAIN && terrain <= LAST_WATER_TERRAIN)
-            {
-                water++;
-            }
-            else if (terrain == BLOCKED_TERRAIN)
-            {
-                blocked++;
-                firstBlocked ??= (hero.AbsX + dx, hero.AbsY + dy);
+                if (distance < nearestDistance && ScenerySpotKey(game, (spot.X + dx, spot.Y + dy)) is { } key)
+                {
+                    nearestKey = key;
+                    nearestDistance = distance;
+                }
             }
         }
 
-        if (water == 0 && blocked == 0)
+        return nearestKey;
+    }
+
+    // What one spot of ground is, or null when it is open.
+    private static string? ScenerySpotKey(Data.Game game, (int X, int Y) spot)
+    {
+        int terrain = MapLookup.TerrainAt(game, spot.X, spot.Y);
+
+        if (terrain >= FIRST_WATER_TERRAIN && terrain <= LAST_WATER_TERRAIN)
         {
-            return null;
+            return "water";
         }
 
-        return water > blocked ? "water" : BlockedKey(game, firstBlocked!.Value);
+        return terrain == BLOCKED_TERRAIN ? BlockedKey(game, spot) : null;
     }
 
     // Trees are blocked ground drawn in greens; indoors it is a wall, else rock.

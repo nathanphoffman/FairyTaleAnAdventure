@@ -1,6 +1,7 @@
-// Generated from the Rust tables by a one-off script, then kept by hand.
+﻿// Generated from the Rust tables by a one-off script, then kept by hand.
 using System.Text;
 using FaeryTale.Game.Data;
+using FaeryTale.Game.Files;
 
 namespace FaeryTale.Game.Data;
 
@@ -30,20 +31,8 @@ public static partial class Tables
     new SetFigEntry { CfileEntry = 17, ImageBase = 4, CanTalk = 1 },
 ];
 
-    // The monsters: hit points, aggression, weapon row, cleverness, treasure and sprite file.
-    public static readonly Encounter[] EncounterChart = [
-    new Encounter { Hitpoints = 18, Agressive = 1, Arms = 2, Cleverness = 0, Treasure = 2, FileId = 6 },
-    new Encounter { Hitpoints = 12, Agressive = 1, Arms = 4, Cleverness = 1, Treasure = 1, FileId = 6 },
-    new Encounter { Hitpoints = 16, Agressive = 1, Arms = 6, Cleverness = 1, Treasure = 4, FileId = 7 },
-    new Encounter { Hitpoints = 8, Agressive = 1, Arms = 3, Cleverness = 0, Treasure = 3, FileId = 7 },
-    new Encounter { Hitpoints = 16, Agressive = 1, Arms = 6, Cleverness = 1, Treasure = 0, FileId = 8 },
-    new Encounter { Hitpoints = 9, Agressive = 1, Arms = 3, Cleverness = 0, Treasure = 0, FileId = 7 },
-    new Encounter { Hitpoints = 10, Agressive = 1, Arms = 6, Cleverness = 1, Treasure = 0, FileId = 8 },
-    new Encounter { Hitpoints = 40, Agressive = 1, Arms = 7, Cleverness = 1, Treasure = 0, FileId = 8 },
-    new Encounter { Hitpoints = 12, Agressive = 1, Arms = 6, Cleverness = 1, Treasure = 0, FileId = 9 },
-    new Encounter { Hitpoints = 50, Agressive = 1, Arms = 5, Cleverness = 0, Treasure = 0, FileId = 9 },
-    new Encounter { Hitpoints = 4, Agressive = 0, Arms = 0, Cleverness = 0, Treasure = 0, FileId = 9 },
-];
+    // The monsters: hit points, aggression, weapon row, cleverness, treasure and sprite file (enemies.json).
+    public static readonly Encounter[] EncounterChart = EmbeddedJson.Read<Encounter[]>("enemies.json");
 
     // Next state of a weapon swing, for each state and each of 4 random picks.
     public static readonly sbyte[][] SwingTransitions = [
@@ -332,6 +321,8 @@ public static partial class Tables
 
     public static readonly byte[] Label5 = Latin1("Food ArrowVial Mace SwordBow  Totem\u0000");
 
+    /// The Magic menu of Reimagined, where the inferno skull takes the bird totem's place.
+    public static readonly byte[] Label6Reimagined = Latin1("StoneJewelVial Orb  Fire Ring Skull\u0000");
     public static readonly byte[] Label6 = Latin1("StoneJewelVial Orb  TotemRing Skull\u0000");
 
     public static readonly byte[] Label7 = Latin1("Dirk Mace SwordBow  Wand LassoShellKey  Sun  Book \u0000");

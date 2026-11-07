@@ -2,6 +2,7 @@ using FaeryTale.Game.Creatures;
 using FaeryTale.Game.Data;
 using FaeryTale.Game.Land;
 using FaeryTale.Game.Output;
+using FaeryTale.Game.Reimagined;
 using FaeryTale.Game.Render;
 
 namespace FaeryTale.Game.Ui;
@@ -196,12 +197,16 @@ public static class Magic
     internal static bool IsScaredByFearSpell(Shape actor) =>
         actor.Vitality != 0 && actor.Kind == ActorKind.ENEMY && actor.Race < FEAR_RACE_LIMIT;
 
+    // The region the map spell's gate looks at: the map is only for outdoors, but the skull that takes
+    // its place in Reimagined burns anywhere.
+    private static ushort GateRegion(Data.Game game) => game.Experience == Experience.Reimagined ? (ushort)0 : game.World.Region;
+
     // Checks that the spell can be cast here and now. Gives a result for MagicOption to return
     // when it cannot, and null when the spell goes ahead.
     private static bool? RefuseSpell(Data.Game game, IOutput output, short chosenEntry)
     {
         byte count = chosenEntry < FIRST_SPELL ? (byte)0 : game.Hero.Stuff[SPELL_SLOT_BASE + chosenEntry];
-        SpellGate gate = GateFor(chosenEntry, count, game.Extents[game.World.Extent].V3, game.Hero.Riding, game.Ui.CheatEnabled, game.World.Region);
+        SpellGate gate = GateFor(chosenEntry, count, game.Extents[game.World.Extent].V3, game.Hero.Riding, game.Ui.CheatEnabled, GateRegion(game));
 
         switch (gate)
         {
@@ -238,6 +243,10 @@ public static class Magic
 
             case SPELL_FREEZE:
                 game.World.FreezeTimer += FREEZE_TIME;
+                break;
+
+            case SPELL_MAP when game.Experience == Experience.Reimagined:
+                InfernoSkull.Cast(game);
                 break;
 
             case SPELL_MAP:

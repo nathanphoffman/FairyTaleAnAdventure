@@ -10,6 +10,7 @@ using FaeryTale.Game.Land;
 using FaeryTale.Game.Land.TravelDoors;
 using FaeryTale.Game.Output;
 using FaeryTale.Game.Remastered;
+using FaeryTale.Game.Reimagined;
 using FaeryTale.Game.Render;
 using FaeryTale.Game.Testing;
 
@@ -354,12 +355,14 @@ public static class GameLoop
 
         Melee.ResolveMelee(game, video);
         Missiles.AdvanceMissiles(game, video);
+        InfernoSkull.Advance(game, video);
 
         game.Actors.Drawn = game.Actors.Active;
         Objects.SpawnObjectActors(game, video);
 
         // The flying missiles, then sort the actors by position.
         Missiles.QueueMissileSprites(game);
+        InfernoSkull.QueueSprites(game);
         ActorOrder.SortActors(game);
 
         // Now that the scroll blit is done, finish repairing the map.

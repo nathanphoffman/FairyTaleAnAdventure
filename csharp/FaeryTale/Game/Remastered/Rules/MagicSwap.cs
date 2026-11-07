@@ -1,6 +1,6 @@
 namespace FaeryTale.Game.Remastered;
 
-/// The bird totem is gone in Remastered and Reimagined: all it did was show the map of the land, and
+/// The bird totem is gone in Remastered (in Reimagined its place in the pack holds the inferno skull): all it did was show the map of the land, and
 /// the minimap and the big map (M) do that now. Wherever the game would give the hero one (lying about,
 /// in a chest, on a body, in the shop) the hero gets one of the other magic stones at random instead.
 public static class MagicSwap
@@ -15,5 +15,5 @@ public static class MagicSwap
     /// The item to give for an item of the pack: a random other stone in place of the bird totem, and
     /// the same item for anything else (and always in the original).
     public static int Resolve(Data.Game game, int slot) =>
-        game.Experience == Data.Experience.Original || slot != BIRD_TOTEM ? slot : OTHER_STONES[game.Rng.Rnd(OTHER_STONES.Length)];
+        game.Experience != Data.Experience.Remastered || slot != BIRD_TOTEM ? slot : OTHER_STONES[game.Rng.Rnd(OTHER_STONES.Length)];
 }

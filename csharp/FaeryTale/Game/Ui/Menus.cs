@@ -1,3 +1,4 @@
+using FaeryTale.Game.Reimagined;
 using FaeryTale.Game.Data;
 using FaeryTale.Game.Input;
 using FaeryTale.Game.Output;
@@ -201,7 +202,7 @@ public static class Menus
     private static byte[] EntryLabel(Data.Game game, int offset)
     {
         int current = game.Ui.CurrentMenu;
-        byte[] labels = game.Menus[current].LabelList;
+        byte[] labels = InfernoSkull.MenuLabels(game, game.Menus[current].LabelList);
         byte[] list = labels;
         int from = offset;
 

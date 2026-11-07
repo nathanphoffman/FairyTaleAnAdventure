@@ -90,8 +90,9 @@ public static class ItemsMenu
         TextRoutines.QueuePrint(game.Ui, PRQ_LIST);
     }
 
-    /// Reveals hidden objects within reach (the Look entry).
-    public static void LookAround(Data.Game game, IOutput output)
+    /// Reveals hidden objects within reach (the Look entry). A look at a clicked spot (Remastered
+    /// and Reimagined) says what is at that spot; without one it says what is round the hero.
+    public static void LookAround(Data.Game game, IOutput output, (int X, int Y)? spot = null)
     {
         bool found = false;
 
@@ -110,7 +111,7 @@ public static class ItemsMenu
         {
             TextRoutines.ShowEvent(game, output, EVENT_FOUND_HIDDEN);
         }
-        else if (!TellWhatIsSeen(game, output))
+        else if (!TellWhatIsSeen(game, output, spot))
         {
             TextRoutines.ShowEvent(game, output, EVENT_NOTHING_HIDDEN);
         }
@@ -118,9 +119,12 @@ public static class ItemsMenu
 
     // Remastered and Reimagined: says something fun about what the hero looks at. False when there
     // is nothing worth a line (bare ground), so the usual "discovered nothing" is shown.
-    private static bool TellWhatIsSeen(Data.Game game, IOutput output)
+    private static bool TellWhatIsSeen(Data.Game game, IOutput output, (int X, int Y)? spot)
     {
-        if (game.Experience == Experience.Original || LookSubject.Find(game) is not { } subject)
+        Shape hero = game.Actors.List[0];
+        int range = spot is null ? LOOK_RANGE : LOOK_RANGE / 2;
+
+        if (game.Experience == Experience.Original || LookSubject.Find(game, spot ?? (hero.AbsX, hero.AbsY), range) is not { } subject)
         {
             return false;
         }

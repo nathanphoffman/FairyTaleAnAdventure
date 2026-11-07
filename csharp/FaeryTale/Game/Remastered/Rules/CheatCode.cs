@@ -1,4 +1,5 @@
 using FaeryTale.Game.Output;
+using FaeryTale.Game.Reimagined;
 using FaeryTale.Game.Ui;
 
 namespace FaeryTale.Game.Remastered;
@@ -25,6 +26,7 @@ public static class CheatCode
     ];
 
     private const int GOLD_GIVEN = 200;
+    private const byte SKULLS_GIVEN = 5;
 
     // Names of keys that are only held down with another (they do not end a word being typed).
     private static readonly string[] MODIFIER_KEYS = ["Left Shift", "Right Shift", "Left Ctrl", "Right Ctrl", "Left Alt", "Right Alt", "Left GUI", "Right GUI", "CapsLock"];
@@ -101,6 +103,11 @@ public static class CheatCode
             {
                 game.Hero.Stuff[slot] = count;
             }
+        }
+
+        if (game.Experience == Data.Experience.Reimagined)
+        {
+            game.Hero.Stuff[InfernoSkull.SKULL_SLOT] = SKULLS_GIVEN;
         }
 
         game.Hero.Wealth += GOLD_GIVEN;

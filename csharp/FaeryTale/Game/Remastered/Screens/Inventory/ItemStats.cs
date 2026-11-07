@@ -29,7 +29,7 @@ public static class ItemStats
         10 => $"Light: lights the dark for about {Seconds(LIGHT_TICKS)} seconds.",
         11 => "Heals you 4 to 11 health, up to a limit that grows with bravery.",
         12 => $"Shows what is hidden for about {Seconds(SECRET_TICKS)} seconds.",
-        13 => "Shows the map of the land.",
+        13 => "Hurls a fireball that bursts into flame and burns every enemy near.",
         14 => $"Freezes time, so enemies stand still, for about {Seconds(FREEZE_TICKS)} seconds.",
         15 => "Frightens and kills the weaker enemies in view.",
         >= 16 and <= 21 => "Opens locked doors and chests of its colour.",

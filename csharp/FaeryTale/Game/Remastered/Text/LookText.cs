@@ -1,5 +1,4 @@
-using System.Reflection;
-using System.Text.Json;
+using FaeryTale.Game.Files;
 
 namespace FaeryTale.Game.Remastered;
 
@@ -7,9 +6,9 @@ namespace FaeryTale.Game.Remastered;
 /// (three variations for each kind of thing) so they can be changed without touching the code.
 public static class LookText
 {
-    private const string RESOURCE_NAME = "look_text.json";
+    private const string FILE_NAME = "look_text.json";
 
-    private static readonly Lazy<Dictionary<string, string[]>> lines = new(Read);
+    private static readonly Lazy<Dictionary<string, string[]>> lines = new(() => EmbeddedJson.Read<Dictionary<string, string[]>>(FILE_NAME));
 
     /// One of the lines for a kind of thing, picked by a random draw (any number, it is wrapped).
     public static string Pick(string subject, int draw)
@@ -17,15 +16,5 @@ public static class LookText
         string[] variations = lines.Value[subject];
 
         return variations[draw % variations.Length];
-    }
-
-    // Reads the file that is built into the program.
-    private static Dictionary<string, string[]> Read()
-    {
-        using Stream file = Assembly.GetExecutingAssembly().GetManifestResourceStream(RESOURCE_NAME)
-            ?? throw new InvalidOperationException($"{RESOURCE_NAME} is missing from the program.");
-
-        return JsonSerializer.Deserialize<Dictionary<string, string[]>>(file)
-            ?? throw new InvalidOperationException($"{RESOURCE_NAME} is empty.");
     }
 }

@@ -55,7 +55,7 @@ public static class InventorySections
     public static readonly InventorySection WEAPONS = new("Weapons", Range(FIRST_WEAPON, WEAPON_COUNT, ItemUse.Equip));
 
     /// The magic stones, each used up when cast.
-    public static readonly InventorySection MAGIC = new("Magic", Range(FIRST_MAGIC, MAGIC_COUNT, ItemUse.Cast).Where(item => item.Slot != MagicSwap.BIRD_TOTEM).ToArray());
+    public static readonly InventorySection MAGIC = new("Magic", Range(FIRST_MAGIC, MAGIC_COUNT, ItemUse.Cast));
 
     /// Things that are eaten, shot or otherwise run out.
     public static readonly InventorySection SUPPLIES = new("Supplies",

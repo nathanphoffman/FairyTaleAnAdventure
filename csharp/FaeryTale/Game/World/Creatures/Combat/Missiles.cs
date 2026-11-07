@@ -31,7 +31,7 @@ public static class Missiles
 
     // HitActor attacker codes for an arrow and for a fireball.
     private const int BY_ARROW = -1;
-    private const int BY_FIREBALL = -2;
+    internal const int BY_FIREBALL = -2;
 
     private const int RAFT = 1;
     private const int MISSILE_COUNT = 6;
@@ -67,11 +67,14 @@ public static class Missiles
 
     /// Adds the visible missiles to the end of the actor list as objects so the drawing draws
     /// them. Stops when the list is full.
-    public static void QueueMissileSprites(Data.Game game)
+    public static void QueueMissileSprites(Data.Game game) => QueueSprites(game, game.Actors.Missiles);
+
+    /// Adds the given missiles (the six of the game, or the fireball and flames of the inferno
+    /// skull) to the actor list in the same way.
+    public static void QueueSprites(Data.Game game, IReadOnlyList<Missile> missiles)
     {
-        for (int number = 0; number < MISSILE_COUNT; number++)
+        foreach (Missile missile in missiles)
         {
-            Missile missile = game.Actors.Missiles[number];
 
             if (missile.MissileType == MISSILE_NONE)
             {
