@@ -52,6 +52,9 @@ public abstract class Font
     /// Draws character character with its baseline at the pen and returns how far the pen moves.
     public abstract int DrawGlyph(Bitmap bitmap, Pen pen, byte character, int planes);
 
+    /// How far the pen moves across after a character (its width with the space after it).
+    public abstract int AdvanceOf(byte character);
+
     // AmigaDOS hunk file markers.
     private const uint HUNK_HEADER = 0x3f3;
     private const uint HUNK_CODE = 0x3e9;
@@ -132,6 +135,8 @@ public abstract class Font
         private const int BASELINE = 6;
         private const byte ASCII_MASK = 0x7f;
 
+        public override int AdvanceOf(byte character) => SIZE;
+
         public override int DrawGlyph(Bitmap bitmap, Pen pen, byte character, int planes)
         {
             int top = pen.Y - BASELINE;
@@ -175,6 +180,9 @@ public abstract class Font
             spaces[index] = space;
             kerns[index] = kern;
         }
+
+        public override int AdvanceOf(byte character) =>
+            spaces[character >= low && character <= high ? character - low : high - low + 1];
 
         public override int DrawGlyph(Bitmap bitmap, Pen pen, byte character, int planes)
         {

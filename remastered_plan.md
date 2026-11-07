@@ -107,5 +107,9 @@ check this).
   chest, body, shop) a random other stone comes instead (`MagicSwap`); the inventory and hotbar have no place for it.
 - Click to attack with a bow or wand keeps shooting while the enemy is in range with a clear line (the fight is
   let go for a moment between shots, `ClickToAttack.ShotHeld`); it ends when the arrows run out.
+- Whatever is printed to the message window wraps by itself in these modes (`MessageWrapper`, in `VideoOutput.PrintBytes`).
+  The sea shell works anywhere there is deep water near, not only outside the middle of the land (the original's rule).
+- Looking (shift-click or the Look button) at something says a fun line about it, picked from three for each kind of thing: trees, water, rock, walls, bodies, each enemy, each person, carriers and objects on the ground.
+  The lines live in `Game/Remastered/Text/look_text.json` (built into the program), `LookSubject` finds what is looked at. Bare ground still says "looked around but discovered nothing".
 - Cheat: typing GRAPHIX while playing gives every item (not the talisman) and some gold, for testing (`CheatCode`).
 - Not done: a map of the indoors; the minimap and big map show the daylight colours only.

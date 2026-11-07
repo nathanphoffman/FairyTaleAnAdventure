@@ -1,0 +1,207 @@
+{
+  "tree": [
+    "% saw a tall tree.",
+    "The leaves of this tree reach out over %'s head.",
+    "% ran a hand over the rough bark of an old tree."
+  ],
+  "water": [
+    "% watched the water ripple and shine.",
+    "% looked out over the cold, dark water.",
+    "Something small broke the surface of the water and was gone."
+  ],
+  "rock": [
+    "% studied a great grey rock, worn smooth by the weather.",
+    "% saw rough stone that no one could climb.",
+    "% looked at the rocks and found nothing but moss."
+  ],
+  "wall": [
+    "% looked over the cold stone wall.",
+    "% saw old stonework, cracked with age.",
+    "% ran a hand along the wall and felt only damp stone."
+  ],
+  "body": [
+    "% looked at the fallen body and moved on.",
+    "% saw a body lying very still.",
+    "% looked down at the body. It would trouble no one now."
+  ],
+  "ogre": [
+    "% looked up at the huge ogre and gulped.",
+    "% saw an ogre with arms as thick as tree trunks.",
+    "The ogre sniffed the air. % did not like the way it looked at him."
+  ],
+  "orc": [
+    "% saw a snarling goblin-man with a crooked blade.",
+    "% watched the orc grind its yellow teeth.",
+    "The orc glared back at %, mean and hungry."
+  ],
+  "wraith": [
+    "% shivered as the wraith drifted closer.",
+    "% saw a pale wraith, cold as a grave.",
+    "The wraith gazed at % with hollow, empty eyes."
+  ],
+  "skeleton": [
+    "% saw a skeleton, its bones clattering softly.",
+    "% looked at the skeleton. It looked back with empty sockets.",
+    "The skeleton grinned at %, as skeletons do."
+  ],
+  "snake": [
+    "% saw a snake coiled in the dirt.",
+    "% watched the snake's tongue flicker in the air.",
+    "A snake hissed at %. He took a careful step back."
+  ],
+  "salamander": [
+    "% saw a salamander, glowing with heat.",
+    "% felt the hot breath of the salamander from where he stood.",
+    "The salamander slid across the stones, trailing smoke."
+  ],
+  "spider": [
+    "% saw a spider as big as a dog.",
+    "% watched the spider's many legs twitch.",
+    "% looked at the spider and wished he had not."
+  ],
+  "dark_knight": [
+    "% saw a dark knight in black armor, standing guard.",
+    "The dark knight did not move. Neither did %.",
+    "% looked at the dark knight and the dark knight looked back."
+  ],
+  "loraii": [
+    "% saw a Loraii, tall and strange and silent.",
+    "% watched the Loraii and felt very small.",
+    "The Loraii turned its cold gaze towards %."
+  ],
+  "necromancer": [
+    "% saw the Necromancer, wrapped in dark power.",
+    "The air around the Necromancer felt thick and wrong to %.",
+    "% looked at the Necromancer and felt his courage drain away."
+  ],
+  "woodcutter": [
+    "% saw a woodcutter with a heavy axe.",
+    "% watched the woodcutter and the chips flying from his axe.",
+    "The woodcutter nodded at %, then went back to work."
+  ],
+  "wizard": [
+    "% saw a wizard in a star-covered robe.",
+    "% looked at the wizard, who seemed to know more than he said.",
+    "The wizard stroked his long beard and smiled at %."
+  ],
+  "priest": [
+    "% saw a priest in plain white robes.",
+    "% looked at the priest, who was whispering a quiet prayer.",
+    "The priest gave % a calm and gentle look."
+  ],
+  "guard": [
+    "% saw a guard standing stiff and watchful.",
+    "% looked at the guard. The guard looked at his spear.",
+    "The guard stared straight ahead and ignored %."
+  ],
+  "princess": [
+    "% saw a princess in a fine gown.",
+    "% looked at the princess, who looked sad and far away.",
+    "The princess met %'s eyes and then looked down."
+  ],
+  "king": [
+    "% saw the king on his throne.",
+    "% looked at the king, who wore a heavy crown and a heavier frown.",
+    "The king watched % with tired, worried eyes."
+  ],
+  "noble": [
+    "% saw a noble in fine clothes.",
+    "% looked at the noble, who looked back with a hint of scorn.",
+    "The noble straightened his collar and glanced at %."
+  ],
+  "sorceress": [
+    "% saw a sorceress, calm and bright with magic.",
+    "% looked at the sorceress and felt a warm tingle.",
+    "The sorceress smiled at % as if she knew a secret."
+  ],
+  "bartender": [
+    "% saw a tavern keeper polishing a mug.",
+    "% looked at the bartender, who looked glad of company.",
+    "The bartender gave % a friendly wave."
+  ],
+  "witch": [
+    "% saw a witch, and quickly looked away.",
+    "% felt a chill. The witch's gaze was on him.",
+    "The witch cackled softly as % looked at her."
+  ],
+  "spectre": [
+    "% saw a spectre drifting in the dark.",
+    "The spectre looked at %, and the air grew cold.",
+    "% looked at the spectre and heard a low whisper."
+  ],
+  "ghost": [
+    "% saw a pale ghost that looked a lot like his brother.",
+    "% looked at the ghost and a sad silence fell.",
+    "The ghost shimmered in the air, watching %."
+  ],
+  "ranger": [
+    "% saw a ranger leaning on a walking stick.",
+    "% looked at the ranger, who knew these lands well.",
+    "The ranger gave % a friendly nod."
+  ],
+  "beggar": [
+    "% saw a beggar holding out a thin hand.",
+    "% looked at the beggar, who smiled a toothless smile.",
+    "The beggar's eyes followed % hopefully."
+  ],
+  "turtle": [
+    "% saw a great turtle with a mossy shell.",
+    "% looked at the turtle, who seemed in no hurry at all.",
+    "The turtle blinked slowly at %."
+  ],
+  "swan": [
+    "% saw a giant swan with white wings.",
+    "% looked at the swan, who held her head up proudly.",
+    "The swan stretched her wings and looked at %."
+  ],
+  "dragon": [
+    "% saw a dragon and forgot to breathe.",
+    "% looked at the dragon. Its scales shone like old coins.",
+    "Smoke curled from the dragon's nose as it watched %."
+  ],
+  "raft": [
+    "% saw a wooden raft bobbing in the water.",
+    "% looked over the raft. It looked sturdy enough.",
+    "The raft rocked gently, waiting for someone to ride it."
+  ],
+  "chest": [
+    "% saw a sturdy chest with an iron lock.",
+    "% looked at the chest and wondered what it held.",
+    "The chest sat in a patch of shadow, quiet as a stone."
+  ],
+  "urn": [
+    "% saw a clay urn, cracked and dusty.",
+    "% looked into the urn and found only shadow.",
+    "The urn was old, and older than the village."
+  ],
+  "sacks": [
+    "% saw a pile of rough sacks.",
+    "% looked at the sacks. They smelled of grain and dust.",
+    "The sacks were stacked neatly. Someone had been here."
+  ],
+  "gold": [
+    "% saw a few gold coins glinting.",
+    "% looked at the gold and smiled a little.",
+    "The coins caught the light and winked at %."
+  ],
+  "arrows": [
+    "% saw a quiver of arrows.",
+    "% looked over the arrows, straight and well made.",
+    "The arrows looked ready to fly."
+  ],
+  "key": [
+    "% saw a key shining in the light.",
+    "% looked at the key and wondered what lock it fit.",
+    "The key was small, but it looked important."
+  ],
+  "treasure": [
+    "% saw something strange and shiny.",
+    "% looked at the object, which seemed to hum with magic.",
+    "A faint glow rose from the object as % looked at it."
+  ],
+  "item": [
+    "% saw something lying on the ground.",
+    "% looked at what someone had left behind.",
+    "% eyed the thing on the ground with curiosity."
+  ]
+}

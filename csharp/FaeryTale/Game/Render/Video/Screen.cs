@@ -243,6 +243,9 @@ public sealed class Screen
         }
     }
 
+    /// How far the pen of a port moves across after a character, in the port's font.
+    public int AdvanceOf(PortId id, byte character) => fonts[(int)GetPort(id).Font].AdvanceOf(character);
+
     /// Draws a line from the port's pen to (x, y).
     public void LineTo(PortId id, int x, int y)
     {

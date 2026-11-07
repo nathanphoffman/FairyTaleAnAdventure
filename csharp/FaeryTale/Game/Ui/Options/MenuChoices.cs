@@ -179,7 +179,9 @@ public static class MenuChoices
 
         if (chosenEntry == SHELL_ENTRY && game.Ui.MenuHitEnabled != 0)
         {
-            if (InNoTurtleArea(game.Hero))
+            // The original keeps the shell from working in the middle of the land; Remastered and Reimagined let it
+            // work anywhere there is deep water near.
+            if (game.Experience == Data.Experience.Original && InNoTurtleArea(game.Hero))
             {
                 return true;
             }

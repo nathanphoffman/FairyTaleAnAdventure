@@ -58,8 +58,25 @@ public sealed partial class Video : IOutput
     // The message window is showing lines this far back (0 is the live window).
     private int shownScroll;
 
-    /// The old lines scroll up by one text line (10 pixels) inside the message area.
+    /// A line of text in the message area; in Remastered and Reimagined a line that is too wide wraps
+    /// onto more lines by itself.
     public void PrintBytes(ReadOnlySpan<byte> text)
+    {
+        if (!Capture.Enabled)
+        {
+            PrintLine(text);
+
+            return;
+        }
+
+        foreach (byte[] line in MessageWrapper.Wrap(text, TEXT_X_MAX - TEXT_X_MIN + 1, character => Screen.AdvanceOf(Screen.CurrentPort, character)))
+        {
+            PrintLine(line);
+        }
+    }
+
+    // The old lines scroll up by one text line (10 pixels) inside the message area.
+    private void PrintLine(ReadOnlySpan<byte> text)
     {
         ShowNewestMessages();
 

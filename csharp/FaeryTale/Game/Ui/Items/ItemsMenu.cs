@@ -1,3 +1,4 @@
+using System.Text;
 using FaeryTale.Game.Creatures.Interaction;
 using FaeryTale.Game.Data;
 using FaeryTale.Game.Land;
@@ -105,6 +106,27 @@ public static class ItemsMenu
             }
         }
 
-        TextRoutines.ShowEvent(game, output, found ? EVENT_FOUND_HIDDEN : EVENT_NOTHING_HIDDEN);
+        if (found)
+        {
+            TextRoutines.ShowEvent(game, output, EVENT_FOUND_HIDDEN);
+        }
+        else if (!TellWhatIsSeen(game, output))
+        {
+            TextRoutines.ShowEvent(game, output, EVENT_NOTHING_HIDDEN);
+        }
+    }
+
+    // Remastered and Reimagined: says something fun about what the hero looks at. False when there
+    // is nothing worth a line (bare ground), so the usual "discovered nothing" is shown.
+    private static bool TellWhatIsSeen(Data.Game game, IOutput output)
+    {
+        if (game.Experience == Experience.Original || LookSubject.Find(game) is not { } subject)
+        {
+            return false;
+        }
+
+        Messages.PrintWrapped(game, output, Encoding.Latin1.GetBytes(LookText.Pick(subject, game.Rng.Rand256())));
+
+        return true;
     }
 }
