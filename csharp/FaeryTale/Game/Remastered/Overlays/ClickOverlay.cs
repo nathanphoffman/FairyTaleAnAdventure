@@ -24,6 +24,20 @@ public static class ClickOverlay
     /// Forgets that something was shown (a new game starts with a clear overlay).
     public static void Reset() => shown = false;
 
+    // Tells the world drawer what is under the pointer and what is going on, for it to draw.
+    private static void HandOverToWorldDrawer(Data.Game game, Video video, bool overDoor)
+    {
+        video.Capture.Marker = ClickToMove.Marker;
+        video.Capture.DoorHover = overDoor;
+        video.Capture.HoverPerson = PersonUnderPointer(game);
+        video.Capture.TalkingTo = Conversation.Person;
+        video.Capture.LookMode = IsLookMode(game);
+        video.Capture.ItemHover = IsPointerOverItem(game, video.Capture);
+        video.Capture.LitButtons = ButtonsInUse(video.Capture);
+        video.Capture.EnemyHover = IsPointerOverEnemy(game);
+        video.Capture.AttackTarget = ClickToAttack.TargetAt(game);
+    }
+
     /// Draws what is wanted this frame and takes it off when nothing is. Called every frame.
     public static void Update(Data.Game game, IOutput output)
     {
@@ -33,15 +47,7 @@ public static class ClickOverlay
         // The new world drawer draws the marker and the door icon itself, in its own pixels.
         if (output is Video video && WindowControls.NativeRendering && video.Capture.Enabled)
         {
-            video.Capture.Marker = ClickToMove.Marker;
-            video.Capture.DoorHover = overDoor;
-            video.Capture.HoverPerson = PersonUnderPointer(game);
-            video.Capture.TalkingTo = Conversation.Person;
-            video.Capture.LookMode = IsLookMode(game);
-            video.Capture.ItemHover = IsPointerOverItem(game, video.Capture);
-            video.Capture.LitButtons = ButtonsInUse(video.Capture);
-            video.Capture.EnemyHover = IsPointerOverEnemy(game);
-            video.Capture.AttackTarget = ClickToAttack.TargetAt(game);
+            HandOverToWorldDrawer(game, video, overDoor);
             ClearOverlay(output);
 
             return;

@@ -27,24 +27,29 @@ public static class TestCommands
         {
             case CommandKind.Teleport:
                 Places.TransferHero(game, output, (ushort)command.First, (ushort)command.Second, 1);
+
                 break;
 
             case CommandKind.Give:
                 game.Hero.Stuff[command.First] = (byte)command.Second;
+
                 break;
 
             case CommandKind.SetStat:
                 SetStat(game, command.First, (short)command.Second);
+
                 break;
 
             case CommandKind.SlayEnemies:
                 SlayEnemies(game, output);
+
                 break;
 
             case CommandKind.KillHero:
                 game.Hero.Luck = (short)command.First;
                 game.Actors.List[0].Vitality = 0;
                 Encounters.CheckDeath(game, output, 0, DEATH_BY_TEST);
+
                 break;
         }
     }

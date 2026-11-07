@@ -185,28 +185,34 @@ public sealed partial class SdlDisplay : IDisplayDevice, IDisposable
         {
             case SDL_EventType.SDL_QUIT:
                 Environment.Exit(0);
+
                 break;
 
             case SDL_EventType.SDL_KEYDOWN:
             case SDL_EventType.SDL_KEYUP:
                 HandleKey(windowEvent.key);
+
                 break;
 
             case SDL_EventType.SDL_MOUSEMOTION:
                 MouseMovedTo(windowEvent.motion.x, windowEvent.motion.y);
+
                 break;
 
             case SDL_EventType.SDL_MOUSEWHEEL:
                 ZoomWithWheel(windowEvent.wheel.y);
+
                 break;
 
             case SDL_EventType.SDL_MOUSEBUTTONDOWN:
             case SDL_EventType.SDL_MOUSEBUTTONUP:
                 HandleMouseButton(windowEvent.button);
+
                 break;
 
             default:
                 pad.Handle(windowEvent);
+
                 break;
         }
     }

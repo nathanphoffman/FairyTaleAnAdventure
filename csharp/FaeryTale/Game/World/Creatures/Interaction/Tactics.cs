@@ -55,35 +55,43 @@ public static class Tactics
         {
             case ActorTactic.PURSUE:
                 SteerIf(game, actsNow, index, heroX, heroY, COURSE_TOWARD);
+
                 break;
 
             case ActorTactic.SHOOT:
                 EngageTarget(game, index, actor, heroX, heroY);
+
                 break;
 
             case ActorTactic.RANDOM:
                 Wander(game, actor, actsNow);
+
                 break;
 
             case ActorTactic.BUMBLE_SEEK:
                 SteerIf(game, actsNow, index, heroX, heroY, COURSE_STRAIGHT);
+
                 break;
 
             case ActorTactic.BACKUP:
                 SteerIf(game, actsNow, index, heroX, heroY, COURSE_AWAY);
+
                 break;
 
             case ActorTactic.FOLLOW:
                 FollowLeader(game, index, actor, actsNow);
+
                 break;
 
             case ActorTactic.EVADE:
                 EvadeNeighbour(game, index, actsNow);
+
                 break;
 
             case ActorTactic.EGG_SEEK:
                 SteerIf(game, actsNow, index, EGG_X, EGG_Y, COURSE_TOWARD);
                 actor.State = ActorState.WALKING;
+
                 break;
         }
     }

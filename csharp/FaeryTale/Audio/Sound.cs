@@ -315,10 +315,12 @@ public sealed class Sound
                 // An instrument word holds the waveform number in its high byte and the volume envelope in the low one.
                 Voices[voice].WaveNum = (byte)(word >> 8);
                 Voices[voice].VolNum = (byte)word;
+
                 break;
 
             case AudioTables.CMD_TEMPO:
                 Tempo = value;
+
                 break;
 
             case AudioTables.CMD_END:

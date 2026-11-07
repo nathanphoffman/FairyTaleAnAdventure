@@ -148,40 +148,55 @@ public static class MenuChoices
         return true;
     }
 
+    // The key entry opens the menu of keys, if the hero has any.
+    private static void OpenKeyMenu(Data.Game game, IOutput output)
+    {
+        if (game.Ui.MenuHitEnabled != 0)
+        {
+            Menus.GoToMenu(game, output, KEYS);
+        }
+        else
+        {
+            Messages.PrintWrapped(game, output, "% has no keys!"u8);
+        }
+    }
+
+    // A weapon entry takes the weapon in hand, if the hero has one.
+    private static void EquipWeapon(Data.Game game, IOutput output, short chosenEntry)
+    {
+        if (game.Ui.MenuHitEnabled != 0)
+        {
+            game.Actors.List[0].Weapon = (sbyte)(chosenEntry + 1);
+        }
+        else
+        {
+            Messages.PrintWrapped(game, output, "% doesn't have one."u8);
+        }
+    }
+
+    // The original keeps the shell from working in the middle of the land; Remastered and Reimagined let it
+    // work anywhere there is deep water near.
+    private static bool ShellBlockedHere(Data.Game game) =>
+        game.Experience == Data.Experience.Original && InNoTurtleArea(game.Hero);
+
     // Picks a weapon, the key menu, the turtle shell, or the sunstone.
     private static bool UseOption(Data.Game game, IOutput output, short chosenEntry)
     {
         if (chosenEntry == KEY_ENTRY)
         {
-            if (game.Ui.MenuHitEnabled != 0)
-            {
-                Menus.GoToMenu(game, output, KEYS);
-            }
-            else
-            {
-                Messages.PrintWrapped(game, output, "% has no keys!"u8);
-            }
+            OpenKeyMenu(game, output);
 
             return false;
         }
 
         if (chosenEntry < WEAPONS)
         {
-            if (game.Ui.MenuHitEnabled != 0)
-            {
-                game.Actors.List[0].Weapon = (sbyte)(chosenEntry + 1);
-            }
-            else
-            {
-                Messages.PrintWrapped(game, output, "% doesn't have one."u8);
-            }
+            EquipWeapon(game, output, chosenEntry);
         }
 
         if (chosenEntry == SHELL_ENTRY && game.Ui.MenuHitEnabled != 0)
         {
-            // The original keeps the shell from working in the middle of the land; Remastered and Reimagined let it
-            // work anywhere there is deep water near.
-            if (game.Experience == Data.Experience.Original && InNoTurtleArea(game.Hero))
+            if (ShellBlockedHere(game))
             {
                 return true;
             }

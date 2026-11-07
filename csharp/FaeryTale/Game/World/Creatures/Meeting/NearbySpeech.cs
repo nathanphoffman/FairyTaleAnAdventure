@@ -36,22 +36,27 @@ public static class NearbySpeech
         {
             case BEGGAR:
                 TextRoutines.Speak(game, output, SPEECH_BEGGAR);
+
                 break;
 
             case WITCH:
                 TextRoutines.Speak(game, output, SPEECH_WITCH);
+
                 break;
 
             case PRINCESS when game.Objects.Regions[INSIDE_OBJECTS][PRINCESS_FREED_SLOT].ObStat != 0:
                 TextRoutines.Speak(game, output, SPEECH_PRINCESS);
+
                 break;
 
             case NECROMANCER:
                 TextRoutines.Speak(game, output, SPEECH_NECROMANCER);
+
                 break;
 
             case DKNIGHT:
                 TextRoutines.Speak(game, output, SPEECH_DKNIGHT);
+
                 break;
         }
 

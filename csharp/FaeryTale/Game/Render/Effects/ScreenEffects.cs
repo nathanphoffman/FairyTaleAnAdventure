@@ -136,26 +136,32 @@ public static class ScreenEffects
         {
             case REQUEST_DEBUG_COORDS:
                 ShowDebugCoords(game.Hero, output);
+
                 break;
 
             case REQUEST_DEBUG_SECTOR:
                 ShowDebugSector(game.World, game.Hero, output);
+
                 break;
 
             case REQUEST_VITALITY:
                 DrawVitality(game.Actors, output);
+
                 break;
 
             case REQUEST_OPTIONS:
                 Menus.PrintOptions(game, output);
+
                 break;
 
             case REQUEST_STATS:
                 DrawStats(game.Hero, output);
+
                 break;
 
             case REQUEST_TAKE_WHAT:
                 output.Print("Take What?");
+
                 break;
         }
 

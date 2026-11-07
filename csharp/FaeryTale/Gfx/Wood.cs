@@ -139,12 +139,15 @@ public static class Wood
     // A fixed pseudo-random value between 0 and 1 for a point.
     private static float RandomAt(int x, int y, uint seed)
     {
+        // A cheap hash: multiplying by big odd numbers scrambles x, y and the seed, xor joins them, and
+        // the two shift-xor steps below spread the high bits down so nearby spots look unrelated.
         uint hash = unchecked((uint)x * 0x9e37_79b1 ^ (uint)y * 0x85eb_ca6b ^ seed * 0xc2b2_ae35);
 
         hash ^= hash >> 15;
         hash = unchecked(hash * 0x2c1b_3c6d);
         hash ^= hash >> 12;
 
+        // Keeps the low 16 bits and scales them to a number from 0 to 1.
         return (hash & 0xffff) / 65535f;
     }
 

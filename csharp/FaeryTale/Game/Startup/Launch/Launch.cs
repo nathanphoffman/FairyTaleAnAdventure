@@ -294,10 +294,12 @@ public static class Launch
 
                 case LaunchAction.ShowBook:
                     ReplayBook(game, video);
+
                     break;
 
                 case LaunchAction.ShowPrologue:
                     ReplayPrologue(game, video);
+
                     break;
 
                 default:

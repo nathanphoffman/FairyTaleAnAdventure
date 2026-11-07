@@ -83,6 +83,7 @@ public static class SpriteDrawing
                     return;
                 }
             }
+
             while (pass == 1);
         }
     }

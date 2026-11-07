@@ -50,6 +50,7 @@ public static class Steering
         {
             (targetX, targetY) = EnemyPathing.AimPoint(game, objectSlot, (targetX, targetY));
         }
+
         short xDifference = mode == STEER_OFFSET ? (short)targetX : (short)(actor.AbsX - targetX);
         short yDifference = mode == STEER_OFFSET ? (short)targetY : (short)(actor.AbsY - targetY);
 

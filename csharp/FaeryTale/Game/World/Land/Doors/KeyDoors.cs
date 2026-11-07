@@ -127,16 +127,19 @@ public static class KeyDoors
         {
             case ABOVE:
                 changes.Add((x, y - 1, second));
+
                 break;
 
             case BACK:
                 changes.Add((x - 1, y, second));
+
                 break;
 
             case CABINET_LAYOUT:
                 changes.Add((x, y - 1, CABINET_TILES[0]));
                 changes.Add((x + 1, y, CABINET_TILES[1]));
                 changes.Add((x + 1, y - 1, CABINET_TILES[2]));
+
                 break;
 
             default:

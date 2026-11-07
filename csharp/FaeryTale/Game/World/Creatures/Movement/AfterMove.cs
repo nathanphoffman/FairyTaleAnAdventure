@@ -367,14 +367,17 @@ internal sealed partial class MoveContext
         {
             case 0:
                 image = SPECTRE_BASE_FRAME_A;
+
                 break;
 
             case 1:
                 image += SPECTRE_BASE_FRAME_B;
+
                 break;
 
             default:
                 image += SPECTRE_BASE_FRAME_C;
+
                 break;
         }
     }

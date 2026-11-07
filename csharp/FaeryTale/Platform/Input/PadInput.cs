@@ -27,15 +27,18 @@ internal sealed class PadInput
         {
             case SDL_EventType.SDL_CONTROLLERDEVICEADDED:
                 Open(windowEvent.cdevice.which);
+
                 break;
 
             case SDL_EventType.SDL_CONTROLLERBUTTONDOWN:
             case SDL_EventType.SDL_CONTROLLERBUTTONUP:
                 Button((SDL_GameControllerButton)windowEvent.cbutton.button, windowEvent.type == SDL_EventType.SDL_CONTROLLERBUTTONDOWN);
+
                 break;
 
             case SDL_EventType.SDL_CONTROLLERAXISMOTION:
                 Stick((SDL_GameControllerAxis)windowEvent.caxis.axis, windowEvent.caxis.axisValue);
+
                 break;
         }
     }

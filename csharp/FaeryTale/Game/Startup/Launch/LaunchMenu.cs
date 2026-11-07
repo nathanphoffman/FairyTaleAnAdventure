@@ -87,25 +87,34 @@ internal static class LaunchMenu
         Launch.PrepareBluePage(game, video);
 
         MenuBackground background = MenuBackground.Load(game, video);
-        uint tick = 0;
 
         WindowControls.SystemCursorShown = true;
         Planks planks = MakePlanks(blocks);
         video.SetOverlay(MenuOverlay(blocks, planks, null));
 
+        int choice = WaitForChoice(game, video, (blocks, planks), background);
+
+        LeaveMenu(game, video);
+
+        return ActionFor(choice);
+    }
+
+    // Draws the menu until an option is clicked or its key is pressed; returns the option.
+    private static int WaitForChoice(Data.Game game, Video video, (List<Block> Blocks, Planks Planks) menu, MenuBackground background)
+    {
+        uint tick = 0;
         int? drawn = null;
-        int choice;
 
         while (true)
         {
             (int pointerX, int pointerY) = InputHandler.RawPointer;
 
             // The pointer is in lores game pixels; the menu is in overlay pixels, twice as many.
-            int? hovered = OptionAt(blocks, pointerX * 2, pointerY * 2);
+            int? hovered = OptionAt(menu.Blocks, pointerX * 2, pointerY * 2);
 
             if (hovered != drawn)
             {
-                video.SetOverlay(MenuOverlay(blocks, planks, hovered));
+                video.SetOverlay(MenuOverlay(menu.Blocks, menu.Planks, hovered));
                 drawn = hovered;
             }
 
@@ -114,21 +123,21 @@ internal static class LaunchMenu
 
             if (hovered is { } option && InputHandler.LeftButtonDown)
             {
-                choice = option;
-
-                break;
+                return option;
             }
 
             if (OptionForKey(InputHandler.NextKey()) is { } keyOption)
             {
-                choice = keyOption;
-
-                break;
+                return keyOption;
             }
 
             Display.Delay(game, video, 1);
         }
+    }
 
+    // Clears the menu away and forgets the click and keys that chose the option.
+    private static void LeaveMenu(Data.Game game, Video video)
+    {
         // Wait for the button to go up, so the click does not carry on into the game.
         while (InputHandler.LeftButtonDown)
         {
@@ -139,15 +148,16 @@ internal static class LaunchMenu
         video.SetOverlay(new Overlay());
         InputHandler.ResetKeyBuffer();
         InputHandler.ForgetLastMenu();
-
-        return choice switch
-        {
-            QUIT => (LaunchAction.Quit, Experience.Original),
-            BOOK => (LaunchAction.ShowBook, Experience.Original),
-            PROLOGUE => (LaunchAction.ShowPrologue, Experience.Original),
-            _ => (LaunchAction.Play, OPTIONS[choice].Experience),
-        };
     }
+
+    // What the launcher does for an option.
+    private static (LaunchAction Action, Experience Experience) ActionFor(int choice) => choice switch
+    {
+        QUIT => (LaunchAction.Quit, Experience.Original),
+        BOOK => (LaunchAction.ShowBook, Experience.Original),
+        PROLOGUE => (LaunchAction.ShowPrologue, Experience.Original),
+        _ => (LaunchAction.Play, OPTIONS[choice].Experience),
+    };
 
     /// Breaks text into lines of at most width characters, between words.
     internal static List<string> Wrap(string text, int width)

@@ -308,56 +308,62 @@ public static class KeyHandler
     }
 
     // Debug keys that rescue, redraw or move the hero about. Returns true if the key was one.
-    private static bool CheatMove(Data.Game game, IOutput output, sbyte key)
+    private static bool CheatMove(Data.Game game, IOutput output, sbyte key) =>
+        game.Ui.CheatEnabled != 0 && (CheatShow(game, output, key) || CheatNudge(game, key));
+
+    // The debug keys that rescue the princess, print debug lines or move the clock on.
+    private static bool CheatShow(Data.Game game, IOutput output, sbyte key)
     {
-        if (game.Ui.CheatEnabled == 0)
+        switch (key)
+        {
+            case CHEAT_RESCUE:
+                Rescue.RescuePrincess(game, output);
+
+                return true;
+
+            case CHEAT_PRQ_2:
+                TextRoutines.QueuePrint(game.Ui, PRQ_DEBUG_COORDS);
+
+                return true;
+
+            case CHEAT_PRQ_3:
+                TextRoutines.QueuePrint(game.Ui, PRQ_DEBUG_SECTOR);
+
+                return true;
+
+            case CHEAT_TIME:
+                game.World.DayClock = unchecked((ushort)(game.World.DayClock + CHEAT_TIME_STEP));
+
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    // The debug keys that move the hero (and the map with him) a step in a direction.
+    private static bool CheatNudge(Data.Game game, sbyte key)
+    {
+        (int dx, int dy) = key switch
+        {
+            CHEAT_NORTH => (0, -CHEAT_STEP_Y),
+            CHEAT_SOUTH => (0, CHEAT_STEP_Y),
+            CHEAT_EAST => (CHEAT_STEP_X, 0),
+            CHEAT_WEST => (-CHEAT_STEP_X, 0),
+            _ => (0, 0),
+        };
+
+        if (dx == 0 && dy == 0)
         {
             return false;
         }
 
         Shape hero = game.Actors.List[0];
 
-        switch (key)
-        {
-            case CHEAT_RESCUE:
-                Rescue.RescuePrincess(game, output);
-                break;
-
-            case CHEAT_PRQ_2:
-                TextRoutines.QueuePrint(game.Ui, PRQ_DEBUG_COORDS);
-                break;
-
-            case CHEAT_PRQ_3:
-                TextRoutines.QueuePrint(game.Ui, PRQ_DEBUG_SECTOR);
-                break;
-
-            case CHEAT_TIME:
-                game.World.DayClock = unchecked((ushort)(game.World.DayClock + CHEAT_TIME_STEP));
-                break;
-
-            case CHEAT_NORTH:
-                hero.AbsY = unchecked((ushort)(hero.AbsY - CHEAT_STEP_Y));
-                game.World.MapY = unchecked((ushort)(game.World.MapY - CHEAT_STEP_Y));
-                break;
-
-            case CHEAT_SOUTH:
-                hero.AbsY = unchecked((ushort)(hero.AbsY + CHEAT_STEP_Y));
-                game.World.MapY = unchecked((ushort)(game.World.MapY + CHEAT_STEP_Y));
-                break;
-
-            case CHEAT_EAST:
-                hero.AbsX = unchecked((ushort)(hero.AbsX + CHEAT_STEP_X));
-                game.World.MapX = unchecked((ushort)(game.World.MapX + CHEAT_STEP_X));
-                break;
-
-            case CHEAT_WEST:
-                hero.AbsX = unchecked((ushort)(hero.AbsX - CHEAT_STEP_X));
-                game.World.MapX = unchecked((ushort)(game.World.MapX - CHEAT_STEP_X));
-                break;
-
-            default:
-                return false;
-        }
+        hero.AbsX = unchecked((ushort)(hero.AbsX + dx));
+        hero.AbsY = unchecked((ushort)(hero.AbsY + dy));
+        game.World.MapX = unchecked((ushort)(game.World.MapX + dx));
+        game.World.MapY = unchecked((ushort)(game.World.MapY + dy));
 
         return true;
     }

@@ -112,10 +112,12 @@ public static class Hits
         {
             case BattleReport.Bravely:
                 output.Print("Bravely done!");
+
                 break;
 
             case BattleReport.Foes foes:
                 PrintFoes(output, foes);
+
                 break;
         }
 
@@ -169,18 +171,22 @@ public static class Hits
         {
             case HitSound.Arrow:
                 Music.PlayEffect(game, EFFECT_ARROW_HIT, PITCH_ARROW + game.Rng.Rand64());
+
                 break;
 
             case HitSound.Rock:
                 Music.PlayEffect(game, EFFECT_ROCK_HIT, PITCH_ROCK + game.Rng.BitRand(PITCH_SPREAD));
+
                 break;
 
             case HitSound.HeroHurt:
                 Music.PlayEffect(game, EFFECT_HERO_HURT, PITCH_HERO_HURT + game.Rng.BitRand(PITCH_SPREAD));
+
                 break;
 
             default:
                 Music.PlayEffect(game, EFFECT_FOE_HURT, PITCH_FOE_HURT + game.Rng.Rand256());
+
                 break;
         }
     }

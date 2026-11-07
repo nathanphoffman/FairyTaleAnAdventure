@@ -114,6 +114,24 @@ public static class GameLoop
     // One frame: input, moving everything, updating the map and the world, then drawing.
     private static void RunFrame(Data.Game game, Video video, FrameState state)
     {
+        ReadInputs(game, video, state);
+
+        if (HandleViewStatus(game, video))
+        {
+            return;
+        }
+
+        InputHandler.ReadWalkDirection(game.Ui, video);
+
+        if (!RunPausedFrame(game, video))
+        {
+            PlayFrame(game, video, state);
+        }
+    }
+
+    // The start of a frame: the frame counters, test commands, the keyboard, the map key and the cheat word.
+    private static void ReadInputs(Data.Game game, Video video, FrameState state)
+    {
         state.Cycle = unchecked((short)(state.Cycle + 1));
         video.Screen.Flasher = unchecked((sbyte)(video.Screen.Flasher + 1));
         TestCommands.RunPendingCommand(game, video); // test commands, does nothing normally
@@ -125,27 +143,30 @@ public static class GameLoop
         {
             CheatCode.GiveEverything(game, video);
         }
+    }
 
-        if (HandleViewStatus(game, video))
-        {
-            return;
-        }
-
-        InputHandler.ReadWalkDirection(game.Ui, video);
-
+    // While the game is paused only orders and the overlay are handled. Returns whether it was paused.
+    private static bool RunPausedFrame(Data.Game game, Video video)
+    {
         bool paused = (game.Menus[GAME_MENU].Enabled[PAUSE_ENTRY] & 1) != 0;
 
         PauseMenu.Update(game, video, paused);
 
-        if (paused)
+        if (!paused)
         {
-            ClickToMove.GiveOrdersWhilePaused(game);
-            ClickOverlay.Update(game, video);
-            Display.Delay(game, video, 1);
-
-            return;
+            return false;
         }
 
+        ClickToMove.GiveOrdersWhilePaused(game);
+        ClickOverlay.Update(game, video);
+        Display.Delay(game, video, 1);
+
+        return true;
+    }
+
+    // The rest of a running frame: orders, hero, creatures, doors, the map and the drawing.
+    private static void PlayFrame(Data.Game game, Video video, FrameState state)
+    {
         ClickToMove.Drive(game, video);
         ClickOverlay.Update(game, video);
         MenuGreying.Refresh(game, video);

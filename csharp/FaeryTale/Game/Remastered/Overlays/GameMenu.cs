@@ -25,6 +25,7 @@ public enum GameMenuChoice
 public static class GameMenu
 {
     private const string HEADING = "Game Menu";
+
     // The menu is laid out from the heading down, and the whole block is centred on the screen.
     private const int FIRST_ENTRY_BELOW_HEADING = 52;
     private const int ENTRY_SPACING = 38;

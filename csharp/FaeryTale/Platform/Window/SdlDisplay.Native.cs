@@ -160,16 +160,13 @@ public sealed partial class SdlDisplay
         bool world = video?.Capture is { Enabled: true, WorldVisible: true };
         bool fresh = world && video!.Capture.Tick != lastCaptureTick;
         double tickEnd = slotStartMs + TICK_MS;
-        double interval = monitorSync ? RefreshIntervalMs() : 1000.0 / WindowControls.FrameRate;
 
         lastCaptureTick = video?.Capture.Tick ?? lastCaptureTick;
 
         if (!world)
         {
             ShowPicture(scene, video, width, height, 1.0);
-            WaitUntil(tickEnd);
-            AdvanceSlot();
-            stepStart = Stopwatch.GetTimestamp();
+            EndTick(tickEnd);
 
             return;
         }
@@ -179,8 +176,16 @@ public sealed partial class SdlDisplay
             frameSpan.Begin(slotStartMs);
         }
 
-        // Pictures keep to their own rhythm from one game step to the next, so a monitor that does
-        // not divide 50 evenly (60 Hz, say) gets some steps with two pictures and some with one.
+        ShowPicturesUntil(tickEnd, monitorSync, (scene, video), (width, height));
+        EndTick(tickEnd);
+    }
+
+    // Shows pictures at the picture rate until the end of the game step's time. They keep to their own
+    // rhythm from one game step to the next, so a monitor that does not divide 50 evenly (60 Hz, say)
+    // gets some steps with two pictures and some with one.
+    private void ShowPicturesUntil(double tickEnd, bool monitorSync, (Scene Scene, Video? Video) source, (int Width, int Height) size)
+    {
+        double interval = monitorSync ? RefreshIntervalMs() : 1000.0 / WindowControls.FrameRate;
         double scheduled = Math.Max(nextPictureMs, clock.Elapsed.TotalMilliseconds);
 
         while (scheduled < tickEnd)
@@ -188,7 +193,7 @@ public sealed partial class SdlDisplay
             double alpha = noSmoothing ? 1.0 : frameSpan.AlphaAt(scheduled);
 
             WaitUntil(scheduled);
-            ShowPicture(scene, video, width, height, alpha);
+            ShowPicture(source.Scene, source.Video, size.Width, size.Height, alpha);
             scheduled = Math.Max(scheduled + interval, clock.Elapsed.TotalMilliseconds);
             HandleEvents();
         }
@@ -196,6 +201,11 @@ public sealed partial class SdlDisplay
         // The next game step starts at the end of this one's time, not earlier: its movement is drawn
         // from that moment on.
         nextPictureMs = scheduled;
+    }
+
+    // Waits out the rest of the game step's time and starts timing the next one.
+    private void EndTick(double tickEnd)
+    {
         WaitUntil(tickEnd);
         AdvanceSlot();
         stepStart = Stopwatch.GetTimestamp();

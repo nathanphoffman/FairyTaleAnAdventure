@@ -51,12 +51,7 @@ public static class IffPicture
     {
         Chunks chunks = new(file);
 
-        if (chunks.Id() != FORM)
-        {
-            return false;
-        }
-
-        if (chunks.Length() is not { } formLength)
+        if (chunks.Id() != FORM || chunks.Length() is not { } formLength)
         {
             return false;
         }
@@ -78,38 +73,63 @@ public static class IffPicture
                 continue; // just the form type, no data
             }
 
-            if (id == BODY)
+            ChunkResult result = ReadChunk(chunks, id, ref header, ref left, (bitmap, offset));
+
+            if (result == ChunkResult.Failed)
             {
-                if (chunks.Length() is not { } bodyLength)
-                {
-                    return false;
-                }
+                return false;
+            }
 
-                UnpackBody(header, new Body(chunks.Take(bodyLength), header.Compressed), bitmap, offset);
-
+            if (result == ChunkResult.Done)
+            {
                 break;
-            }
-
-            if (id != BMHD && !SKIPPED_CHUNKS.Contains(id))
-            {
-                return false;
-            }
-
-            if (chunks.Length() is not { } length)
-            {
-                return false;
-            }
-
-            left -= length + CHUNK_FIELD_BYTES;
-            byte[] data = chunks.Take(length);
-
-            if (id == BMHD)
-            {
-                header = Header.Read(data);
             }
         }
 
         return true;
+    }
+
+    /// What reading one chunk of a form led to.
+    private enum ChunkResult
+    {
+        Continue,
+
+        /// The body was read: the picture is finished.
+        Done,
+
+        Failed,
+    }
+
+    // Reads the chunk with this id: the body is unpacked into the bitmap, the header is kept and
+    // the chunks the game has no use for are skipped. left is how much of the form remains.
+    private static ChunkResult ReadChunk(Chunks chunks, string id, ref Header header, ref long left, (Bitmap Bitmap, int Offset) target)
+    {
+        if (id == BODY)
+        {
+            if (chunks.Length() is not { } bodyLength)
+            {
+                return ChunkResult.Failed;
+            }
+
+            UnpackBody(header, new Body(chunks.Take(bodyLength), header.Compressed), target.Bitmap, target.Offset);
+
+            return ChunkResult.Done;
+        }
+
+        if ((id != BMHD && !SKIPPED_CHUNKS.Contains(id)) || chunks.Length() is not { } length)
+        {
+            return ChunkResult.Failed;
+        }
+
+        left -= length + CHUNK_FIELD_BYTES;
+        byte[] data = chunks.Take(length);
+
+        if (id == BMHD)
+        {
+            header = Header.Read(data);
+        }
+
+        return ChunkResult.Continue;
     }
 
     // Unpacks the BODY into the bitmap, starting offset bytes into each plane: each picture row is

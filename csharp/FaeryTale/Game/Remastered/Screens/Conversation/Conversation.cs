@@ -126,14 +126,17 @@ public static class Conversation
             case RowKind.Talk:
                 Close();
                 TalkOptions.TalkToActor(game, output, number, (short)row.Number);
+
                 break;
 
             case RowKind.Buy:
                 listOpen = !listOpen;
+
                 break;
 
             case RowKind.Item when row.Enabled:
                 ShopOptions.BuyFromActor(game, output, number, row.Number);
+
                 break;
         }
     }

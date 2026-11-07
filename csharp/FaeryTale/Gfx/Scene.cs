@@ -62,8 +62,8 @@ public sealed class Scene
     {
         // Pulls out each 4 bit component: shift it down, then mask off the rest.
         uint red = (uint)((color >> RED_NIBBLE_SHIFT) & NIBBLE_MASK);
-        uint green = (uint)((color >> GREEN_NIBBLE_SHIFT) & NIBBLE_MASK);
-        uint blue = (uint)(color & NIBBLE_MASK);
+        uint green = (uint)((color >> GREEN_NIBBLE_SHIFT) & NIBBLE_MASK); // the same for the middle nibble
+        uint blue = (uint)(color & NIBBLE_MASK); // the last nibble needs no shift
 
         // Puts the three components, each stretched from 4 to 8 bits, side by side in one pixel.
         return ((red * NIBBLE_TO_BYTE) << RED_BYTE_SHIFT) | ((green * NIBBLE_TO_BYTE) << GREEN_BYTE_SHIFT) | (blue * NIBBLE_TO_BYTE);
@@ -191,6 +191,7 @@ public sealed class Scene
                 // is the highest bit of each half, so shift counts down from the left; "& 1" keeps that
                 // one bit, and "<< 1" moves the high-bit plane up to where the second bit belongs.
                 int shift = POINTER_WIDTH - 1 - bit;
+                // Reads one bit from each half of the word, then joins them: the high half's bit is the colour's low bit.
                 int value = (((ushort)(word >> HIGH_WORD_SHIFT) >> shift) & 1) | ((((ushort)word >> shift) & 1) << 1);
 
                 if (value != 0 && POINTER_FIRST_COLOR + value < pointerColors.Colors.Length)

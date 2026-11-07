@@ -19,6 +19,7 @@ public sealed class WorldRenderer
 
     private const int TILE_COLUMN_WRAP = 0x7ff;
     private const int TILE_ROW_WRAP = 0x7fff;
+
     // Outdoors the world is 32768 pixels across and high, but the rooms inside buildings are further
     // down the same map (their y positions go past 32768, up to 65536).
     private const int WORLD_WIDTH = 0x8000;
@@ -392,6 +393,7 @@ public sealed class WorldRenderer
 
                 case SceneryMasks.SceneryRule.UseFullMask:
                     entry = SceneryMasks.TILE_FULL_MASK;
+
                     break;
             }
 

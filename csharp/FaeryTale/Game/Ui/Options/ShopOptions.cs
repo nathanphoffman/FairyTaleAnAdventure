@@ -151,11 +151,13 @@ public static class ShopOptions
             case Bought.Food:
                 TextRoutines.ShowEvent(game, output, BOUGHT_FOOD_EVENT);
                 Food.EatFood(game, output, FOOD_HUNGER);
+
                 break;
 
             case Bought.Arrows:
                 ItemsMenu.AddStuff(game, item, ARROWS_BOUGHT);
                 TextRoutines.ShowEvent(game, output, BOUGHT_ARROWS_EVENT);
+
                 break;
 
             default:
@@ -165,6 +167,7 @@ public static class ShopOptions
                 Messages.PrintWrapped(game, output, "% bought a "u8);
                 output.PrintCont(ItemsMenu.ItemName(bought));
                 output.PrintCont(".");
+
                 break;
         }
     }

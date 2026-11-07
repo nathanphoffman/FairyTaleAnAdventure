@@ -64,10 +64,12 @@ public static class EnemyTactics
             case Hostile.KnightGuard:
                 actor.State = ActorState.STILL;
                 actor.Facing = DKNIGHT_FACING;
+
                 break;
 
             default:
                 Tactics.RunTactic(game, index, tactic);
+
                 break;
         }
     }

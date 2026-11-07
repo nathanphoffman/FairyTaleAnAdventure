@@ -231,6 +231,32 @@ public static class Magic
     // Casts the spell. Returns false if it did not work (the stone ring only works in a circle).
     private static bool CastSpell(Data.Game game, IOutput output, short chosenEntry)
     {
+        if (chosenEntry == SPELL_STONE)
+        {
+            return JumpAndHeal(game, output);
+        }
+
+        CastOtherSpell(game, output, chosenEntry);
+
+        return true;
+    }
+
+    // The stone ring spell also heals, but only when the jump worked.
+    private static bool JumpAndHeal(Data.Game game, IOutput output)
+    {
+        if (!StoneJumpSpell(game, output))
+        {
+            return false;
+        }
+
+        Heal(game, output);
+
+        return true;
+    }
+
+    // The spells that cannot fail: the timers, the map (or the skull), healing and fear.
+    private static void CastOtherSpell(Data.Game game, IOutput output, short chosenEntry)
+    {
         switch (chosenEntry)
         {
             case SPELL_LIGHT:
@@ -253,15 +279,6 @@ public static class Magic
                 ShowMap(game, output);
                 break;
 
-            case SPELL_STONE:
-                if (!StoneJumpSpell(game, output))
-                {
-                    return false;
-                }
-
-                Heal(game, output);
-                break;
-
             case SPELL_HEAL:
                 Heal(game, output);
                 break;
@@ -270,8 +287,6 @@ public static class Magic
                 ScareEnemies(game, output);
                 break;
         }
-
-        return true;
     }
 
     // Takes one of the spell's stones from the stack, and updates the menu when the last is gone.

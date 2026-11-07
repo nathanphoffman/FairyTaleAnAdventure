@@ -48,6 +48,7 @@ public static class ContainerContents
         {
             case Contents.Nothing:
                 output.Print("nothing.");
+
                 break;
 
             case Contents.One one:
@@ -57,10 +58,12 @@ public static class ContainerContents
                 output.PrintCont(ItemsMenu.ItemName(found));
                 output.PrintCont(".");
                 ItemsMenu.AddStuff(game, found, 1);
+
                 break;
 
             case Contents.Two two:
                 TakeTwoThings(game, output, two.First, two.Second);
+
                 break;
 
             case Contents.ThreeKeys keys:
@@ -80,6 +83,7 @@ public static class ContainerContents
                 output.PrintCont(ItemsMenu.ItemName(many));
                 output.PrintCont("s.");
                 ItemsMenu.AddStuff(game, many, MANY);
+
                 break;
         }
 
@@ -158,6 +162,7 @@ public static class ContainerContents
         {
             second = pick(ITEM_CHOICES) + FIRST_CONTAINER_ITEM;
         }
+
         while (second == first);
 
         if (second == ROLL_ARROWS_OR_GOLD)

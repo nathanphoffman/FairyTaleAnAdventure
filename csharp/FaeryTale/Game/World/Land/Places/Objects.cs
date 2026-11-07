@@ -239,6 +239,7 @@ public static class Objects
                 x = (short)(game.Rng.BitRand(REGION_WIDTH - 1) + (game.World.Region & 1) * REGION_WIDTH);
                 y = (short)(game.Rng.BitRand(REGION_HEIGHT - 1) + (game.World.Region & 6) * REGION_ROW_STEP);
             }
+
             while (MapLookup.TerrainAt(game, x, y) != 0);
 
             int slot = game.Objects.Used[region];

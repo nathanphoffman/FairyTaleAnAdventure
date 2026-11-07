@@ -53,6 +53,7 @@ public static class InventoryActions
         {
             case ItemUse.Equip:
                 Equip(game, item.Slot);
+
                 break;
 
             // A magic stone is not cast from here: the hotbar casts it (so there is no click to use up).
@@ -61,10 +62,12 @@ public static class InventoryActions
 
             case ItemUse.Unlock:
                 ChooseIn(game, output, KEYS_MENU, (short)(FIRST_ITEM_ENTRY + item.Slot - FIRST_KEY_SLOT));
+
                 break;
 
             case ItemUse.UseSpecial:
                 UseSpecial(game, output, item.Slot);
+
                 break;
         }
     }

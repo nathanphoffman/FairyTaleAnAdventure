@@ -259,6 +259,7 @@ public static class TalkOptions
         {
             case TalkAction.TooCloseToYell:
                 TextRoutines.Speak(game, output, SPEECH_TOO_CLOSE_TO_YELL);
+
                 break;
 
             case TalkAction.Person person:
@@ -269,19 +270,23 @@ public static class TalkOptions
                 }
 
                 PersonSpeaks(game, output, (byte)(actor.Race & PERSON_MASK), actor);
+
                 break;
 
             case TalkAction.TurtleHasShell:
                 TextRoutines.Speak(game, output, SPEECH_TURTLE_HAS_SHELL);
+
                 break;
 
             case TalkAction.TurtleGivesShell:
                 game.Hero.Stuff[SHELL] = 1;
                 TextRoutines.Speak(game, output, SPEECH_TURTLE_GIVES_SHELL);
+
                 break;
 
             case TalkAction.EnemyShouts shout:
                 TextRoutines.Speak(game, output, shout.Race);
+
                 break;
         }
     }
@@ -323,11 +328,13 @@ public static class TalkOptions
         {
             case SorceressAction.GiveLuck:
                 game.Hero.Luck += SORCERESS_LUCK;
+
                 break;
 
             case SorceressAction.AskForHelp:
                 TextRoutines.Speak(game, output, SPEECH_SORCERESS_HELP);
                 game.Objects.Global[SORCERESS_SLOT].ObStat = 1;
+
                 break;
         }
 
@@ -344,20 +351,24 @@ public static class TalkOptions
             case PriestAction.WritReward:
                 TextRoutines.Speak(game, output, SPEECH_PRIEST_WRIT_REWARD);
                 game.Objects.Global[PRIEST_WRIT_SLOT].ObStat = 1;
+
                 break;
 
             case PriestAction.WritAgain:
                 TextRoutines.Speak(game, output, SPEECH_PRIEST_WRIT_AGAIN);
+
                 break;
 
             case PriestAction.Scold:
                 TextRoutines.Speak(game, output, SPEECH_PRIEST_SCOLD);
+
                 break;
 
             case PriestAction.Bless bless:
                 TextRoutines.Speak(game, output, bless.Speech);
                 game.Actors.List[0].Vitality = (short)(FULL_VITALITY_BASE + game.Hero.Brave / BRAVERY_DIVISOR);
                 TextRoutines.QueuePrint(game.Ui, MenuChoices.PRQ_VITALITY_LINE);
+
                 break;
         }
     }

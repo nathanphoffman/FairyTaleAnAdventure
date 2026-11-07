@@ -51,22 +51,27 @@ public static class ItemsMenu
         {
             case USE_ENTRY:
                 Menus.GoToMenu(game, output, USE);
+
                 break;
 
             case LIST:
                 ShowItemList(game, output);
+
                 break;
 
             case TAKE:
                 TakeItems.TakeNearest(game, output);
+
                 break;
 
             case LOOK:
                 LookAround(game, output);
+
                 break;
 
             case GIVE_ENTRY:
                 Menus.GoToMenu(game, output, GIVE);
+
                 break;
         }
     }

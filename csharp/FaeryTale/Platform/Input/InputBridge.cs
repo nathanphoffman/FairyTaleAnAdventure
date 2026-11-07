@@ -54,6 +54,7 @@ public static class InputBridge
         {
             Inventory.Toggle();
         }
+
         ScrollMessagesWithKey(name, down);
 
         if (InputHandler.RemasteredControls && name == MAP_KEY)
@@ -76,14 +77,17 @@ public static class InputBridge
         {
             case KeyNames.KeyKind.Arrow:
                 SetArrow(key.Value, down);
+
                 break;
 
             case KeyNames.KeyKind.Fire:
                 InputHandler.JoystickFire = down;
+
                 break;
 
             case KeyNames.KeyKind.Code:
                 InputHandler.KeyEvent(key.Value | (down ? 0 : RELEASED));
+
                 break;
         }
     }

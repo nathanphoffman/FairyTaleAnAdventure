@@ -173,6 +173,7 @@ internal static class SceneryMasks
 
             case SceneryRule.UseFullMask:
                 cm = TILE_FULL_MASK;
+
                 break;
         }
 

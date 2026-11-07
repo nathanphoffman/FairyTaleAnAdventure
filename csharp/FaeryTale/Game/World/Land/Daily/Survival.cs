@@ -47,14 +47,17 @@ public static class Survival
             {
                 case SurvivalStep.Event message:
                     TextRoutines.ShowEvent(game, output, message.Message);
+
                     break;
 
                 case SurvivalStep.RedrawStats:
                     TextRoutines.QueuePrint(game.Ui, PrintRequest.VITALITY);
+
                     break;
 
                 case SurvivalStep.PickMusic:
                     Music.SetMood(game, 0);
+
                     break;
             }
         }

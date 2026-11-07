@@ -45,6 +45,7 @@ public class PageTurnTests
         uint[] picture = Turn().Render(1.0 / 3);
 
         Assert.Equal(BLUE, At(picture, 560, ROW));
+
         // The page is a little darker as it rises, so it is only red, not exactly RED.
         Assert.True(((At(picture, 360, ROW) >> 16) & 0xff) > 150);
     }

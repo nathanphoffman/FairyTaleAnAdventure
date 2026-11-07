@@ -46,6 +46,7 @@ public class UiAndInputTests
 
             return 0;
         }));
+
         Assert.Equal(0, drawn);
 
         short starving = HeroControls.STUMBLE_HUNGER + 1;

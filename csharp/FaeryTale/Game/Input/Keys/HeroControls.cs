@@ -269,6 +269,7 @@ public static class HeroControls
 
             case FairyAction.FlyIn:
                 PlaceFairy(game, cycle);
+
                 break;
         }
 
