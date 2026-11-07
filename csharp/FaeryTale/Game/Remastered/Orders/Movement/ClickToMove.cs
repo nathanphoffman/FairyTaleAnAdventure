@@ -306,6 +306,15 @@ public static class ClickToMove
     private static void WalkToLook(Data.Game game, IOutput output, (int X, int Y) target)
     {
         Cancel();
+
+        // A spot within half the reach of a look is looked at from where the hero stands.
+        if (LooksFromHere(game.Actors.List[0], target))
+        {
+            ItemsMenu.LookAround(game, output);
+
+            return;
+        }
+
         StartRoute(game, target, null);
 
         if (Active)
@@ -317,6 +326,11 @@ public static class ClickToMove
             ItemsMenu.LookAround(game, output);
         }
     }
+
+    /// Whether a spot is so near the hero (within half the reach of a look) that the look is made without
+    /// walking there.
+    internal static bool LooksFromHere(Shape hero, (int X, int Y) target) =>
+        Math.Max(Math.Abs(target.X - hero.AbsX), Math.Abs(target.Y - hero.AbsY)) <= ItemsMenu.LOOK_RANGE / 2;
 
     // Looks around once a walk that was meant to end with a look is over.
     private static void LookIfArrived(Data.Game game, IOutput output)

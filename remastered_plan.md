@@ -61,7 +61,7 @@ check this).
   (to under 35 pixels, so a Yell is told off as in the original) and open a bubble with Yell, Say, Ask and,
   for a bartender, Buy (a list of the things for sale, greyed when too dear, on a different wood).
 - Shift: the pointer is an eye (`EyeCursor`); a shift click walks to the spot (not through a door) and
-  does the Look action.
+  does the Look action; a spot within half the reach of a look (20 of 40) is looked at without walking.
 - Click on water swims in; click on the black outside of a room indoors walks to the exit door.
 - `Game/Remastered/Interaction`: a hand pointer over a chest or anything Take picks up; a click walks
   over and takes that one.

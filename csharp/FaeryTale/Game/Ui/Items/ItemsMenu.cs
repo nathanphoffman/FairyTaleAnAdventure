@@ -32,7 +32,7 @@ public static class ItemsMenu
     private const int PRQ_LIST = 5;
 
     /// Look finds hidden objects closer than this.
-    private const int LOOK_RANGE = 40;
+    public const int LOOK_RANGE = 40;
     private const int EVENT_NOTHING_HIDDEN = 20;
     private const int EVENT_FOUND_HIDDEN = 38;
 
