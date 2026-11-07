@@ -91,10 +91,16 @@ public static class ClickToMove
     public static bool Active => route.Count > 0 || doorPoint is not null;
 
     /// While the game is paused a click still gives an order (a walk, or an attack on an enemy) that
-    /// the hero carries out when the game goes on. Remastered and Reimagined only.
-    public static void GiveOrdersWhilePaused(Data.Game game)
+    /// the hero carries out when the game goes on, or queues a hotbar item. Remastered and Reimagined only.
+    public static void GiveOrdersWhilePaused(Data.Game game, IOutput output)
     {
         if (game.Experience == Experience.Original || game.Ui.ViewStatus != VIEW_NORMAL || InputHandler.TakeClick() is not { } click)
+        {
+            return;
+        }
+
+        // A click on the hotbar queues that item for when the game goes on.
+        if (Hotbar.TryClick(game, output, click, WorldView.Current.Width, WorldView.Current.Height))
         {
             return;
         }
@@ -225,7 +231,7 @@ public static class ClickToMove
     // to, else a place (or door) to walk to. Persons and the bubble only exist in the new drawer.
     private static void Click(Data.Game game, IOutput output, InputHandler.Click click)
     {
-        if (Hotbar.TryClick(game, output, click, WorldView.Current.Width, WorldView.Current.Height) || Inventory.TryClick(game, output, InputHandler.GridPointer) || Conversation.TakeButtonClick(game, output, click) || PanelBackButton.TryPress(game, output, InputHandler.GridPointer))
+        if (Hotbar.TryClick(game, output, click, WorldView.Current.Width, WorldView.Current.Height) || Inventory.TryClick(game, output, InputHandler.GridPointer) || Journal.TryClick(InputHandler.GridPointer) || Conversation.TakeButtonClick(game, output, click) || PanelBackButton.TryPress(game, output, InputHandler.GridPointer))
         {
             return;
         }

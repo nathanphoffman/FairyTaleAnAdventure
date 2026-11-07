@@ -36,6 +36,7 @@ public static class ClickOverlay
         video.Capture.LitButtons = ButtonsInUse(video.Capture);
         video.Capture.EnemyHover = IsPointerOverEnemy(game);
         video.Capture.AttackTarget = ClickToAttack.TargetAt(game);
+        video.Capture.HealthBars = EnemyHealthBars.Update(game, video.Ticks);
     }
 
     /// Draws what is wanted this frame and takes it off when nothing is. Called every frame.

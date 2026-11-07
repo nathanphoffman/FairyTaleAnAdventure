@@ -27,8 +27,15 @@ public static class GameMenu
     private const string HEADING = "Game Menu";
 
     // The menu is laid out from the heading down, and the whole block is centred on the screen.
-    private const int FIRST_ENTRY_BELOW_HEADING = 52;
-    private const int ENTRY_SPACING = 38;
+    private const int FIRST_ENTRY_BELOW_HEADING = 40;
+    private const int ENTRY_SPACING = 34;
+
+    // The entries are in two columns, filled a row at a time, in half-size letters (a menu this long
+    // would not fit one column).
+    private const int COLUMNS = 2;
+    private const int COLUMN_GAP = 10;
+    private const int ENTRY_SCALE = 1;
+    private const int ENTRY_ASCENT = 14 * ENTRY_SCALE / 2;
     private const int BOARD_BELOW_BASELINE = 16;
     private const int DESCRIPTION_BELOW_BOARDS = 16;
     private const int DESCRIPTION_DESCENT = 2;
@@ -55,7 +62,9 @@ public static class GameMenu
         ("VSync", GameMenuChoice.Resume),
         ("Frame Rate", GameMenuChoice.Resume),
         ("Map", GameMenuChoice.Resume),
+        ("Health Bars", GameMenuChoice.Resume),
         ("Resolution", GameMenuChoice.Resume),
+        ("Controls", GameMenuChoice.Resume),
         ("Back To Main Menu", GameMenuChoice.BackToGameSelection),
         ("Exit Game", GameMenuChoice.ExitGame),
     ];
@@ -64,11 +73,13 @@ public static class GameMenu
     private const int VSYNC_ENTRY = 2;
     private const int FRAME_RATE_ENTRY = 3;
     private const int MAP_ENTRY = 4;
-    private const int RESOLUTION_ENTRY = 5;
+    private const int HEALTH_BARS_ENTRY = 5;
+    private const int RESOLUTION_ENTRY = 6;
+    private const int CONTROLS_ENTRY = 7;
 
-    // The two entries that leave the game come last, set apart from the settings by this much room.
-    private const int FIRST_LEAVING_ENTRY = 6;
-    private const int LEAVING_MARGIN = 14;
+    // The two entries that leave the game come last, in a row of their own set apart from the settings by this much room.
+    private const int FIRST_LEAVING_ENTRY = 8;
+    private const int LEAVING_MARGIN = 10;
     private const string VSYNC_LABEL = "VSync: ";
     private const string FRAME_RATE_LABEL = "Frame Rate: ";
     private const string DIFFICULTY_LABEL = "Difficulty: ";
@@ -93,11 +104,11 @@ public static class GameMenu
             (int pointerX, int pointerY) = InputHandler.GridPointer;
             int? hovered = EntryAt(areas, pointerX, pointerY);
 
-            video.SetOverlay(Draw(game, heading, boards, hovered));
+            video.SetOverlay(Draw(game, heading, (areas, boards), hovered));
 
             if (hovered is { } entry && InputHandler.LeftButtonDown)
             {
-                if (entry is DIFFICULTY_ENTRY or VSYNC_ENTRY or FRAME_RATE_ENTRY or MAP_ENTRY or RESOLUTION_ENTRY)
+                if (entry is DIFFICULTY_ENTRY or VSYNC_ENTRY or FRAME_RATE_ENTRY or MAP_ENTRY or HEALTH_BARS_ENTRY or RESOLUTION_ENTRY or CONTROLS_ENTRY)
                 {
                     ChangeSetting(game, video, entry);
 
@@ -142,9 +153,17 @@ public static class GameMenu
         {
             MapSettings.Toggle();
         }
+        else if (entry == HEALTH_BARS_ENTRY)
+        {
+            EnemyHealthBars.Toggle();
+        }
         else if (entry == RESOLUTION_ENTRY)
         {
             ResolutionMenu.Show(game, video);
+        }
+        else if (entry == CONTROLS_ENTRY)
+        {
+            ControlsMenu.Show(game, video);
         }
         else
         {
@@ -181,9 +200,10 @@ public static class GameMenu
 
         widest = Math.Max(widest, FRAME_RATE_LABEL.Length + MAX_RATE_TEXT_LENGTH);
         widest = Math.Max(widest, RESOLUTION_LABEL.Length + MAX_RESOLUTION_TEXT_LENGTH);
-        int width = widest * Overlay.GLYPH_SIZE * TITLE_SCALE + PANEL_PADDING * 2;
+        int width = widest * Overlay.GLYPH_SIZE * ENTRY_SCALE + PANEL_PADDING * 2;
+        int left = (Overlay.WIDTH - COLUMNS * width - (COLUMNS - 1) * COLUMN_GAP) / 2;
 
-        return ENTRIES.Select((_, index) => ((Overlay.WIDTH - width) / 2, EntryBaseline(index) - TITLE_ASCENT - PANEL_PADDING, width, TITLE_ASCENT + PANEL_PADDING * 2 + Overlay.GLYPH_SIZE)).ToArray();
+        return ENTRIES.Select((_, index) => (left + index % COLUMNS * (width + COLUMN_GAP), EntryBaseline(index) - ENTRY_ASCENT - PANEL_PADDING, width, ENTRY_ASCENT + PANEL_PADDING * 2 + Overlay.GLYPH_SIZE)).ToArray();
     }
 
     // Where the heading, the entries and the description go, so that all of them together (the top
@@ -192,13 +212,15 @@ public static class GameMenu
 
     private static int HeadingBoardAbove => TITLE_ASCENT + PANEL_PADDING;
 
-    private static int DescriptionBelowHeading => FIRST_ENTRY_BELOW_HEADING + (ENTRIES.Length - 1) * ENTRY_SPACING + LEAVING_MARGIN + BOARD_BELOW_BASELINE + DESCRIPTION_BELOW_BOARDS;
+    private static int Rows => (ENTRIES.Length + COLUMNS - 1) / COLUMNS;
+
+    private static int DescriptionBelowHeading => FIRST_ENTRY_BELOW_HEADING + (Rows - 1) * ENTRY_SPACING + LEAVING_MARGIN + BOARD_BELOW_BASELINE + DESCRIPTION_BELOW_BOARDS;
 
     private static int DescriptionY => HeadingY + DescriptionBelowHeading;
 
-    // The baseline of an entry's label.
+    // The baseline of an entry's label (the row it is in).
     private static int EntryBaseline(int index) =>
-        HeadingY + FIRST_ENTRY_BELOW_HEADING + index * ENTRY_SPACING + (index >= FIRST_LEAVING_ENTRY ? LEAVING_MARGIN : 0);
+        HeadingY + FIRST_ENTRY_BELOW_HEADING + index / COLUMNS * ENTRY_SPACING + (index >= FIRST_LEAVING_ENTRY ? LEAVING_MARGIN : 0);
 
     private static (int Left, int Top, int Width, int Height) HeadingArea()
     {
@@ -208,7 +230,7 @@ public static class GameMenu
     }
 
     // The darkened game, the heading and the entries (the one under the pointer lit).
-    private static Overlay Draw(Data.Game game, Image heading, Image[][] boards, int? hovered)
+    private static Overlay Draw(Data.Game game, Image heading, ((int Left, int Top, int Width, int Height)[] Areas, Image[][] Boards) entries, int? hovered)
     {
         Overlay overlay = new() { Shades = { new Shade(0, 0, Overlay.WIDTH, FULL_HEIGHT, BACKGROUND_DARKNESS) }, PointerOnTop = true, CenterOnScreen = true };
 
@@ -219,8 +241,11 @@ public static class GameMenu
         {
             bool lit = hovered == index;
 
-            overlay.Images.Add(boards[index][lit ? 1 : 0]);
-            AddCentered(overlay, LabelOf(game, index), EntryBaseline(index), lit ? HOVER_COLOR : TITLE_COLOR, TITLE_SCALE);
+            string label = LabelOf(game, index);
+            (int left, _, int width, _) = entries.Areas[index];
+
+            overlay.Images.Add(entries.Boards[index][lit ? 1 : 0]);
+            AddText(overlay, label, (left + (width - Overlay.TextWidth(label, ENTRY_SCALE)) / 2, EntryBaseline(index)), lit ? HOVER_COLOR : TITLE_COLOR, ENTRY_SCALE);
         }
 
         AddCentered(overlay, DescriptionOf(game.Difficulty), DescriptionY, DESCRIPTION_COLOR, DESCRIPTION_SCALE);
@@ -235,6 +260,7 @@ public static class GameMenu
         VSYNC_ENTRY => VSYNC_LABEL + WindowControls.VSyncText,
         FRAME_RATE_ENTRY => FRAME_RATE_LABEL + WindowControls.FrameRateText,
         MAP_ENTRY => MapSettings.MenuText,
+        HEALTH_BARS_ENTRY => EnemyHealthBars.MenuText,
         RESOLUTION_ENTRY => RESOLUTION_LABEL + WindowControls.ResolutionText,
         _ => ENTRIES[index].Label,
     };

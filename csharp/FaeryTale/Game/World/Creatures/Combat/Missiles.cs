@@ -16,6 +16,10 @@ public static class Missiles
     /// A missile gives up after this many frames in flight.
     internal const sbyte MAX_FLIGHT = 40;
 
+    /// In Remastered and Reimagined the hero's arrows and fireballs fly this many times as long,
+    /// because the view shows so much more than the old screen did.
+    internal const int HERO_FLIGHT_FACTOR = 2;
+
     // Terrain a missile stops at: solid wall and the map edge.
     private const int WALL_TERRAIN_SOLID = 1;
     private const int WALL_TERRAIN_EDGE = 15;
@@ -42,6 +46,13 @@ public static class Missiles
     private const short SCREEN_RIGHT = 340;
     private const short SCREEN_TOP = -20;
     private const short SCREEN_BOTTOM = 190;
+
+    // Remastered and Reimagined show far more of the world than the old screen did, so missiles are
+    // drawn over the same wider area as the people and things (see Objects.WIDE_SHOWN).
+    private const short WIDE_LEFT = -300;
+    private const short WIDE_RIGHT = 620;
+    private const short WIDE_TOP = -260;
+    private const short WIDE_BOTTOM = 420;
 
     // The sprite's centre is this far from its map position.
     private const int SPRITE_OFFSET_X = 9;
@@ -84,7 +95,9 @@ public static class Missiles
             short xStart = (short)(missile.AbsX - game.World.MapX - SPRITE_OFFSET_X);
             short yStart = (short)(missile.AbsY - game.World.MapY - SPRITE_OFFSET_Y);
 
-            if (xStart > SCREEN_LEFT && xStart < SCREEN_RIGHT && yStart > SCREEN_TOP && yStart < SCREEN_BOTTOM)
+            bool wide = game.Experience != Experience.Original;
+
+            if (xStart > (wide ? WIDE_LEFT : SCREEN_LEFT) && xStart < (wide ? WIDE_RIGHT : SCREEN_RIGHT) && yStart > (wide ? WIDE_TOP : SCREEN_TOP) && yStart < (wide ? WIDE_BOTTOM : SCREEN_BOTTOM))
             {
                 AddMissileActor(game.Actors, missile, xStart, yStart);
                 game.Actors.Drawn++;
@@ -105,7 +118,7 @@ public static class Missiles
 
     /// Whether the missile is unused, spent, standing still (s is its doubled speed) or has been
     /// in the air too long. Counts one more tick of flight when it has not expired.
-    internal static bool MissileExpired(Missile missile, short s)
+    internal static bool MissileExpired(Missile missile, short s, int maxFlight = MAX_FLIGHT)
     {
         sbyte flight = missile.TimeOfFlight;
 
@@ -116,8 +129,12 @@ public static class Missiles
 
         missile.TimeOfFlight = unchecked((sbyte)(flight + 1));
 
-        return flight > MAX_FLIGHT;
+        return flight > maxFlight;
     }
+
+    // How long a missile may stay in the air: longer for the hero's in Remastered and Reimagined.
+    private static int MaxFlightOf(Data.Game game, Missile missile) =>
+        game.Experience != Experience.Original && missile.Archer == 0 ? MAX_FLIGHT * HERO_FLIGHT_FACTOR : MAX_FLIGHT;
 
     // One missile's flight for this frame.
     private static void Fly(Data.Game game, IOutput output, int position)
@@ -125,7 +142,7 @@ public static class Missiles
         Missile missile = game.Actors.Missiles[position];
         short s = (short)(missile.Speed * 2);
 
-        if (MissileExpired(missile, s))
+        if (MissileExpired(missile, s, MaxFlightOf(game, missile)))
         {
             missile.MissileType = MISSILE_NONE;
 

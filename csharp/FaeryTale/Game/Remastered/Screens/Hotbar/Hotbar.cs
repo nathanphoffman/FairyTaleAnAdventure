@@ -38,7 +38,11 @@ public static class Hotbar
             return false;
         }
 
-        if (slot.IsSpell)
+        if (PauseMenu.IsPaused(game))
+        {
+            QueuedUse.Toggle(slot.Item, slot.IsSpell);
+        }
+        else if (slot.IsSpell)
         {
             InventoryActions.Cast(game, output, slot.Item);
         }

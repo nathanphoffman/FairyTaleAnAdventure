@@ -229,6 +229,10 @@ public sealed partial class SdlDisplay : IDisplayDevice, IDisposable
         {
             // Handled: the zoom keys do not reach the game.
         }
+        else if (down && KeyRemap.Offer(SDL_GetKeyName(key.keysym.sym)))
+        {
+            // Handled: the controls screen was waiting for this key.
+        }
         else if (key.repeat == 0)
         {
             InputBridge.KeyEvent(KeyRemap.Apply(SDL_GetKeyName(key.keysym.sym)), down);

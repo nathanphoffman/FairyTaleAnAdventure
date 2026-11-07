@@ -21,6 +21,11 @@ public sealed partial class Video : IOutput
     private const int LINE_HEIGHT = 10;
     private const int NEW_LINE_Y = 42;
 
+    // Item names in the message log: the dark brown pen of the text panel's colours, and the underline
+    // two lines below the baseline (the letters reach one line below it).
+    private const byte ITEM_NAME_PEN = 18;
+    private const int UNDERLINE_OFFSET = 2;
+
     /// The colour the hero's "+" is drawn in on the overview map.
     private const byte MAP_MARK_PEN = 31;
 
@@ -84,7 +89,7 @@ public sealed partial class Video : IOutput
 
         Screen.Scroll(Screen.CurrentPort, area, (0, LINE_HEIGHT));
         TextRoutines.MoveTo(this, TEXT_X_MIN, NEW_LINE_Y);
-        Screen.Text(Screen.CurrentPort, text);
+        DrawMessageText(Screen.CurrentPort, text);
 
         if (Capture.Enabled)
         {
@@ -95,7 +100,15 @@ public sealed partial class Video : IOutput
     public void PrintContBytes(ReadOnlySpan<byte> text)
     {
         ShowNewestMessages();
-        Screen.Text(Screen.CurrentPort, text);
+
+        if (History.OnMessageLine)
+        {
+            DrawMessageText(Screen.CurrentPort, text);
+        }
+        else
+        {
+            Screen.Text(Screen.CurrentPort, text);
+        }
 
         if (Capture.Enabled)
         {
@@ -170,8 +183,46 @@ public sealed partial class Video : IOutput
             int rowsFromBottom = window.Count - 1 - index;
 
             Screen.MoveTo(PortId.Text, TEXT_X_MIN, NEW_LINE_Y - rowsFromBottom * LINE_HEIGHT);
-            Screen.Text(PortId.Text, window[index]);
+            DrawMessageText(PortId.Text, window[index]);
         }
+    }
+
+    /// How far across a character of the message font reaches.
+    public int MessageAdvance(byte character) => Screen.AdvanceOf(PortId.Text, character);
+
+    // Writes message text at the pen. In Remastered and Reimagined the names of items are written
+    // in dark brown and underlined, so they stand out as things the pointer can ask about.
+    private void DrawMessageText(PortId port, ReadOnlySpan<byte> text)
+    {
+        if (!Capture.Enabled || Capture.Game is not { } game)
+        {
+            Screen.Text(port, text);
+
+            return;
+        }
+
+        int done = 0;
+
+        foreach (ItemWord word in ItemWords.Find(game, text))
+        {
+            Screen.Text(port, text[done..word.Start]);
+            DrawItemName(port, text.Slice(word.Start, word.Length));
+            done = word.Start + word.Length;
+        }
+
+        Screen.Text(port, text[done..]);
+    }
+
+    // One item name: dark brown with a line under it, then the pen goes back as it was.
+    private void DrawItemName(PortId port, ReadOnlySpan<byte> name)
+    {
+        Port current = Screen.GetPort(port);
+        (byte color, int left, int baseline) = (current.Pen.Fg, current.Pen.X, current.Pen.Y);
+
+        Screen.SetAPen(port, ITEM_NAME_PEN);
+        Screen.Text(port, name);
+        Screen.RectFill(port, (left, baseline + UNDERLINE_OFFSET), (current.Pen.X - 1, baseline + UNDERLINE_OFFSET));
+        Screen.SetAPen(port, color);
     }
 
     public void LoadPageColors(ReadOnlySpan<ushort> colors) => Screen.LoadColors(ViewPortId.Page, colors);

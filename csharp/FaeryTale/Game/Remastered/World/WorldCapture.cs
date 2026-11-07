@@ -82,6 +82,9 @@ public sealed class WorldCapture
 
     public (int X, int Y)? AttackTarget { get; set; }
 
+    /// The health bars over enemies that were hurt lately.
+    public List<EnemyHealthBars.Bar> HealthBars { get; set; } = [];
+
     /// The classic buttons that get a red square (what the new controls are doing).
     public PanelButtons LitButtons { get; set; }
 

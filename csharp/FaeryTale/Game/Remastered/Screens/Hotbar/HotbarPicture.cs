@@ -18,6 +18,11 @@ public static class HotbarPicture
     private const uint BLACK = 0xff00_0000;
     private const uint GOLD = 0xffe0_b040;
 
+    // The dotted white line of a queued square: this thick, in dashes this long.
+    private const uint WHITE = 0xffff_ffff;
+    private const int QUEUED_THICKNESS = 2;
+    private const int DASH_LENGTH = 3;
+
     // Room between a picture and the border of its square.
     private const int ICON_MARGIN = 3;
 
@@ -30,6 +35,7 @@ public static class HotbarPicture
     private const byte TIP_DARKNESS = 215;
 
     private static readonly Dictionary<(int Size, bool Lit, bool Equipped), Image> squares = [];
+    private static readonly Dictionary<int, Image> queuedBorders = [];
 
     /// The overlay for the slots; pointer is where the mouse is in the window.
     public static Overlay Of(Data.Game game, HotbarGeometry geometry, IReadOnlyList<HotbarSlot> slots, Func<int, SpriteImage?> pictureOf, (int X, int Y) pointer)
@@ -57,6 +63,11 @@ public static class HotbarPicture
         bool equipped = !slot.IsSpell && InventoryActions.IsEquipped(game, slot.Item);
 
         overlay.Images.Add(Square(size, lit, equipped) with { X = slot.X, Y = slot.Y });
+
+        if (QueuedUse.Contains(slot.Item))
+        {
+            overlay.Images.Add(QueuedBorder(size) with { X = slot.X, Y = slot.Y });
+        }
 
         if (ItemIcons.Fitted(slot.Item, pictureOf, size - 2 * (BORDER + ICON_MARGIN)) is { } icon)
         {
@@ -96,6 +107,31 @@ public static class HotbarPicture
         overlay.Shades.Add(new Shade(left, top, width, 2 * TIP_PADDING + TIP_LINE_HEIGHT + GLYPH_ASCENT, TIP_DARKNESS));
         MenuStyle.AddText(overlay, name, (left + TIP_PADDING, top + TIP_PADDING + GLYPH_ASCENT * NAME_SCALE), MenuStyle.TITLE_COLOR, NAME_SCALE);
         MenuStyle.AddText(overlay, detail, (left + TIP_PADDING, top + TIP_PADDING + TIP_LINE_HEIGHT + GLYPH_ASCENT), MenuStyle.DESCRIPTION_COLOR, 1);
+    }
+
+    // The white dotted line round a square that is queued for when the game goes on: dashes along the
+    // black border (a pixel is white where its diagonal stripe, x + y, falls in an even block).
+    private static Image QueuedBorder(int size)
+    {
+        if (!queuedBorders.TryGetValue(size, out Image? border))
+        {
+            uint[] pixels = new uint[size * size];
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    int depth = Math.Min(Math.Min(x, size - 1 - x), Math.Min(y, size - 1 - y));
+
+                    pixels[y * size + x] = depth < QUEUED_THICKNESS && (x + y) / DASH_LENGTH % 2 == 0 ? WHITE : 0;
+                }
+            }
+
+            border = new Image(0, 0, size, size, pixels);
+            queuedBorders[size] = border;
+        }
+
+        return border;
     }
 
     // A square: stone inside, a thick black border, and a gold ring for the weapon in hand.

@@ -9,13 +9,20 @@ public static class KeyRemap
 
     private static readonly Dictionary<string, string> REMAP = [];
 
+    // While the controls screen waits for a key to bind, the next key pressed is kept here and does
+    // not reach the game. The window thread sets it and the game thread reads it.
+    private static volatile bool capturing;
+    private static volatile string? captured;
+
+    private static string ConfigPath => Environment.GetEnvironmentVariable(CONFIG_VARIABLE) ?? DEFAULT_CONFIG;
+
     /// The key name the game should see when the key with this name is pressed.
     public static string Apply(string name) => REMAP.GetValueOrDefault(name, name);
 
     /// Reads the config file. No file is normal.
     public static void Load()
     {
-        string path = Environment.GetEnvironmentVariable(CONFIG_VARIABLE) ?? DEFAULT_CONFIG;
+        string path = ConfigPath;
 
         if (!File.Exists(path))
         {
@@ -32,6 +39,81 @@ public static class KeyRemap
             {
                 Console.Error.WriteLine($"{path}: cannot read line '{line}'");
             }
+        }
+    }
+
+    /// The key the player gave to a game key (the name the game sees, like "Up" or "I"), or null when it
+    /// still has only its own.
+    public static string? KeyFor(string gameKey) => REMAP.FirstOrDefault(pair => pair.Value == gameKey).Key;
+
+    /// Makes the key press the game key from now on (and gives up the key it had before), and saves.
+    public static void Bind(string key, string gameKey)
+    {
+        foreach (string old in REMAP.Where(pair => pair.Value == gameKey).Select(pair => pair.Key).ToList())
+        {
+            REMAP.Remove(old);
+        }
+
+        REMAP[key] = gameKey;
+        Save();
+    }
+
+    /// Takes every key the player set back to the keys the game came with, and saves.
+    public static void ResetAll()
+    {
+        REMAP.Clear();
+        Save();
+    }
+
+    /// Waits for the next key press and keeps it (see TakeCaptured).
+    public static void StartCapture()
+    {
+        captured = null;
+        capturing = true;
+    }
+
+    /// Gives up waiting for a key.
+    public static void StopCapture() => capturing = false;
+
+    /// Called with each key pressed: keeps it and returns true while a capture is waiting (the key is
+    /// then not for the game).
+    public static bool Offer(string name)
+    {
+        if (!capturing)
+        {
+            return false;
+        }
+
+        captured = name;
+        capturing = false;
+
+        return true;
+    }
+
+    /// The key that was captured, once (null while none has been pressed).
+    public static string? TakeCaptured()
+    {
+        string? name = captured;
+
+        captured = null;
+
+        return name;
+    }
+
+    // Writes the keys the player set in the format Load reads, so they stay for the next run.
+    private static void Save()
+    {
+        List<string> lines = ["# Keys set in the game's Controls screen. Format: Key = Action (SDL key names)."];
+
+        lines.AddRange(REMAP.Select(pair => $"{pair.Key} = {pair.Value}"));
+
+        try
+        {
+            File.WriteAllLines(ConfigPath, lines);
+        }
+        catch (IOException problem)
+        {
+            Console.Error.WriteLine($"{ConfigPath}: cannot save the keys: {problem.Message}");
         }
     }
 

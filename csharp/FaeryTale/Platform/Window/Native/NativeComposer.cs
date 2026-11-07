@@ -19,6 +19,13 @@ internal sealed class NativeComposer
     // line twice).
     private const int PANEL_FIRST_LINE = 143;
     private const int GRID_ROWS_PER_LINE = 2;
+
+    // An enemy's health bar, in world pixels, and its colours.
+    private const int HEALTH_BAR_WIDTH = 24;
+    private const int HEALTH_BAR_HEIGHT = 3;
+    private const uint HEALTH_BAR_EDGE = 0xff10_0808;
+    private const uint HEALTH_BAR_GONE = 0xff70_1010;
+    private const uint HEALTH_BAR_LEFT = 0xff30_c040;
     private const int GRID_WIDTH = Overlay.WIDTH;
     private const int GRID_HEIGHT = Overlay.HEIGHT;
     private const int PANEL_FIRST_ROW = PANEL_FIRST_LINE * GRID_ROWS_PER_LINE;
@@ -137,6 +144,7 @@ internal sealed class NativeComposer
         DrawMarker(width, view, video.Capture);
         DrawMinimap(width, view, video.Capture);
         DrawAttackTarget(width, view, video.Capture);
+        DrawHealthBars(width, view, video.Capture);
 
         scene.ComposeFromLine(legacyFrame, PANEL_FIRST_LINE);
         DrawPanel(width);
@@ -144,11 +152,23 @@ internal sealed class NativeComposer
         DrawBackButton(width, video.Capture);
         DrawHotbar(width, video, pointer);
         DrawInventory(width, video);
+        DrawJournal(width);
         MessageScrollBar.Of(video.History).DrawAt(picture, width, new Overlay.Placement(GridLeft, GridTop, Scale));
+        DrawItemTip(width, video);
         overlay.DrawAt(picture, width, new Overlay.Placement(GridLeft, OverlayTop, Scale));
 
         DrawConversation(width, video, pointer);
         DrawPointer(width, scene, overlay, video, pointer);
+    }
+
+    // What an item is, in a box over its name in the message log, while the pointer rests on it.
+    private void DrawItemTip(int width, Video video)
+    {
+        if (video.Capture.Game is { } game)
+        {
+            MessageItemTip.Of(game, video.History, video.MessageAdvance, InputHandler.GridPointer)
+                .DrawAt(picture, width, new Overlay.Placement(GridLeft, GridTop, Scale));
+        }
     }
 
     // The pointer: a door or a face when over one, else the game's own.
@@ -228,6 +248,41 @@ internal sealed class NativeComposer
         new Overlay { Images = { Crosshair.At(((int)Math.Round(x), (int)Math.Round(y)), TARGET_RADIUS_WORLD_PIXELS * view.Scale) } }.Draw(picture, width);
     }
 
+    // A bar over each enemy that was hurt lately: black edge, dark red where health is gone, green where it is left.
+    private void DrawHealthBars(int width, WorldView view, WorldCapture capture)
+    {
+        foreach (EnemyHealthBars.Bar bar in capture.HealthBars)
+        {
+            (double x, double y) = view.ToScreen(bar.X, bar.Y);
+            int barWidth = HEALTH_BAR_WIDTH * view.Scale;
+            int barHeight = HEALTH_BAR_HEIGHT * view.Scale;
+            int left = (int)Math.Round(x) - barWidth / 2;
+            int top = (int)Math.Round(y);
+            int green = (int)Math.Round(bar.Fraction * barWidth);
+
+            Overlay overlay = new();
+
+            overlay.Images.Add(new Image(left - view.Scale, top - view.Scale, barWidth + 2 * view.Scale, barHeight + 2 * view.Scale, Filled((barWidth + 2 * view.Scale) * (barHeight + 2 * view.Scale), HEALTH_BAR_EDGE)));
+            overlay.Images.Add(new Image(left, top, barWidth, barHeight, Filled(barWidth * barHeight, HEALTH_BAR_GONE)));
+
+            if (green > 0)
+            {
+                overlay.Images.Add(new Image(left, top, green, barHeight, Filled(green * barHeight, HEALTH_BAR_LEFT)));
+            }
+
+            overlay.Draw(picture, width);
+        }
+    }
+
+    private static uint[] Filled(int count, uint color)
+    {
+        uint[] pixels = new uint[count];
+
+        Array.Fill(pixels, color);
+
+        return pixels;
+    }
+
     // The inventory screen over the world, while it is open (the game goes on behind it).
     private void DrawInventory(int width, Video video)
     {
@@ -238,6 +293,15 @@ internal sealed class NativeComposer
 
         InventoryPicture.Of(game, number => renderer.ObjectPicture(video, number), InputHandler.GridPointer)
             .DrawAt(picture, width, new Overlay.Placement(GridLeft, GridTop, Scale));
+    }
+
+    // The journal over the world, while it is open (the game goes on behind it).
+    private void DrawJournal(int width)
+    {
+        if (Journal.IsOpen)
+        {
+            JournalPicture.Of(Journal.Entries()).DrawAt(picture, width, new Overlay.Placement(GridLeft, GridTop, Scale));
+        }
     }
 
     // The hotbar: wood growing out of the text panel's board to each side, the weapons the hero carries

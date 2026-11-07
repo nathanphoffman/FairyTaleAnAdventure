@@ -28,10 +28,6 @@ public static class GameLoop
     private const sbyte VIEW_REDRAW_2 = 98;
     private const sbyte VIEW_REDRAW = 99;
 
-    // The game menu entry that pauses the game; bit 0 set means paused.
-    private const int GAME_MENU = 4;
-    private const int PAUSE_ENTRY = 5;
-
     /// A region number below this means the next region is still being loaded.
     private const ushort NO_REGION = 10;
 
@@ -148,7 +144,7 @@ public static class GameLoop
     // While the game is paused only orders and the overlay are handled. Returns whether it was paused.
     private static bool RunPausedFrame(Data.Game game, Video video)
     {
-        bool paused = (game.Menus[GAME_MENU].Enabled[PAUSE_ENTRY] & 1) != 0;
+        bool paused = PauseMenu.IsPaused(game);
 
         PauseMenu.Update(game, video, paused);
 
@@ -157,7 +153,7 @@ public static class GameLoop
             return false;
         }
 
-        ClickToMove.GiveOrdersWhilePaused(game);
+        ClickToMove.GiveOrdersWhilePaused(game, video);
         ClickOverlay.Update(game, video);
         Display.Delay(game, video, 1);
 
@@ -203,7 +199,7 @@ public static class GameLoop
     private static void ReadKeyboard(Data.Game game, IOutput output)
     {
         sbyte key = unchecked((sbyte)InputHandler.NextKey());
-        bool notPause = (game.Menus[GAME_MENU].Enabled[PAUSE_ENTRY] & 1) == 0;
+        bool notPause = !PauseMenu.IsPaused(game);
 
         if (key == InputHandler.ESCAPE_KEY && output is Video video)
         {

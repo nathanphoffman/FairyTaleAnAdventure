@@ -10,9 +10,9 @@ namespace FaeryTale.Game.Remastered;
 public static class ClickToAttack
 {
     // How close the hero stands to an enemy to fight it by hand, and how far away he shoots a bow or
-    // a wand (which fly straight along the way he faces).
+    // a wand (which fly straight along the way he faces; twice as far as the old game's, see Missiles).
     private const int MELEE_DISTANCE = 18;
-    private const int RANGED_DISTANCE = 120;
+    private const int RANGED_DISTANCE = ClickToShoot.SHOOTING_DISTANCE;
 
     // The route to a moving enemy is worked out again this often (in frames).
     private const int REPLAN_FRAMES = 12;
@@ -99,6 +99,13 @@ public static class ClickToAttack
             return false;
         }
 
+        if (ranged && ClickToShoot.PlanFor(game, hero, enemy, HasClearShot(game, hero, enemy)) is { } plan)
+        {
+            FollowPlan(game, hero, plan);
+
+            return true;
+        }
+
         if (Blocking.ActorDistance(game, number, 0) <= ReachOf(hero) && (!ranged || HasClearShot(game, hero, enemy)))
         {
             Fight(game, hero, enemy);
@@ -145,6 +152,16 @@ public static class ClickToAttack
         }
 
         return true;
+    }
+
+    // Shoots along a line the enemy is on, or takes a step towards getting on one.
+    private static void FollowPlan(Data.Game game, Shape hero, ClickToShoot.Plan plan)
+    {
+        ClickToMove.Cancel();
+        game.Ui.PathDirection = plan.Direction;
+        game.Ui.CompassLitDirection = plan.Direction;
+        game.Ui.PathWalking = !plan.Fire;
+        game.Ui.PathFighting = plan.Fire && ShotHeld(hero.Weapon, shotFrames++);
     }
 
     // Stands and fights, turned towards the enemy.

@@ -26,6 +26,7 @@ public static class InputBridge
     private static int heldDirection;
     private const string MAP_KEY = "M";
     private const string INVENTORY_KEY = "I";
+    private const string JOURNAL_KEY = "Tab";
     private const string PAGE_UP = "PageUp";
     private const string PAGE_DOWN = "PageDown";
 
@@ -71,6 +72,13 @@ public static class InputBridge
             return;
         }
 
+        if (InputHandler.RemasteredControls && name == JOURNAL_KEY)
+        {
+            OpenOrCloseJournal(down);
+
+            return;
+        }
+
         KeyNames.Key key = KeyNames.Lookup(InputHandler.RemasteredControls ? RemasteredKeys.Translate(name) : name);
 
         switch (key.Kind)
@@ -98,6 +106,15 @@ public static class InputBridge
         if (down && !CheatCode.HoldInventoryKey())
         {
             Inventory.Toggle();
+        }
+    }
+
+    // Tab opens the journal and closes it again; the game does not see the key.
+    private static void OpenOrCloseJournal(bool down)
+    {
+        if (down)
+        {
+            Journal.Toggle();
         }
     }
 

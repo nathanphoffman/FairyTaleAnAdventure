@@ -129,6 +129,7 @@ public static class Launch
         ClickOverlay.Reset();
         MenuGreying.Reset();
         PauseMenu.Reset();
+        Journal.Reset();
         WindowControls.SystemCursorShown = false;
         WindowControls.NativeRendering = false;
     }

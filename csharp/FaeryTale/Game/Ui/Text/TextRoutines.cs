@@ -1,5 +1,6 @@
 using FaeryTale.Game.Data;
 using FaeryTale.Game.Output;
+using FaeryTale.Game.Remastered;
 
 namespace FaeryTale.Game.Ui;
 
@@ -122,7 +123,15 @@ public static class TextRoutines
     public static void ShowEvent(Data.Game game, IOutput output, int n) => ShowMessage(game, output, StoryText.EVENT_MSG, n);
 
     /// Shows speech number n (what people say).
-    public static void Speak(Data.Game game, IOutput output, int n) => ShowMessage(game, output, StoryText.SPEECHES, n);
+    public static void Speak(Data.Game game, IOutput output, int n)
+    {
+        if (game.Experience != Experience.Original)
+        {
+            Journal.Record(game, NthString(StoryText.SPEECHES, n));
+        }
+
+        ShowMessage(game, output, StoryText.SPEECHES, n);
+    }
 
     /// Adds a request to the print queue (ignored if the queue is full). The screen code handles
     /// them one per tick, which spreads the redrawing work over several frames.
