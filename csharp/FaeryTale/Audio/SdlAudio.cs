@@ -31,17 +31,7 @@ public static class SdlAudio
             callback = callback = (_, stream, length) => Fill(engine, stream, length),
         };
 
-        // This SDL2-CS version cannot take a null device name, so the first device is named.
-        string? deviceName = SDL_GetNumAudioDevices(0) > 0 ? SDL_GetAudioDeviceName(0, 0) : null;
-
-        if (deviceName is null)
-        {
-            Console.Error.WriteLine("No audio: no playback device");
-
-            return;
-        }
-
-        if (SDL_OpenAudioDevice(deviceName, 0, ref wanted, out SDL_AudioSpec _, 0) is var device && device == 0)
+        if (OpenDefaultAudioDevice(ref wanted) is var device && device == 0)
         {
             Console.Error.WriteLine($"No audio: {SDL_GetError()}");
 
@@ -50,6 +40,16 @@ public static class SdlAudio
 
         Music.Player = engine;
         SDL_PauseAudioDevice(device, 0);
+    }
+
+    // SDL2-CS cannot pass a null device name (it throws), so this calls SDL directly. Null asks
+    // SDL for the system's default output, which is what the player has chosen in their settings.
+    [DllImport("SDL2", EntryPoint = "SDL_OpenAudioDevice")]
+    private static extern uint OpenDeviceNative(IntPtr deviceName, int isCapture, ref SDL_AudioSpec wanted, out SDL_AudioSpec obtained, int allowedChanges);
+
+    private static uint OpenDefaultAudioDevice(ref SDL_AudioSpec wanted)
+    {
+        return OpenDeviceNative(IntPtr.Zero, 0, ref wanted, out SDL_AudioSpec _, 0);
     }
 
     // Mixes length bytes of 32 bit float samples into SDL's buffer.
