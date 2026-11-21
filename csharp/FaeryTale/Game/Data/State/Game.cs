@@ -33,6 +33,9 @@ public sealed class Game
     public World World = new() { Region = STARTING_REGION };
     public Hero Hero = new();
 
+    /// What click to move remembers between frames.
+    public ClickWalk Walk = new();
+
     /// The actor r names.
     public Shape Actor(ActorRef r) => Actors.Actor(r);
 

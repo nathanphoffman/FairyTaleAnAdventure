@@ -97,7 +97,7 @@ public static class GameMenu
         Image heading = Board(HeadingArea(), HEADING_SEED)[0];
         GameMenuChoice choice;
 
-        ClickToMove.CancelAll();
+        ClickToMove.CancelAll(game);
 
         while (true)
         {

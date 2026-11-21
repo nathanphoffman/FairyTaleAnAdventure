@@ -27,13 +27,13 @@ public static class ClickOverlay
     // Tells the world drawer what is under the pointer and what is going on, for it to draw.
     private static void HandOverToWorldDrawer(Data.Game game, Video video, bool overDoor)
     {
-        video.Capture.Marker = ClickToMove.Marker;
+        video.Capture.Marker = ClickToMove.Marker(game);
         video.Capture.DoorHover = overDoor;
         video.Capture.HoverPerson = PersonUnderPointer(game);
         video.Capture.TalkingTo = Conversation.Person;
         video.Capture.LookMode = IsLookMode(game);
         video.Capture.ItemHover = IsPointerOverItem(game, video.Capture);
-        video.Capture.LitButtons = ButtonsInUse(video.Capture);
+        video.Capture.LitButtons = ButtonsInUse(game, video.Capture);
         video.Capture.EnemyHover = IsPointerOverEnemy(game);
         video.Capture.AttackTarget = ClickToAttack.TargetAt(game);
         video.Capture.HealthBars = EnemyHealthBars.Update(game, video.Ticks);
@@ -54,7 +54,7 @@ public static class ClickOverlay
             return;
         }
 
-        if (ClickToMove.Marker is null && !overDoor && !looking)
+        if (ClickToMove.Marker(game) is null && !overDoor && !looking)
         {
             ClearOverlay(output);
 
@@ -63,7 +63,7 @@ public static class ClickOverlay
 
         Overlay overlay = new() { HidePointer = overDoor || looking };
 
-        if (ClickToMove.Marker is { } marker)
+        if (ClickToMove.Marker(game) is { } marker)
         {
             overlay.Images.Add(ClickRing.PictureAt(ToOverlay(game, marker.World), marker.Walkable));
         }
@@ -97,8 +97,8 @@ public static class ClickOverlay
 
     // The classic buttons the new controls are using now: Look with shift held, Take over an item,
     // Talk with a conversation open, List with the inventory open; and the ones a walk in progress is for.
-    private static PanelButtons ButtonsInUse(WorldCapture capture) =>
-        ClickToMove.WalkingFor
+    private static PanelButtons ButtonsInUse(Data.Game game, WorldCapture capture) =>
+        ClickToMove.WalkingFor(game)
         | (capture.LookMode ? PanelButtons.Look : 0)
         | (capture.ItemHover ? PanelButtons.Take : 0)
         | (Conversation.Person is not null ? PanelButtons.Talk : 0)

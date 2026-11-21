@@ -81,7 +81,7 @@ public static class ClickToAttack
         if (!EnemyTargets.IsAttackable(game, number) || ClickToMove.PlayerSteers(game))
         {
             Clear();
-            ClickToMove.Cancel();
+            ClickToMove.Cancel(game);
 
             return false;
         }
@@ -94,7 +94,7 @@ public static class ClickToAttack
         if (ranged && hero.Weapon == WEAPON_BOW && game.Hero.Stuff[ARROW_SLOT] == 0)
         {
             Clear();
-            ClickToMove.Cancel();
+            ClickToMove.Cancel(game);
 
             return false;
         }
@@ -157,7 +157,7 @@ public static class ClickToAttack
     // Shoots along a line the enemy is on, or takes a step towards getting on one.
     private static void FollowPlan(Data.Game game, Shape hero, ClickToShoot.Plan plan)
     {
-        ClickToMove.Cancel();
+        ClickToMove.Cancel(game);
         game.Ui.PathDirection = plan.Direction;
         game.Ui.CompassLitDirection = plan.Direction;
         game.Ui.PathWalking = !plan.Fire;
@@ -169,7 +169,7 @@ public static class ClickToAttack
     {
         short direction = ClickToMove.DirectionTo(enemy.AbsX - hero.AbsX, enemy.AbsY - hero.AbsY);
 
-        ClickToMove.Cancel();
+        ClickToMove.Cancel(game);
 
         if (direction < ClickToMove.NOT_WALKING)
         {
@@ -183,7 +183,7 @@ public static class ClickToAttack
     // Keeps a route to the enemy, worked out again now and then as the enemy moves.
     private static void Approach(Data.Game game, Shape enemy)
     {
-        if (!ClickToMove.Active || frames++ % REPLAN_FRAMES == 0)
+        if (!ClickToMove.Active(game) || frames++ % REPLAN_FRAMES == 0)
         {
             ClickToMove.RouteTo(game, (enemy.AbsX, enemy.AbsY));
         }

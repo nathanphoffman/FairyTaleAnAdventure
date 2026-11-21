@@ -87,7 +87,7 @@ public static class MapScreen
         (double, double, double, bool) drawn = default;
 
         view.CenterOn(HeroTile(game));
-        ClickToMove.CancelAll();
+        ClickToMove.CancelAll(game);
         IsOpen = true;
 
         while (true)

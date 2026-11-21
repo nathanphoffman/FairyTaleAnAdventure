@@ -119,11 +119,10 @@ public static class Launch
         return backToMenu;
     }
 
-    // Clears the keyboard, mouse and walking state a game leaves behind in static fields.
+    // Clears the keyboard, mouse and screen state a game leaves behind in static fields.
     private static void ForgetLastGame()
     {
         InputHandler.Reset();
-        ClickToMove.CancelAll();
         Conversation.Close();
         EnemyPathing.Reset();
         ClickOverlay.Reset();

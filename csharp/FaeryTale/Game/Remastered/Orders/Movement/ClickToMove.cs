@@ -46,49 +46,16 @@ public static class ClickToMove
     internal const short NOT_WALKING = 9;
     private const sbyte VIEW_NORMAL = 0;
 
-    private static readonly List<(int X, int Y)> route = [];
-    private static (int X, int Y) goal;
-    private static (ushort X, ushort Y) lastPosition;
-    private static int stuckFrames;
-    private static int replans;
-    private static bool goalWalkable;
-
-    // The click was on water: the hero may swim through deep water to get there (as with the keys).
-    private static bool swimming;
-
-    // A click on a person: the actor to walk up to before the choices of the conversation appear.
-    private static int? personToTalkTo;
-
-    // A click on something to pick up: the actor to walk to, and the one to take now that the walk
-    // ended near it (set when the walk ends, used on the next step).
-    private static int? itemToTake;
-    private static int? arrivedToTake;
-
-    // A shift click: look around when the walk is over (arrivedToLook is that moment).
-    private static bool lookWhenThere;
-    private static bool arrivedToLook;
-    private static (int X, int Y) lookSpot;
-
-    // A click on a door: where to push towards once the route ends, how many frames have been spent
-    // pushing, and the region the walk started in (the walk is over when the hero is somewhere else).
-    private static (int X, int Y)? doorPoint;
-    private static int pushFrames;
-
-    // A far goal is reached in legs: how many have been planned, and where the present one began.
-    private static int legs;
-    private static (int X, int Y) legStart;
-    private static ushort startRegion;
-
     /// Where the walk is heading (a world position) and whether the hero can stand there, while a
     /// route is being followed.
-    public static ((int X, int Y) World, bool Walkable)? Marker => Active && !ClickToAttack.Active ? (doorPoint ?? goal, goalWalkable) : null;
+    public static ((int X, int Y) World, bool Walkable)? Marker(Data.Game game) => Active(game) && !ClickToAttack.Active ? (game.Walk.Planning.DoorPoint ?? game.Walk.Route.Goal, game.Walk.Route.GoalWalkable) : null;
 
     /// The classic buttons the walk in progress is for (Talk to a person, Take an item, Look).
-    public static PanelButtons WalkingFor =>
-        (personToTalkTo is not null ? PanelButtons.Talk : 0) | (itemToTake is not null ? PanelButtons.Take : 0) | (lookWhenThere ? PanelButtons.Look : 0);
+    public static PanelButtons WalkingFor(Data.Game game) =>
+        (game.Walk.Errands.PersonToTalkTo is not null ? PanelButtons.Talk : 0) | (game.Walk.Errands.ItemToTake is not null ? PanelButtons.Take : 0) | (game.Walk.Errands.LookWhenThere ? PanelButtons.Look : 0);
 
     /// Whether a route is being followed.
-    public static bool Active => route.Count > 0 || doorPoint is not null;
+    public static bool Active(Data.Game game) => game.Walk.Route.Points.Count > 0 || game.Walk.Planning.DoorPoint is not null;
 
     /// While the game is paused a click still gives an order (a walk, or an attack on an enemy) that
     /// the hero carries out when the game goes on, or queues a hotbar item. Remastered and Reimagined only.
@@ -109,7 +76,7 @@ public static class ClickToMove
 
         if (click.Native && EnemyTargets.EnemyAt(game, target) is { } enemy)
         {
-            Cancel();
+            Cancel(game);
             ClickToAttack.Order(enemy);
         }
         else
@@ -120,9 +87,9 @@ public static class ClickToMove
     }
 
     /// Forgets the route and any attack order (the hero stops).
-    public static void CancelAll()
+    public static void CancelAll(Data.Game game)
     {
-        Cancel();
+        Cancel(game);
         ClickToAttack.Clear();
     }
 
@@ -131,13 +98,13 @@ public static class ClickToMove
     internal static void RouteTo(Data.Game game, (int X, int Y) goalPoint) => StartRoute(game, goalPoint, null);
 
     /// Forgets the route (the hero stops).
-    public static void Cancel()
+    public static void Cancel(Data.Game game)
     {
-        route.Clear();
-        doorPoint = null;
-        personToTalkTo = null;
-        itemToTake = null;
-        lookWhenThere = false;
+        game.Walk.Route.Points.Clear();
+        game.Walk.Planning.DoorPoint = null;
+        game.Walk.Errands.PersonToTalkTo = null;
+        game.Walk.Errands.ItemToTake = null;
+        game.Walk.Errands.LookWhenThere = false;
     }
 
     /// Called every frame after the keyboard and mouse were read. Takes a new click, and while a
@@ -165,14 +132,14 @@ public static class ClickToMove
             return;
         }
 
-        if (!Active)
+        if (!Active(game))
         {
             return;
         }
 
-        if (PlayerSteers(game) || game.World.Region != startRegion)
+        if (PlayerSteers(game) || game.World.Region != game.Walk.Planning.StartRegion)
         {
-            Cancel();
+            Cancel(game);
 
             return;
         }
@@ -196,7 +163,7 @@ public static class ClickToMove
 
         if (terrain == DEEP_WATER)
         {
-            return swimming ? WADING_COST : -1;
+            return game.Walk.Route.Swimming ? WADING_COST : -1;
         }
 
         return terrain is >= WADING_FIRST and <= WADING_LAST ? WADING_COST : 0;
@@ -246,7 +213,7 @@ public static class ClickToMove
         }
         else if (click.Native && EnemyTargets.EnemyAt(game, target) is { } enemy)
         {
-            Cancel();
+            Cancel(game);
             ClickToAttack.Order(enemy);
         }
         else if (click.Native && PersonTargets.PersonAt(game, target) is { } person)
@@ -266,7 +233,7 @@ public static class ClickToMove
     // Walks up to something lying about and takes it, or takes it at once when already near.
     private static void WalkToItem(Data.Game game, IOutput output, int number)
     {
-        Cancel();
+        Cancel(game);
 
         if (ItemTargets.IsCloseEnough(game, number))
         {
@@ -278,9 +245,9 @@ public static class ClickToMove
         Shape item = game.Actors.List[number];
 
         StartRoute(game, (item.AbsX, item.AbsY), null);
-        itemToTake = Active ? number : null;
+        game.Walk.Errands.ItemToTake = Active(game) ? number : null;
 
-        if (!Active && ItemTargets.IsCloseEnough(game, number))
+        if (!Active(game) && ItemTargets.IsCloseEnough(game, number))
         {
             TakeItems.TakeFromActor(game, output, number);
         }
@@ -289,14 +256,14 @@ public static class ClickToMove
     // Takes the object walked to once the hero is near it, or when the walk ends short of it.
     private static void TakeItemWhenThere(Data.Game game, IOutput output)
     {
-        if (itemToTake is { } number && ItemTargets.IsCloseEnough(game, number))
+        if (game.Walk.Errands.ItemToTake is { } number && ItemTargets.IsCloseEnough(game, number))
         {
-            Cancel();
+            Cancel(game);
             TakeIfStillThere(game, output, number);
         }
-        else if (arrivedToTake is { } arrived)
+        else if (game.Walk.Errands.ArrivedToTake is { } arrived)
         {
-            arrivedToTake = null;
+            game.Walk.Errands.ArrivedToTake = null;
             TakeIfStillThere(game, output, arrived);
         }
     }
@@ -312,26 +279,26 @@ public static class ClickToMove
     // Shift and click: walks to the spot (not through a door there) and then looks around.
     private static void WalkToLook(Data.Game game, IOutput output, (int X, int Y) target)
     {
-        Cancel();
-        lookSpot = target;
+        Cancel(game);
+        game.Walk.Errands.LookSpot = target;
 
         // A spot within half the reach of a look is looked at from where the hero stands.
         if (LooksFromHere(game.Actors.List[0], target))
         {
-            ItemsMenu.LookAround(game, output, lookSpot);
+            ItemsMenu.LookAround(game, output, game.Walk.Errands.LookSpot);
 
             return;
         }
 
         StartRoute(game, target, null);
 
-        if (Active)
+        if (Active(game))
         {
-            lookWhenThere = true;
+            game.Walk.Errands.LookWhenThere = true;
         }
         else
         {
-            ItemsMenu.LookAround(game, output, lookSpot);
+            ItemsMenu.LookAround(game, output, game.Walk.Errands.LookSpot);
         }
     }
 
@@ -343,17 +310,17 @@ public static class ClickToMove
     // Looks around once a walk that was meant to end with a look is over.
     private static void LookIfArrived(Data.Game game, IOutput output)
     {
-        if (arrivedToLook)
+        if (game.Walk.Errands.ArrivedToLook)
         {
-            arrivedToLook = false;
-            ItemsMenu.LookAround(game, output, lookSpot);
+            game.Walk.Errands.ArrivedToLook = false;
+            ItemsMenu.LookAround(game, output, game.Walk.Errands.LookSpot);
         }
     }
 
     // Walks towards a person, or opens the conversation at once when already near.
     private static void WalkToPerson(Data.Game game, int number)
     {
-        Cancel();
+        Cancel(game);
 
         if (PersonTargets.IsCloseEnough(game, number))
         {
@@ -365,9 +332,9 @@ public static class ClickToMove
         Shape person = game.Actors.List[number];
 
         Plan(game, (person.AbsX, person.AbsY));
-        personToTalkTo = Active ? number : null;
+        game.Walk.Errands.PersonToTalkTo = Active(game) ? number : null;
 
-        if (!Active && PersonTargets.IsInTalkRange(game, number))
+        if (!Active(game) && PersonTargets.IsInTalkRange(game, number))
         {
             Conversation.Open(game, number);
         }
@@ -376,12 +343,12 @@ public static class ClickToMove
     // Once the hero is near the person walked to, stops and opens the conversation.
     private static void OpenConversationWhenNear(Data.Game game)
     {
-        if (personToTalkTo is not { } number || !PersonTargets.IsCloseEnough(game, number))
+        if (game.Walk.Errands.PersonToTalkTo is not { } number || !PersonTargets.IsCloseEnough(game, number))
         {
             return;
         }
 
-        Cancel();
+        Cancel(game);
         Conversation.Open(game, number);
     }
 
@@ -400,19 +367,19 @@ public static class ClickToMove
             return;
         }
 
-        personToTalkTo = null;
-        itemToTake = null;
-        lookWhenThere = false;
-        swimming = IsWater(game, target);
-        doorPoint = door is { } found ? DoorTargets.EntryPoint(game, found) : null;
-        goal = door is { } doorToApproach ? DoorTargets.ApproachPoint(game, doorToApproach) : target;
-        goalWalkable = doorPoint is not null || CellCost(game, target.X, target.Y) >= 0;
-        startRegion = game.World.Region;
-        replans = 0;
-        stuckFrames = 0;
-        pushFrames = 0;
-        legs = 0;
-        legStart = (hero.AbsX, hero.AbsY);
+        game.Walk.Errands.PersonToTalkTo = null;
+        game.Walk.Errands.ItemToTake = null;
+        game.Walk.Errands.LookWhenThere = false;
+        game.Walk.Route.Swimming = IsWater(game, target);
+        game.Walk.Planning.DoorPoint = door is { } found ? DoorTargets.EntryPoint(game, found) : null;
+        game.Walk.Route.Goal = door is { } doorToApproach ? DoorTargets.ApproachPoint(game, doorToApproach) : target;
+        game.Walk.Route.GoalWalkable = game.Walk.Planning.DoorPoint is not null || CellCost(game, target.X, target.Y) >= 0;
+        game.Walk.Planning.StartRegion = game.World.Region;
+        game.Walk.Planning.Replans = 0;
+        game.Walk.Route.StuckFrames = 0;
+        game.Walk.Planning.PushFrames = 0;
+        game.Walk.Planning.Legs = 0;
+        game.Walk.Planning.LegStart = (hero.AbsX, hero.AbsY);
         PlanFrom(game, hero);
     }
 
@@ -420,16 +387,16 @@ public static class ClickToMove
     private static void PlanFrom(Data.Game game, Shape hero)
     {
         int cell = PathFinder.CELL;
-        (int X, int Y) goalCell = (RoundDivide(goal.X - hero.AbsX, cell), RoundDivide(goal.Y - hero.AbsY, cell));
+        (int X, int Y) goalCell = (RoundDivide(game.Walk.Route.Goal.X - hero.AbsX, cell), RoundDivide(game.Walk.Route.Goal.Y - hero.AbsY, cell));
 
-        route.Clear();
+        game.Walk.Route.Points.Clear();
 
         foreach ((int x, int y) in PathFinder.Find(goalCell, (cx, cy) => CellCost(game, hero.AbsX + cx * cell, hero.AbsY + cy * cell)))
         {
-            route.Add((hero.AbsX + x * cell, hero.AbsY + y * cell));
+            game.Walk.Route.Points.Add((hero.AbsX + x * cell, hero.AbsY + y * cell));
         }
 
-        lastPosition = (hero.AbsX, hero.AbsY);
+        game.Walk.Route.LastPosition = (hero.AbsX, hero.AbsY);
     }
 
     // The player is steering by hand: keys, the compass, the fight button, or riding something.
@@ -446,12 +413,12 @@ public static class ClickToMove
     {
         Shape hero = game.Actors.List[0];
 
-        while (route.Count > 0 && Math.Abs(route[0].X - hero.AbsX) <= REACH && Math.Abs(route[0].Y - hero.AbsY) <= REACH)
+        while (game.Walk.Route.Points.Count > 0 && Math.Abs(game.Walk.Route.Points[0].X - hero.AbsX) <= REACH && Math.Abs(game.Walk.Route.Points[0].Y - hero.AbsY) <= REACH)
         {
-            route.RemoveAt(0);
+            game.Walk.Route.Points.RemoveAt(0);
         }
 
-        if (route.Count == 0)
+        if (game.Walk.Route.Points.Count == 0)
         {
             if (!ContinueTowardsGoal(game, hero))
             {
@@ -466,7 +433,7 @@ public static class ClickToMove
             return;
         }
 
-        game.Ui.PathDirection = DirectionTo(route[0].X - hero.AbsX, route[0].Y - hero.AbsY);
+        game.Ui.PathDirection = DirectionTo(game.Walk.Route.Points[0].X - hero.AbsX, game.Walk.Route.Points[0].Y - hero.AbsY);
         game.Ui.CompassLitDirection = game.Ui.PathDirection;
         game.Ui.PathWalking = true;
     }
@@ -477,26 +444,26 @@ public static class ClickToMove
     // MAX_LEGS legs.
     private static bool ContinueTowardsGoal(Data.Game game, Shape hero)
     {
-        int distance = Math.Max(Math.Abs(goal.X - hero.AbsX), Math.Abs(goal.Y - hero.AbsY));
-        bool progressed = (hero.AbsX, hero.AbsY) != legStart;
+        int distance = Math.Max(Math.Abs(game.Walk.Route.Goal.X - hero.AbsX), Math.Abs(game.Walk.Route.Goal.Y - hero.AbsY));
+        bool progressed = (hero.AbsX, hero.AbsY) != game.Walk.Planning.LegStart;
 
-        if (distance <= LEG_END_TOLERANCE || !progressed || legs >= MAX_LEGS)
+        if (distance <= LEG_END_TOLERANCE || !progressed || game.Walk.Planning.Legs >= MAX_LEGS)
         {
             return false;
         }
 
-        legs++;
-        legStart = (hero.AbsX, hero.AbsY);
+        game.Walk.Planning.Legs++;
+        game.Walk.Planning.LegStart = (hero.AbsX, hero.AbsY);
         PlanFrom(game, hero);
 
-        return route.Count > 0;
+        return game.Walk.Route.Points.Count > 0;
     }
 
     // At the end of a route to a door: keeps walking into the door, which opens when bumped and lets
     // the hero through. Gives up after a while.
     private static void Push(Data.Game game, Shape hero)
     {
-        if (doorPoint is not { } door || pushFrames++ >= MAX_PUSH_FRAMES)
+        if (game.Walk.Planning.DoorPoint is not { } door || game.Walk.Planning.PushFrames++ >= MAX_PUSH_FRAMES)
         {
             EndWalk(game);
 
@@ -511,13 +478,13 @@ public static class ClickToMove
     // The route is over: a walk to a person that ended in talking range still opens the conversation.
     private static void EndWalk(Data.Game game)
     {
-        int? person = personToTalkTo;
-        int? item = itemToTake;
-        bool look = lookWhenThere;
+        int? person = game.Walk.Errands.PersonToTalkTo;
+        int? item = game.Walk.Errands.ItemToTake;
+        bool look = game.Walk.Errands.LookWhenThere;
 
-        Cancel();
-        arrivedToLook = look;
-        arrivedToTake = item is { } itemNumber && ItemTargets.IsCloseEnough(game, itemNumber) ? item : null;
+        Cancel(game);
+        game.Walk.Errands.ArrivedToLook = look;
+        game.Walk.Errands.ArrivedToTake = item is { } itemNumber && ItemTargets.IsCloseEnough(game, itemNumber) ? item : null;
 
         if (person is { } number && PersonTargets.IsInTalkRange(game, number))
         {
@@ -529,18 +496,18 @@ public static class ClickToMove
     // attempts the walk is given up. Returns true when the route was dropped.
     private static bool IsStuck(Data.Game game, Shape hero)
     {
-        stuckFrames = (hero.AbsX, hero.AbsY) == lastPosition ? stuckFrames + 1 : 0;
-        lastPosition = (hero.AbsX, hero.AbsY);
+        game.Walk.Route.StuckFrames = (hero.AbsX, hero.AbsY) == game.Walk.Route.LastPosition ? game.Walk.Route.StuckFrames + 1 : 0;
+        game.Walk.Route.LastPosition = (hero.AbsX, hero.AbsY);
 
-        if (stuckFrames < STUCK_FRAMES)
+        if (game.Walk.Route.StuckFrames < STUCK_FRAMES)
         {
             return false;
         }
 
-        stuckFrames = 0;
-        replans++;
+        game.Walk.Route.StuckFrames = 0;
+        game.Walk.Planning.Replans++;
 
-        if (replans > MAX_REPLANS)
+        if (game.Walk.Planning.Replans > MAX_REPLANS)
         {
             EndWalk(game);
 
@@ -549,7 +516,7 @@ public static class ClickToMove
 
         PlanFrom(game, hero);
 
-        return route.Count == 0;
+        return game.Walk.Route.Points.Count == 0;
     }
 
     // Divides rounding to the nearest whole number (halves away from zero).
