@@ -1,5 +1,4 @@
 using FaeryTale.Game.Data;
-using FaeryTale.Game.Output;
 using FaeryTale.Game.Render;
 using FaeryTale.Game.Ui;
 

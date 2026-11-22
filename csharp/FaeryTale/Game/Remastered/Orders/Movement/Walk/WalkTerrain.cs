@@ -1,6 +1,5 @@
 using FaeryTale.Game.Creatures.Interaction;
 using FaeryTale.Game.Land.Map;
-using FaeryTale.Game.Ui;
 
 namespace FaeryTale.Game.Remastered;
 

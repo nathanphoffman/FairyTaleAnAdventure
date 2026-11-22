@@ -112,7 +112,7 @@ public sealed class FPage
 /// The play field is a lores picture of 5 bit planes (32 colours) on top; the text panel is a
 /// hires picture of 4 bit planes below it. The game draws on one page while the other is on
 /// screen, then swaps them.
-public sealed class Screen
+public sealed partial class Screen
 {
     /// View port mode bits.
     public const ushort HIRES = 0x8000;
@@ -192,172 +192,6 @@ public sealed class Screen
         MaskRegion = new byte[BLITTER_REGION];
     }
 
-    public Bitmap GetBitmap(BitmapId id) => bitmaps[IndexOf(id)];
-
-    public void SetBitmap(BitmapId id, Bitmap bitmap) => bitmaps[IndexOf(id)] = bitmap;
-
-    /// What the sprite blitter works on: the bitmap being drawn on and its two work regions.
-    public (Bitmap Bitmap, byte[] Queue, byte[] Mask) BlitterMemory() => (bitmaps[IndexOf(DrawTarget)], QueueRegion, MaskRegion);
-
-    public Bitmap DrawBitmap => GetBitmap(DrawTarget);
-
-    /// The bitmap of display page n (0 or 1) as it is wired up now.
-    public BitmapId PageBitmap(int n) => Ras[Pages[n].Ras].Bitmap;
-
-    /// The page being drawn on.
-    public FPage DrawingPage => Pages[Drawing];
-
-    /// The bitmap of the page being drawn on / being shown.
-    public BitmapId DrawingBitmapId => PageBitmap(Drawing);
-
-    public BitmapId ViewingBitmapId => PageBitmap(Viewing);
-
-    public Port GetPort(PortId id) => ports[(int)id];
-
-    public void SetFontKind(PortId id, FontKind kind) => GetPort(id).Font = kind;
-
-    public void SetFont(FontKind kind, Font font) => fonts[(int)kind] = font;
-
-    public void SetAPen(PortId id, byte pen) => GetPort(id).Pen.Fg = pen;
-
-    public void SetBPen(PortId id, byte pen) => GetPort(id).Pen.Bg = pen;
-
-    public void SetDrawMode(PortId id, byte mode) => GetPort(id).Pen.Mode = mode;
-
-    public void MoveTo(PortId id, int x, int y)
-    {
-        Port port = GetPort(id);
-
-        port.Pen.X = x;
-        port.Pen.Y = y;
-    }
-
-    /// Writes the bytes at the pen of the port.
-    public void Text(PortId id, ReadOnlySpan<byte> bytes)
-    {
-        if (TargetOf(id) is { } target)
-        {
-            Port port = GetPort(id);
-
-            WriteText(target.Bitmap, port, bytes, target.Planes);
-        }
-    }
-
-    /// How far the pen of a port moves across after a character, in the port's font.
-    public int AdvanceOf(PortId id, byte character) => fonts[(int)GetPort(id).Font].AdvanceOf(character);
-
-    /// Draws a line from the port's pen to (x, y).
-    public void LineTo(PortId id, int x, int y)
-    {
-        if (TargetOf(id) is { } target)
-        {
-            Gfx.Drawing.LineTo(target.Bitmap, ref GetPort(id).Pen, (x, y), target.Planes);
-        }
-    }
-
-    public void RectFill(PortId id, (int X, int Y) from, (int X, int Y) to)
-    {
-        if (TargetOf(id) is { } target)
-        {
-            Gfx.Drawing.RectFill(target.Bitmap, GetPort(id).Pen, from, to, target.Planes);
-        }
-    }
-
-    public void FillPolygon(PortId id, IReadOnlyList<(int X, int Y)> points, Rect clip)
-    {
-        if (TargetOf(id) is { } target)
-        {
-            Gfx.Drawing.FillPolygon(target.Bitmap, GetPort(id).Pen, points, clip, target.Planes);
-        }
-    }
-
-    /// Fills the whole bitmap of the port with colour pen.
-    public void Clear(PortId id, byte pen)
-    {
-        if (TargetOf(id) is { } target)
-        {
-            target.Bitmap.Clear(pen, target.Planes);
-        }
-    }
-
-    /// Scrolls an area of the port's bitmap; what scrolls in gets the port's background colour.
-    public void Scroll(PortId id, Rect area, (int X, int Y) by)
-    {
-        if (TargetOf(id) is { } target)
-        {
-            BitmapOps.Scroll(target.Bitmap, area, by, GetPort(id).Pen.Bg, target.Planes);
-        }
-    }
-
-    /// Copies a rectangle of one bitmap to another (not the same one), for the planes in mask.
-    public void Copy(BitmapId from, Rect rect, BitmapId to, (int X, int Y) at, uint mask)
-    {
-        (Bitmap source, Bitmap destination) = TwoBitmaps(from, to);
-
-        BitmapOps.CopyRect(source, destination, rect, at, mask);
-    }
-
-    /// The compass picture which (0 normal, 1 lit) copied into plane plane of the text panel.
-    public void CopyCompass(int which, Rect rect, (int X, int Y) at, int plane) =>
-        BitmapOps.CopyPlaneRect(Compass[which], 0, GetBitmap(BitmapId.Text), plane, rect, at);
-
-    /// Two different bitmaps, the first to read and the second to write.
-    public (Bitmap From, Bitmap To) TwoBitmaps(BitmapId from, BitmapId to)
-    {
-        if (IndexOf(from) == IndexOf(to))
-        {
-            throw new InvalidOperationException("a copy needs two different bitmaps");
-        }
-
-        return (GetBitmap(from), GetBitmap(to));
-    }
-
-    public ViewPortState GetViewPort(ViewPortId id) => id == ViewPortId.Page ? VpPage : VpText;
-
-    /// Loads the first colours of a view port's table from colors (12 bit colours, 0x0RGB).
-    public void LoadColors(ViewPortId id, ReadOnlySpan<ushort> colors)
-    {
-        ushort[] table = GetViewPort(id).Colors;
-
-        colors[..Math.Min(table.Length, colors.Length)].CopyTo(table);
-    }
-
-    /// Sets one colour of a view port from its red, green and blue (4 bits each).
-    public void SetColor(ViewPortId id, int n, (uint R, uint G, uint B) color)
-    {
-        ushort[] table = GetViewPort(id).Colors;
-
-        if (n >= 0 && n < table.Length)
-        {
-            // Packs the three components into one 12 bit colour: each masked to its width, then moved to its place.
-            table[n] = (ushort)(((color.R & COMPONENT_MASK) << RED_SHIFT) | ((color.G & COMPONENT_MASK) << GREEN_SHIFT) | (color.B & COMPONENT_MASK));
-        }
-    }
-
-    /// What is on screen now: the text panel on top of the play field, unless hidden.
-    public Scene ToScene()
-    {
-        List<ViewPort> viewPorts = [];
-
-        foreach (ViewPortState state in new[] { VpText, VpPage })
-        {
-            if (state.Ras is { } ras && (state.Modes & VP_HIDE) == 0 && state.Colors.Length > 0)
-            {
-                viewPorts.Add(MakeViewPort(state, ras));
-            }
-        }
-
-        return new Scene { ViewPorts = viewPorts, Pointer = PointerImage is null ? null : new Pointer(PointerImage, PointerPosition) };
-    }
-
-    // Writes text with the port's pen and font on the bitmap.
-    private void WriteText(Bitmap bitmap, Port port, ReadOnlySpan<byte> bytes, int planes) =>
-        Gfx.Drawing.Text(bitmap, ref port.Pen, fonts[(int)port.Font], bytes, planes);
-
-    // Splits a port from the bitmap it draws on and the planes drawing touches.
-    private (Bitmap Bitmap, int Planes)? TargetOf(PortId id) =>
-        GetPort(id).Target is { } target ? (bitmaps[IndexOf(target)], PlanesOf(target)) : null;
-
     private ViewPort MakeViewPort(ViewPortState state, int rasIndex)
     {
         RasInfo ras = Ras[rasIndex];
@@ -373,17 +207,6 @@ public sealed class Screen
             ShowsPointer = (state.Modes & SPRITES) != 0,
         };
     }
-
-    // The position of an id in the list of bitmaps.
-    private static int IndexOf(BitmapId id) => id switch
-    {
-        BitmapId.Page1 => 0,
-        BitmapId.Page2 => 1,
-        BitmapId.Text or BitmapId.TextPlane0 => 2,
-        BitmapId.PageA => 3,
-        BitmapId.PageB => 4,
-        _ => 5,
-    };
 
     // The pages, the text panel and the compass pictures.
     private void MakeBitmaps(byte[][] compass)
