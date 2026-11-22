@@ -1,4 +1,3 @@
-using FaeryTale.Game.Data;
 using FaeryTale.Game.Output;
 
 namespace FaeryTale.Game.Land.TravelDoors;

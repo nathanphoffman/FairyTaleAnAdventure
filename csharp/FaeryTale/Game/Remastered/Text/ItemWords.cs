@@ -1,5 +1,4 @@
 using System.Text;
-using FaeryTale.Game.Data;
 using FaeryTale.Game.Reimagined;
 
 namespace FaeryTale.Game.Remastered;

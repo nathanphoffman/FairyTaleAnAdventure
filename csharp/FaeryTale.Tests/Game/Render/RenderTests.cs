@@ -1,4 +1,3 @@
-using FaeryTale.Game.Data;
 using FaeryTale.Game.Files;
 using FaeryTale.Game.Render;
 using FaeryTale.Gfx;

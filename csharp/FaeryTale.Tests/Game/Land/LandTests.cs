@@ -40,7 +40,7 @@ public class LandTests
     public void ATiredHeroFallsAsleepAfterThirtyFramesOnABed()
     {
         short wait = 0;
-        Bed.BedAction last = Bed.BedAction.Nothing;
+        Bed.BedAction last;
 
         for (int frame = 1; frame <= Bed.BED_WAIT; frame++)
         {

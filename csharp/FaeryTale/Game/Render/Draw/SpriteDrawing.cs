@@ -125,7 +125,7 @@ public static class SpriteDrawing
 
         sbyte bytesWide = PlaceOnScreen(game.World, video, sprite);
 
-        if (!SpriteImages.AdjustForDepth(game.Actors, game.Hero, actor, slot, cycle, passmode, sprite))
+        if (!SpriteImages.AdjustForDepth(game.Hero, actor, slot, cycle, passmode, sprite))
         {
             return Drawn.Done;
         }

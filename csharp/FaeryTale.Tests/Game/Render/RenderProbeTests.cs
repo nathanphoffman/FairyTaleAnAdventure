@@ -1,4 +1,3 @@
-using FaeryTale.Game.Creatures.Interaction;
 using FaeryTale.Game.Data;
 using FaeryTale.Game.Files;
 using FaeryTale.Game.Land;

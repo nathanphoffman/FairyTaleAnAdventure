@@ -1,6 +1,5 @@
 ﻿// Generated from the Rust tables by a one-off script, then kept by hand.
 using System.Text;
-using FaeryTale.Game.Data;
 using FaeryTale.Game.Files;
 
 namespace FaeryTale.Game.Data;

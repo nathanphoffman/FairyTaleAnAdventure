@@ -1,4 +1,3 @@
-using FaeryTale.Game.Data;
 
 namespace FaeryTale.Game.Land.Map;
 

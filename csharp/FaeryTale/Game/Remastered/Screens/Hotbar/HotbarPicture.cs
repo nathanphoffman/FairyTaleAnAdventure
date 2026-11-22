@@ -1,5 +1,4 @@
 using FaeryTale.Game.Reimagined;
-using FaeryTale.Game.Data;
 using FaeryTale.Gfx;
 
 namespace FaeryTale.Game.Remastered;

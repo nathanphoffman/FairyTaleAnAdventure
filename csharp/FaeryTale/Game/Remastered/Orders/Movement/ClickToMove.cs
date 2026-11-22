@@ -1,7 +1,6 @@
 using FaeryTale.Game.Data;
 using FaeryTale.Game.Input;
 using FaeryTale.Game.Output;
-using FaeryTale.Game.Ui;
 
 namespace FaeryTale.Game.Remastered;
 

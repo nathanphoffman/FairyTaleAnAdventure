@@ -25,9 +25,6 @@ public static class WitchBeam
     private const int DIRECTIONS_BEFORE = 63;
     private const int DIRECTIONS_AFTER = 1;
 
-    /// An edge is two (x, y) points of one byte each, so 4 bytes.
-    private const int EDGE_BYTES = 4;
-
     /// Which side of the line (p1, p2) the point (xh, yh) is on: the cross product, as the 16 bit
     /// value the original kept.
     internal static short Side((short X, short Y) p1, (short X, short Y) p2, short xh, short yh)

@@ -1,13 +1,9 @@
 // Generated from the Rust tables by a one-off script, then kept by hand.
-using System.Text;
-using FaeryTale.Game.Data;
 
 namespace FaeryTale.Game.Data;
 
 public static partial class ObjectTables
 {
-    private static byte[] Latin1(string text) => Encoding.Latin1.GetBytes(text);
-
     /// Builds an object list entry: position, item id and state.
     private static WorldObject Obj(ushort x, ushort y, byte id, sbyte stat) =>
         new() { Xc = x, Yc = y, ObId = unchecked((sbyte)id), ObStat = stat };

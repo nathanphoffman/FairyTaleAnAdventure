@@ -14,9 +14,6 @@ public static class ClickOverlay
     /// The overlay grid is twice as wide and twice as tall as the game's screen.
     private const int OVERLAY_SCALE = 2;
 
-    /// The play field ends at this screen line.
-    private const int PLAY_FIELD_BOTTOM = 143;
-
     private const sbyte VIEW_NORMAL = 0;
 
     private static bool shown;

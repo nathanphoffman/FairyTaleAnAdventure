@@ -156,7 +156,7 @@ internal static class SpriteImages
 
     /// Sinks the sprite into water, shortens it when the hero rides the swan, and so on. Returns
     /// false if nothing is left to draw.
-    internal static bool AdjustForDepth(Actors actors, Hero hero, Shape actor, int slot, short cycle, bool passmode, Sprite sprite)
+    internal static bool AdjustForDepth(Hero hero, Shape actor, int slot, short cycle, bool passmode, Sprite sprite)
     {
         short depth = actor.Environ;
 
