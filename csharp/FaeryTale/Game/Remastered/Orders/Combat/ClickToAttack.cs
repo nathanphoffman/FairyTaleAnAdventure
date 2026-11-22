@@ -78,7 +78,7 @@ public static class ClickToAttack
             return false;
         }
 
-        if (!EnemyTargets.IsAttackable(game, number) || ClickToMove.PlayerSteers(game))
+        if (!EnemyTargets.IsAttackable(game, number) || WalkFollowing.PlayerSteers(game))
         {
             Clear();
             ClickToMove.Cancel(game);
@@ -167,11 +167,11 @@ public static class ClickToAttack
     // Stands and fights, turned towards the enemy.
     private static void Fight(Data.Game game, Shape hero, Shape enemy)
     {
-        short direction = ClickToMove.DirectionTo(enemy.AbsX - hero.AbsX, enemy.AbsY - hero.AbsY);
+        short direction = WalkFollowing.DirectionTo(enemy.AbsX - hero.AbsX, enemy.AbsY - hero.AbsY);
 
         ClickToMove.Cancel(game);
 
-        if (direction < ClickToMove.NOT_WALKING)
+        if (direction < WalkFollowing.NOT_WALKING)
         {
             game.Ui.PathDirection = direction;
             game.Ui.CompassLitDirection = direction;
@@ -185,7 +185,7 @@ public static class ClickToAttack
     {
         if (!ClickToMove.Active(game) || frames++ % REPLAN_FRAMES == 0)
         {
-            ClickToMove.RouteTo(game, (enemy.AbsX, enemy.AbsY));
+            WalkRoutes.RouteTo(game, (enemy.AbsX, enemy.AbsY));
         }
     }
 }

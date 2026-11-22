@@ -19,8 +19,8 @@ public class LookFromHereTests
     {
         Shape hero = HeroAt(1000, 1000);
 
-        Assert.True(ClickToMove.LooksFromHere(hero, (1000, 1000)));
-        Assert.True(ClickToMove.LooksFromHere(hero, (1020, 980)));
+        Assert.True(LookWalks.LooksFromHere(hero, (1000, 1000)));
+        Assert.True(LookWalks.LooksFromHere(hero, (1020, 980)));
     }
 
     [Fact]
@@ -28,7 +28,7 @@ public class LookFromHereTests
     {
         Shape hero = HeroAt(1000, 1000);
 
-        Assert.False(ClickToMove.LooksFromHere(hero, (1021, 1000)));
-        Assert.False(ClickToMove.LooksFromHere(hero, (1000, 960)));
+        Assert.False(LookWalks.LooksFromHere(hero, (1021, 1000)));
+        Assert.False(LookWalks.LooksFromHere(hero, (1000, 960)));
     }
 }

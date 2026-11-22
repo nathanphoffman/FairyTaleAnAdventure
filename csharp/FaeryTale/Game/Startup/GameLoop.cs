@@ -153,7 +153,7 @@ public static class GameLoop
             return false;
         }
 
-        ClickToMove.GiveOrdersWhilePaused(game, video);
+        WalkClicks.GiveOrdersWhilePaused(game, video);
         ClickOverlay.Update(game, video);
         Display.Delay(game, video, 1);
 

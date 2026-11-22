@@ -68,7 +68,7 @@ public class ClickToMoveTests
     [InlineData(-9, 0, 7)]
     [InlineData(1, 1, 9)]
     public void TheWalkDirectionPointsAtTheTarget(int dx, int dy, int expected) =>
-        Assert.Equal(expected, ClickToMove.DirectionTo(dx, dy));
+        Assert.Equal(expected, WalkFollowing.DirectionTo(dx, dy));
 
     [Fact]
     public void AClickAndTheMarkerUseTheSameGroundSpot()
