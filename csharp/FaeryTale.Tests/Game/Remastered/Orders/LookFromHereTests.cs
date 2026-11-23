@@ -5,11 +5,11 @@ namespace FaeryTale.Tests;
 
 public class LookFromHereTests
 {
-    private static Shape HeroAt(int x, int y)
+    private static Shape HeroAt(int positionX, int positionY)
     {
         Shape hero = new();
 
-        (hero.AbsX, hero.AbsY) = ((ushort)x, (ushort)y);
+        (hero.AbsX, hero.AbsY) = ((ushort)positionX, (ushort)positionY);
 
         return hero;
     }

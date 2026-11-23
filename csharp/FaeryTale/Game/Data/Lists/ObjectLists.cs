@@ -14,6 +14,16 @@ public sealed class ObjectLists
 {
     public const int REGION_COUNT = 10;
 
+    // How many objects the lists of the regions with more than one start out using.
+    private const short REGION_0_USED = 3;
+    private const short REGION_2_USED = 5;
+    private const short REGION_3_USED = 12;
+    private const short REGION_4_USED = 3;
+    private const short REGION_5_USED = 5;
+    private const short REGION_8_PLACED_USED = 61;
+    private const short REGION_8_EXTRA_USED = 16;
+    private const short REGION_9_USED = 9;
+
     public WorldObject[][] Regions =
     [
         Copy(ObjectTables.InitialObList0),
@@ -31,7 +41,7 @@ public sealed class ObjectLists
     public WorldObject[] Global = Copy(ObjectTables.InitialObListg);
 
     /// How many objects each region's list uses, and whether random treasure has been scattered there.
-    public short[] Used = [3, 1, 5, 12, 3, 5, 1, 1, 61 + 16, 9];
+    public short[] Used = [REGION_0_USED, 1, REGION_2_USED, REGION_3_USED, REGION_4_USED, REGION_5_USED, 1, 1, REGION_8_PLACED_USED + REGION_8_EXTRA_USED, REGION_9_USED];
     public short[] Distributed = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1];
 
     /// The objects of which.

@@ -36,6 +36,12 @@ internal sealed partial class MoveContext
     /// Snake pictures start here, two frames for each pair of facings.
     private const short SNAKE_FIRST_FRAME = 0x24;
 
+    // Dropping the lowest bit of a facing pairs it with its neighbour (snake pictures come in pairs).
+    private const int FACING_PAIR_MASK = 0xfe;
+
+    // The fighting pictures come after the eight walking ones, so a fighter's facing is shifted by 8.
+    private const int FIGHTING_FACING_OFFSET = 8;
+
     /// Velocity is kept as four times the movement of the last step.
     private const int VELOCITY_SCALE = 4;
 
@@ -254,7 +260,7 @@ internal sealed partial class MoveContext
         if (actor.Race == RACE_SNAKE)
         {
             // Snake pictures: two frames (bit 1 of the cycle) for each pair of facings.
-            image = (short)((cycle & 2) + ((facing & 0xfe) << 2) + SNAKE_FIRST_FRAME);
+            image = (short)((cycle & 2) + ((facing & FACING_PAIR_MASK) << 2) + SNAKE_FIRST_FRAME);
         }
     }
 
@@ -307,7 +313,7 @@ internal sealed partial class MoveContext
     // Swinging a weapon (states 0-8): steps through the swing table.
     private Pc Fighting()
     {
-        frameBase = DirectionOffset(facing + 8);
+        frameBase = DirectionOffset(facing + FIGHTING_FACING_OFFSET);
         short next = Tables.Entry(Tables.SwingTransitions, state)[game.Rng.Rand4()];
 
         actor.State = (sbyte)next;

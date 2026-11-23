@@ -33,6 +33,9 @@ public interface IDisplayDevice
 /// A display that shows nothing and only counts ticks, for runs without a window.
 public sealed class NullDisplayDevice : IDisplayDevice
 {
+    // A picture of an animation lasts one tick of 1/50 second.
+    private const double TICK_MILLISECONDS = 20;
+
     public Video? Source { get; set; }
 
     public uint Ticks { get; private set; }
@@ -47,7 +50,7 @@ public sealed class NullDisplayDevice : IDisplayDevice
     {
     }
 
-    public double AnimationFrameMs => 20;
+    public double AnimationFrameMs => TICK_MILLISECONDS;
 
     public void ShowAnimationFrame(Scene scene) => Ticks++;
 }

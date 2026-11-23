@@ -31,13 +31,13 @@ internal static class MenuStyle
     }
 
     /// Adds a line of text in the middle of the screen with its baseline at y.
-    public static void AddCentered(Overlay overlay, string text, int y, uint color, int scale) =>
-        AddText(overlay, text, ((Overlay.WIDTH - Overlay.TextWidth(text, scale)) / 2, y), color, scale);
+    public static void AddCentered(Overlay overlay, string text, int positionY, uint color, int scale) =>
+        AddText(overlay, text, ((Overlay.WIDTH - Overlay.TextWidth(text, scale)) / 2, positionY), color, scale);
 
     /// Adds a line of text with a dark shadow behind it, down and to the right.
-    public static void AddText(Overlay overlay, string text, (int X, int Y) at, uint color, int scale)
+    public static void AddText(Overlay overlay, string text, (int X, int Y) offset, uint color, int scale)
     {
-        overlay.Texts.Add(new Text(text, at.X + scale, at.Y + scale, TEXT_SHADOW_COLOR, scale));
-        overlay.Texts.Add(new Text(text, at.X, at.Y, color, scale));
+        overlay.Texts.Add(new Text(text, offset.X + scale, offset.Y + scale, TEXT_SHADOW_COLOR, scale));
+        overlay.Texts.Add(new Text(text, offset.X, offset.Y, color, scale));
     }
 }

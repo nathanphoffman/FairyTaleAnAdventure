@@ -147,14 +147,24 @@ public sealed partial class Screen
     private const int RED_SHIFT = 8;
     private const int GREEN_SHIFT = 4;
 
-    private readonly Bitmap[] bitmaps = Enumerable.Range(0, 6).Select(_ => Bitmap.Empty()).ToArray();
+    // The bitmaps by position: the page A, page B and the last one (the rest of the ids) come after
+    // the first three (pages 1 and 2 and the text bitmap).
+    private const int BITMAP_COUNT = 6;
+    private const int PAGE_A_INDEX = 3;
+    private const int PAGE_B_INDEX = 4;
+    private const int LAST_BITMAP_INDEX = 5;
+
+    /// How many raster infos the screen keeps.
+    private const int RAS_INFO_COUNT = 3;
+
+    private readonly Bitmap[] bitmaps = Enumerable.Range(0, BITMAP_COUNT).Select(_ => Bitmap.Empty()).ToArray();
     private readonly Port[] ports = [new(), new(), new()];
     private readonly Font[] fonts = [Font.Builtin, Font.Builtin];
 
     /// The compass picture: lit up, and not.
     public Bitmap[] Compass = [Bitmap.Empty(), Bitmap.Empty()];
 
-    public RasInfo[] Ras = new RasInfo[3];
+    public RasInfo[] Ras = new RasInfo[RAS_INFO_COUNT];
     public FPage[] Pages = [new(), new()];
 
     /// Which of the two pages is being drawn on and which is on screen.
@@ -179,7 +189,7 @@ public sealed partial class Screen
     public sbyte Flasher;
 
     /// How many planes drawing on this bitmap touches.
-    public static int PlanesOf(BitmapId id) => id == BitmapId.TextPlane0 ? 1 : int.MaxValue;
+    public static int PlanesOf(BitmapId identifier) => identifier == BitmapId.TextPlane0 ? 1 : int.MaxValue;
 
     /// Makes the bitmaps, pens and view ports, and the memory the sprite blitter works in.
     public void SetUp(byte[][] compass)

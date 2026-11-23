@@ -47,10 +47,10 @@ public class ItemWordsTests
 
         // "Julian found a " is 15 characters, then the 5 of "Sword"; the line is the newest, its baseline row 42.
         int swordLeft = TEXT_LEFT + 15 * ADVANCE;
-        int row = 278 + (42 - 3) * 2;
+        int rowIndex = 278 + (42 - 3) * 2;
 
-        Assert.Equal(SWORD_SLOT, MessageItemTip.SlotAt(game, history, _ => ADVANCE, (swordLeft + 1, row))?.Slot);
-        Assert.Null(MessageItemTip.SlotAt(game, history, _ => ADVANCE, (swordLeft - 1, row)));
-        Assert.Null(MessageItemTip.SlotAt(game, history, _ => ADVANCE, (swordLeft + 5 * ADVANCE, row)));
+        Assert.Equal(SWORD_SLOT, MessageItemTip.SlotAt(game, history, _ => ADVANCE, (swordLeft + 1, rowIndex))?.Slot);
+        Assert.Null(MessageItemTip.SlotAt(game, history, _ => ADVANCE, (swordLeft - 1, rowIndex)));
+        Assert.Null(MessageItemTip.SlotAt(game, history, _ => ADVANCE, (swordLeft + 5 * ADVANCE, rowIndex)));
     }
 }

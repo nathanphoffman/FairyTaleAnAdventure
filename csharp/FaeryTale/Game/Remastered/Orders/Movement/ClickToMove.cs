@@ -19,7 +19,7 @@ public static class ClickToMove
 
     /// The classic buttons the walk in progress is for (Talk to a person, Take an item, Look).
     public static PanelButtons WalkingFor(Data.Game game) =>
-        (game.Walk.Errands.PersonToTalkTo is not null ? PanelButtons.Talk : 0) | (game.Walk.Errands.ItemToTake is not null ? PanelButtons.Take : 0) | (game.Walk.Errands.LookWhenThere ? PanelButtons.Look : 0);
+        (game.Walk.Errands.PersonToTalkTo is not null ? PanelButtons.Talk : 0) | (game.Walk.Errands.ItemToTake is not null ? PanelButtons.Take : 0) | (game.Walk.Errands.LookWhenThere ? PanelButtons.Look : 0); // each errand adds its button flag, OR combines them
 
     /// Whether a route is being followed.
     public static bool Active(Data.Game game) => game.Walk.Route.Points.Count > 0 || game.Walk.Planning.DoorPoint is not null;

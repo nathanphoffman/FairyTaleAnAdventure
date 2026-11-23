@@ -19,11 +19,11 @@ public static partial class Magic
 
         // The hero on the overview map: his tile column minus the left edge of the shown sectors,
         // and his position in 16 pixel steps minus the top edge.
-        uint x = unchecked((uint)((game.Hero.X >> TILE_SHIFT) - ((game.World.SectorX + (long)game.World.OriginX) << TILE_SHIFT) - MARK_X_OFFSET));
-        uint y = unchecked((uint)((game.Hero.Y >> TILE_SHIFT) - ((game.World.SectorY + (long)game.World.OriginY) << TILE_SHIFT) + MARK_Y_OFFSET));
-        bool onMap = x > 0 && x < MARK_MAX_X && y > 0 && y < MARK_MAX_Y;
+        uint positionX = unchecked((uint)((game.Hero.X >> TILE_SHIFT) - ((game.World.SectorX + (long)game.World.OriginX) << TILE_SHIFT) - MARK_X_OFFSET));
+        uint positionY = unchecked((uint)((game.Hero.Y >> TILE_SHIFT) - ((game.World.SectorY + (long)game.World.OriginY) << TILE_SHIFT) + MARK_Y_OFFSET));  // same idea for Y: pixels to tiles, minus the sector origin
+        bool onMap = positionX > 0 && positionX < MARK_MAX_X && positionY > 0 && positionY < MARK_MAX_Y;
 
-        output.MarkOverviewMap(onMap ? ((int)x, (int)y) : null);
+        output.MarkOverviewMap(onMap ? ((int)positionX, (int)positionY) : null);
 
         game.Ui.ViewStatus = VIEW_MAP;
         MessagePage.ShowStillScreen(game, output);

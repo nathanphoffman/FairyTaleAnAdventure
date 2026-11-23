@@ -31,7 +31,7 @@ public sealed partial class Sound
     {
         double perTick = rate / AudioTables.TICK_HZ;
 
-        for (int at = 0; at + 1 < output.Length; at += 2)
+        for (int offset = 0; offset + 1 < output.Length; offset += 2)
         {
             tickAccumulator += 1.0;
 
@@ -43,8 +43,8 @@ public sealed partial class Sound
 
             (float left, float right) = MixFrame();
 
-            output[at] = Math.Clamp(left * AudioTables.MIX_LEVEL, -1f, 1f);
-            output[at + 1] = Math.Clamp(right * AudioTables.MIX_LEVEL, -1f, 1f);
+            output[offset] = Math.Clamp(left * AudioTables.MIX_LEVEL, -1f, 1f);
+            output[offset + 1] = Math.Clamp(right * AudioTables.MIX_LEVEL, -1f, 1f);
         }
 
         // A finished sound effect gives its voice back to the music.

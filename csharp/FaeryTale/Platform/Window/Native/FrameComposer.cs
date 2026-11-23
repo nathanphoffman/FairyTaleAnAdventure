@@ -46,11 +46,11 @@ internal static class FrameComposer
     {
         uint[] doubled = new uint[frame.Length * ROW_SCALE];
 
-        for (int row = 0; row < Scene.FRAME_HEIGHT; row++)
+        for (int rowIndex = 0; rowIndex < Scene.FRAME_HEIGHT; rowIndex++)
         {
             for (int copy = 0; copy < ROW_SCALE; copy++)
             {
-                Array.Copy(frame, row * Scene.FRAME_WIDTH, doubled, (row * ROW_SCALE + copy) * Scene.FRAME_WIDTH, Scene.FRAME_WIDTH);
+                Array.Copy(frame, rowIndex * Scene.FRAME_WIDTH, doubled, (rowIndex * ROW_SCALE + copy) * Scene.FRAME_WIDTH, Scene.FRAME_WIDTH);
             }
         }
 

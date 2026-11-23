@@ -19,6 +19,10 @@ public static class WindowControls
 
     private const int DEFAULT_FIXED_RATE = 150;
 
+    // The monitor size assumed until the real window reports its own.
+    private const int DEFAULT_MONITOR_WIDTH = 1920;
+    private const int DEFAULT_MONITOR_HEIGHT = 1080;
+
     private static readonly int[] FIXED_RATES = [50, 100, 150, 200, 250, 300];
 
     // The fixed rate to go back to when vsync is turned off again.
@@ -75,10 +79,10 @@ public static class WindowControls
     private static Resolution? requested;
 
     /// The monitor's own size (the real window reads it; until then a common one, for tests).
-    public static (int Width, int Height) Monitor { get; set; } = (1920, 1080);
+    public static (int Width, int Height) Monitor { get; set; } = (DEFAULT_MONITOR_WIDTH, DEFAULT_MONITOR_HEIGHT);
 
     /// What the window is now: its size and whether it is the borderless full screen.
-    public static (int Width, int Height, bool Fullscreen) WindowState { get; set; } = (1920, 1080, true);
+    public static (int Width, int Height, bool Fullscreen) WindowState { get; set; } = (DEFAULT_MONITOR_WIDTH, DEFAULT_MONITOR_HEIGHT, true);
 
     /// The choices for the window, from the monitor's own size (borderless) down to 640x480 (windowed),
     /// in that order. Only sizes that fit on the monitor are offered.

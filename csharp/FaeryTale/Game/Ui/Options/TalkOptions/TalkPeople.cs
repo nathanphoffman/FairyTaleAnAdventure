@@ -15,7 +15,7 @@ public static partial class TalkOptions
         PRINCESS when t.PrincessFreed => SPEECH_PRINCESS,
         KING when t.PrincessFreed => SPEECH_KING,
         NOBLE => SPEECH_NOBLE,
-        BARTENDER => t.Fatigue < TIRED ? SPEECH_BARTENDER_RESTED : t.DayPeriod > NIGHT_PERIOD ? SPEECH_BARTENDER_NIGHT : SPEECH_BARTENDER_EVENING,
+        BARTENDER => t.Fatigue < TIRED ? SPEECH_BARTENDER_RESTED : t.DayPeriod > NIGHT_PERIOD ? SPEECH_BARTENDER_NIGHT : SPEECH_BARTENDER_EVENING,  // rested, else night, else evening
         WITCH => SPEECH_WITCH,
         SPECTRE => SPEECH_SPECTRE,
         GHOST => SPEECH_GHOST,

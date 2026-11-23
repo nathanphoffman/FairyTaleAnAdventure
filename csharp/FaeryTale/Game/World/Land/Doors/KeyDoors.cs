@@ -73,9 +73,9 @@ public static class KeyDoors
     /// it without a key). Looks 4 pixels either side for the door terrain, then walks left and
     /// down to the door's top-left tile. Returns 1 if a door opened, 0 if not ("It's locked." is
     /// said the first time).
-    public static int OpenDoorNear(Data.Game game, IOutput output, ushort x, ushort y, uint keyType)
+    public static int OpenDoorNear(Data.Game game, IOutput output, ushort positionX, ushort positionY, uint keyType)
     {
-        if (FindDoorCorner(game, x, y) is not { } corner)
+        if (FindDoorCorner(game, positionX, positionY) is not { } corner)
         {
             return 0;
         }
@@ -113,9 +113,9 @@ public static class KeyDoors
             open.MapId == mapId && open.DoorId == sectorId && (open.KeyType == NOKEY || open.KeyType == keyType));
 
     /// The tiles an opened door changes, as (x, y, new tile). The door's top-left tile is (x, y).
-    internal static List<(int X, int Y, byte Tile)> OpenChanges(DoorOpen open, int x, int y)
+    internal static List<(int X, int Y, byte Tile)> OpenChanges(DoorOpen open, int positionX, int positionY)
     {
-        List<(int X, int Y, byte Tile)> changes = [(x, y, open.New1)];
+        List<(int X, int Y, byte Tile)> changes = [(positionX, positionY, open.New1)];
         byte second = open.New2;
 
         if (second == 0)
@@ -126,28 +126,28 @@ public static class KeyDoors
         switch (open.Above)
         {
             case ABOVE:
-                changes.Add((x, y - 1, second));
+                changes.Add((positionX, positionY - 1, second));
 
                 break;
 
             case BACK:
-                changes.Add((x - 1, y, second));
+                changes.Add((positionX - 1, positionY, second));
 
                 break;
 
             case CABINET_LAYOUT:
-                changes.Add((x, y - 1, CABINET_TILES[0]));
-                changes.Add((x + 1, y, CABINET_TILES[1]));
-                changes.Add((x + 1, y - 1, CABINET_TILES[2]));
+                changes.Add((positionX, positionY - 1, CABINET_TILES[0]));
+                changes.Add((positionX + 1, positionY, CABINET_TILES[1]));
+                changes.Add((positionX + 1, positionY - 1, CABINET_TILES[2]));
 
                 break;
 
             default:
-                changes.Add((x + 1, y, second));
+                changes.Add((positionX + 1, positionY, second));
 
                 if (open.Above != SIDE)
                 {
-                    changes.Add((x + 2, y, open.Above));
+                    changes.Add((positionX + 2, positionY, open.Above));
                 }
 
                 break;
@@ -157,27 +157,27 @@ public static class KeyDoors
     }
 
     // The tile number at tile position (x, y) of the map.
-    private static byte Tile(Data.Game game, int x, int y) => game.Map.SectorByte(MapLookup.TileIndex(game, x, y));
+    private static byte Tile(Data.Game game, int positionX, int positionY) => game.Map.SectorByte(MapLookup.TileIndex(game, positionX, positionY));
 
     // Changes the tile number at tile position (x, y) of the map.
-    private static void SetTile(Data.Game game, int x, int y, byte value) => game.Map.SetSectorByte(MapLookup.TileIndex(game, x, y), value);
+    private static void SetTile(Data.Game game, int positionX, int positionY, byte value) => game.Map.SetSectorByte(MapLookup.TileIndex(game, positionX, positionY), value);
 
     // Looks for a door tile at the point, 4 pixels right of it, or 4 pixels left of it, then moves
     // to the door's top-left tile. Returns that tile's column and row, or null if there is no door.
-    private static (int X, int Y)? FindDoorCorner(Data.Game game, ushort x, ushort y)
+    private static (int X, int Y)? FindDoorCorner(Data.Game game, ushort positionX, ushort positionY)
     {
-        bool found = MapLookup.TerrainAt(game, x, y) == DOOR_TERRAIN;
+        bool found = MapLookup.TerrainAt(game, positionX, positionY) == DOOR_TERRAIN;
 
         if (!found)
         {
-            x += DOOR_SEARCH_SIDE;
-            found = MapLookup.TerrainAt(game, x, y) == DOOR_TERRAIN;
+            positionX += DOOR_SEARCH_SIDE;
+            found = MapLookup.TerrainAt(game, positionX, positionY) == DOOR_TERRAIN;
         }
 
         if (!found)
         {
-            x -= 2 * DOOR_SEARCH_SIDE;
-            found = MapLookup.TerrainAt(game, x, y) == DOOR_TERRAIN;
+            positionX -= 2 * DOOR_SEARCH_SIDE;
+            found = MapLookup.TerrainAt(game, positionX, positionY) == DOOR_TERRAIN;
         }
 
         if (!found)
@@ -188,26 +188,26 @@ public static class KeyDoors
         // A door can be up to three tiles wide; step to its left edge.
         for (int step = 0; step < DOOR_MAX_LEFT_STEPS; step++)
         {
-            if (MapLookup.TerrainAt(game, x - TILE_WIDTH, y) == DOOR_TERRAIN)
+            if (MapLookup.TerrainAt(game, positionX - TILE_WIDTH, positionY) == DOOR_TERRAIN)
             {
-                x -= TILE_WIDTH;
+                positionX -= TILE_WIDTH;
             }
         }
 
-        if (MapLookup.TerrainAt(game, x, y + TILE_HEIGHT) == DOOR_TERRAIN)
+        if (MapLookup.TerrainAt(game, positionX, positionY + TILE_HEIGHT) == DOOR_TERRAIN)
         {
-            y += TILE_HEIGHT;
+            positionY += TILE_HEIGHT;
         }
 
         // Pixel position to tile column and row (shift = divide by the tile size).
-        return (x >> TILE_WIDTH_SHIFT, y >> TILE_HEIGHT_SHIFT);
+        return (positionX >> TILE_WIDTH_SHIFT, positionY >> TILE_HEIGHT_SHIFT);
     }
 
     // Replaces the closed door tile at (x, y) with its open version, and the neighbouring tiles the
     // door covers (which ones depends on the door's layout).
-    private static void SwapInOpenDoorTiles(Data.Game game, DoorOpen open, int x, int y)
+    private static void SwapInOpenDoorTiles(Data.Game game, DoorOpen open, int positionX, int positionY)
     {
-        foreach ((int tileX, int tileY, byte value) in OpenChanges(open, x, y))
+        foreach ((int tileX, int tileY, byte value) in OpenChanges(open, positionX, positionY))
         {
             SetTile(game, tileX, tileY, value);
         }

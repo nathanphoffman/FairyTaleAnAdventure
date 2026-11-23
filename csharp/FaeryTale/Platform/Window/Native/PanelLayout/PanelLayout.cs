@@ -44,6 +44,12 @@ internal sealed partial class PanelLayout
 
     // The panel's wood is darker than the menus' boards (out of 100 of their brightness).
     private const int WOOD_BRIGHTNESS_PERCENT = 62;
+
+    // For darkening a colour: the percent scale, the mask of one 8 bit channel, and where red and green sit.
+    private const int PERCENT_SCALE = 100;
+    private const uint CHANNEL_MASK = 0xff;
+    private const int RED_SHIFT = 16;
+    private const int GREEN_SHIFT = 8;
     private const uint BOARD_SEED = 0x51d3;
 
     // The menu boxes: two columns of six, 48 pixels wide and 8 lines tall, the first 2 lines down.
@@ -105,32 +111,32 @@ internal sealed partial class PanelLayout
 
     /// The wood at a place of the board (x across from its left edge, y down from its top). The board is
     /// ArrangedWidth + 2 * PAD_SIDE wide and ArrangedLines tall.
-    public uint BoardPixel(int x, int y) => wood[y * (ArrangedWidth + 2 * PAD_SIDE) + x];
+    public uint BoardPixel(int positionX, int positionY) => wood[positionY * (ArrangedWidth + 2 * PAD_SIDE) + positionX];
 
     /// The place of the classic panel that a place of the new layout is (x across in pixels, y down in
     /// rows of the 640 x 400 grid, both counted from the panel's top left), so the mouse finds the
     /// buttons and the compass where they were.
-    public static (int X, int Y) ToClassic(int x, int y)
+    public static (int X, int Y) ToClassic(int positionX, int positionY)
     {
-        if (x >= COMPASS_START + COMPASS_SHIFT)
+        if (positionX >= COMPASS_START + COMPASS_SHIFT)
         {
-            return (x - COMPASS_SHIFT, y + COMPASS_RAISE_LINES * 2);
+            return (positionX - COMPASS_SHIFT, positionY + COMPASS_RAISE_LINES * 2);
         }
 
-        return x >= MENU_START + MENU_SHIFT ? (x - MENU_SHIFT, y) : (x, y + MESSAGE_RAISE_LINES * 2);
+        return positionX >= MENU_START + MENU_SHIFT ? (positionX - MENU_SHIFT, positionY) : (positionX, positionY + MESSAGE_RAISE_LINES * 2);
     }
 
     // Where a pixel of the classic picture goes: everything the room above lower in the picture, the
     // message box up a little, the menu a little to the right, the compass a little more to the right
     // and up.
-    private static (int X, int Y) Moved(int x, int y)
+    private static (int X, int Y) Moved(int positionX, int positionY)
     {
-        if (x >= COMPASS_START)
+        if (positionX >= COMPASS_START)
         {
-            return (x + COMPASS_SHIFT, y - COMPASS_RAISE_LINES + TOP_PAD_LINES);
+            return (positionX + COMPASS_SHIFT, positionY - COMPASS_RAISE_LINES + TOP_PAD_LINES);
         }
 
-        return x >= MENU_START ? (x + MENU_SHIFT, y + TOP_PAD_LINES) : (x, y + TOP_PAD_LINES - MESSAGE_RAISE_LINES);
+        return positionX >= MENU_START ? (positionX + MENU_SHIFT, positionY + TOP_PAD_LINES) : (positionX, positionY + TOP_PAD_LINES - MESSAGE_RAISE_LINES);
     }
 
     // The board's pixels: a plank the width and height of the board, without the soft shadow that Wood
@@ -140,9 +146,9 @@ internal sealed partial class PanelLayout
         uint[] plank = Wood.Plank(boardWidth, boardLines, BOARD_SEED);
         uint[] board = new uint[boardWidth * boardLines];
 
-        for (int y = 0; y < boardLines; y++)
+        for (int positionY = 0; positionY < boardLines; positionY++)
         {
-            Array.Copy(plank, y * (boardWidth + Wood.SHADOW), board, y * boardWidth, boardWidth);
+            Array.Copy(plank, positionY * (boardWidth + Wood.SHADOW), board, positionY * boardWidth, boardWidth);
         }
 
         return board.Select(Darken).ToArray();

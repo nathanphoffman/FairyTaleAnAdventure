@@ -42,7 +42,7 @@ public sealed class InteriorMask
         }
 
         Shape hero = game.Actors.List[0];
-        (int column, int row) = (hero.AbsX >> TILE_COLUMN_SHIFT, hero.AbsY >> TILE_ROW_SHIFT);
+        (int column, int row) = (hero.AbsX >> TILE_COLUMN_SHIFT, hero.AbsY >> TILE_ROW_SHIFT); // pixel position to tile column/row by shifting right
 
         if (shown is null || !shown.Contains(Key(column, row)))
         {
@@ -52,7 +52,7 @@ public sealed class InteriorMask
 
     /// Whether a tile of the world is left black (it is in another building). False when there is
     /// no mask.
-    public bool Hides(int column, int row) => shown is not null && !shown.Contains(Key(column, row));
+    public bool Hides(int column, int rowIndex) => shown is not null && !shown.Contains(Key(column, rowIndex));
 
     /// Whether a world position is left black.
     public bool HidesPosition(int worldX, int worldY) => Hides(worldX >> TILE_COLUMN_SHIFT, worldY >> TILE_ROW_SHIFT);
@@ -96,8 +96,8 @@ public sealed class InteriorMask
         && !found.Contains(Key(tile.Column, tile.Row))
         && TileAt(game, tile.Column, tile.Row) != BLACK_TILE;
 
-    private static int TileAt(Data.Game game, int column, int row) =>
-        MapLookup.TileNumber(game, (ushort)column, (ushort)row);
+    private static int TileAt(Data.Game game, int column, int rowIndex) =>
+        MapLookup.TileNumber(game, (ushort)column, (ushort)rowIndex);
 
-    private static int Key(int column, int row) => (row << ROW_KEY_SHIFT) | column;
+    private static int Key(int column, int rowIndex) => (rowIndex << ROW_KEY_SHIFT) | column; // pack row into the high bits and column into the low bits as one key
 }

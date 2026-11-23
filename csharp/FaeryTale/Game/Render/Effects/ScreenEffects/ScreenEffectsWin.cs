@@ -10,16 +10,16 @@ public static partial class ScreenEffects
     /// The size of the picture during the intro's zoom: x is half the width in pixels (0 to 160),
     /// the height keeps the 8:5 shape. Moves the page and text view ports to match, fades the
     /// colours with the size (black when small), and shows the result.
-    public static void SetIntroZoom(Data.Game game, IOutput output, int x)
+    public static void SetIntroZoom(Data.Game game, IOutput output, int positionX)
     {
-        int y = x * ZOOM_ASPECT_HEIGHT / ZOOM_ASPECT_WIDTH;
+        int positionY = positionX * ZOOM_ASPECT_HEIGHT / ZOOM_ASPECT_WIDTH;
 
         Display.Delay(game, output, 2);
-        output.SetZoomSize(x, y);
+        output.SetZoomSize(positionX, positionY);
         Fading.FadePage(
             game,
             output,
-            ((short)(y * 2 - ZOOM_FADE_RED), (short)(y * 2 - ZOOM_FADE_GREEN), (short)(y * 2 - ZOOM_FADE_BLUE)),
+            ((short)(positionY * 2 - ZOOM_FADE_RED), (short)(positionY * 2 - ZOOM_FADE_GREEN), (short)(positionY * 2 - ZOOM_FADE_BLUE)),
             0,
             Tables.IntroColors);
         Display.FlipPages(game, output);

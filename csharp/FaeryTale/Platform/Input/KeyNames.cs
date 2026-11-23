@@ -31,6 +31,28 @@ public static class KeyNames
     /// Direction codes are the compass numbers 0-9 offset by this.
     private const int DIR_BASE = 20;
 
+    /// Offsets from DIR_BASE for each compass direction (and the middle of the keypad).
+    private const int NORTH_EAST_OFFSET = 2;
+    private const int EAST_OFFSET = 3;
+    private const int SOUTH_EAST_OFFSET = 4;
+    private const int SOUTH_OFFSET = 5;
+    private const int SOUTH_WEST_OFFSET = 6;
+    private const int WEST_OFFSET = 7;
+    private const int CENTER_OFFSET = 9;
+
+    /// The value of the right arrow in a Key of kind Arrow.
+    private const int RIGHT_ARROW = 3;
+
+    /// Plain ASCII codes for keys that have no character to write.
+    private const int SPACE_CODE = 0x20;
+    private const int BACKSPACE_CODE = 8;
+    private const int TAB_CODE = 9;
+    private const int RETURN_CODE = 13;
+    private const int DELETE_CODE = 0x7f;
+
+    /// How many function keys there are (F1 to F10).
+    private const int FUNCTION_KEY_COUNT = 10;
+
     /// F1 is code 10, F2 is 11 ... F10 is 19.
     private const int FUNCTION_KEY_BASE = 10;
 
@@ -57,19 +79,19 @@ public static class KeyNames
     ///   26 25 24      keypad 1 2 3
     public static int DirectionCode(bool up, bool down, bool left, bool right)
     {
-        int dx = (right ? 1 : 0) - (left ? 1 : 0);
-        int dy = (down ? 1 : 0) - (up ? 1 : 0);
+        int deltaX = (right ? 1 : 0) - (left ? 1 : 0);  // true counts as 1, so right minus left gives -1, 0 or 1
+        int deltaY = (down ? 1 : 0) - (up ? 1 : 0);  // true counts as 1, so down minus up gives -1, 0 or 1
 
-        return (dx, dy) switch
+        return (deltaX, deltaY) switch
         {
             (-1, -1) => DIR_BASE,
             (0, -1) => DIR_BASE + 1,
-            (1, -1) => DIR_BASE + 2,
-            (1, 0) => DIR_BASE + 3,
-            (1, 1) => DIR_BASE + 4,
-            (0, 1) => DIR_BASE + 5,
-            (-1, 1) => DIR_BASE + 6,
-            (-1, 0) => DIR_BASE + 7,
+            (1, -1) => DIR_BASE + NORTH_EAST_OFFSET,
+            (1, 0) => DIR_BASE + EAST_OFFSET,
+            (1, 1) => DIR_BASE + SOUTH_EAST_OFFSET,
+            (0, 1) => DIR_BASE + SOUTH_OFFSET,
+            (-1, 1) => DIR_BASE + SOUTH_WEST_OFFSET,
+            (-1, 0) => DIR_BASE + WEST_OFFSET,
             _ => 0,
         };
     }
@@ -81,7 +103,7 @@ public static class KeyNames
             ["Up"] = new(KeyKind.Arrow, 0),
             ["Down"] = new(KeyKind.Arrow, 1),
             ["Left"] = new(KeyKind.Arrow, 2),
-            ["Right"] = new(KeyKind.Arrow, 3),
+            ["Right"] = new(KeyKind.Arrow, RIGHT_ARROW),
             ["Left Ctrl"] = new(KeyKind.Fire, 0),
             ["Right Ctrl"] = new(KeyKind.Fire, 0),
             ["-"] = Code('-'),
@@ -97,12 +119,12 @@ public static class KeyNames
             [","] = Code(','),
             ["."] = Code('.'),
             ["Keypad ."] = Code('.'),
-            ["Space"] = Code(0x20),
-            ["Backspace"] = Code(8),
-            ["Tab"] = Code(9),
-            ["Return"] = Code(13),
-            ["Keypad Enter"] = Code(13),
-            ["Delete"] = Code(0x7f),
+            ["Space"] = Code(SPACE_CODE),
+            ["Backspace"] = Code(BACKSPACE_CODE),
+            ["Tab"] = Code(TAB_CODE),
+            ["Return"] = Code(RETURN_CODE),
+            ["Keypad Enter"] = Code(RETURN_CODE),
+            ["Delete"] = Code(DELETE_CODE),
             ["Escape"] = Code(CODE_ESCAPE),
             ["Keypad 0"] = Code('0'),
         };
@@ -112,15 +134,15 @@ public static class KeyNames
             names[digit.ToString()] = Code(digit);
         }
 
-        for (int function = 1; function <= 10; function++)
+        for (int function = 1; function <= FUNCTION_KEY_COUNT; function++)
         {
             names[$"F{function}"] = Code(FUNCTION_KEY_BASE + function - 1);
         }
 
         // Keypad keys give the direction code of the key's position.
-        (int Digit, int Offset)[] keypad = [(7, 0), (8, 1), (9, 2), (6, 3), (3, 4), (2, 5), (1, 6), (4, 7), (5, 9)];
+        (char Digit, int Offset)[] keypad = [('7', 0), ('8', 1), ('9', NORTH_EAST_OFFSET), ('6', EAST_OFFSET), ('3', SOUTH_EAST_OFFSET), ('2', SOUTH_OFFSET), ('1', SOUTH_WEST_OFFSET), ('4', WEST_OFFSET), ('5', CENTER_OFFSET)];
 
-        foreach ((int digit, int offset) in keypad)
+        foreach ((char digit, int offset) in keypad)
         {
             names[$"Keypad {digit}"] = Code(DIR_BASE + offset);
         }

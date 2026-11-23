@@ -34,11 +34,11 @@ internal sealed partial class NativeComposer
 
         int left = onLeft ? edge - blocks * Scale : edge;
 
-        for (int row = 0; row < rows; row++)
+        for (int rowIndex = 0; rowIndex < rows; rowIndex++)
         {
             for (int block = 0; block < blocks; block++)
             {
-                FillPanelBlock(width, height, (left + block * Scale, geometry.BoardTop + row * GRID_ROWS_PER_LINE * Scale), wood[row * blocks + block]);
+                FillPanelBlock(width, height, (left + block * Scale, geometry.BoardTop + rowIndex * GRID_ROWS_PER_LINE * Scale), wood[rowIndex * blocks + block]);
             }
         }
     }
@@ -62,13 +62,13 @@ internal sealed partial class NativeComposer
 
         for (int line = 0; line < panelLayout.ArrangedLines; line++)
         {
-            for (int x = 0; x < panelLayout.ArrangedWidth; x++)
+            for (int positionX = 0; positionX < panelLayout.ArrangedWidth; positionX++)
             {
-                uint color = panelLayout.Arranged[line * panelLayout.ArrangedWidth + x];
+                uint color = panelLayout.Arranged[line * panelLayout.ArrangedWidth + positionX];
 
                 if (color != 0)
                 {
-                    FillPanelBlock(width, height, (GridLeft + x * Scale, GridTop + (PANEL_FIRST_LINE - PanelLayout.TOP_PAD_LINES + line) * GRID_ROWS_PER_LINE * Scale), color);
+                    FillPanelBlock(width, height, (GridLeft + positionX * Scale, GridTop + (PANEL_FIRST_LINE - PanelLayout.TOP_PAD_LINES + line) * GRID_ROWS_PER_LINE * Scale), color);
                 }
             }
         }
@@ -82,9 +82,9 @@ internal sealed partial class NativeComposer
 
         for (int line = 0; line < panelLayout.ArrangedLines; line++)
         {
-            for (int x = 0; x < boardColumns; x++)
+            for (int positionX = 0; positionX < boardColumns; positionX++)
             {
-                FillPanelBlock(width, height, (GridLeft + (x - PanelLayout.PAD_SIDE) * Scale, GridTop + (PANEL_FIRST_LINE - PanelLayout.TOP_PAD_LINES + line) * GRID_ROWS_PER_LINE * Scale), panelLayout.BoardPixel(x, line));
+                FillPanelBlock(width, height, (GridLeft + (positionX - PanelLayout.PAD_SIDE) * Scale, GridTop + (PANEL_FIRST_LINE - PanelLayout.TOP_PAD_LINES + line) * GRID_ROWS_PER_LINE * Scale), panelLayout.BoardPixel(positionX, line));
             }
         }
     }
@@ -92,14 +92,14 @@ internal sealed partial class NativeComposer
     // One game pixel of the panel as a block of Scale x (2 x Scale) window pixels, cut to the window.
     private void FillPanelBlock(int width, int height, (int X, int Y) corner, uint color)
     {
-        for (int y = Math.Max(corner.Y, 0); y < Math.Min(corner.Y + GRID_ROWS_PER_LINE * Scale, height); y++)
+        for (int positionY = Math.Max(corner.Y, 0); positionY < Math.Min(corner.Y + GRID_ROWS_PER_LINE * Scale, height); positionY++)
         {
             int left = Math.Max(corner.X, 0);
             int right = Math.Min(corner.X + Scale, width);
 
             if (right > left)
             {
-                Array.Fill(picture, color, y * width + left, right - left);
+                Array.Fill(picture, color, positionY * width + left, right - left);
             }
         }
     }

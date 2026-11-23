@@ -13,7 +13,7 @@ public sealed partial class Sound
                 ushort word = index < Instruments.Length ? Instruments[index] : (ushort)0;
 
                 // An instrument word holds the waveform number in its high byte and the volume envelope in the low one.
-                Voices[voice].WaveNum = (byte)(word >> 8);
+                Voices[voice].WaveNum = (byte)(word >> BITS_PER_BYTE);
                 Voices[voice].VolNum = (byte)word;
 
                 break;

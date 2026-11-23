@@ -29,8 +29,8 @@ public class RenderProbeTests
         return hash;
     }
 
-    private static Shape ActorAt(sbyte kind, ushort x, ushort y, ushort relX, ushort relY, sbyte index, sbyte weapon, byte race, sbyte state, sbyte facing) =>
-        new() { Kind = kind, AbsX = x, AbsY = y, RelX = relX, RelY = relY, Index = index, Weapon = weapon, Race = race, State = state, Facing = facing };
+    private static Shape ActorAt(sbyte kind, ushort positionX, ushort positionY, ushort relX, ushort relY, sbyte index, sbyte weapon, byte race, sbyte state, sbyte facing) =>
+        new() { Kind = kind, AbsX = positionX, AbsY = positionY, RelX = relX, RelY = relY, Index = index, Weapon = weapon, Race = race, State = state, Facing = facing };
 
     private static List<string> Probe(string name, ushort heroX, ushort heroY, ushort region)
     {

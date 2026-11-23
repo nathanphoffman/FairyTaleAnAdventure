@@ -41,19 +41,19 @@ internal static class Crosshair
         bool[] red = new bool[size * size];
         uint[] pixels = new uint[size * size];
 
-        for (int y = 0; y < size; y++)
+        for (int positionY = 0; positionY < size; positionY++)
         {
-            for (int x = 0; x < size; x++)
+            for (int positionX = 0; positionX < size; positionX++)
             {
-                red[y * size + x] = IsRed(x - reach, y - reach, radius);
+                red[positionY * size + positionX] = IsRed(positionX - reach, positionY - reach, radius);
             }
         }
 
-        for (int y = 0; y < size; y++)
+        for (int positionY = 0; positionY < size; positionY++)
         {
-            for (int x = 0; x < size; x++)
+            for (int positionX = 0; positionX < size; positionX++)
             {
-                pixels[y * size + x] = red[y * size + x] ? RED : TouchesRed(red, size, x, y) ? EDGE : 0;
+                pixels[positionY * size + positionX] = red[positionY * size + positionX] ? RED : TouchesRed(red, size, positionX, positionY) ? EDGE : 0; // red pixel, else edge if next to red, else transparent
             }
         }
 
@@ -61,18 +61,18 @@ internal static class Crosshair
     }
 
     // Whether a pixel (offset from the middle) is on the ring or on one of the lines.
-    private static bool IsRed(int dx, int dy, int radius)
+    private static bool IsRed(int deltaX, int deltaY, int radius)
     {
         int half = Math.Max(2, radius / RING_THICKNESS_DIVISOR) / 2;
-        double distance = Math.Sqrt(dx * dx + dy * dy);
+        double distance = Math.Sqrt(deltaX * deltaX + deltaY * deltaY);
         bool onRing = Math.Abs(distance - radius) <= half;
-        bool onLine = (Math.Abs(dx) <= half || Math.Abs(dy) <= half) && distance >= radius * LINE_INNER && distance <= radius * LINE_OUTER;
+        bool onLine = (Math.Abs(deltaX) <= half || Math.Abs(deltaY) <= half) && distance >= radius * LINE_INNER && distance <= radius * LINE_OUTER;
 
         return onRing || onLine;
     }
 
     // Whether a pixel has a red one above, below or beside it.
-    private static bool TouchesRed(bool[] red, int size, int x, int y) =>
-        x > 0 && red[y * size + x - 1] || x < size - 1 && red[y * size + x + 1]
-        || y > 0 && red[(y - 1) * size + x] || y < size - 1 && red[(y + 1) * size + x];
+    private static bool TouchesRed(bool[] red, int size, int positionX, int positionY) =>
+        positionX > 0 && red[positionY * size + positionX - 1] || positionX < size - 1 && red[positionY * size + positionX + 1]
+        || positionY > 0 && red[(positionY - 1) * size + positionX] || positionY < size - 1 && red[(positionY + 1) * size + positionX];
 }

@@ -5,15 +5,15 @@ namespace FaeryTale.Game.Render;
 /// Screen: ports, fonts and pens.
 public sealed partial class Screen
 {
-    public Port GetPort(PortId id) => ports[(int)id];
+    public Port GetPort(PortId identifier) => ports[(int)identifier];
 
-    public void SetFontKind(PortId id, FontKind kind) => GetPort(id).Font = kind;
+    public void SetFontKind(PortId identifier, FontKind kind) => GetPort(identifier).Font = kind;
 
     public void SetFont(FontKind kind, Font font) => fonts[(int)kind] = font;
 
-    public void SetAPen(PortId id, byte pen) => GetPort(id).Pen.Fg = pen;
+    public void SetAPen(PortId identifier, byte penColor) => GetPort(identifier).Pen.Fg = penColor;
 
-    public void SetBPen(PortId id, byte pen) => GetPort(id).Pen.Bg = pen;
+    public void SetBPen(PortId identifier, byte penColor) => GetPort(identifier).Pen.Bg = penColor;
 
-    public void SetDrawMode(PortId id, byte mode) => GetPort(id).Pen.Mode = mode;
+    public void SetDrawMode(PortId identifier, byte mode) => GetPort(identifier).Pen.Mode = mode;
 }

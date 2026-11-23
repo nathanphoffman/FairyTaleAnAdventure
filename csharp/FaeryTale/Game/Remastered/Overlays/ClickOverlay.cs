@@ -68,9 +68,9 @@ public static class ClickOverlay
         if (overDoor || looking)
         {
             (int x, int y) = InputHandler.RawPointer;
-            (int X, int Y) at = (x * OVERLAY_SCALE, y * OVERLAY_SCALE);
+            (int X, int Y) offset = (x * OVERLAY_SCALE, y * OVERLAY_SCALE);
 
-            overlay.Images.Add(looking ? EyeCursor.At(at) : DoorCursor.At(at));
+            overlay.Images.Add(looking ? EyeCursor.At(offset) : DoorCursor.At(offset));
         }
 
         output.SetOverlay(overlay);
@@ -97,7 +97,7 @@ public static class ClickOverlay
     private static PanelButtons ButtonsInUse(Data.Game game, WorldCapture capture) =>
         ClickToMove.WalkingFor(game)
         | (capture.LookMode ? PanelButtons.Look : 0)
-        | (capture.ItemHover ? PanelButtons.Take : 0)
+        | (capture.ItemHover ? PanelButtons.Take : 0)  // each active button ORs its flag bit into the mask
         | (Conversation.Person is not null ? PanelButtons.Talk : 0)
         | (Inventory.IsOpen ? PanelButtons.List : 0);
 

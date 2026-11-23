@@ -129,7 +129,7 @@ public static class Encounters
         Shape actor = game.Actors.List[FIRST_CARRIER_SLOT];
 
         actor.Kind = n == CARRIER_DRAGON ? ActorKind.DRAGON : ActorKind.CARRIER;
-        int extent = n == CARRIER_DRAGON ? 2 : n == CARRIER_TURTLE ? 1 : 0;
+        int extent = n == CARRIER_DRAGON ? 2 : n == CARRIER_TURTLE ? 1 : 0; // dragon 2, turtle 1, otherwise 0
 
         if (game.Actors.LoadedActorFile != n)
         {
@@ -244,17 +244,17 @@ public static class Encounters
 
         for (int attempt = 0; attempt < MAX_TRY; attempt++)
         {
-            ushort x = (ushort)(game.Encounter.X + game.Rng.BitRand(spread) - spread / 2);
-            ushort y = (ushort)(game.Encounter.Y + game.Rng.BitRand(spread) - spread / 2);
+            ushort positionX = (ushort)(game.Encounter.X + game.Rng.BitRand(spread) - spread / 2);
+            ushort positionY = (ushort)(game.Encounter.Y + game.Rng.BitRand(spread) - spread / 2);
 
-            if (Blocking.BlockedAt(game, (short)x, (short)y, (short)position) == 0)
+            if (Blocking.BlockedAt(game, (short)positionX, (short)positionY, (short)position) == 0)
             {
-                return (x, y);
+                return (positionX, positionY);
             }
 
-            if (game.World.ExtentType == SPIDER_PIT && MapLookup.TerrainAt(game, x, y) == TERRAIN_SWAMP)
+            if (game.World.ExtentType == SPIDER_PIT && MapLookup.TerrainAt(game, positionX, positionY) == TERRAIN_SWAMP)
             {
-                return (x, y);
+                return (positionX, positionY);
             }
         }
 

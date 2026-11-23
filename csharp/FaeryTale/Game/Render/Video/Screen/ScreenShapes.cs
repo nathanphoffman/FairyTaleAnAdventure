@@ -16,41 +16,41 @@ public sealed partial class Screen
 
     public BitmapId ViewingBitmapId => PageBitmap(Viewing);
 
-    public void FillPolygon(PortId id, IReadOnlyList<(int X, int Y)> points, Rect clip)
+    public void FillPolygon(PortId identifier, IReadOnlyList<(int X, int Y)> points, Rect clip)
     {
-        if (TargetOf(id) is { } target)
+        if (TargetOf(identifier) is { } target)
         {
-            Gfx.Drawing.FillPolygon(target.Bitmap, GetPort(id).Pen, points, clip, target.Planes);
+            Gfx.Drawing.FillPolygon(target.Bitmap, GetPort(identifier).Pen, points, clip, target.Planes);
         }
     }
 
     /// Fills the whole bitmap of the port with colour pen.
-    public void Clear(PortId id, byte pen)
+    public void Clear(PortId identifier, byte penColor)
     {
-        if (TargetOf(id) is { } target)
+        if (TargetOf(identifier) is { } target)
         {
-            target.Bitmap.Clear(pen, target.Planes);
+            target.Bitmap.Clear(penColor, target.Planes);
         }
     }
 
     /// Scrolls an area of the port's bitmap; what scrolls in gets the port's background colour.
-    public void Scroll(PortId id, Rect area, (int X, int Y) by)
+    public void Scroll(PortId identifier, Rect area, (int X, int Y) by)
     {
-        if (TargetOf(id) is { } target)
+        if (TargetOf(identifier) is { } target)
         {
-            BitmapOps.Scroll(target.Bitmap, area, by, GetPort(id).Pen.Bg, target.Planes);
+            BitmapOps.Scroll(target.Bitmap, area, by, GetPort(identifier).Pen.Bg, target.Planes);
         }
     }
 
     /// Copies a rectangle of one bitmap to another (not the same one), for the planes in mask.
-    public void Copy(BitmapId from, Rect rect, BitmapId to, (int X, int Y) at, uint mask)
+    public void Copy(BitmapId from, Rect rect, BitmapId to, (int X, int Y) offset, uint mask)
     {
         (Bitmap source, Bitmap destination) = TwoBitmaps(from, to);
 
-        BitmapOps.CopyRect(source, destination, rect, at, mask);
+        BitmapOps.CopyRect(source, destination, rect, offset, mask);
     }
 
     /// The compass picture which (0 normal, 1 lit) copied into plane plane of the text panel.
-    public void CopyCompass(int which, Rect rect, (int X, int Y) at, int plane) =>
-        BitmapOps.CopyPlaneRect(Compass[which], 0, GetBitmap(BitmapId.Text), plane, rect, at);
+    public void CopyCompass(int which, Rect rect, (int X, int Y) offset, int plane) =>
+        BitmapOps.CopyPlaneRect(Compass[which], 0, GetBitmap(BitmapId.Text), plane, rect, offset);
 }

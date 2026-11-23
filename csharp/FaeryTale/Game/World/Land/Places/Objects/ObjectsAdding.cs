@@ -51,9 +51,9 @@ public static partial class Objects
 
     // Makes sure the sprite file for the kind of person id is loaded. Several kinds share one
     // file, so it is only reloaded when the needed file differs from the loaded one.
-    private static void LoadSetFigure(Actors actors, IOutput output, sbyte id)
+    private static void LoadSetFigure(Actors actors, IOutput output, sbyte identifier)
     {
-        int entry = Tables.Entry(Tables.SetfigTable, id).CfileEntry;
+        int entry = Tables.Entry(Tables.SetfigTable, identifier).CfileEntry;
 
         if (SpriteFiles.All[entry].FileId == SpriteFiles.All[actors.LoadedSetfigFile].FileId)
         {
@@ -145,7 +145,7 @@ public static partial class Objects
     // there as an actor (the object is then marked dead if the actor died).
     private static (Shape Actor, short Row)? AddPersonActor(Actors actors, ref WorldObject item, short index, short yStart)
     {
-        sbyte id = item.ObId;
+        sbyte identifier = item.ObId;
         Shape actor = actors.List[actors.FreeSlot];
 
         actors.FreeSlot++;
@@ -161,15 +161,15 @@ public static partial class Objects
         }
 
         actor.Kind = ActorKind.SETFIG;
-        actor.Index = Tables.Entry(Tables.SetfigTable, id).ImageBase;
+        actor.Index = Tables.Entry(Tables.SetfigTable, identifier).ImageBase;
         actor.Weapon = 0;
-        actor.Vitality = (short)(2 + id + id);
+        actor.Vitality = (short)(2 + identifier + identifier);
         actor.Goal = (sbyte)index;
         actor.Environ = 0;
         actor.State = item.ObStat == STAT_DEAD_PERSON ? ActorState.DEAD : ActorState.STILL;
 
         // A person's race is 0x80 plus their kind, so they can be told from monsters.
-        actor.Race = (byte)(id + PERSON_RACE_BASE);
+        actor.Race = (byte)(identifier + PERSON_RACE_BASE);
 
         if (actors.FreeSlot > actors.Drawn)
         {

@@ -60,38 +60,38 @@ public static class TextRoutines
     }
 
     /// Moves the text position (the C name is "move").
-    public static void MoveTo(IOutput output, int x, int y) => output.SetTextPosition(x, y);
+    public static void MoveTo(IOutput output, int positionX, int positionY) => output.SetTextPosition(positionX, positionY);
 
     /// Prints a string that may hold XY escapes (128, x/2, y) to move the text position. A string
     /// ends at a zero byte (or its end); bytes of 128 and above end each plain run of text.
     /// (The x position is stored halved so it fits in a byte.)
     public static void PrintPositioned(IOutput output, byte[] text)
     {
-        int at = 0;
+        int offset = 0;
 
-        while (ByteAt(text, at) != 0)
+        while (ByteAt(text, offset) != 0)
         {
-            if (ByteAt(text, at) == XY)
+            if (ByteAt(text, offset) == XY)
             {
-                MoveTo(output, ByteAt(text, at + 1) * XY_X_SCALE, ByteAt(text, at + 2));
-                at += XY_BYTES;
+                MoveTo(output, ByteAt(text, offset + 1) * XY_X_SCALE, ByteAt(text, offset + 2));
+                offset += XY_BYTES;
 
                 continue;
             }
 
             int run = 0;
 
-            while (ByteAt(text, at + run) != 0 && ByteAt(text, at + run) < XY)
+            while (ByteAt(text, offset + run) != 0 && ByteAt(text, offset + run) < XY)
             {
                 run++;
             }
 
-            output.PrintContBytes(text.AsSpan(at, run));
-            at += run;
+            output.PrintContBytes(text.AsSpan(offset, run));
+            offset += run;
 
             if (run == 0)
             {
-                at++; // stray byte >= 128 that is not XY
+                offset++; // stray byte >= 128 that is not XY
             }
         }
     }
@@ -103,16 +103,16 @@ public static class TextRoutines
     /// past the end gives the final zero byte, an empty string.
     public static ReadOnlySpan<byte> NthString(byte[] list, int n)
     {
-        int at = 0;
+        int offset = 0;
 
         for (int skipped = 0; skipped < n; skipped++)
         {
-            int length = list.AsSpan(at).IndexOf((byte)0);
+            int length = list.AsSpan(offset).IndexOf((byte)0);
 
-            at = Math.Min(at + Math.Max(length, 0) + 1, list.Length - 1);
+            offset = Math.Min(offset + Math.Max(length, 0) + 1, list.Length - 1);
         }
 
-        return list.AsSpan(at);
+        return list.AsSpan(offset);
     }
 
     /// Shows the num-th string of a list of messages, word-wrapped.

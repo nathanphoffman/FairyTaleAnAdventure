@@ -31,11 +31,11 @@ public static class FacePicture
     {
         uint[] pixels = new uint[SIZE * SIZE];
 
-        for (int y = 0; y < SIZE; y++)
+        for (int positionY = 0; positionY < SIZE; positionY++)
         {
-            for (int x = 0; x < SIZE; x++)
+            for (int positionX = 0; positionX < SIZE; positionX++)
             {
-                pixels[y * SIZE + x] = PixelAt(palette, sprite, x, y);
+                pixels[positionY * SIZE + positionX] = PixelAt(palette, sprite, positionX, positionY);
             }
         }
 
@@ -49,15 +49,15 @@ public static class FacePicture
 
         Array.Copy(face.Pixels, pixels, face.Pixels.Length);
 
-        for (int row = 0; row < TAIL_HEIGHT; row++)
+        for (int rowIndex = 0; rowIndex < TAIL_HEIGHT; rowIndex++)
         {
-            int half = (TAIL_WIDTH - row * TAIL_WIDTH / TAIL_HEIGHT) / 2;
+            int half = (TAIL_WIDTH - rowIndex * TAIL_WIDTH / TAIL_HEIGHT) / 2;
 
-            for (int x = SIZE / 2 - half; x <= SIZE / 2 + half; x++)
+            for (int positionX = SIZE / 2 - half; positionX <= SIZE / 2 + half; positionX++)
             {
-                bool edge = x == SIZE / 2 - half || x == SIZE / 2 + half || row == TAIL_HEIGHT - 1;
+                bool edge = positionX == SIZE / 2 - half || positionX == SIZE / 2 + half || rowIndex == TAIL_HEIGHT - 1;
 
-                pixels[(SIZE + row) * SIZE + x] = edge ? OUTER_FRAME : INNER_FRAME;
+                pixels[(SIZE + rowIndex) * SIZE + positionX] = edge ? OUTER_FRAME : INNER_FRAME;
             }
         }
 
@@ -65,11 +65,11 @@ public static class FacePicture
     }
 
     // One pixel: outside the rounded corners nothing, then the two frame lines, then the head.
-    private static uint PixelAt(uint[] palette, SpriteImage sprite, int x, int y)
+    private static uint PixelAt(uint[] palette, SpriteImage sprite, int positionX, int positionY)
     {
-        int depth = Math.Min(Math.Min(x, SIZE - 1 - x), Math.Min(y, SIZE - 1 - y));
+        int depth = Math.Min(Math.Min(positionX, SIZE - 1 - positionX), Math.Min(positionY, SIZE - 1 - positionY));
 
-        if (CutOffByCorner(x, y))
+        if (CutOffByCorner(positionX, positionY))
         {
             return 0;
         }
@@ -84,19 +84,19 @@ public static class FacePicture
             return INNER_FRAME;
         }
 
-        int column = CROP_LEFT + (x - FRAME) / ZOOM;
-        int row = CROP_TOP + (y - FRAME) / ZOOM;
-        bool inside = column < sprite.Width && row < sprite.Height && sprite.Opaque[row * sprite.Width + column];
+        int column = CROP_LEFT + (positionX - FRAME) / ZOOM;
+        int rowIndex = CROP_TOP + (positionY - FRAME) / ZOOM;
+        bool inside = column < sprite.Width && rowIndex < sprite.Height && sprite.Opaque[rowIndex * sprite.Width + column];
 
-        return inside ? palette[sprite.Pixels[row * sprite.Width + column]] : BACKGROUND;
+        return inside ? palette[sprite.Pixels[rowIndex * sprite.Width + column]] : BACKGROUND;
     }
 
     // Whether a pixel lies outside the circle that rounds off one of the four corners.
-    private static bool CutOffByCorner(int x, int y)
+    private static bool CutOffByCorner(int positionX, int positionY)
     {
-        int dx = x < CORNER ? CORNER - x : x >= SIZE - CORNER ? x - (SIZE - 1 - CORNER) : 0;
-        int dy = y < CORNER ? CORNER - y : y >= SIZE - CORNER ? y - (SIZE - 1 - CORNER) : 0;
+        int deltaX = positionX < CORNER ? CORNER - positionX : positionX >= SIZE - CORNER ? positionX - (SIZE - 1 - CORNER) : 0;  // distance into a corner zone: left edge, right edge, else 0
+        int deltaY = positionY < CORNER ? CORNER - positionY : positionY >= SIZE - CORNER ? positionY - (SIZE - 1 - CORNER) : 0;  // distance into a corner zone: top edge, bottom edge, else 0
 
-        return dx * dx + dy * dy > CORNER * CORNER;
+        return deltaX * deltaX + deltaY * deltaY > CORNER * CORNER;
     }
 }

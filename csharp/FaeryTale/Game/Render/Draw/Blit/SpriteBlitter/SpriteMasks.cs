@@ -24,10 +24,10 @@ public static partial class SpriteBlitter
 
     /// Copies the 32 line mask of scenery tile tile (from the shadow masks) into the scenery mask
     /// at word column x, tile row y; modWords is the mask width in words.
-    public static void AddSceneryMask(Video video, int x, int y, int modWords, int tile)
+    public static void AddSceneryMask(Video video, int positionX, int positionY, int modWords, int tile)
     {
         int rowBytes = modWords * 2;
-        Loc destination = new Loc(Area.Mask, MASK_START).Add((long)y * rowBytes * TILE_LINES + x * 2);
+        Loc destination = new Loc(Area.Mask, MASK_START).Add((long)positionY * rowBytes * TILE_LINES + positionX * 2);
         byte[] shadow = video.Graphics.Shadow;
         int source = tile * TILE_MASK_BYTES;
         BlitMemory memory = MemoryOf(video);
@@ -54,13 +54,13 @@ public static partial class SpriteBlitter
             for (int index = 0; index < planeBytes; index++)
             {
                 // A pixel is kept only if every plane has it set (AND of all planes), 0xff when no planes.
-                int all = 0xff;
+                int all = ALL_PIXELS_SET;
 
                 for (int plane = 0; plane < PLANE_COUNT; plane++)
                 {
-                    int at = source + plane * planeBytes + index;
+                    int offset = source + plane * planeBytes + index;
 
-                    all &= at >= 0 && at < shapes.Length ? shapes[at] : 0;
+                    all &= offset >= 0 && offset < shapes.Length ? shapes[offset] : 0;
                 }
 
                 if (destination >= 0 && destination < shapes.Length)

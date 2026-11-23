@@ -97,7 +97,7 @@ public static class Missiles
 
             bool wide = game.Experience != Experience.Original;
 
-            if (xStart > (wide ? WIDE_LEFT : SCREEN_LEFT) && xStart < (wide ? WIDE_RIGHT : SCREEN_RIGHT) && yStart > (wide ? WIDE_TOP : SCREEN_TOP) && yStart < (wide ? WIDE_BOTTOM : SCREEN_BOTTOM))
+            if (xStart > (wide ? WIDE_LEFT : SCREEN_LEFT) && xStart < (wide ? WIDE_RIGHT : SCREEN_RIGHT) && yStart > (wide ? WIDE_TOP : SCREEN_TOP) && yStart < (wide ? WIDE_BOTTOM : SCREEN_BOTTOM))  // each edge uses the wide limit when not in Original mode
             {
                 AddMissileActor(game.Actors, missile, xStart, yStart);
                 game.Actors.Drawn++;
@@ -149,9 +149,9 @@ public static class Missiles
             return;
         }
 
-        short x = (short)missile.AbsX;
-        short y = (short)missile.AbsY;
-        int terrain = MapLookup.TerrainAt(game, x, y);
+        short positionX = (short)missile.AbsX;
+        short positionY = (short)missile.AbsY;
+        int terrain = MapLookup.TerrainAt(game, positionX, positionY);
 
         if (terrain == WALL_TERRAIN_SOLID || terrain == WALL_TERRAIN_EDGE)
         {
@@ -161,7 +161,7 @@ public static class Missiles
 
         int facing = missile.Direction;
 
-        HitFirstActorInPath(game, output, position, missile, x, y);
+        HitFirstActorInPath(game, output, position, missile, positionX, positionY);
         missile.AbsX = (ushort)MapSteps.StepX(missile.AbsX, facing, s);
         missile.AbsY = (ushort)MapSteps.StepY(missile.AbsY, facing, s);
     }
@@ -169,7 +169,7 @@ public static class Missiles
     // Hits the first actor close enough to the missile at (x, y) and stops the missile. position
     // is the missile's own index; the hero (actor 0) gets a dodge chance from bravery, others a
     // fixed one.
-    private static void HitFirstActorInPath(Data.Game game, IOutput output, int position, Missile missile, short x, short y)
+    private static void HitFirstActorInPath(Data.Game game, IOutput output, int position, Missile missile, short positionX, short positionY)
     {
         int facing = missile.Direction;
         bool isRock = missile.MissileType == MISSILE_ROCK;
@@ -185,7 +185,7 @@ public static class Missiles
                 continue;
             }
 
-            short dist = Melee.DistanceToPoint(game.Actors.List[target], x, y);
+            short dist = Melee.DistanceToPoint(game.Actors.List[target], positionX, positionY);
 
             // The original tests the missile's own index here, not the target's.
             if (!MissileConnects(position, dist, range, dodge, () => game.Rng.BitRand(DODGE_RANGE)))

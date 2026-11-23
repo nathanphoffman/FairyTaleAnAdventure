@@ -114,9 +114,9 @@ internal sealed partial class NativeComposer
 
     // A place of the grid over the panel, turned back into where it is on the classic panel (the pieces of
     // the panel are not where they were, but the menus and the compass still think in the old places).
-    private static (int X, int Y) ToClassicPanel(int x, int y)
+    private static (int X, int Y) ToClassicPanel(int positionX, int positionY)
     {
-        (int classicX, int classicRows) = PanelLayout.ToClassic(x, y - PANEL_FIRST_ROW);
+        (int classicX, int classicRows) = PanelLayout.ToClassic(positionX, positionY - PANEL_FIRST_ROW);
 
         return (classicX, classicRows + PANEL_FIRST_ROW);
     }
@@ -160,24 +160,24 @@ internal sealed partial class NativeComposer
 
         Array.Fill(picture, 0xff00_0000u);
 
-        for (int row = 0; row < rows; row++)
+        for (int rowIndex = 0; rowIndex < rows; rowIndex++)
         {
             for (int copy = 0; copy < rowScale; copy++)
             {
-                int y = GridTop + row * rowScale + copy;
+                int positionY = GridTop + rowIndex * rowScale + copy;
 
-                if (y < 0 || y >= height)
+                if (positionY < 0 || positionY >= height)
                 {
                     continue;
                 }
 
-                for (int x = 0; x < GRID_WIDTH * Scale; x++)
+                for (int positionX = 0; positionX < GRID_WIDTH * Scale; positionX++)
                 {
-                    int screenX = GridLeft + x;
+                    int screenX = GridLeft + positionX;
 
                     if (screenX >= 0 && screenX < width)
                     {
-                        picture[y * width + screenX] = pixels[row * GRID_WIDTH + x / Scale];
+                        picture[positionY * width + screenX] = pixels[rowIndex * GRID_WIDTH + positionX / Scale];
                     }
                 }
             }

@@ -5,6 +5,9 @@ namespace FaeryTale.Game.Output;
 /// Recorder: frame timing, page swaps and the overlay.
 public sealed partial class Recorder
 {
+    // The frame time of the 50 Hz screen, in milliseconds.
+    private const double ANIMATION_FRAME_MILLISECONDS = 20;
+
     public void SwapPages() => Record("SwapPages");
 
     public void Present() => Record("Present");
@@ -15,7 +18,7 @@ public sealed partial class Recorder
         Record("WaitFrame");
     }
 
-    public double AnimationFrameMs => 20;
+    public double AnimationFrameMs => ANIMATION_FRAME_MILLISECONDS;
 
     public void ShowAnimationFrame() => WaitFrame();
 

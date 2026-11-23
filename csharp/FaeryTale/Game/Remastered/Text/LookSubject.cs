@@ -21,6 +21,10 @@ public static class LookSubject
     private const int TERRAIN_COLOR_BYTE = 3;
     private const int COLOR_MASK = 31;
 
+    // Tiles are 16 pixels wide and 32 tall, so these shifts turn pixels into tile coordinates.
+    private const int TILE_WIDTH_SHIFT = 4;
+    private const int TILE_HEIGHT_SHIFT = 5;
+
     // Terrain types: 1 blocks the way, 2 to 5 are water of growing depth.
     private const int BLOCKED_TERRAIN = 1;
     private const int FIRST_WATER_TERRAIN = 2;
@@ -63,7 +67,7 @@ public static class LookSubject
     {
         ActorKind.ENEMY => actor.State == ActorState.DEAD ? "body" : ENEMY_KEYS.ElementAtOrDefault(actor.Race),
         ActorKind.SETFIG => PERSON_KEYS.ElementAtOrDefault(actor.Race - SETFIG_FIRST_RACE),
-        ActorKind.CARRIER => game.Actors.ActiveCarrier == TURTLE_CARRIER ? "turtle" : "swan",
+        ActorKind.CARRIER => game.Actors.ActiveCarrier == TURTLE_CARRIER ? "turtle" : "swan",  // turtle if that carrier is active, otherwise swan
         ActorKind.DRAGON => "dragon",
         ActorKind.RAFT => "raft",
         ActorKind.OBJECTS when actor.Race != 0 => ObjectKey((byte)actor.Index),
@@ -71,7 +75,7 @@ public static class LookSubject
     };
 
     // Chests, urns and the like get their own lines; keys and magic things share two, the rest one.
-    private static string ObjectKey(byte id) => id switch
+    private static string ObjectKey(byte identifier) => identifier switch
     {
         ObjectTables.CHEST => "chest",
         ObjectTables.URN => "urn",
@@ -89,13 +93,13 @@ public static class LookSubject
         int nearestDistance = int.MaxValue;
         string? nearestKey = null;
 
-        for (int dx = -SCENERY_REACH; dx <= SCENERY_REACH; dx += PROBE_STEP)
+        for (int deltaX = -SCENERY_REACH; deltaX <= SCENERY_REACH; deltaX += PROBE_STEP)
         {
-            for (int dy = -SCENERY_REACH; dy <= SCENERY_REACH; dy += PROBE_STEP)
+            for (int deltaY = -SCENERY_REACH; deltaY <= SCENERY_REACH; deltaY += PROBE_STEP)
             {
-                int distance = Math.Max(Math.Abs(dx), Math.Abs(dy));
+                int distance = Math.Max(Math.Abs(deltaX), Math.Abs(deltaY));
 
-                if (distance < nearestDistance && ScenerySpotKey(game, (spot.X + dx, spot.Y + dy)) is { } key)
+                if (distance < nearestDistance && ScenerySpotKey(game, (spot.X + deltaX, spot.Y + deltaY)) is { } key)
                 {
                     nearestKey = key;
                     nearestDistance = distance;
@@ -127,7 +131,7 @@ public static class LookSubject
             return "wall";
         }
 
-        int tile = MapLookup.TileNumber(game, (ushort)(spot.X >> 4), (ushort)(spot.Y >> 5));
+        int tile = MapLookup.TileNumber(game, (ushort)(spot.X >> TILE_WIDTH_SHIFT), (ushort)(spot.Y >> TILE_HEIGHT_SHIFT));  // divide by tile size (16 wide, 32 tall) to get tile coordinates
         int color = game.Map.TerrainByte(tile * TERRAIN_ENTRY_BYTES + TERRAIN_COLOR_BYTE) & COLOR_MASK;
 
         return color >= TREE_FIRST_COLOR && color <= TREE_LAST_COLOR ? "tree" : "rock";

@@ -67,10 +67,10 @@ public static class MessageScrollBar
 
     // The scroll that puts the middle of the thumb at a row of the grid: the top of the track is the
     // oldest line and the bottom the newest.
-    private static int ScrollAt(MessageHistory history, int row)
+    private static int ScrollAt(MessageHistory history, int rowIndex)
     {
         int thumbHeight = ThumbHeight(history);
-        double fromTop = Math.Clamp((row - TOP - thumbHeight / 2.0) / (HEIGHT - thumbHeight), 0, 1);
+        double fromTop = Math.Clamp((rowIndex - TOP - thumbHeight / 2.0) / (HEIGHT - thumbHeight), 0, 1);
 
         return (int)Math.Round((1 - fromTop) * history.MaxScroll);
     }
@@ -84,11 +84,11 @@ public static class MessageScrollBar
         int thumbTop = (HEIGHT - thumbHeight) * (history.MaxScroll - history.Scrolled) / history.MaxScroll;
         uint[] pixels = new uint[WIDTH * HEIGHT];
 
-        for (int y = 0; y < HEIGHT; y++)
+        for (int positionY = 0; positionY < HEIGHT; positionY++)
         {
-            for (int x = 0; x < WIDTH; x++)
+            for (int positionX = 0; positionX < WIDTH; positionX++)
             {
-                pixels[y * WIDTH + x] = PixelAt(x, y, (thumbTop, thumbHeight));
+                pixels[positionY * WIDTH + positionX] = PixelAt(positionX, positionY, (thumbTop, thumbHeight));
             }
         }
 
@@ -96,19 +96,19 @@ public static class MessageScrollBar
     }
 
     // One pixel: the outline round the track, the thumb (with a light edge), or the bare track.
-    private static uint PixelAt(int x, int y, (int Top, int Height) thumb)
+    private static uint PixelAt(int positionX, int positionY, (int Top, int Height) thumb)
     {
-        if (x == 0 || y == 0 || x == WIDTH - 1 || y == HEIGHT - 1)
+        if (positionX == 0 || positionY == 0 || positionX == WIDTH - 1 || positionY == HEIGHT - 1)
         {
             return OUTLINE;
         }
 
-        if (y < thumb.Top || y >= thumb.Top + thumb.Height)
+        if (positionY < thumb.Top || positionY >= thumb.Top + thumb.Height)
         {
             return TRACK;
         }
 
-        bool edge = y == thumb.Top || y == thumb.Top + thumb.Height - 1 || x == 1 || x == WIDTH - 2;
+        bool edge = positionY == thumb.Top || positionY == thumb.Top + thumb.Height - 1 || positionX == 1 || positionX == WIDTH - 2;
 
         return edge ? THUMB_EDGE : THUMB;
     }

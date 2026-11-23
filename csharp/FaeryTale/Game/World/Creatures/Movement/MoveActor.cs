@@ -214,7 +214,7 @@ internal sealed partial class MoveContext
         return Pc.Dispatch;
     }
 
-    private Pc Run(Pc pc) => pc switch
+    private Pc Run(Pc pc) => pc switch  // switch expression maps each step to the next step
     {
         Pc.Dispatch => Dispatch(),
         Pc.CheckDev1 => CheckDev1(),
@@ -299,9 +299,9 @@ internal sealed partial class MoveContext
     // the range; facings are 0-7 (+8 for shooting).
     private static short DirectionOffset(int direction) => Tables.Entry(Tables.FacingFrameOffsets, direction);
 
-    private static ushort PosX(int x, int direction, int speed) => (ushort)MapSteps.StepX(x, direction, speed);
+    private static ushort PosX(int positionX, int direction, int speed) => (ushort)MapSteps.StepX(positionX, direction, speed);
 
-    private static ushort PosY(int y, int direction, int speed) => (ushort)MapSteps.StepY(y, direction, speed);
+    private static ushort PosY(int positionY, int direction, int speed) => (ushort)MapSteps.StepY(positionY, direction, speed);
 
-    private short TerrainAtPoint(ushort x, ushort y) => (short)MapLookup.TerrainAt(game, x, y);
+    private short TerrainAtPoint(ushort positionX, ushort positionY) => (short)MapLookup.TerrainAt(game, positionX, positionY);
 }

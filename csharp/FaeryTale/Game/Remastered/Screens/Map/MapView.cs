@@ -56,11 +56,11 @@ public sealed class MapView
     {
         uint[] pixels = new uint[WIDTH * HEIGHT];
 
-        for (int y = 0; y < HEIGHT; y++)
+        for (int positionY = 0; positionY < HEIGHT; positionY++)
         {
-            for (int x = 0; x < WIDTH; x++)
+            for (int positionX = 0; positionX < WIDTH; positionX++)
             {
-                pixels[y * WIDTH + x] = LandAt(world, x, y);
+                pixels[positionY * WIDTH + positionX] = LandAt(world, positionX, positionY);
             }
         }
 
@@ -73,31 +73,31 @@ public sealed class MapView
     }
 
     // The colour of the land at a unit of the view (black outside the world).
-    private uint LandAt(uint[] world, int x, int y)
+    private uint LandAt(uint[] world, int positionX, int positionY)
     {
-        int column = (int)Math.Floor(CenterColumn + (x - WIDTH / 2.0) / Scale);
-        int row = (int)Math.Floor(CenterRow + (y - HEIGHT / 2.0) / (Scale * ROW_HEIGHT_FACTOR));
-        bool inside = column >= 0 && column < WorldOverview.COLUMNS && row >= 0 && row < WorldOverview.ROWS;
+        int column = (int)Math.Floor(CenterColumn + (positionX - WIDTH / 2.0) / Scale);
+        int rowIndex = (int)Math.Floor(CenterRow + (positionY - HEIGHT / 2.0) / (Scale * ROW_HEIGHT_FACTOR));
+        bool inside = column >= 0 && column < WorldOverview.COLUMNS && rowIndex >= 0 && rowIndex < WorldOverview.ROWS;
 
-        return inside ? world[row * WorldOverview.COLUMNS + column] : OFF_WORLD;
+        return inside ? world[rowIndex * WorldOverview.COLUMNS + column] : OFF_WORLD;
     }
 
     // Where the hero's tile is in the view, kept inside it.
     private (int X, int Y) MarkPlace((int Column, int Row) hero)
     {
-        int x = (int)Math.Round(WIDTH / 2.0 + (hero.Column - CenterColumn) * Scale);
-        int y = (int)Math.Round(HEIGHT / 2.0 + (hero.Row - CenterRow) * Scale * ROW_HEIGHT_FACTOR);
+        int positionX = (int)Math.Round(WIDTH / 2.0 + (hero.Column - CenterColumn) * Scale);
+        int positionY = (int)Math.Round(HEIGHT / 2.0 + (hero.Row - CenterRow) * Scale * ROW_HEIGHT_FACTOR);
 
-        return (Math.Clamp(x, MARK_RADIUS, WIDTH - 1 - MARK_RADIUS), Math.Clamp(y, MARK_RADIUS, HEIGHT - 1 - MARK_RADIUS));
+        return (Math.Clamp(positionX, MARK_RADIUS, WIDTH - 1 - MARK_RADIUS), Math.Clamp(positionY, MARK_RADIUS, HEIGHT - 1 - MARK_RADIUS));
     }
 
     private static void DrawMark(uint[] pixels, (int X, int Y) centre)
     {
-        for (int dy = -MARK_RADIUS; dy <= MARK_RADIUS; dy++)
+        for (int deltaY = -MARK_RADIUS; deltaY <= MARK_RADIUS; deltaY++)
         {
-            for (int dx = -MARK_RADIUS; dx <= MARK_RADIUS; dx++)
+            for (int deltaX = -MARK_RADIUS; deltaX <= MARK_RADIUS; deltaX++)
             {
-                pixels[(centre.Y + dy) * WIDTH + centre.X + dx] = Math.Max(Math.Abs(dx), Math.Abs(dy)) == MARK_RADIUS ? MARK_RING : MARK_FILL;
+                pixels[(centre.Y + deltaY) * WIDTH + centre.X + deltaX] = Math.Max(Math.Abs(deltaX), Math.Abs(deltaY)) == MARK_RADIUS ? MARK_RING : MARK_FILL;
             }
         }
     }

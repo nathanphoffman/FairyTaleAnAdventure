@@ -21,7 +21,7 @@ public class ClickToMoveTests
     public void ARouteGoesAroundAWall()
     {
         // A wall of blocked cells across x = 3 from y = -4 to y = 4.
-        Func<int, int, int> wall = (x, y) => x == 3 && Math.Abs(y) <= 4 ? -1 : 0;
+        Func<int, int, int> wall = (positionX, positionY) => positionX == 3 && Math.Abs(positionY) <= 4 ? -1 : 0;
         List<(int X, int Y)> route = PathFinder.Find((6, 0), wall);
 
         Assert.Equal((6, 0), route[^1]);
@@ -32,7 +32,7 @@ public class ClickToMoveTests
     [Fact]
     public void ABlockedGoalEndsAsNearAsPossible()
     {
-        Func<int, int, int> block = (x, y) => x >= 5 ? -1 : 0;
+        Func<int, int, int> block = (positionX, positionY) => positionX >= 5 ? -1 : 0;
         List<(int X, int Y)> route = PathFinder.Find((8, 0), block);
 
         Assert.Equal((4, 0), route[^1]);
@@ -42,7 +42,7 @@ public class ClickToMoveTests
     public void ADiagonalDoesNotSqueezeBetweenTwoBlockedCorners()
     {
         // (1, 0) and (0, 1) are blocked, so (1, 1) cannot be reached by cutting the corner.
-        Func<int, int, int> corner = (x, y) => (x, y) is (1, 0) or (0, 1) ? -1 : 0;
+        Func<int, int, int> corner = (positionX, positionY) => (positionX, positionY) is (1, 0) or (0, 1) ? -1 : 0;
         List<(int X, int Y)> route = PathFinder.Find((1, 1), corner);
 
         Assert.True(route.Count > 1 || route[^1] != (1, 1));
@@ -51,7 +51,7 @@ public class ClickToMoveTests
     [Fact]
     public void ACostlyCellIsAvoidedWhenThereIsADryWay()
     {
-        Func<int, int, int> puddle = (x, y) => x == 2 && y == 0 ? 500 : 0;
+        Func<int, int, int> puddle = (positionX, positionY) => positionX == 2 && positionY == 0 ? 500 : 0;
         List<(int X, int Y)> route = PathFinder.Find((4, 0), puddle);
 
         Assert.DoesNotContain((2, 0), route);
@@ -67,8 +67,8 @@ public class ClickToMoveTests
     [InlineData(-9, 9, 6)]
     [InlineData(-9, 0, 7)]
     [InlineData(1, 1, 9)]
-    public void TheWalkDirectionPointsAtTheTarget(int dx, int dy, int expected) =>
-        Assert.Equal(expected, WalkFollowing.DirectionTo(dx, dy));
+    public void TheWalkDirectionPointsAtTheTarget(int deltaX, int deltaY, int expected) =>
+        Assert.Equal(expected, WalkFollowing.DirectionTo(deltaX, deltaY));
 
     [Fact]
     public void AClickAndTheMarkerUseTheSameGroundSpot()

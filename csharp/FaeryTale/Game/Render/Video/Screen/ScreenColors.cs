@@ -5,20 +5,20 @@ namespace FaeryTale.Game.Render;
 /// Screen: view ports, colors and the scene.
 public sealed partial class Screen
 {
-    public ViewPortState GetViewPort(ViewPortId id) => id == ViewPortId.Page ? VpPage : VpText;
+    public ViewPortState GetViewPort(ViewPortId identifier) => identifier == ViewPortId.Page ? VpPage : VpText;
 
     /// Loads the first colours of a view port's table from colors (12 bit colours, 0x0RGB).
-    public void LoadColors(ViewPortId id, ReadOnlySpan<ushort> colors)
+    public void LoadColors(ViewPortId identifier, ReadOnlySpan<ushort> colors)
     {
-        ushort[] table = GetViewPort(id).Colors;
+        ushort[] table = GetViewPort(identifier).Colors;
 
         colors[..Math.Min(table.Length, colors.Length)].CopyTo(table);
     }
 
     /// Sets one colour of a view port from its red, green and blue (4 bits each).
-    public void SetColor(ViewPortId id, int n, (uint R, uint G, uint B) color)
+    public void SetColor(ViewPortId identifier, int n, (uint R, uint G, uint B) color)
     {
-        ushort[] table = GetViewPort(id).Colors;
+        ushort[] table = GetViewPort(identifier).Colors;
 
         if (n >= 0 && n < table.Length)
         {

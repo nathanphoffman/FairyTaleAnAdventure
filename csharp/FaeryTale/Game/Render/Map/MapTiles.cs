@@ -43,40 +43,40 @@ public static class MapTiles
         {
             int source = plane * IMAGE_PLANE_SIZE + tile * TILE_BYTES;
             Span<byte> bytes = screen.DrawBitmap.Plane(plane);
-            int at = destination;
+            int offset = destination;
 
             for (int line = 0; line < TILE_LINES; line++)
             {
-                bytes[at] = graphics.Image[source];
-                bytes[at + 1] = graphics.Image[source + 1];
+                bytes[offset] = graphics.Image[source];
+                bytes[offset + 1] = graphics.Image[source + 1];
                 source += 2;
-                at += ROW_BYTES;
+                offset += ROW_BYTES;
             }
         }
     }
 
     /// Draws the tile at minimap position (col, row) to its place on screen.
-    public static void DrawMinimapTile(Data.Game game, Video video, int column, int row) =>
-        DrawTile(video.Graphics, video.Screen, game.Map.Minimap[column * MapLookup.SCREEN_ROWS + row], row * TILE_LINES * ROW_BYTES + column * 2);
+    public static void DrawMinimapTile(Data.Game game, Video video, int column, int rowIndex) =>
+        DrawTile(video.Graphics, video.Screen, game.Map.Minimap[column * MapLookup.SCREEN_ROWS + rowIndex], rowIndex * TILE_LINES * ROW_BYTES + column * 2);
 
     /// The whole screen, 19 x 6 tiles.
     public static void DrawMap(Data.Game game, Video video)
     {
         for (int column = 0; column < MapLookup.SCREEN_COLUMNS; column++)
         {
-            for (int row = 0; row < MapLookup.SCREEN_ROWS; row++)
+            for (int rowIndex = 0; rowIndex < MapLookup.SCREEN_ROWS; rowIndex++)
             {
-                DrawMinimapTile(game, video, column, row);
+                DrawMinimapTile(game, video, column, rowIndex);
             }
         }
     }
 
     /// One column of tiles; x is the byte offset on screen (0 or 36).
-    public static void DrawMapColumn(Data.Game game, Video video, int x)
+    public static void DrawMapColumn(Data.Game game, Video video, int positionX)
     {
-        for (int row = 0; row < MapLookup.SCREEN_ROWS; row++)
+        for (int rowIndex = 0; rowIndex < MapLookup.SCREEN_ROWS; rowIndex++)
         {
-            DrawMinimapTile(game, video, x / 2, row);
+            DrawMinimapTile(game, video, positionX / 2, rowIndex);
         }
     }
 

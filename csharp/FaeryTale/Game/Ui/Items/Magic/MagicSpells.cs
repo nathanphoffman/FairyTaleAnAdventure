@@ -24,7 +24,7 @@ public static partial class Magic
 
         // Which sector the hero is in: pixels divided by the sector size via a shift.
         int sectorX = px >> SECTOR_SHIFT;
-        int sectorY = py >> SECTOR_SHIFT;
+        int sectorY = py >> SECTOR_SHIFT; // same shift for the row
 
         for (int ring = 0; ring < STONE_CIRCLES; ring++)
         {
@@ -41,10 +41,10 @@ public static partial class Magic
             }
 
             // Back to pixels: the target sector, then the same spot inside it.
-            ushort x = unchecked((ushort)((list[target * 2] << SECTOR_SHIFT) + (px & SECTOR_MASK)));
-            ushort y = unchecked((ushort)((list[target * 2 + 1] << SECTOR_SHIFT) + (py & SECTOR_MASK)));
+            ushort positionX = unchecked((ushort)((list[target * 2] << SECTOR_SHIFT) + (px & SECTOR_MASK)));
+            ushort positionY = unchecked((ushort)((list[target * 2 + 1] << SECTOR_SHIFT) + (py & SECTOR_MASK)));  // same as x, for the row
 
-            return new StoneJump.To(x, y);
+            return new StoneJump.To(positionX, positionY);
         }
 
         return new StoneJump.NoRing();

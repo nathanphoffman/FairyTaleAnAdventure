@@ -89,13 +89,13 @@ public static partial class InputHandler
     /// Pointer position in lores pixels (x 0-319) and screen lines (y 0-199). The pointer is kept
     /// inside the text panel (the bottom of the screen), where the menus and the compass are,
     /// because that is the only place the mouse is used.
-    public static void MouseMoved(int x, int y)
+    public static void MouseMoved(int positionX, int positionY)
     {
         lock (padlock)
         {
             gridPointer = null;
-            rawPointer = ((short)x, (short)y);
-            pointer = ((short)Math.Clamp(x, POINTER_MIN_X, POINTER_MAX_X), (short)Math.Clamp(y, POINTER_MIN_Y, POINTER_MAX_Y));
+            rawPointer = ((short)positionX, (short)positionY);
+            pointer = ((short)Math.Clamp(positionX, POINTER_MIN_X, POINTER_MAX_X), (short)Math.Clamp(positionY, POINTER_MIN_Y, POINTER_MAX_Y));
         }
     }
 
@@ -104,7 +104,7 @@ public static partial class InputHandler
     /// flag (it makes the hero fight, see ReadWalkDirection).
     public static void MouseButtonsChanged(bool left, bool right)
     {
-        short newQualifier = (short)((left ? LEFT_BUTTON : 0) | (right ? RIGHT_BUTTON : 0));
+        short newQualifier = (short)((left ? LEFT_BUTTON : 0) | (right ? RIGHT_BUTTON : 0));  // each pressed button turns on its own flag bit
 
         lock (padlock)
         {

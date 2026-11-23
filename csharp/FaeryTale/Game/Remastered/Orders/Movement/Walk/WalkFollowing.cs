@@ -22,6 +22,16 @@ internal static class WalkFollowing
 
     internal const short NOT_WALKING = 9;
 
+    // The walk directions, clockwise from north-west (the order of the direction numbers).
+    private const int NORTH_WEST = 0;
+    private const int NORTH = 1;
+    private const int NORTH_EAST = 2;
+    private const int EAST = 3;
+    private const int SOUTH_EAST = 4;
+    private const int SOUTH = 5;
+    private const int SOUTH_WEST = 6;
+    private const int WEST = 7;
+
     // Steers towards the next route point, dropping points that were reached and planning again
     // when the hero is stuck.
     internal static void Follow(Data.Game game)
@@ -115,21 +125,21 @@ internal static class WalkFollowing
 
     /// The walk direction (0-7, clockwise from north-west) towards a point that is (dx, dy) away,
     /// or 9 when already there.
-    internal static short DirectionTo(int dx, int dy)
+    internal static short DirectionTo(int deltaX, int deltaY)
     {
-        int stepX = Math.Abs(dx) <= AXIS_DEAD_ZONE ? 0 : Math.Sign(dx);
-        int stepY = Math.Abs(dy) <= AXIS_DEAD_ZONE ? 0 : Math.Sign(dy);
+        int stepX = Math.Abs(deltaX) <= AXIS_DEAD_ZONE ? 0 : Math.Sign(deltaX);
+        int stepY = Math.Abs(deltaY) <= AXIS_DEAD_ZONE ? 0 : Math.Sign(deltaY);
 
         return (stepX, stepY) switch
         {
-            (-1, -1) => 0,
-            (0, -1) => 1,
-            (1, -1) => 2,
-            (1, 0) => 3,
-            (1, 1) => 4,
-            (0, 1) => 5,
-            (-1, 1) => 6,
-            (-1, 0) => 7,
+            (-1, -1) => NORTH_WEST,
+            (0, -1) => NORTH,
+            (1, -1) => NORTH_EAST,
+            (1, 0) => EAST,
+            (1, 1) => SOUTH_EAST,
+            (0, 1) => SOUTH,
+            (-1, 1) => SOUTH_WEST,
+            (-1, 0) => WEST,
             _ => NOT_WALKING,
         };
     }

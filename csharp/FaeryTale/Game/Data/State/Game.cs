@@ -6,6 +6,9 @@ public sealed class Game
 {
     public const ushort STARTING_REGION = 3;
 
+    // Words of unused space kept in the save file layout.
+    private const int SAVE_PADDING_WORDS = 3;
+
     public Experience Experience;
 
     /// The fireball and flames of the inferno skull (Reimagined); idle when none is burning.
@@ -21,7 +24,7 @@ public sealed class Game
     public Ui Ui = new();
     public EncounterState Encounter = new();
     public MapData Map = new();
-    public ushort[] SavePadding = new ushort[3];
+    public ushort[] SavePadding = new ushort[SAVE_PADDING_WORDS];
     public Rng Rng = new();
     public Extent[] Extents = (Extent[])Tables.InitialExtents.Clone();
     public Menu[] Menus = Tables.InitialMenus.Select(menu => menu.Copy()).ToArray();

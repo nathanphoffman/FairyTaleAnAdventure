@@ -79,5 +79,5 @@ public static class MessageWrapper
         }
     }
 
-    private static int WidthOf(byte[] word, Func<byte, int> advanceOf) => word.Sum(character => advanceOf(character));
+    private static int WidthOf(byte[] word, Func<byte, int> advanceOf) => word.Sum(character => advanceOf(character)); // add up the pixel width of each character in the word
 }

@@ -90,13 +90,13 @@ public static partial class ScreenEffects
 
     /// Redraws the compass with direction dir lit. First the unlit compass is copied, then the lit
     /// part for that direction (if any) is copied on top from a second image.
-    public static void DrawCompass(Screen screen, short dir)
+    public static void DrawCompass(Screen screen, short direction)
     {
-        CompassPart part = ObjectTables.Comptable[dir];
+        CompassPart part = ObjectTables.Comptable[direction];
 
         screen.CopyCompass(PLAIN, new Rect(0, 0, COMPASS_WIDTH, COMPASS_HEIGHT), (COMPASS_X, COMPASS_Y), COMPASS_PLANE);
 
-        if (dir < COMPASS_DIRECTIONS)
+        if (direction < COMPASS_DIRECTIONS)
         {
             screen.CopyCompass(LIT, new Rect(part.Xrect, part.Yrect, part.Xsize, part.Ysize), (COMPASS_X + part.Xrect, COMPASS_Y + part.Yrect), COMPASS_PLANE);
         }
@@ -207,14 +207,14 @@ public static partial class ScreenEffects
         {
             InvItem item = Tables.ItemList[slot];
             int shown = Math.Min(hero.Stuff[slot], (int)item.Maxshown);
-            int x = item.Xoff + ITEM_X_MARGIN;
-            ushort y = item.Yoff;
+            int positionX = item.Xoff + ITEM_X_MARGIN;
+            ushort positionY = item.Yoff;
             Rect picture = new(0, item.ImageNumber * ITEM_ROW_HEIGHT + item.ImgOff, ITEM_IMAGE_WIDTH, item.ImgHeight);
 
             for (int count = 0; count < shown; count++)
             {
-                screen.Copy(BitmapId.Items, picture, page, (x, y), ALL_PLANES);
-                y = unchecked((ushort)(y + item.Ydelta));
+                screen.Copy(BitmapId.Items, picture, page, (positionX, positionY), ALL_PLANES);
+                positionY = unchecked((ushort)(positionY + item.Ydelta));
             }
         }
     }

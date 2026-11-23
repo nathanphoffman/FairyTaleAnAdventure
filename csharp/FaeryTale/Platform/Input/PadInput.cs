@@ -8,10 +8,13 @@ internal sealed class PadInput
     /// How far a stick must move (of 32767) before it counts as a direction.
     private const int STICK_DEAD_ZONE = 12000;
 
+    /// The stick directions tracked: left, right, up, down.
+    private const int STICK_DIRECTION_COUNT = 4;
+
     private readonly List<IntPtr> pads = [];
 
     /// Left stick state: left, right, up, down.
-    private readonly bool[] stick = new bool[4];
+    private readonly bool[] stick = new bool[STICK_DIRECTION_COUNT];
 
     public PadInput()
     {

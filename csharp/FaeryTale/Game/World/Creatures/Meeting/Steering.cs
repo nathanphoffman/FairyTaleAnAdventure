@@ -116,10 +116,10 @@ public static class Steering
     // long one. Compared as signed values: the shifted magnitude is at most half the other axis.
     private static (int X, int Y) AlongTheLongAxis(int xDirection, int yDirection, ushort xAbs, ushort yAbs)
     {
-        int y = (short)yAbs < (short)(xAbs >> IGNORE_SHIFT) ? 0 : yDirection;
-        int x = (short)xAbs < (short)(yAbs >> IGNORE_SHIFT) ? 0 : xDirection;
+        int positionY = (short)yAbs < (short)(xAbs >> IGNORE_SHIFT) ? 0 : yDirection; // y is zeroed when it is under half of x (shift right 1 halves)
+        int positionX = (short)xAbs < (short)(yAbs >> IGNORE_SHIFT) ? 0 : xDirection; // x is zeroed when it is under half of y
 
-        return (x, y);
+        return (positionX, positionY);
     }
 
     // The sideways wobble (one direction step) of modes 1 and 2 when the target is close, else 0.

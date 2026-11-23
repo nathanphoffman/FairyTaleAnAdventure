@@ -61,25 +61,25 @@ public static class SoundBank
     internal static byte[][] SplitTracks(byte[] data)
     {
         List<byte[]> result = [];
-        int at = 0;
+        int offset = 0;
         int loaded = 0;
 
         for (int count = 0; count < TRACK_COUNT; count++)
         {
-            int bytes = (int)Be32(data, at) * 2;
+            int bytes = (int)Be32(data, offset) * 2;
 
-            at += LENGTH_BYTES;
+            offset += LENGTH_BYTES;
 
             if (bytes + loaded > SCORE_MEMORY)
             {
                 break;
             }
 
-            int end = Math.Min(at + bytes, data.Length);
-            int start = Math.Min(at, end);
+            int end = Math.Min(offset + bytes, data.Length);
+            int start = Math.Min(offset, end);
 
             result.Add(data[start..end]);
-            at += bytes;
+            offset += bytes;
             loaded += bytes;
         }
 
@@ -91,25 +91,25 @@ public static class SoundBank
     internal static sbyte[][] SplitSamples(byte[] data)
     {
         sbyte[][] result = new sbyte[SAMPLE_COUNT][];
-        int at = 0;
+        int offset = 0;
 
         for (int count = 0; count < SAMPLE_COUNT; count++)
         {
-            int length = (int)Be32(data, at);
+            int length = (int)Be32(data, offset);
 
-            at += LENGTH_BYTES;
+            offset += LENGTH_BYTES;
 
-            int end = Math.Min(at + length, data.Length);
-            int start = Math.Min(at, end);
+            int end = Math.Min(offset + length, data.Length);
+            int start = Math.Min(offset, end);
 
             result[count] = data[start..end].Select(value => unchecked((sbyte)value)).ToArray();
-            at += length;
+            offset += length;
         }
 
         return result;
     }
 
     // The big-endian number at at, or 0 when the data ends first.
-    private static uint Be32(byte[] data, int at) =>
-        at >= 0 && at + LENGTH_BYTES <= data.Length ? (uint)(data[at] << 24 | data[at + 1] << 16 | data[at + 2] << 8 | data[at + 3]) : 0;
+    private static uint Be32(byte[] data, int offset) =>
+        offset >= 0 && offset + LENGTH_BYTES <= data.Length ? (uint)(data[offset] << 24 | data[offset + 1] << 16 | data[offset + 2] << 8 | data[offset + 3]) : 0;  // joins 4 bytes, most significant first, by shifting each into place
 }

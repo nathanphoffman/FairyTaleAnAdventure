@@ -37,26 +37,26 @@ public static class MinimapPicture
     public static Image Of(uint[] world, (int Column, int Row) hero)
     {
         int left = Math.Clamp(hero.Column - TILES_ACROSS / 2, 0, WorldOverview.COLUMNS - TILES_ACROSS);
-        int top = Math.Clamp(hero.Row - TILES_DOWN / 2, 0, WorldOverview.ROWS - TILES_DOWN);
+        int topEdge = Math.Clamp(hero.Row - TILES_DOWN / 2, 0, WorldOverview.ROWS - TILES_DOWN);
         uint[] pixels = new uint[WIDTH * HEIGHT];
 
-        for (int y = 0; y < HEIGHT; y++)
+        for (int positionY = 0; positionY < HEIGHT; positionY++)
         {
-            for (int x = 0; x < WIDTH; x++)
+            for (int positionX = 0; positionX < WIDTH; positionX++)
             {
-                pixels[y * WIDTH + x] = PixelAt(world, (left, top), x, y);
+                pixels[positionY * WIDTH + positionX] = PixelAt(world, (left, topEdge), positionX, positionY);
             }
         }
 
-        DrawMark(pixels, (FRAME + (int)((hero.Column - left) / ZOOM_OUT), FRAME + (int)((hero.Row - top) * ROW_HEIGHT / ZOOM_OUT) + 1));
+        DrawMark(pixels, (FRAME + (int)((hero.Column - left) / ZOOM_OUT), FRAME + (int)((hero.Row - topEdge) * ROW_HEIGHT / ZOOM_OUT) + 1));
 
         return new Image(0, 0, WIDTH, HEIGHT, pixels);
     }
 
     // One pixel: the two frame lines round the edge, the land inside.
-    private static uint PixelAt(uint[] world, (int Column, int Row) corner, int x, int y)
+    private static uint PixelAt(uint[] world, (int Column, int Row) corner, int positionX, int positionY)
     {
-        int depth = Math.Min(Math.Min(x, WIDTH - 1 - x), Math.Min(y, HEIGHT - 1 - y));
+        int depth = Math.Min(Math.Min(positionX, WIDTH - 1 - positionX), Math.Min(positionY, HEIGHT - 1 - positionY));
 
         if (depth < FRAME)
         {
@@ -64,25 +64,25 @@ public static class MinimapPicture
         }
 
         // Each unit is more than a tile wide on the map, so the land is sampled (nearest tile).
-        int column = corner.Column + (int)((x - FRAME) * ZOOM_OUT);
-        int row = corner.Row + (int)((y - FRAME) / (double)ROW_HEIGHT * ZOOM_OUT);
+        int column = corner.Column + (int)((positionX - FRAME) * ZOOM_OUT);
+        int rowIndex = corner.Row + (int)((positionY - FRAME) / (double)ROW_HEIGHT * ZOOM_OUT);
 
-        return world[row * WorldOverview.COLUMNS + column];
+        return world[rowIndex * WorldOverview.COLUMNS + column];
     }
 
     // The mark centred on a pixel of the picture.
     private static void DrawMark(uint[] pixels, (int X, int Y) centre)
     {
-        for (int dy = -MARK_RADIUS; dy <= MARK_RADIUS; dy++)
+        for (int deltaY = -MARK_RADIUS; deltaY <= MARK_RADIUS; deltaY++)
         {
-            for (int dx = -MARK_RADIUS; dx <= MARK_RADIUS; dx++)
+            for (int deltaX = -MARK_RADIUS; deltaX <= MARK_RADIUS; deltaX++)
             {
-                int x = centre.X + dx;
-                int y = centre.Y + dy;
+                int positionX = centre.X + deltaX;
+                int positionY = centre.Y + deltaY;
 
-                if (x >= 0 && x < WIDTH && y >= 0 && y < HEIGHT)
+                if (positionX >= 0 && positionX < WIDTH && positionY >= 0 && positionY < HEIGHT)
                 {
-                    pixels[y * WIDTH + x] = Math.Max(Math.Abs(dx), Math.Abs(dy)) == MARK_RADIUS ? MARK_RING : MARK_FILL;
+                    pixels[positionY * WIDTH + positionX] = Math.Max(Math.Abs(deltaX), Math.Abs(deltaY)) == MARK_RADIUS ? MARK_RING : MARK_FILL;
                 }
             }
         }

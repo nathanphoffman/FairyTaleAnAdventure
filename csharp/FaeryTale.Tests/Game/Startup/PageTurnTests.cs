@@ -16,7 +16,7 @@ public class PageTurnTests
         return new PageTurn(old, fresh);
     }
 
-    private static uint At(uint[] picture, int x, int y) => picture[y * PageTurn.OUTPUT_WIDTH + x];
+    private static uint At(uint[] picture, int positionX, int positionY) => picture[positionY * PageTurn.OUTPUT_WIDTH + positionX];
 
     [Fact]
     public void ThePageStartsAsTheOldPictureAndEndsAsTheNewOne()

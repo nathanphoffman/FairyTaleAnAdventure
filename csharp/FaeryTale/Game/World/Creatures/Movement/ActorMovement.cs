@@ -19,7 +19,7 @@ internal static class MoveContextProbe
 
     internal static bool TurtleCarries(short nearness, short carrierSlot) => MoveContext.TurtleCarries(nearness, carrierSlot);
 
-    internal static short TurtleHeading(short dir, Func<short, bool> waterAhead) => MoveContext.TurtleHeading(dir, waterAhead);
+    internal static short TurtleHeading(short direction, Func<short, bool> waterAhead) => MoveContext.TurtleHeading(direction, waterAhead);
 
     internal static short? FrustratedFrame(sbyte frustration, short cycle) => MoveContext.FrustratedFrame(frustration, cycle);
 

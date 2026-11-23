@@ -21,6 +21,10 @@ public static class TestScript
     /// A test command has at least tick, name and one number.
     private const int MIN_COMMAND_FIELDS = 3;
 
+    // A click is tick:x:y; a command's optional second number is the fourth field.
+    private const int MIN_CLICK_FIELDS = 3;
+    private const int SECOND_NUMBER_FIELD = 3;
+
     public static List<KeyEvent> KeysFromEnvironment() => ParseKeys(Environment.GetEnvironmentVariable("FTA_INJECT"));
 
     public static List<Click> ClicksFromEnvironment() => ParseClicks(Environment.GetEnvironmentVariable("FTA_CLICK"));
@@ -60,7 +64,7 @@ public static class TestScript
         {
             string[] parts = item.Split(':');
 
-            if (parts.Length >= 3
+            if (parts.Length >= MIN_CLICK_FIELDS
                 && int.TryParse(parts[0], out int tick)
                 && int.TryParse(parts[1], out int x)
                 && int.TryParse(parts[2], out int y))
@@ -87,7 +91,7 @@ public static class TestScript
             }
 
             int first = int.TryParse(parts[2], out int a) ? a : 0;
-            int second = parts.Length > 3 && int.TryParse(parts[3], out int b) ? b : 0;
+            int second = parts.Length > SECOND_NUMBER_FIELD && int.TryParse(parts[SECOND_NUMBER_FIELD], out int b) ? b : 0;
 
             if (KindFor(parts[1]) is { } kind)
             {
@@ -100,7 +104,7 @@ public static class TestScript
 
     private static string[] Items(string? text) => (text ?? "").Split(',');
 
-    private static CommandKind? KindFor(string name) => name switch
+    private static CommandKind? KindFor(string name) => name switch  // switch expression: command name to kind, null if unknown
     {
         "tp" => CommandKind.Teleport,
         "kill" => CommandKind.KillHero,

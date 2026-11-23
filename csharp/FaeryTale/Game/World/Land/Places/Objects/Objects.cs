@@ -113,9 +113,9 @@ public static partial class Objects
 
     /// Changes the object that actor id stands for: flag 1 = show, 2 = take. A chest opens
     /// instead (its id changes to the opened chest, rather than its state).
-    public static void ChangeObject(ObjectLists objects, Actors actors, World world, int id, int flag)
+    public static void ChangeObject(ObjectLists objects, Actors actors, World world, int identifier, int flag)
     {
-        short vitality = actors.List[id].Vitality;
+        short vitality = actors.List[identifier].Vitality;
         int index = vitality & OBJECT_INDEX_MASK;
         WorldObject[] list = (vitality & GLOBAL_LIST_BIT) != 0 ? objects.Global : objects.Region(world.Region);
 

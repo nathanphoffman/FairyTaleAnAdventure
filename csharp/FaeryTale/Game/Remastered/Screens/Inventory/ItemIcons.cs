@@ -58,13 +58,13 @@ public static class ItemIcons
         int height = Math.Max(1, entry.ImgHeight * widthPixels / sprite.Width);
         uint[] pixels = new uint[widthPixels * height];
 
-        for (int y = 0; y < height; y++)
+        for (int positionY = 0; positionY < height; positionY++)
         {
-            for (int x = 0; x < widthPixels; x++)
+            for (int positionX = 0; positionX < widthPixels; positionX++)
             {
-                int source = (entry.ImgOff + y * entry.ImgHeight / height) * sprite.Width + x * sprite.Width / widthPixels;
+                int source = (entry.ImgOff + positionY * entry.ImgHeight / height) * sprite.Width + positionX * sprite.Width / widthPixels;
 
-                pixels[y * widthPixels + x] = source < sprite.Opaque.Length && sprite.Opaque[source] ? palette[sprite.Pixels[source]] : 0;
+                pixels[positionY * widthPixels + positionX] = source < sprite.Opaque.Length && sprite.Opaque[source] ? palette[sprite.Pixels[source]] : 0;
             }
         }
 
@@ -83,13 +83,13 @@ public static class ItemIcons
         int height = rows * ZOOM;
         uint[] pixels = new uint[width * height];
 
-        for (int y = 0; y < height; y++)
+        for (int positionY = 0; positionY < height; positionY++)
         {
-            for (int x = 0; x < width; x++)
+            for (int positionX = 0; positionX < width; positionX++)
             {
-                int source = (firstRow + y / ZOOM) * sprite.Width + x / ZOOM;
+                int source = (firstRow + positionY / ZOOM) * sprite.Width + positionX / ZOOM;
 
-                pixels[y * width + x] = source < sprite.Opaque.Length && sprite.Opaque[source] ? palette[sprite.Pixels[source]] : 0;
+                pixels[positionY * width + positionX] = source < sprite.Opaque.Length && sprite.Opaque[source] ? palette[sprite.Pixels[source]] : 0;
             }
         }
 

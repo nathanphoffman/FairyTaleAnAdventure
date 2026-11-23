@@ -12,7 +12,7 @@ public sealed partial class Recorder
 
     public void SetPanelVisible(bool visible) => Record("SetPanelVisible", visible);
 
-    public void SetZoomSize(int x, int y) => Record("SetZoomSize", x, y);
+    public void SetZoomSize(int positionX, int positionY) => Record("SetZoomSize", positionX, positionY);
 
     public void LoadPictureToDrawingPage(string name) => Record("LoadPictureToDrawingPage", Quote(name));
 }

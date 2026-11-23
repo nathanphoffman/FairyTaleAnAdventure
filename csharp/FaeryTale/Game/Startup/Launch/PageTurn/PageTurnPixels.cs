@@ -5,7 +5,7 @@ namespace FaeryTale.Game.Startup;
 internal sealed partial class PageTurn
 {
     // The mean colour of a row of a page from one column to another.
-    private static uint Average(Flap flap, int row)
+    private static uint Average(Flap flap, int rowIndex)
     {
         uint red = 0;
         uint green = 0;
@@ -13,23 +13,23 @@ internal sealed partial class PageTurn
 
         for (int column = flap.FirstColumn; column <= flap.LastColumn; column++)
         {
-            uint color = flap.Source[row * PAGE_WIDTH + column];
+            uint color = flap.Source[rowIndex * PAGE_WIDTH + column];
 
-            red += (color >> 16) & CHANNEL_MASK;
-            green += (color >> 8) & CHANNEL_MASK;
+            red += (color >> RED_SHIFT) & CHANNEL_MASK; // unpack the red byte from 0xAARRGGBB
+            green += (color >> GREEN_SHIFT) & CHANNEL_MASK; // unpack the green byte
             blue += color & CHANNEL_MASK;
         }
 
         uint count = (uint)(flap.LastColumn - flap.FirstColumn + 1);
 
-        return OPAQUE | (red / count << 16) | (green / count << 8) | (blue / count);
+        return OPAQUE | (red / count << RED_SHIFT) | (green / count << GREEN_SHIFT) | (blue / count); // average each channel, then shift it back into its byte and OR together
     }
 
     // A colour with each channel multiplied by a factor from 0 to 1.
     private static uint Scale(uint color, double factor)
     {
-        uint Part(int shift) => (uint)(((color >> shift) & CHANNEL_MASK) * factor) << shift;
+        uint Part(int shift) => (uint)(((color >> shift) & CHANNEL_MASK) * factor) << shift; // pull one channel out, scale it, and shift it back into place
 
-        return OPAQUE | Part(16) | Part(8) | Part(0);
+        return OPAQUE | Part(RED_SHIFT) | Part(GREEN_SHIFT) | Part(0);
     }
 }

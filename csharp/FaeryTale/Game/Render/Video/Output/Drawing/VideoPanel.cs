@@ -8,7 +8,7 @@ namespace FaeryTale.Game.Render;
 /// Video: the compass, item list, overview map and panel.
 public sealed partial class Video
 {
-    public void DrawCompass(short dir) => ScreenEffects.DrawCompass(Screen, dir);
+    public void DrawCompass(short direction) => ScreenEffects.DrawCompass(Screen, direction);
 
     public void DrawItemList(Hero hero)
     {
@@ -23,13 +23,13 @@ public sealed partial class Video
         OverviewMap.DrawOverviewMap(this, map, world, mx, my);
     }
 
-    public void MarkOverviewMap((int X, int Y)? at)
+    public void MarkOverviewMap((int X, int Y)? offset)
     {
         Screen.GetPort(PortId.Map).Target = Screen.DrawTarget;
         Screen.SetDrawMode(PortId.Map, Drawing.JAM1);
         Screen.SetAPen(PortId.Map, MAP_MARK_PEN);
 
-        if (at is { } place)
+        if (offset is { } place)
         {
             Screen.MoveTo(PortId.Map, place.X, place.Y);
             Screen.Text(PortId.Map, "+"u8);

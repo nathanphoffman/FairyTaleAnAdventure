@@ -29,7 +29,7 @@ public readonly record struct BubbleLayout(int Left, int Top, int Scale)
     public static int HeightOf(int rowCount) => Math.Max(FACE_SIZE, ButtonTop(rowCount));
 
     /// How wide a board is in units: the things for sale have longer words.
-    public static int WidthOf(Row row) => row.Kind == RowKind.Item ? ITEM_WIDTH : BUTTON_WIDTH;
+    public static int WidthOf(Row rowIndex) => rowIndex.Kind == RowKind.Item ? ITEM_WIDTH : BUTTON_WIDTH;
 
     /// Where the bubble goes for a person standing at a world position, kept inside the window.
     public static BubbleLayout For(WorldView view, (int X, int Y) person, int rowCount)
@@ -37,11 +37,11 @@ public readonly record struct BubbleLayout(int Left, int Top, int Scale)
         int scale = Math.Max(1, (int)Math.Round((double)view.Height / PIXELS_PER_UNIT_HEIGHT));
         (double headX, double headY) = view.ToScreen(person.X, person.Y - HEAD_HEIGHT);
         int left = (int)headX - FACE_SIZE * scale / 2;
-        int top = (int)headY - (FACE_SIZE + HEAD_GAP) * scale;
+        int topEdge = (int)headY - (FACE_SIZE + HEAD_GAP) * scale;
 
         return new BubbleLayout(
             Math.Clamp(left, 0, Math.Max(0, view.Width - Width * scale)),
-            Math.Clamp(top, 0, Math.Max(0, view.Height - HeightOf(rowCount) * scale)),
+            Math.Clamp(topEdge, 0, Math.Max(0, view.Height - HeightOf(rowCount) * scale)),
             scale);
     }
 
@@ -54,12 +54,12 @@ public readonly record struct BubbleLayout(int Left, int Top, int Scale)
     /// Which row a window pixel is on, if any.
     public int? RowAt(int pixelX, int pixelY, IReadOnlyList<Row> rows)
     {
-        int x = FloorDivide(pixelX - Left, Scale) - ButtonLeft;
-        int y = FloorDivide(pixelY - Top, Scale);
+        int positionX = FloorDivide(pixelX - Left, Scale) - ButtonLeft;
+        int positionY = FloorDivide(pixelY - Top, Scale);
 
         for (int index = 0; index < rows.Count; index++)
         {
-            if (x >= 0 && x < WidthOf(rows[index]) && y >= ButtonTop(index) && y < ButtonTop(index) + BUTTON_HEIGHT)
+            if (positionX >= 0 && positionX < WidthOf(rows[index]) && positionY >= ButtonTop(index) && positionY < ButtonTop(index) + BUTTON_HEIGHT)
             {
                 return index;
             }

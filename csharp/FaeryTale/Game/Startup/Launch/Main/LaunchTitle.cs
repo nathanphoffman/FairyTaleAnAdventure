@@ -61,11 +61,11 @@ public static partial class Launch
     {
         PrepareBluePage(game, video);
 
-        byte pen = video.Screen.GetPort(PortId.Map).Pen.Fg;
+        byte penColor = video.Screen.GetPort(PortId.Map).Pen.Fg;
 
         video.Screen.SetAPen(PortId.Map, TITLE_PEN);
         TextRoutines.PrintPositioned(video, StoryText.TITLE_TEXT);
-        video.Screen.SetAPen(PortId.Map, pen);
+        video.Screen.SetAPen(PortId.Map, penColor);
 
         SkippableDelay(game, video, TitleWait());
 

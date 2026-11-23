@@ -23,6 +23,36 @@ public static class Stone
 
     private const uint OUTLINE = 0xff1c_1c20;
 
+    // Value noise is centred on its midpoint of 0..1 so blotches and speckle go both lighter and darker.
+    private const double NOISE_MIDPOINT = 0.5;
+
+    // Speckle spreads its pixel coordinates with these multipliers and offsets so rows and columns differ.
+    private const int SPECKLE_X_MULTIPLIER = 7;
+    private const int SPECKLE_X_OFFSET = 3;
+    private const int SPECKLE_Y_MULTIPLIER = 13;
+    private const int SPECKLE_Y_OFFSET = 5;
+
+    // Large primes used by the coordinate hash to scramble x, y and the seed.
+    private const int HASH_X_PRIME = 374761393;
+    private const int HASH_Y_PRIME = 668265263;
+    private const uint HASH_SEED_PRIME = 2246822519u;
+    private const uint HASH_SPREAD_PRIME = 1274126177u;
+
+    // Hash bit folding: the first shift and the final shift (half of 32 bits).
+    private const int HASH_FIRST_SHIFT = 13;
+    private const int HASH_FINAL_SHIFT = 16;
+
+    // The low 16 bits of the hash become the 0 to 1 noise value.
+    private const uint HASH_LOW_MASK = 0xffff;
+    private const double HASH_LOW_MAX = 65535.0;
+
+    // Colour channel limits and the ARGB packing of a grey.
+    private const int CHANNEL_MAX = 255;
+    private const uint OPAQUE_ALPHA = 0xff00_0000;
+    private const int RED_SHIFT = 16;
+    private const int GREEN_SHIFT = 8;
+    private const uint BLUISH_EXTRA = 6;
+
     /// A slab width x height pixels as 0xAARRGGBB. seed makes each slab's pattern different.
     public static uint[] Slab(int width, int height, uint seed) => Make(width, height, seed, 0);
 
@@ -34,11 +64,11 @@ public static class Stone
     {
         uint[] pixels = new uint[width * height];
 
-        for (int y = 0; y < height; y++)
+        for (int positionY = 0; positionY < height; positionY++)
         {
-            for (int x = 0; x < width; x++)
+            for (int positionX = 0; positionX < width; positionX++)
             {
-                pixels[y * width + x] = PixelAt(x, y, (width, height), seed, lift);
+                pixels[positionY * width + positionX] = PixelAt(positionX, positionY, (width, height), seed, lift);
             }
         }
 
@@ -46,20 +76,20 @@ public static class Stone
     }
 
     // One pixel: the outline round the slab, the bevel inside it, then the stone itself.
-    private static uint PixelAt(int x, int y, (int Width, int Height) size, uint seed, int lift)
+    private static uint PixelAt(int positionX, int positionY, (int Width, int Height) size, uint seed, int lift)
     {
-        if (x == 0 || y == 0 || x == size.Width - 1 || y == size.Height - 1)
+        if (positionX == 0 || positionY == 0 || positionX == size.Width - 1 || positionY == size.Height - 1)
         {
             return OUTLINE;
         }
 
-        int grey = BASE_GREY + Blotch(x, y, seed) + Speckle(x, y, seed) + lift;
+        int grey = BASE_GREY + Blotch(positionX, positionY, seed) + Speckle(positionX, positionY, seed) + lift;
 
-        if (x <= BEVEL || y <= BEVEL)
+        if (positionX <= BEVEL || positionY <= BEVEL)
         {
             grey += BEVEL_STEP;
         }
-        else if (x >= size.Width - 1 - BEVEL || y >= size.Height - 1 - BEVEL)
+        else if (positionX >= size.Width - 1 - BEVEL || positionY >= size.Height - 1 - BEVEL)
         {
             grey -= BEVEL_STEP;
         }
@@ -68,39 +98,39 @@ public static class Stone
     }
 
     // Soft patches: value noise, smoothly mixed between the corners of a grid square.
-    private static int Blotch(int x, int y, uint seed)
+    private static int Blotch(int positionX, int positionY, uint seed)
     {
-        int cellX = x / BLOTCH_SIZE;
-        int cellY = y / BLOTCH_SIZE;
-        double across = (x % BLOTCH_SIZE) / (double)BLOTCH_SIZE;
-        double down = (y % BLOTCH_SIZE) / (double)BLOTCH_SIZE;
-        double top = Mix(Noise(cellX, cellY, seed), Noise(cellX + 1, cellY, seed), across);
+        int cellX = positionX / BLOTCH_SIZE;
+        int cellY = positionY / BLOTCH_SIZE;
+        double across = (positionX % BLOTCH_SIZE) / (double)BLOTCH_SIZE;
+        double down = (positionY % BLOTCH_SIZE) / (double)BLOTCH_SIZE;
+        double topEdge = Mix(Noise(cellX, cellY, seed), Noise(cellX + 1, cellY, seed), across);
         double bottom = Mix(Noise(cellX, cellY + 1, seed), Noise(cellX + 1, cellY + 1, seed), across);
 
-        return (int)((Mix(top, bottom, down) - 0.5) * BLOTCH_RANGE);
+        return (int)((Mix(topEdge, bottom, down) - NOISE_MIDPOINT) * BLOTCH_RANGE);
     }
 
     // Fine grain, a different value for every pixel.
-    private static int Speckle(int x, int y, uint seed) => (int)((Noise(x * 7 + 3, y * 13 + 5, seed ^ 0x9e37u) - 0.5) * SPECKLE_RANGE);
+    private static int Speckle(int positionX, int positionY, uint seed) => (int)((Noise(positionX * SPECKLE_X_MULTIPLIER + SPECKLE_X_OFFSET, positionY * SPECKLE_Y_MULTIPLIER + SPECKLE_Y_OFFSET, seed ^ 0x9e37u) - NOISE_MIDPOINT) * SPECKLE_RANGE);
 
     private static double Mix(double from, double to, double part) => from + (to - from) * part;
 
     // A repeatable number from 0 to 1 for a place (a small hash of the coordinates).
-    private static double Noise(int x, int y, uint seed)
+    private static double Noise(int positionX, int positionY, uint seed)
     {
-        uint hash = unchecked((uint)(x * 374761393 + y * 668265263) ^ seed * 2246822519u);
+        uint hash = unchecked((uint)(positionX * HASH_X_PRIME + positionY * HASH_Y_PRIME) ^ seed * HASH_SEED_PRIME);  // multiply by large primes to scramble x, y and seed, XOR mixes them
 
-        hash = unchecked((hash ^ (hash >> 13)) * 1274126177u);
-        hash ^= hash >> 16;
+        hash = unchecked((hash ^ (hash >> HASH_FIRST_SHIFT)) * HASH_SPREAD_PRIME);  // fold high bits down with shift+XOR, then multiply to spread bits
+        hash ^= hash >> HASH_FINAL_SHIFT;  // fold the top 16 bits into the bottom for final mixing
 
-        return (hash & 0xffff) / 65535.0;
+        return (hash & HASH_LOW_MASK) / HASH_LOW_MAX;
     }
 
     // A grey of a brightness (kept in range), slightly bluish like cold stone.
     private static uint Grey(int brightness)
     {
-        uint level = (uint)Math.Clamp(brightness, 0, 255);
+        uint level = (uint)Math.Clamp(brightness, 0, CHANNEL_MAX);
 
-        return 0xff00_0000 | level << 16 | level << 8 | Math.Min(level + 6, 255u);
+        return OPAQUE_ALPHA | level << RED_SHIFT | level << GREEN_SHIFT | Math.Min(level + BLUISH_EXTRA, (uint)CHANNEL_MAX);  // pack ARGB: alpha 0xff, level in red and green, blue a bit brighter
     }
 }

@@ -28,6 +28,8 @@ public static class InventoryPicture
     private const int TITLE_BASELINE = 14;
     private const int SECTION_TITLE_BASELINE = 9;
     private const int COUNT_INSET = 3;
+    private const int GOLD_RIGHT_GAP = 24;
+    private const int DETAIL_TEXT_INDENT = 8;
     private const uint DETAIL_BACKGROUND = 0xff2a_2a30;
 
     // The detail area's two lines: where the first one's baseline is and how far apart they are.
@@ -71,7 +73,7 @@ public static class InventoryPicture
         MenuStyle.AddText(overlay, "Inventory", (TITLE_X, InventoryLayout.PANEL_TOP + TITLE_BASELINE + GLYPH_ASCENT), MenuStyle.TITLE_COLOR, TITLE_SCALE);
 
         string gold = $"Gold {game.Hero.Wealth}";
-        int goldLeft = InventoryLayout.CloseCorner.X - 24 - Overlay.TextWidth(gold, TEXT_SCALE);
+        int goldLeft = InventoryLayout.CloseCorner.X - GOLD_RIGHT_GAP - Overlay.TextWidth(gold, TEXT_SCALE);
 
         MenuStyle.AddText(overlay, gold, (goldLeft, InventoryLayout.PANEL_TOP + TITLE_BASELINE + GLYPH_ASCENT), MenuStyle.HEADING_COLOR, TEXT_SCALE);
 
@@ -122,13 +124,13 @@ public static class InventoryPicture
 
     // One line of the detail area (0 is the first).
     private static void AddDetailLine(Overlay overlay, string text, int line) =>
-        MenuStyle.AddText(overlay, text, (InventoryLayout.DETAIL_LEFT + 8, InventoryLayout.DETAIL_TOP + DETAIL_FIRST_BASELINE + line * DETAIL_LINE_HEIGHT), line == 0 ? MenuStyle.DESCRIPTION_COLOR : MenuStyle.HEADING_COLOR, TEXT_SCALE);
+        MenuStyle.AddText(overlay, text, (InventoryLayout.DETAIL_LEFT + DETAIL_TEXT_INDENT, InventoryLayout.DETAIL_TOP + DETAIL_FIRST_BASELINE + line * DETAIL_LINE_HEIGHT), line == 0 ? MenuStyle.DESCRIPTION_COLOR : MenuStyle.HEADING_COLOR, TEXT_SCALE);
 
     private static string DetailText(Data.Game game, InventoryItem item)
     {
         int count = InventoryActions.CountOf(game, item.Slot);
         string name = InfernoSkull.NameOf(game, item.Slot);
-        string state = InventoryActions.IsEquipped(game, item.Slot) ? "  (in hand)" : count > 1 ? $"  x{count}" : "";
+        string state = InventoryActions.IsEquipped(game, item.Slot) ? "  (in hand)" : count > 1 ? $"  x{count}" : "";  // equipped wins, else show count if more than one, else blank
 
         return $"{name}{state}   {InventoryActions.HintFor(item)}";
     }
@@ -166,11 +168,11 @@ public static class InventoryPicture
             uint[] stone = lit ? Stone.LitSlab(width, height, CELL_SEED) : Stone.Slab(width, height, CELL_SEED);
             uint[] pixels = new uint[width * height];
 
-            for (int y = 0; y < height; y++)
+            for (int positionY = 0; positionY < height; positionY++)
             {
-                for (int x = 0; x < width; x++)
+                for (int positionX = 0; positionX < width; positionX++)
                 {
-                    pixels[y * width + x] = CellPixel(stone[y * width + x], x, y, equipped);
+                    pixels[positionY * width + positionX] = CellPixel(stone[positionY * width + positionX], positionX, positionY, equipped);
                 }
             }
 
@@ -182,13 +184,13 @@ public static class InventoryPicture
     }
 
     // One pixel of a square: the checkerboard edge, the gold ring just inside it, else the stone.
-    private static uint CellPixel(uint stone, int x, int y, bool equipped)
+    private static uint CellPixel(uint stone, int positionX, int positionY, bool equipped)
     {
-        int depth = Math.Min(Math.Min(x, InventoryLayout.CELL_WIDTH - 1 - x), Math.Min(y, InventoryLayout.CELL_HEIGHT - 1 - y));
+        int depth = Math.Min(Math.Min(positionX, InventoryLayout.CELL_WIDTH - 1 - positionX), Math.Min(positionY, InventoryLayout.CELL_HEIGHT - 1 - positionY));
 
         if (depth < EDGE)
         {
-            return (x / EDGE + y / EDGE) % 2 == 0 ? EDGE_LIGHT : EDGE_DARK;
+            return (positionX / EDGE + positionY / EDGE) % 2 == 0 ? EDGE_LIGHT : EDGE_DARK;
         }
 
         return equipped && depth < EDGE + RING ? GOLD : stone;

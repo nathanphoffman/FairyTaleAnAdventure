@@ -113,11 +113,11 @@ public sealed class Scene
     }
 
     // Sets a frame pixel if it lies inside the frame.
-    internal static void PutPixel(uint[] frame, int x, int y, uint color)
+    internal static void PutPixel(uint[] frame, int positionX, int positionY, uint color)
     {
-        if (x >= 0 && x < FRAME_WIDTH && y >= 0 && y < frame.Length / FRAME_WIDTH)
+        if (positionX >= 0 && positionX < FRAME_WIDTH && positionY >= 0 && positionY < frame.Length / FRAME_WIDTH)
         {
-            frame[y * FRAME_WIDTH + x] = color;
+            frame[positionY * FRAME_WIDTH + positionX] = color;
         }
     }
 
@@ -126,10 +126,10 @@ public sealed class Scene
     {
         Bitmap bitmap = viewPort.Bitmap;
 
-        for (int row = 0; row < viewPort.Size.Height; row++)
+        for (int rowIndex = 0; rowIndex < viewPort.Size.Height; rowIndex++)
         {
-            int sourceY = viewPort.Scroll.Y + row;
-            int outY = viewPort.Position.Y + row;
+            int sourceY = viewPort.Scroll.Y + rowIndex;
+            int outY = viewPort.Position.Y + rowIndex;
 
             if (sourceY < 0 || sourceY >= bitmap.Rows || outY < 0 || outY >= FRAME_HEIGHT)
             {
@@ -164,7 +164,7 @@ public sealed class Scene
 
     /// Draws the pointer on a frame of any size with its top left corner at a pixel, each pixel of
     /// the sprite a square of pixelSize frame pixels (used by the native size drawing).
-    public void DrawPointerAtPixel(uint[] frame, int width, (int X, int Y) at, int pixelSize)
+    public void DrawPointerAtPixel(uint[] frame, int width, (int X, int Y) offset, int pixelSize)
     {
         ViewPort? pointerColors = ViewPorts.FirstOrDefault(viewPort => viewPort.ShowsPointer);
 
@@ -196,21 +196,21 @@ public sealed class Scene
 
                 if (value != 0 && POINTER_FIRST_COLOR + value < pointerColors.Colors.Length)
                 {
-                    FillSquare(frame, (width, height), (at.X + bit * pixelSize, at.Y + line * pixelSize), pixelSize, Rgb4(pointerColors.Colors[POINTER_FIRST_COLOR + value]));
+                    FillSquare(frame, (width, height), (offset.X + bit * pixelSize, offset.Y + line * pixelSize), pixelSize, Rgb4(pointerColors.Colors[POINTER_FIRST_COLOR + value]));
                 }
             }
         }
     }
 
     // A square of one colour (opaque), where it is on the frame.
-    private static void FillSquare(uint[] frame, (int Width, int Height) size, (int X, int Y) at, int side, uint color)
+    private static void FillSquare(uint[] frame, (int Width, int Height) size, (int X, int Y) offset, int side, uint color)
     {
-        for (int y = Math.Max(at.Y, 0); y < Math.Min(at.Y + side, size.Height); y++)
+        for (int positionY = Math.Max(offset.Y, 0); positionY < Math.Min(offset.Y + side, size.Height); positionY++)
         {
-            int start = Math.Min(Math.Max(at.X, 0), size.Width);
-            int end = Math.Clamp(at.X + side, start, size.Width);
+            int start = Math.Min(Math.Max(offset.X, 0), size.Width);
+            int end = Math.Clamp(offset.X + side, start, size.Width);
 
-            Array.Fill(frame, OPAQUE_ALPHA | color, y * size.Width + start, end - start);
+            Array.Fill(frame, OPAQUE_ALPHA | color, positionY * size.Width + start, end - start);
         }
     }
 
@@ -236,7 +236,7 @@ public sealed class Scene
     // Draws one line of the pointer sprite. A 32 bit value holds two 16 pixel rows of a bitplane.
     private static void DrawPointerLine(uint[] frame, ushort[] colors, uint word, (int X, int Y) origin)
     {
-        ushort a = (ushort)(word >> HIGH_WORD_SHIFT);
+        ushort a = (ushort)(word >> HIGH_WORD_SHIFT);  // top 16 bits of the word are plane a
         ushort b = (ushort)word;
 
         for (int bit = 0; bit < POINTER_WIDTH; bit++)
@@ -251,9 +251,9 @@ public sealed class Scene
                 continue;
             }
 
-            for (int dx = 0; dx < LORES_SCALE; dx++)
+            for (int deltaX = 0; deltaX < LORES_SCALE; deltaX++)
             {
-                PutPixel(frame, origin.X + bit * LORES_SCALE + dx, origin.Y, Rgb4(colors[POINTER_FIRST_COLOR + value]));
+                PutPixel(frame, origin.X + bit * LORES_SCALE + deltaX, origin.Y, Rgb4(colors[POINTER_FIRST_COLOR + value]));
             }
         }
     }

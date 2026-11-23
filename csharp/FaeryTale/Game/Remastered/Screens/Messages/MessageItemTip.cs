@@ -48,10 +48,10 @@ public static class MessageItemTip
         for (int index = 0; index < window.Count; index++)
         {
             int baseline = NEWEST_BASELINE - (window.Count - 1 - index) * LINE_HEIGHT;
-            int top = PANEL_TOP_ROW + (baseline - ASCENT_LINES) * ROWS_PER_LINE;
+            int topEdge = PANEL_TOP_ROW + (baseline - ASCENT_LINES) * ROWS_PER_LINE;
             int bottom = PANEL_TOP_ROW + (baseline + DESCENT_LINES) * ROWS_PER_LINE;
 
-            if (place.Y < top || place.Y >= bottom)
+            if (place.Y < topEdge || place.Y >= bottom)
             {
                 continue;
             }
@@ -62,7 +62,7 @@ public static class MessageItemTip
 
                 if (place.X >= left && place.X < left + WidthOf(window[index].AsSpan(word.Start, word.Length), advanceOf))
                 {
-                    return (word.Slot, left, top);
+                    return (word.Slot, left, topEdge);
                 }
             }
         }
@@ -83,22 +83,22 @@ public static class MessageItemTip
     }
 
     // The box above the line: the name, then what the item does when it has something to say.
-    private static void Add(Overlay overlay, Data.Game game, int slot, int left, int top)
+    private static void Add(Overlay overlay, Data.Game game, int slot, int left, int topEdge)
     {
         string name = InfernoSkull.NameOf(game, slot);
         string detail = ItemStats.For(slot);
         int lines = detail.Length > 0 ? 2 : 1;
         int width = Math.Max(Overlay.TextWidth(name, 1), Overlay.TextWidth(detail, 1)) + 2 * PADDING;
         int height = 2 * PADDING + (lines - 1) * LINE_ADVANCE + GLYPH_ASCENT;
-        int x = Math.Clamp(left, 0, Math.Max(0, Overlay.WIDTH - width));
-        int y = top - GAP - height;
+        int positionX = Math.Clamp(left, 0, Math.Max(0, Overlay.WIDTH - width));
+        int positionY = topEdge - GAP - height;
 
-        overlay.Shades.Add(new Shade(x, y, width, height, DARKNESS));
-        MenuStyle.AddText(overlay, name, (x + PADDING, y + PADDING + GLYPH_ASCENT), MenuStyle.TITLE_COLOR, 1);
+        overlay.Shades.Add(new Shade(positionX, positionY, width, height, DARKNESS));
+        MenuStyle.AddText(overlay, name, (positionX + PADDING, positionY + PADDING + GLYPH_ASCENT), MenuStyle.TITLE_COLOR, 1);
 
         if (detail.Length > 0)
         {
-            MenuStyle.AddText(overlay, detail, (x + PADDING, y + PADDING + LINE_ADVANCE + GLYPH_ASCENT), MenuStyle.DESCRIPTION_COLOR, 1);
+            MenuStyle.AddText(overlay, detail, (positionX + PADDING, positionY + PADDING + LINE_ADVANCE + GLYPH_ASCENT), MenuStyle.DESCRIPTION_COLOR, 1);
         }
     }
 }

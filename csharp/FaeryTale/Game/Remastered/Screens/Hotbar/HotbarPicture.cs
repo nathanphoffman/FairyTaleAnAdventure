@@ -101,11 +101,11 @@ public static class HotbarPicture
         string detail = slot.IsSpell ? $"{Hotbar.KeyOf(slot.Item)} or click to cast. {ItemStats.For(slot.Item)}" : $"Click to equip. {ItemStats.For(slot.Item)}";
         int width = Math.Max(Overlay.TextWidth(name, NAME_SCALE), Overlay.TextWidth(detail, 1)) + 2 * TIP_PADDING;
         int left = Math.Clamp(slot.X + geometry.SlotSize / 2 - width / 2, 0, Math.Max(0, geometry.WindowWidth - width));
-        int top = geometry.BoardTop - 2 * TIP_PADDING - TIP_LINE_HEIGHT - TIP_GAP;
+        int topEdge = geometry.BoardTop - 2 * TIP_PADDING - TIP_LINE_HEIGHT - TIP_GAP;
 
-        overlay.Shades.Add(new Shade(left, top, width, 2 * TIP_PADDING + TIP_LINE_HEIGHT + GLYPH_ASCENT, TIP_DARKNESS));
-        MenuStyle.AddText(overlay, name, (left + TIP_PADDING, top + TIP_PADDING + GLYPH_ASCENT * NAME_SCALE), MenuStyle.TITLE_COLOR, NAME_SCALE);
-        MenuStyle.AddText(overlay, detail, (left + TIP_PADDING, top + TIP_PADDING + TIP_LINE_HEIGHT + GLYPH_ASCENT), MenuStyle.DESCRIPTION_COLOR, 1);
+        overlay.Shades.Add(new Shade(left, topEdge, width, 2 * TIP_PADDING + TIP_LINE_HEIGHT + GLYPH_ASCENT, TIP_DARKNESS));
+        MenuStyle.AddText(overlay, name, (left + TIP_PADDING, topEdge + TIP_PADDING + GLYPH_ASCENT * NAME_SCALE), MenuStyle.TITLE_COLOR, NAME_SCALE);
+        MenuStyle.AddText(overlay, detail, (left + TIP_PADDING, topEdge + TIP_PADDING + TIP_LINE_HEIGHT + GLYPH_ASCENT), MenuStyle.DESCRIPTION_COLOR, 1);
     }
 
     // The white dotted line round a square that is queued for when the game goes on: dashes along the
@@ -116,13 +116,13 @@ public static class HotbarPicture
         {
             uint[] pixels = new uint[size * size];
 
-            for (int y = 0; y < size; y++)
+            for (int positionY = 0; positionY < size; positionY++)
             {
-                for (int x = 0; x < size; x++)
+                for (int positionX = 0; positionX < size; positionX++)
                 {
-                    int depth = Math.Min(Math.Min(x, size - 1 - x), Math.Min(y, size - 1 - y));
+                    int depth = Math.Min(Math.Min(positionX, size - 1 - positionX), Math.Min(positionY, size - 1 - positionY));
 
-                    pixels[y * size + x] = depth < QUEUED_THICKNESS && (x + y) / DASH_LENGTH % 2 == 0 ? WHITE : 0;
+                    pixels[positionY * size + positionX] = depth < QUEUED_THICKNESS && (positionX + positionY) / DASH_LENGTH % 2 == 0 ? WHITE : 0;
                 }
             }
 
@@ -141,13 +141,13 @@ public static class HotbarPicture
             uint[] stone = lit ? Stone.LitSlab(size, size, STONE_SEED) : Stone.Slab(size, size, STONE_SEED);
             uint[] pixels = new uint[size * size];
 
-            for (int y = 0; y < size; y++)
+            for (int positionY = 0; positionY < size; positionY++)
             {
-                for (int x = 0; x < size; x++)
+                for (int positionX = 0; positionX < size; positionX++)
                 {
-                    int depth = Math.Min(Math.Min(x, size - 1 - x), Math.Min(y, size - 1 - y));
+                    int depth = Math.Min(Math.Min(positionX, size - 1 - positionX), Math.Min(positionY, size - 1 - positionY));
 
-                    pixels[y * size + x] = depth < BORDER ? BLACK : equipped && depth < BORDER + RING ? GOLD : stone[y * size + x];
+                    pixels[positionY * size + positionX] = depth < BORDER ? BLACK : equipped && depth < BORDER + RING ? GOLD : stone[positionY * size + positionX]; // black border, then gold ring if equipped, else stone
                 }
             }
 

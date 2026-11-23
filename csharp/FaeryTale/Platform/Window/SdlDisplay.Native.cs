@@ -20,6 +20,14 @@ public sealed partial class SdlDisplay
     /// The last milliseconds of a wait are spent looking at the clock, because sleeping is not exact.
     private const double SPIN_MS = 1.0;
 
+    private const double MILLISECONDS_PER_SECOND = 1000.0;
+
+    /// How often the frame rate is printed, in milliseconds.
+    private const double FRAME_LOG_INTERVAL_MS = 1000.0;
+
+    /// Clock checks made in a row while spinning, before looking at the time again.
+    private const int SPIN_WAIT_ITERATIONS = 50;
+
     private readonly NativePresenter nativePresenter = new();
     private readonly Stopwatch clock = Stopwatch.StartNew();
     private bool nativeApplied;
@@ -185,7 +193,7 @@ public sealed partial class SdlDisplay
     // gets some steps with two pictures and some with one.
     private void ShowPicturesUntil(double tickEnd, bool monitorSync, (Scene Scene, Video? Video) source, (int Width, int Height) size)
     {
-        double interval = monitorSync ? RefreshIntervalMs() : 1000.0 / WindowControls.FrameRate;
+        double interval = monitorSync ? RefreshIntervalMs() : MILLISECONDS_PER_SECOND / WindowControls.FrameRate;
         double scheduled = Math.Max(nextPictureMs, clock.Elapsed.TotalMilliseconds);
 
         while (scheduled < tickEnd)
@@ -233,10 +241,10 @@ public sealed partial class SdlDisplay
 
         if (SDL_GetCurrentDisplayMode(display, out SDL_DisplayMode mode) == 0 && mode.refresh_rate > 0)
         {
-            return 1000.0 / mode.refresh_rate;
+            return MILLISECONDS_PER_SECOND / mode.refresh_rate;
         }
 
-        return 1000.0 / DEFAULT_REFRESH_HZ;
+        return MILLISECONDS_PER_SECOND / DEFAULT_REFRESH_HZ;
     }
 
     // FTA_FPS_LOG=1 prints how many pictures a second were shown (to see if the machine keeps up).
@@ -246,7 +254,7 @@ public sealed partial class SdlDisplay
 
         double now = clock.Elapsed.TotalMilliseconds;
 
-        if (logFrameRate && now - lastLogMs >= 1000)
+        if (logFrameRate && now - lastLogMs >= FRAME_LOG_INTERVAL_MS)
         {
             Console.Error.WriteLine($"{framesShown} pictures and {ticksCounted} game steps a second at {width}x{height}, zoom {WorldView.Current.Zoom:F2}");
             Console.Error.WriteLine("    " + timings.TakeReport());
@@ -272,7 +280,7 @@ public sealed partial class SdlDisplay
 
         while (clock.Elapsed.TotalMilliseconds < milliseconds)
         {
-            Thread.SpinWait(50);
+            Thread.SpinWait(SPIN_WAIT_ITERATIONS);
         }
     }
 
@@ -290,12 +298,12 @@ public sealed partial class SdlDisplay
     }
 
     // A window point to a pixel of the drawing area (the two differ on a screen with a scaling).
-    private (int X, int Y) ToOutputPixels(int x, int y)
+    private (int X, int Y) ToOutputPixels(int positionX, int positionY)
     {
         SDL_GetWindowSize(window, out int windowWidth, out int windowHeight);
         (int outputWidth, int outputHeight) = NativePresenter.OutputSize(renderer);
 
-        return (x * outputWidth / Math.Max(windowWidth, 1), y * outputHeight / Math.Max(windowHeight, 1));
+        return (positionX * outputWidth / Math.Max(windowWidth, 1), positionY * outputHeight / Math.Max(windowHeight, 1));
     }
 
     // The mouse wheel zooms the world in (up) and out (down), or over the text panel scrolls the

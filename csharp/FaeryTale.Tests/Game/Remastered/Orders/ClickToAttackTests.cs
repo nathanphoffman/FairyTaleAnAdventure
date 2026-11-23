@@ -6,12 +6,12 @@ namespace FaeryTale.Tests;
 public class ClickToAttackTests
 {
     // A game with one enemy standing at a place (actor 1).
-    private static FaeryTale.Game.Data.Game GameWithEnemyAt(int x, int y)
+    private static FaeryTale.Game.Data.Game GameWithEnemyAt(int positionX, int positionY)
     {
         FaeryTale.Game.Data.Game game = new();
         Shape enemy = game.Actors.List[1];
 
-        (enemy.Kind, enemy.State, enemy.Vitality, enemy.AbsX, enemy.AbsY) = (ActorKind.ENEMY, ActorState.WALKING, 10, (ushort)x, (ushort)y);
+        (enemy.Kind, enemy.State, enemy.Vitality, enemy.AbsX, enemy.AbsY) = (ActorKind.ENEMY, ActorState.WALKING, 10, (ushort)positionX, (ushort)positionY);
         game.Actors.Drawn = 2;
 
         return game;

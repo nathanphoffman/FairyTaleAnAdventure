@@ -80,14 +80,14 @@ public static class HotbarLayout
     private static void AddGroup(List<HotbarSlot> slots, HotbarGeometry geometry, IReadOnlyList<int> items, bool isSpell, (int Left, int Columns) place)
     {
         int rows = (items.Count + place.Columns - 1) / place.Columns;
-        int top = geometry.CenterY - (rows * geometry.SlotSize + (rows - 1) * GAP) / 2;
+        int topEdge = geometry.CenterY - (rows * geometry.SlotSize + (rows - 1) * GAP) / 2;
 
         for (int index = 0; index < items.Count; index++)
         {
-            int x = place.Left + index % place.Columns * (geometry.SlotSize + GAP);
-            int y = top + index / place.Columns * (geometry.SlotSize + GAP);
+            int positionX = place.Left + index % place.Columns * (geometry.SlotSize + GAP);
+            int positionY = topEdge + index / place.Columns * (geometry.SlotSize + GAP);
 
-            slots.Add(new HotbarSlot(items[index], isSpell, x, y));
+            slots.Add(new HotbarSlot(items[index], isSpell, positionX, positionY));
         }
     }
 

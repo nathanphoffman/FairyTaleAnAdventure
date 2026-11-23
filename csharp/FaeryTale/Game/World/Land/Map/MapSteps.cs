@@ -24,44 +24,44 @@ public static class MapSteps
 
     // Moves value one step in direction dir at speed; the result stays within 15 bits. The step is
     // table value * speed / 2, so speed 2 moves the table's amount in pixels.
-    private static int Step(int value, int dir, int speed, short[] table)
+    private static int Step(int value, int direction, int speed, short[] table)
     {
-        int product = table[dir & DIRECTION_MASK] * (short)speed;
-        int half = (ushort)product >> 1;
+        int product = table[direction & DIRECTION_MASK] * (short)speed;
+        int half = (ushort)product >> 1;  // drop the sign bits, then >> 1 halves it
 
         return (ushort)(value + half) & COORD_MASK;
     }
 
     /// The x position after one step in direction dir (0-7) at speed. Directions above 7 mean "no
     /// move". Directions go clockwise from north-west.
-    public static int StepX(int x, int dir, int speed)
+    public static int StepX(int positionX, int direction, int speed)
     {
-        if ((dir & DIRECTION_MASK) > MAX_DIRECTION)
+        if ((direction & DIRECTION_MASK) > MAX_DIRECTION)
         {
-            return x;
+            return positionX;
         }
 
-        return Step(x, dir, speed, X_STEPS);
+        return Step(positionX, direction, speed, X_STEPS);
     }
 
     /// Like StepX, but for y; it keeps bit 15 of y (a flag the game stores there).
-    public static int StepY(int y, int dir, int speed)
+    public static int StepY(int positionY, int direction, int speed)
     {
-        if ((dir & DIRECTION_MASK) > MAX_DIRECTION)
+        if ((direction & DIRECTION_MASK) > MAX_DIRECTION)
         {
-            return y;
+            return positionY;
         }
 
-        return Step(y, dir, speed, Y_STEPS) | (y & COORD_SIGN);
+        return Step(positionY, direction, speed, Y_STEPS) | (positionY & COORD_SIGN);
     }
 
     /// Copies bit 14 into bit 15, giving a signed 15 bit value (the world wraps around at the edges).
-    public static int WrapCoordinate(int x)
+    public static int WrapCoordinate(int positionX)
     {
-        uint low = (uint)x & WORD_MASK;
+        uint low = (uint)positionX & WORD_MASK;
 
         low = (low & SIGN_BIT_14) != 0 ? low | SIGN_BIT_15 : low & LOW_15_BITS;
 
-        return unchecked((int)(((uint)x & HIGH_WORD_MASK) | low));
+        return unchecked((int)(((uint)positionX & HIGH_WORD_MASK) | low));
     }
 }

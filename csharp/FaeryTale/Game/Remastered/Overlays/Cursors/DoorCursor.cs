@@ -14,6 +14,9 @@ internal static class DoorCursor
     private const int PANEL_INSET = 4;
     private const int PANEL_GAP = 2;
 
+    /// Every this many columns of the plain door is a dark board seam.
+    private const int DARK_COLUMN_SPACING = 4;
+
     private const uint OUTLINE = 0xff20_1006;
     private const uint DARK_WOOD = 0xff7a_4a20;
     private const uint LIGHT_WOOD = 0xffb0_7438;
@@ -32,11 +35,11 @@ internal static class DoorCursor
     {
         uint[] result = new uint[WIDTH * HEIGHT];
 
-        for (int y = 0; y < HEIGHT; y++)
+        for (int positionY = 0; positionY < HEIGHT; positionY++)
         {
-            for (int x = 0; x < WIDTH; x++)
+            for (int positionX = 0; positionX < WIDTH; positionX++)
             {
-                result[y * WIDTH + x] = PixelAt(x, y);
+                result[positionY * WIDTH + positionX] = PixelAt(positionX, positionY);
             }
         }
 
@@ -44,46 +47,46 @@ internal static class DoorCursor
     }
 
     // Whether a pixel is part of the door: a rectangle with a half circle on top.
-    private static bool Inside(int x, int y)
+    private static bool Inside(int positionX, int positionY)
     {
-        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT)
+        if (positionX < 0 || positionX >= WIDTH || positionY < 0 || positionY >= HEIGHT)
         {
             return false;
         }
 
-        if (y >= ARCH_RADIUS)
+        if (positionY >= ARCH_RADIUS)
         {
             return true;
         }
 
-        int across = x - ARCH_RADIUS + 1;
-        int up = ARCH_RADIUS - y;
+        int across = positionX - ARCH_RADIUS + 1;
+        int up = ARCH_RADIUS - positionY;
 
         return across * across + up * up <= ARCH_RADIUS * ARCH_RADIUS;
     }
 
-    private static uint PixelAt(int x, int y)
+    private static uint PixelAt(int positionX, int positionY)
     {
-        if (!Inside(x, y))
+        if (!Inside(positionX, positionY))
         {
             return 0;
         }
 
-        bool edge = !Inside(x - 1, y) || !Inside(x + 1, y) || !Inside(x, y - 1) || !Inside(x, y + 1);
+        bool edge = !Inside(positionX - 1, positionY) || !Inside(positionX + 1, positionY) || !Inside(positionX, positionY - 1) || !Inside(positionX, positionY + 1);
 
         if (edge)
         {
             return OUTLINE;
         }
 
-        if (x == KNOB_X && (y == KNOB_Y || y == KNOB_Y + 1) || x == KNOB_X + 1 && (y == KNOB_Y || y == KNOB_Y + 1))
+        if (positionX == KNOB_X && (positionY == KNOB_Y || positionY == KNOB_Y + 1) || positionX == KNOB_X + 1 && (positionY == KNOB_Y || positionY == KNOB_Y + 1))
         {
             return KNOB;
         }
 
         // Two raised panels in the lower part of the door, a lighter board elsewhere.
-        bool panel = y >= ARCH_RADIUS + PANEL_INSET - PANEL_GAP && y < HEIGHT - PANEL_INSET && x >= PANEL_INSET && x < WIDTH - PANEL_INSET;
+        bool panel = positionY >= ARCH_RADIUS + PANEL_INSET - PANEL_GAP && positionY < HEIGHT - PANEL_INSET && positionX >= PANEL_INSET && positionX < WIDTH - PANEL_INSET;
 
-        return panel ? PANEL_WOOD : x % 4 == 0 ? DARK_WOOD : LIGHT_WOOD;
+        return panel ? PANEL_WOOD : positionX % DARK_COLUMN_SPACING == 0 ? DARK_WOOD : LIGHT_WOOD;  // panel wood inside; outside, every 4th column is dark
     }
 }

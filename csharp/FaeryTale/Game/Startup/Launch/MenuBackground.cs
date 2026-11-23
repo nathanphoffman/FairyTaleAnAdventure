@@ -48,8 +48,8 @@ internal sealed class MenuBackground
     {
         game.World.MapX = START_X;
         game.World.MapY = START_Y;
-        game.World.TileX = START_X >> TILE_WIDTH_SHIFT;
-        game.World.TileY = START_Y >> TILE_HEIGHT_SHIFT;
+        game.World.TileX = START_X >> TILE_WIDTH_SHIFT;  // tiles are 16 pixels wide, so >> 4 divides by 16
+        game.World.TileY = START_Y >> TILE_HEIGHT_SHIFT;  // tiles are 32 pixels tall, so >> 5 divides by 32
         game.World.NewRegion = REGION;
         Regions.LoadRegionNow(game, video);
         Regions.RefreshMinimap(game, video);
@@ -94,8 +94,8 @@ internal sealed class MenuBackground
         int columns = MapLookup.SCREEN_COLUMNS;
         int rows = MapLookup.SCREEN_ROWS;
         Bitmap strip = new(STRIP_SCREENS * columns * TILE_WIDTH, STRIP_ROWS * MapTiles.TILE_LINES, MapTiles.PLANE_COUNT);
-        int firstColumn = START_X >> TILE_WIDTH_SHIFT;
-        int firstRow = START_Y >> TILE_HEIGHT_SHIFT;
+        int firstColumn = START_X >> TILE_WIDTH_SHIFT;  // tiles are 16 pixels wide, so >> 4 divides by 16
+        int firstRow = START_Y >> TILE_HEIGHT_SHIFT;  // tiles are 32 pixels tall, so >> 5 divides by 32
 
         for (int screen = 0; screen < STRIP_SCREENS; screen++)
         {
@@ -105,9 +105,9 @@ internal sealed class MenuBackground
 
                 for (int column = 0; column < columns; column++)
                 {
-                    for (int row = 0; row < Math.Min(rows, STRIP_ROWS - band * rows); row++)
+                    for (int rowIndex = 0; rowIndex < Math.Min(rows, STRIP_ROWS - band * rows); rowIndex++)
                     {
-                        DrawTile(graphics, strip, game.Map.Minimap[column * rows + row], (screen * columns + column, band * rows + row));
+                        DrawTile(graphics, strip, game.Map.Minimap[column * rows + rowIndex], (screen * columns + column, band * rows + rowIndex));
                     }
                 }
             }
@@ -117,7 +117,7 @@ internal sealed class MenuBackground
     }
 
     // Copies one tile image into the strip at tile column and row at.
-    private static void DrawTile(Graphics graphics, Bitmap strip, int tile, (int Column, int Row) at)
+    private static void DrawTile(Graphics graphics, Bitmap strip, int tile, (int Column, int Row) offset)
     {
         int rowBytes = strip.BytesPerRow;
 
@@ -125,7 +125,7 @@ internal sealed class MenuBackground
         {
             int imageStart = plane * MapTiles.IMAGE_PLANE_SIZE + tile * MapTiles.TILE_BYTES;
             Span<byte> bytes = strip.Plane(plane);
-            int start = at.Row * MapTiles.TILE_LINES * rowBytes + at.Column * TILE_WIDTH_BYTES;
+            int start = offset.Row * MapTiles.TILE_LINES * rowBytes + offset.Column * TILE_WIDTH_BYTES;
 
             for (int line = 0; line < MapTiles.TILE_LINES; line++)
             {

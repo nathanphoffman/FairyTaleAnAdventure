@@ -26,6 +26,9 @@ public static class GameMenu
 {
     private const string HEADING = "Game Menu";
 
+    // A factor shown as a percent is multiplied by this.
+    private const double PERCENT_SCALE = 100;
+
     // The menu is laid out from the heading down, and the whole block is centred on the screen.
     private const int FIRST_ENTRY_BELOW_HEADING = 40;
     private const int ENTRY_SPACING = 34;
@@ -177,13 +180,13 @@ public static class GameMenu
     }
 
     /// The entry whose board the point (overlay pixels) is on, if any.
-    internal static int? EntryAt((int Left, int Top, int Width, int Height)[] areas, int x, int y)
+    internal static int? EntryAt((int Left, int Top, int Width, int Height)[] areas, int positionX, int positionY)
     {
         for (int index = 0; index < areas.Length; index++)
         {
             (int left, int top, int width, int height) = areas[index];
 
-            if (x >= left && x < left + width && y >= top && y < top + height)
+            if (positionX >= left && positionX < left + width && positionY >= top && positionY < top + height)
             {
                 return index;
             }
@@ -273,7 +276,7 @@ public static class GameMenu
         return $"Enemies: {Percent(f.EnemyHealth)} health, {Percent(f.EnemyDamage)} damage    You: {Percent(f.PlayerHealth)} health, {Percent(f.PlayerDamage)} damage";
     }
 
-    private static string Percent(double factor) => $"{Math.Round(factor * 100)}%";
+    private static string Percent(double factor) => $"{Math.Round(factor * PERCENT_SCALE)}%";
 
     // Takes the menu off the screen and makes sure the click or key that closed it does not carry
     // on into the game.

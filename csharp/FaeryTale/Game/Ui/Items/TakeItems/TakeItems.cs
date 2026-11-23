@@ -169,7 +169,7 @@ public static partial class TakeItems
 
     /// Sorts a nearby object by what taking it does. Fruit is kept when the hero is not hungry and
     /// eaten otherwise; the scrap of paper reads differently indoors.
-    internal static Take ClassifyTake(uint id, short hunger, ushort region) => id switch
+    internal static Take ClassifyTake(uint identifier, short hunger, ushort region) => identifier switch
     {
         GOLD_PILE => new Take.Gold(),
         SCRAP_OF_PAPER => new Take.Paper(region > FIRST_INDOOR_REGION),

@@ -173,7 +173,7 @@ public static partial class SpriteDrawing
     {
         // Pixel columns to word columns (16 pixels to a word).
         sbyte xbw = unchecked((sbyte)(clip.XStart >> WORD_PIXELS_SHIFT));
-        sbyte xew = unchecked((sbyte)(clip.XStop >> WORD_PIXELS_SHIFT));
+        sbyte xew = unchecked((sbyte)(clip.XStop >> WORD_PIXELS_SHIFT));  // shift right = divide pixels by 16 per word
         sbyte wide = unchecked((sbyte)(xew - xbw + 1));
         sbyte high = unchecked((sbyte)(clip.YStop - clip.YStart + 1));
 

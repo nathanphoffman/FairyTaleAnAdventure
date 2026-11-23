@@ -129,7 +129,7 @@ public static class MapScreen
             return held;
         }
 
-        return (key & KEY_RELEASED) == 0 ? direction : held == direction ? -1 : held;
+        return (key & KEY_RELEASED) == 0 ? direction : held == direction ? -1 : held;  // press gives the new direction; release clears it only if it is the held one
     }
 
     // Moves the view with a held arrow key or a dragging mouse. Returns where the mouse was.

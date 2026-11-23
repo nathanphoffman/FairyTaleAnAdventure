@@ -30,10 +30,10 @@ public static class Carriers
 
         Shape carrier = game.Actors.List[game.Actors.CarrierSlot];
         Shape hero = game.Actors.List[0];
-        short dx = (short)(hero.AbsX - carrier.AbsX - CARRIER_OFFSET);
-        short dy = (short)(hero.AbsY - carrier.AbsY - CARRIER_OFFSET);
+        short deltaX = (short)(hero.AbsX - carrier.AbsX - CARRIER_OFFSET);
+        short deltaY = (short)(hero.AbsY - carrier.AbsY - CARRIER_OFFSET);
 
-        game.Actors.RaftNearness = Nearness(dx, dy);
+        game.Actors.RaftNearness = Nearness(deltaX, deltaY);
 
         if (game.Hero.Riding == BIRD)
         {
@@ -42,13 +42,13 @@ public static class Carriers
     }
 
     /// 0 when the hero is not near, 1 when near and 2 when very near the carrier (offsets in pixels).
-    internal static short Nearness(short dx, short dy)
+    internal static short Nearness(short deltaX, short deltaY)
     {
-        if (dx < VERY_NEAR && dx > -VERY_NEAR && dy < VERY_NEAR && dy > -VERY_NEAR)
+        if (deltaX < VERY_NEAR && deltaX > -VERY_NEAR && deltaY < VERY_NEAR && deltaY > -VERY_NEAR)
         {
             return 2;
         }
 
-        return dx < NEAR && dx > -NEAR && dy < NEAR && dy > -NEAR ? (short)1 : (short)0;
+        return deltaX < NEAR && deltaX > -NEAR && deltaY < NEAR && deltaY > -NEAR ? (short)1 : (short)0;
     }
 }

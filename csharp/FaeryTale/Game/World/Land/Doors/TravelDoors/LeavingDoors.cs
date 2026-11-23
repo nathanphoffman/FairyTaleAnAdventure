@@ -16,13 +16,13 @@ public static class LeavingDoors
 
     /// Indoors: if the hero stands at the inside entrance of a door and is lined up with it, he is
     /// moved to the outside.
-    public static void LeaveDoor(Data.Game game, IOutput output, ushort x, ushort y)
+    public static void LeaveDoor(Data.Game game, IOutput output, ushort positionX, ushort positionY)
     {
         for (int index = 0; index < TravelDoors.DOOR_COUNT; index++)
         {
             Door door = EnteringDoors.DoorAt(index);
 
-            if (!IsExitHere(door, x, y))
+            if (!IsExitHere(door, positionX, positionY))
             {
                 continue;
             }
@@ -57,11 +57,11 @@ public static class LeavingDoors
 
     /// Whether a door's inside entrance is where the hero stands (x, y: the hero's position
     /// rounded to a tile). Horizontal doors are also found one tile to the right.
-    internal static bool IsExitHere(Door d, ushort x, ushort y)
+    internal static bool IsExitHere(Door d, ushort positionX, ushort positionY)
     {
         bool horizontal = (d.Kind & 1) != 0;
 
-        return d.Yc2 == y && (d.Xc2 == x || (d.Xc2 == x - TravelDoors.TILE_WIDTH && horizontal));
+        return d.Yc2 == positionY && (d.Xc2 == positionX || (d.Xc2 == positionX - TravelDoors.TILE_WIDTH && horizontal));
     }
 
     /// The hero can go out when lined up with the door the other way round to MayEnter.

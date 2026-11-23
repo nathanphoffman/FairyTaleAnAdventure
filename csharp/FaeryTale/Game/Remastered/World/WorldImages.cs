@@ -80,9 +80,9 @@ public sealed class WorldImages
             {
                 for (int column = 0; column < TILE_WIDTH; column++)
                 {
-                    int bit = (image[source + line * TILE_ROW_BYTES + column / BITS_PER_BYTE] >> (TOP_BIT - column % BITS_PER_BYTE)) & 1;
+                    int bit = (image[source + line * TILE_ROW_BYTES + column / BITS_PER_BYTE] >> (TOP_BIT - column % BITS_PER_BYTE)) & 1;  // pick the column's bit from its byte (leftmost pixel = top bit)
 
-                    pixels[line * TILE_WIDTH + column] |= (byte)(bit << plane);
+                    pixels[line * TILE_WIDTH + column] |= (byte)(bit << plane);  // put this bit at its bitplane position in the pixel color
                 }
             }
         }
@@ -119,14 +119,14 @@ public sealed class WorldImages
         {
             for (int column = 0; column < width; column++)
             {
-                int at = line * rowBytes + column / BITS_PER_BYTE;
+                int offset = line * rowBytes + column / BITS_PER_BYTE;
                 int shift = TOP_BIT - column % BITS_PER_BYTE;
 
-                opaque[line * width + column] = ((shape[mask + at] >> shift) & 1) != 0;
+                opaque[line * width + column] = ((shape[mask + offset] >> shift) & 1) != 0;  // pick this column's bit from the mask byte; 1 = opaque
 
                 for (int plane = 0; plane < PLANES; plane++)
                 {
-                    pixels[line * width + column] |= (byte)(((shape[picture + plane * planeBytes + at] >> shift) & 1) << plane);
+                    pixels[line * width + column] |= (byte)(((shape[picture + plane * planeBytes + offset] >> shift) & 1) << plane);  // gather one bit per plane and stack them into a color index
                 }
             }
         }

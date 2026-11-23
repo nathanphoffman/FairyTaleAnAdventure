@@ -6,6 +6,9 @@ namespace FaeryTale.Game.Land;
 /// Objects: where treasure goes.
 public static partial class Objects
 {
+    // The region bits that say which row of regions it is in (the column bit is 1).
+    private const int REGION_ROW_BITS = 6;
+
     // Whether value is strictly between the two limits.
     private static bool Inside(short value, short low, short high) => value > low && value < high;
 
@@ -18,16 +21,16 @@ public static partial class Objects
 
         for (int count = 0; count < RANDOM_TREASURES; count++)
         {
-            short x;
-            short y;
+            short positionX;
+            short positionY;
 
             do
             {
-                x = (short)(game.Rng.BitRand(REGION_WIDTH - 1) + (game.World.Region & 1) * REGION_WIDTH);
-                y = (short)(game.Rng.BitRand(REGION_HEIGHT - 1) + (game.World.Region & 6) * REGION_ROW_STEP);
+                positionX = (short)(game.Rng.BitRand(REGION_WIDTH - 1) + (game.World.Region & 1) * REGION_WIDTH);
+                positionY = (short)(game.Rng.BitRand(REGION_HEIGHT - 1) + (game.World.Region & REGION_ROW_BITS) * REGION_ROW_STEP);
             }
 
-            while (MapLookup.TerrainAt(game, x, y) != 0);
+            while (MapLookup.TerrainAt(game, positionX, positionY) != 0);
 
             int slot = game.Objects.Used[region];
             game.Objects.Used[region]++;
@@ -35,8 +38,8 @@ public static partial class Objects
             sbyte kind = (sbyte)ObjectTables.RandTreasure[game.Rng.BitRand(TREASURE_KINDS - 1)];
             WorldObject[] list = game.Objects.Region(region);
 
-            list[slot].Xc = (ushort)x;
-            list[slot].Yc = (ushort)y;
+            list[slot].Xc = (ushort)positionX;
+            list[slot].Yc = (ushort)positionY;
             list[slot].ObId = kind;
             list[slot].ObStat = STAT_SHOWN;
         }

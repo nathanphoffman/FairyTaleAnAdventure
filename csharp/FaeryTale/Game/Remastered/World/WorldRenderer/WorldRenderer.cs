@@ -44,6 +44,13 @@ public sealed partial class WorldRenderer
     private const int SHADOW_MASK_BYTES = 64;
     private const int SHADOW_ROW_BYTES = 2;
     private const int RAFT_SLOT = 1;
+    private const int FALLING_TERRAIN_TYPE = 3;
+    private const int BYTE_SHIFT_FOR_PIXELS = 3;
+    private const int LAST_BIT_IN_BYTE = 7;
+
+    // A pixel's middle is half a pixel in from its edge; sampling there avoids edge bias.
+    private const double PIXEL_CENTER = 0.5;
+    private const double MILLISECONDS_PER_SECOND = 1000.0;
 
     private readonly WorldImages images = new();
     private readonly NeighborRegions neighbors = new();
@@ -109,7 +116,7 @@ public sealed partial class WorldRenderer
     {
         if (cameraLogPath is not null)
         {
-            File.AppendAllText(cameraLogPath, $"{System.Diagnostics.Stopwatch.GetTimestamp() * 1000.0 / System.Diagnostics.Stopwatch.Frequency:F2} {view.CenterX:F2} {capture.Tick} {alpha:F3}\n");
+            File.AppendAllText(cameraLogPath, $"{System.Diagnostics.Stopwatch.GetTimestamp() * MILLISECONDS_PER_SECOND / System.Diagnostics.Stopwatch.Frequency:F2} {view.CenterX:F2} {capture.Tick} {alpha:F3}\n");
         }
     }
 }

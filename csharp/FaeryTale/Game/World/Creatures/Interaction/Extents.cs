@@ -47,12 +47,12 @@ public static class Extents
     }
 
     /// Centres extent e on a point (it covers 500 by 400 pixels around it).
-    public static void CenterExtentOn(Data.Game game, short e, short x, short y)
+    public static void CenterExtentOn(Data.Game game, short e, short positionX, short positionY)
     {
-        game.Extents[e].X1 = (ushort)(x - HALF_WIDTH);
-        game.Extents[e].Y1 = (ushort)(y - HALF_HEIGHT);
-        game.Extents[e].X2 = (ushort)(x + HALF_WIDTH);
-        game.Extents[e].Y2 = (ushort)(y + HALF_HEIGHT);
+        game.Extents[e].X1 = (ushort)(positionX - HALF_WIDTH);
+        game.Extents[e].Y1 = (ushort)(positionY - HALF_HEIGHT);
+        game.Extents[e].X2 = (ushort)(positionX + HALF_WIDTH);
+        game.Extents[e].Y2 = (ushort)(positionY + HALF_HEIGHT);
     }
 
     /// Picks where a new encounter appears: a random direction and distance from the hero (150 to

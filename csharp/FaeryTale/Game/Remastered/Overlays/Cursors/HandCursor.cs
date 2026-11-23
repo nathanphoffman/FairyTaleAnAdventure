@@ -49,11 +49,11 @@ internal static class HandCursor
     {
         uint[] result = new uint[WIDTH * ROWS.Length];
 
-        for (int y = 0; y < ROWS.Length; y++)
+        for (int positionY = 0; positionY < ROWS.Length; positionY++)
         {
-            for (int x = 0; x < ROWS[y].Length; x++)
+            for (int positionX = 0; positionX < ROWS[positionY].Length; positionX++)
             {
-                result[y * WIDTH + x] = ROWS[y][x] switch { 'o' => OUTLINE, 'h' => SKIN, 's' => SHADE, _ => 0u };
+                result[positionY * WIDTH + positionX] = ROWS[positionY][positionX] switch { 'o' => OUTLINE, 'h' => SKIN, 's' => SHADE, _ => 0u };
             }
         }
 

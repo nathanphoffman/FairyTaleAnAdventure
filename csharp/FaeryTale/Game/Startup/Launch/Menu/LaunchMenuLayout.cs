@@ -53,11 +53,11 @@ internal static partial class LaunchMenu
 
     /// The option whose block the point (overlay pixels) is in, if any; QUIT for the Quit entry. A
     /// block is hit anywhere from side margin to side margin.
-    internal static int? OptionAt(List<Block> blocks, int x, int y)
+    internal static int? OptionAt(List<Block> blocks, int positionX, int positionY)
     {
         foreach ((int entry, (int Left, int Top, int Width, int Height) area) in new[] { (QUIT, QuitArea()), (BOOK, BookArea()), (PROLOGUE, PrologueArea()) })
         {
-            if (x >= area.Left && x < area.Left + area.Width && y >= area.Top && y < area.Top + area.Height)
+            if (positionX >= area.Left && positionX < area.Left + area.Width && positionY >= area.Top && positionY < area.Top + area.Height)
             {
                 return entry;
             }
@@ -67,7 +67,7 @@ internal static partial class LaunchMenu
         {
             (int blockTop, int blockBottom) = blocks[index].PanelSpan;
 
-            if (x >= SIDE_MARGIN && x < Overlay.WIDTH - SIDE_MARGIN && y >= blockTop && y < blockBottom)
+            if (positionX >= SIDE_MARGIN && positionX < Overlay.WIDTH - SIDE_MARGIN && positionY >= blockTop && positionY < blockBottom)
             {
                 return index;
             }

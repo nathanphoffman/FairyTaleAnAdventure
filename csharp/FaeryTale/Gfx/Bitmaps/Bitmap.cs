@@ -13,6 +13,7 @@ public sealed class Bitmap
 
     private const int PIXELS_PER_BYTE = 8;
     private const byte LEFTMOST_PIXEL = 0x80;
+    private const byte ALL_PIXELS_SET = 0xff;
 
     // Rows are a whole number of 16 pixel words (2 bytes each).
     private const int WORD_PIXELS = 16;
@@ -79,19 +80,19 @@ public sealed class Bitmap
     public byte[] PaddedPlane(int plane) => planes[plane];
 
     /// True when the point is inside the bitmap.
-    public bool Contains(int x, int y) => x >= 0 && y >= 0 && y < Rows && x < Width;
+    public bool Contains(int positionX, int positionY) => positionX >= 0 && positionY >= 0 && positionY < Rows && positionX < Width;
 
     /// Bit p of the pixel at (x, y), which must be inside the bitmap.
-    public bool Bit(int plane, int x, int y)
+    public bool Bit(int plane, int positionX, int positionY)
     {
-        (int byteIndex, byte mask) = PixelLocation(x, y);
+        (int byteIndex, byte mask) = PixelLocation(positionX, positionY);
 
         return (Plane(plane)[byteIndex] & mask) != 0;
     }
 
-    public void SetBit(int plane, int x, int y, bool on)
+    public void SetBit(int plane, int positionX, int positionY, bool on)
     {
-        (int byteIndex, byte mask) = PixelLocation(x, y);
+        (int byteIndex, byte mask) = PixelLocation(positionX, positionY);
         Span<byte> bytes = Plane(plane);
 
         if (on)
@@ -105,9 +106,9 @@ public sealed class Bitmap
     }
 
     /// The colour number of the pixel at (x, y), which must be inside the bitmap.
-    public int Pixel(int x, int y)
+    public int Pixel(int positionX, int positionY)
     {
-        (int byteIndex, byte mask) = PixelLocation(x, y);
+        (int byteIndex, byte mask) = PixelLocation(positionX, positionY);
         int index = 0;
 
         for (int plane = 0; plane < Depth; plane++)
@@ -123,9 +124,9 @@ public sealed class Bitmap
 
     /// Draws one pixel in colour pen on the first planes planes, or flips it (complement). Pixels
     /// outside the bitmap are ignored.
-    public void Plot(int x, int y, byte pen, bool complement, int planeCount)
+    public void Plot(int positionX, int positionY, byte penColor, bool complement, int planeCount)
     {
-        if (!Contains(x, y))
+        if (!Contains(positionX, positionY))
         {
             return;
         }
@@ -133,23 +134,23 @@ public sealed class Bitmap
         for (int plane = 0; plane < Math.Min(Depth, planeCount); plane++)
         {
             // Bit p of the pen number says whether this plane gets the pixel.
-            bool on = complement ? !Bit(plane, x, y) : ((pen >> plane) & 1) != 0;
+            bool on = complement ? !Bit(plane, positionX, positionY) : ((penColor >> plane) & 1) != 0;
 
-            SetBit(plane, x, y, on);
+            SetBit(plane, positionX, positionY, on);
         }
     }
 
     /// Fills the first planes planes with colour pen.
-    public void Clear(byte pen, int planeCount)
+    public void Clear(byte penColor, int planeCount)
     {
         for (int plane = 0; plane < Math.Min(Depth, planeCount); plane++)
         {
             // A plane is all ones if the pen has that bit set, and all zeros otherwise.
-            Plane(plane).Fill(((pen >> plane) & 1) != 0 ? (byte)0xff : (byte)0);
+            Plane(plane).Fill(((penColor >> plane) & 1) != 0 ? ALL_PIXELS_SET : (byte)0);
         }
     }
 
     // The byte holding the pixel and the pixel's bit inside it: the leftmost pixel is the top bit.
-    private (int Byte, byte Mask) PixelLocation(int x, int y) =>
-        (y * BytesPerRow + x / PIXELS_PER_BYTE, (byte)(LEFTMOST_PIXEL >> (x % PIXELS_PER_BYTE)));
+    private (int Byte, byte Mask) PixelLocation(int positionX, int positionY) =>
+        (positionY * BytesPerRow + positionX / PIXELS_PER_BYTE, (byte)(LEFTMOST_PIXEL >> (positionX % PIXELS_PER_BYTE)));  // shifting the top bit right x places walks the mask across the byte
 }

@@ -10,12 +10,12 @@ public sealed partial class Recorder
 
     public void BlankMenuEntry(int slot) => Record("BlankMenuEntry", slot);
 
-    public void DrawCompass(short dir) => Record("DrawCompass", dir);
+    public void DrawCompass(short direction) => Record("DrawCompass", direction);
 
     public void DrawItemList(Hero hero) => Record("DrawItemList");
 
     public void DrawOverviewMap(MapData map, World world, int mx, int my) => Record("DrawOverviewMap", mx, my);
 
-    public void MarkOverviewMap((int X, int Y)? at) =>
-        Record("MarkOverviewMap", at is { } place ? $"({place.X}, {place.Y})" : "none");
+    public void MarkOverviewMap((int X, int Y)? offset) =>
+        Record("MarkOverviewMap", offset is { } place ? $"({place.X}, {place.Y})" : "none");
 }

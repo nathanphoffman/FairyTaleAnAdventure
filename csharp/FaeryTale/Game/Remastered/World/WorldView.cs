@@ -19,14 +19,19 @@ public sealed class WorldView
     public const double WINDOW_ZOOM = 1.0;
     public const double FULLSCREEN_ZOOM = 0.5;
 
+    /// The picture size before a window sets it, and the line where the hero stands in it.
+    private const int DEFAULT_WIDTH = 640;
+    private const int DEFAULT_HEIGHT = 360;
+    private const int DEFAULT_GROUND_Y = 180;
+
     /// The view the game uses (there is one window).
     public static WorldView Current { get; } = new();
 
     /// The size of the picture in pixels, and the line of it where the hero stands (the middle of the
     /// part not covered by the text panel).
-    public int Width { get; private set; } = 640;
-    public int Height { get; private set; } = 360;
-    public int GroundY { get; private set; } = 180;
+    public int Width { get; private set; } = DEFAULT_WIDTH;
+    public int Height { get; private set; } = DEFAULT_HEIGHT;
+    public int GroundY { get; private set; } = DEFAULT_GROUND_Y;
 
     /// How far zoomed: 1 shows as much across as the original game's play field.
     public double Zoom { get; private set; } = WINDOW_ZOOM;

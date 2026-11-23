@@ -64,10 +64,10 @@ public sealed partial class Video
         Screen.SetAPen(port, color);
     }
 
-    public void SetTextPosition(int x, int y)
+    public void SetTextPosition(int positionX, int positionY)
     {
-        History.OnMessageLine = y == NEW_LINE_Y;
-        Screen.MoveTo(Screen.CurrentPort, x, y);
+        History.OnMessageLine = positionY == NEW_LINE_Y;
+        Screen.MoveTo(Screen.CurrentPort, positionX, positionY);
     }
 
     public void SelectMessageArea() => Screen.CurrentPort = PortId.Text;

@@ -92,18 +92,18 @@ public static class MapLookup
     internal static ushort ClampSectorRow(short value) => (ushort)Math.Clamp((int)value, 0, SECTOR_ROWS_IN_REGION - 1);
 
     /// The sector number for a sector column and row of the region map.
-    private static byte SectorAt(Data.Game game, ushort column, ushort row) =>
-        game.Map.MapByte((ushort)(row * MAP_ROW_BYTES + column + game.World.OriginX));
+    private static byte SectorAt(Data.Game game, ushort column, ushort rowIndex) =>
+        game.Map.MapByte((ushort)(rowIndex * MAP_ROW_BYTES + column + game.World.OriginX));
 
     /// Terrain type (0-15) at a pixel position, 0 if that sub-area is clear.
     ///
     /// Each tile is divided into 8 sub-areas (2 across, 4 down); the terrain table has a bit mask
     /// saying which of them are solid, so a tile can be partly walkable (a tree trunk in the
     /// middle of a clearing, say). The bit is picked from pixel bits 3 (x), 3 and 4 (y).
-    public static int TerrainAt(Data.Game game, int x, int y)
+    public static int TerrainAt(Data.Game game, int positionX, int positionY)
     {
-        ushort ux = (ushort)x;
-        ushort uy = (ushort)y;
+        ushort ux = (ushort)positionX;
+        ushort uy = (ushort)positionY;
         byte bit = SubareaBit(ux, uy);
 
         // The tile column and row: tiles are 16 pixels wide and 32 high.
@@ -147,16 +147,16 @@ public static class MapLookup
     /// Collision test with two probes either side of the character (4 pixels right and left, 2
     /// down). Returns the blocking terrain type, 0 if the way is clear. Type 1 always blocks; the
     /// right-hand probe is blocked by 10 and above, the left-hand one by 8 and above.
-    public static int ProbeCollision(Data.Game game, int x, int y)
+    public static int ProbeCollision(Data.Game game, int positionX, int positionY)
     {
-        int right = TerrainAt(game, x + PROBE_SIDE, y + PROBE_DOWN);
+        int right = TerrainAt(game, positionX + PROBE_SIDE, positionY + PROBE_DOWN);
 
         if (right == ALWAYS_BLOCKS || right >= RIGHT_PROBE_BLOCKS_FROM)
         {
             return right;
         }
 
-        int left = TerrainAt(game, x - PROBE_SIDE, y + PROBE_DOWN);
+        int left = TerrainAt(game, positionX - PROBE_SIDE, positionY + PROBE_DOWN);
 
         if (left == ALWAYS_BLOCKS || left >= LEFT_PROBE_BLOCKS_FROM)
         {
@@ -176,14 +176,14 @@ public static class MapLookup
         ushort column = WrapSectorColumn((ushort)((ux >> TILE_WIDTH_SHIFT) - game.World.OriginX));
 
         // Pixel row to sector row: 8 tiles to a sector, so 8 times 32 divided by 32.
-        ushort row = (ushort)((uy >> SECTOR_HEIGHT_SHIFT) - game.World.OriginY);
+        ushort rowIndex = (ushort)((uy >> SECTOR_HEIGHT_SHIFT) - game.World.OriginY);
 
-        if ((row & ROW_OFF_MAP) != 0)
+        if ((rowIndex & ROW_OFF_MAP) != 0)
         {
-            row = (row & ROW_OFF_LOW_SIDE) != 0 ? (ushort)0 : (ushort)LAST_SECTOR_ROW;
+            rowIndex = (rowIndex & ROW_OFF_LOW_SIDE) != 0 ? (ushort)0 : (ushort)LAST_SECTOR_ROW;
         }
 
-        int sector = SectorAt(game, column, row);
+        int sector = SectorAt(game, column, rowIndex);
 
         return (ushort)(sector * SECTOR_BYTES + (uy & TILE_ROW_MASK) * SECTOR_ROW_TILES + (ux & TILE_COLUMN_MASK));
     }
@@ -192,40 +192,40 @@ public static class MapLookup
     /// at tile (tileX, tileY), and works out which sector the hero is in.
     public static void FillMinimap(Data.Game game, int tileX, int tileY)
     {
-        ushort x = (ushort)tileX;
+        ushort positionX = (ushort)tileX;
         int next = 0;
 
         for (int column = 0; column < SCREEN_COLUMNS; column++)
         {
-            x &= TILE_COLUMN_WRAP;
+            positionX &= TILE_COLUMN_WRAP;
 
-            for (int row = 0; row < SCREEN_ROWS; row++)
+            for (int rowIndex = 0; rowIndex < SCREEN_ROWS; rowIndex++)
             {
-                ushort y = (ushort)(tileY + row);
+                ushort positionY = (ushort)(tileY + rowIndex);
 
-                game.Map.Minimap[next] = TileNumber(game, x, (ushort)(y & TILE_ROW_WRAP));
+                game.Map.Minimap[next] = TileNumber(game, positionX, (ushort)(positionY & TILE_ROW_WRAP));
                 next++;
             }
 
-            x++;
+            positionX++;
         }
 
         game.Hero.Sector = HeroSector(game);
     }
 
     // The tile number at tile column x and row y of the world.
-    public static byte TileNumber(Data.Game game, ushort x, ushort y)
+    public static byte TileNumber(Data.Game game, ushort positionX, ushort positionY)
     {
         // Tile column to sector column: 16 tiles to a sector.
-        ushort column = (ushort)(WrapSectorColumn((ushort)((x >> SECTOR_WIDTH_SHIFT) - game.World.OriginX)) + game.World.OriginX);
+        ushort column = (ushort)(WrapSectorColumn((ushort)((positionX >> SECTOR_WIDTH_SHIFT) - game.World.OriginX)) + game.World.OriginX);
 
         // Tile row to sector row: 8 tiles to a sector.
-        ushort row = ClampSectorRow((short)((y >> SECTOR_HEIGHT_SHIFT) - game.World.OriginY));
+        ushort rowIndex = ClampSectorRow((short)((positionY >> SECTOR_HEIGHT_SHIFT) - game.World.OriginY));
 
         // Row and column become one byte offset into the map: the row is shifted up, the column added.
-        int sector = game.Map.MapByte((ushort)((row << MAP_ROW_SHIFT) + column));
+        int sector = game.Map.MapByte((ushort)((rowIndex << MAP_ROW_SHIFT) + column));
 
-        return game.Map.SectorByte((ushort)(sector * SECTOR_BYTES + (y & TILE_ROW_MASK) * SECTOR_ROW_TILES + (x & TILE_COLUMN_MASK)));
+        return game.Map.SectorByte((ushort)(sector * SECTOR_BYTES + (positionY & TILE_ROW_MASK) * SECTOR_ROW_TILES + (positionX & TILE_COLUMN_MASK)));
     }
 
     // The sector the hero is in; the second half of the sector table is used from region 8 on.

@@ -10,7 +10,7 @@ public class SwingArcTests
     private const int SOUTH = 5;
     private const int RANGE = 20;
 
-    private static Shape At(int x, int y) => new() { AbsX = (ushort)x, AbsY = (ushort)y };
+    private static Shape At(int positionX, int positionY) => new() { AbsX = (ushort)positionX, AbsY = (ushort)positionY };
 
     [Fact]
     public void AnEnemyBesideTheHeroIsInTheSwing()

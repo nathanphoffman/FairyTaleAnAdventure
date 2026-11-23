@@ -55,6 +55,9 @@ public sealed partial class Sound
         }
     }
 
+    // What an envelope reads as when it runs past the end of the volume list.
+    private const byte END_OF_ENVELOPE = 0xff;
+
     // Steps the volume envelope of a sounding note.
     private void FollowEnvelope(int voice)
     {
@@ -65,7 +68,7 @@ public sealed partial class Sound
             return;
         }
 
-        sbyte level = unchecked((sbyte)(at < Volumes.Length ? Volumes[at] : (byte)0xff));
+        sbyte level = unchecked((sbyte)(at < Volumes.Length ? Volumes[at] : END_OF_ENVELOPE));
 
         if (level >= 0)
         {
@@ -100,10 +103,10 @@ public sealed partial class Sound
     private (byte Command, byte Value) NextEvent(int voice)
     {
         Voice v = Voices[voice];
-        int at = v.Pos;
+        int offset = v.Pos;
 
         v.Pos += 2;
 
-        return v.Track is { } track && at + 2 <= track.Length ? (track[at], track[at + 1]) : (AudioTables.CMD_END, (byte)0);
+        return v.Track is { } track && offset + 2 <= track.Length ? (track[offset], track[offset + 1]) : (AudioTables.CMD_END, (byte)0);
     }
 }

@@ -5,8 +5,8 @@ namespace FaeryTale.Game.Data;
 public static partial class ObjectTables
 {
     /// Builds an object list entry: position, item id and state.
-    private static WorldObject Obj(ushort x, ushort y, byte id, sbyte stat) =>
-        new() { Xc = x, Yc = y, ObId = unchecked((sbyte)id), ObStat = stat };
+    private static WorldObject Obj(ushort positionX, ushort positionY, byte identifier, sbyte stat) =>
+        new() { Xc = positionX, Yc = positionY, ObId = unchecked((sbyte)identifier), ObStat = stat };
 
     private static CompassPart Part(byte xrect, byte yrect, byte xsize, byte ysize) =>
         new() { Xrect = xrect, Yrect = yrect, Xsize = xsize, Ysize = ysize };

@@ -170,11 +170,11 @@ public static class Messages
         }
 
         // Ends the text at the position at (without moving the end).
-        public void Terminate(int at)
+        public void Terminate(int offset)
         {
-            if (at >= 0 && at < bytes.Length)
+            if (offset >= 0 && offset < bytes.Length)
             {
-                bytes[at] = 0;
+                bytes[offset] = 0;
             }
         }
 

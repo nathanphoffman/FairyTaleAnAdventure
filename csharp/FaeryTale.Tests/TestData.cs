@@ -6,9 +6,9 @@ public static class TestData
     /// The folder holding the disk image, or null when the files are not there.
     public static string? FindGameFolder()
     {
-        for (DirectoryInfo? dir = new(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
+        for (DirectoryInfo? direction = new(AppContext.BaseDirectory); direction is not null; direction = direction.Parent)
         {
-            string candidate = Path.Combine(dir.FullName, "faery-tale-amiga", "game");
+            string candidate = Path.Combine(direction.FullName, "faery-tale-amiga", "game");
 
             if (File.Exists(Path.Combine(candidate, "image")))
             {

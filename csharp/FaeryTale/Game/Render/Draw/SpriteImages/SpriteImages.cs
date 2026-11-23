@@ -36,6 +36,13 @@ internal static partial class SpriteImages
     // with bit 7 set.
     private const sbyte SMALL_OBJECT_LINES = 8;
     private const short OBJECT_FLAG_SMALL = 128;
+    private const short SMALL_LONE_IMAGE_A = 0x1b;
+    private const short SMALL_LONE_IMAGE_B = 25;
+    private const short SMALL_LONE_IMAGE_C = 26;
+    private const short SMALL_RUN_ONE_FIRST = 8;
+    private const short SMALL_RUN_ONE_LAST = 12;
+    private const short SMALL_RUN_TWO_FIRST = 0x11;
+    private const short SMALL_RUN_TWO_LAST = 0x17;
 
     // Sinking: the hero on the swan sits 16 lines higher; shallow water (depth 2) hides 10 lines;
     // beyond 29 the actor is under the surface and only bubbles show, drawn 27 lines down and 7 high.
@@ -118,9 +125,9 @@ internal static partial class SpriteImages
     /// The height of an image in lines: the sheet's, except for some small objects.
     internal static sbyte ImageHeight(short atype, short inum, sbyte sheetHeight)
     {
-        bool smallObject = inum == 0x1b || inum == 25 || inum == 26
-            || (inum >= 8 && inum <= 12)
-            || (inum >= 0x11 && inum <= 0x17)
+        bool smallObject = inum == SMALL_LONE_IMAGE_A || inum == SMALL_LONE_IMAGE_B || inum == SMALL_LONE_IMAGE_C
+            || (inum >= SMALL_RUN_ONE_FIRST && inum <= SMALL_RUN_ONE_LAST)
+            || (inum >= SMALL_RUN_TWO_FIRST && inum <= SMALL_RUN_TWO_LAST)
             || (inum & OBJECT_FLAG_SMALL) != 0;
 
         return atype == OBJECTS && smallObject ? SMALL_OBJECT_LINES : sheetHeight;

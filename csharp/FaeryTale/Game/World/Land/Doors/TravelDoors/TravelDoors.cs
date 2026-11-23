@@ -31,16 +31,16 @@ public static class TravelDoors
             return;
         }
 
-        ushort x = (ushort)(game.Hero.X & TILE_X_MASK);
-        ushort y = (ushort)(game.Hero.Y & TILE_Y_MASK);
+        ushort positionX = (ushort)(game.Hero.X & TILE_X_MASK);
+        ushort positionY = (ushort)(game.Hero.Y & TILE_Y_MASK);
 
         if (game.World.Region < FIRST_INSIDE_REGION)
         {
-            EnteringDoors.EnterDoor(game, output, x, y);
+            EnteringDoors.EnterDoor(game, output, positionX, positionY);
         }
         else
         {
-            LeavingDoors.LeaveDoor(game, output, x, y);
+            LeavingDoors.LeaveDoor(game, output, positionX, positionY);
         }
     }
 }

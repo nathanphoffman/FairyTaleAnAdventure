@@ -114,7 +114,7 @@ public static partial class GameLoop
     {
         // Pixels to tiles: a shift is a divide by the tile width / height.
         world.TileX = (ushort)(world.MapX >> TILE_WIDTH_SHIFT);
-        world.TileY = (ushort)(world.MapY >> TILE_HEIGHT_SHIFT);
+        world.TileY = (ushort)(world.MapY >> TILE_HEIGHT_SHIFT);  // shift right = divide pixels by tile height
 
         FPage page = screen.DrawingPage;
         short difX = unchecked((short)(world.TileX - page.IsvX));

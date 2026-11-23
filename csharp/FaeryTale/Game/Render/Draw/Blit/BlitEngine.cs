@@ -61,9 +61,9 @@ internal static class BlitEngine
         uint previousA = 0;
         uint previousB = 0;
 
-        for (int x = 0; x < blit.Width; x++)
+        for (int positionX = 0; positionX < blit.Width; positionX++)
         {
-            uint aWord = NextAWord(blit, memory, x);
+            uint aWord = NextAWord(blit, memory, positionX);
             uint bWord = 0;
             uint cWord = 0;
 
@@ -80,7 +80,7 @@ internal static class BlitEngine
 
             // Shifting right across two words: the bits that fell off the previous word enter from the left.
             uint shiftedA = ((previousA << WORD_BITS | aWord) >> blit.AShift) & Blit.ALL_BITS;
-            uint shiftedB = ((previousB << WORD_BITS | bWord) >> blit.BShift) & Blit.ALL_BITS;
+            uint shiftedB = ((previousB << WORD_BITS | bWord) >> blit.BShift) & Blit.ALL_BITS;  // same two-word shift as above, for source B
 
             previousA = aWord;
             previousB = bWord;
@@ -102,7 +102,7 @@ internal static class BlitEngine
 
     // The A source word for column x of a row (all ones when A is not in use): the first and last
     // words of the row are masked.
-    private static uint NextAWord(Blit blit, BlitMemory memory, int x)
+    private static uint NextAWord(Blit blit, BlitMemory memory, int positionX)
     {
         if ((blit.Uses & Blit.USE_A) == 0)
         {
@@ -113,12 +113,12 @@ internal static class BlitEngine
 
         blit.A = blit.A.Add(2);
 
-        if (x == 0)
+        if (positionX == 0)
         {
             word &= blit.FirstWordMask;
         }
 
-        if (x == blit.Width - 1)
+        if (positionX == blit.Width - 1)
         {
             word &= blit.LastWordMask;
         }

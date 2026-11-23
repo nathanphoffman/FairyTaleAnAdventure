@@ -7,12 +7,12 @@ public static class BitmapOps
 
     /// Copies rect of plane from of src to plane to of dst, putting its top left corner at (dstX,
     /// dstY). Parts outside either bitmap are skipped.
-    public static void CopyPlaneRect(Bitmap src, int from, Bitmap dst, int to, Rect rect, (int X, int Y) at)
+    public static void CopyPlaneRect(Bitmap src, int from, Bitmap dst, int to, Rect rect, (int X, int Y) offset)
     {
         // Everything is read first so copies that overlap within one bitmap work.
         bool[] bits = ReadRect(src, from, rect);
 
-        WriteRect(dst, to, rect, at, bits);
+        WriteRect(dst, to, rect, offset, bits);
     }
 
     /// Copies rect from src to dst plane by plane for the planes mask selects (bit p for plane p)
@@ -23,7 +23,7 @@ public static class BitmapOps
 
         for (int plane = 0; plane < Math.Min(src.Depth, dst.Depth); plane++)
         {
-            if (((mask >> plane) & 1) != 0)
+            if (((mask >> plane) & 1) != 0)  // test bit 'plane' of the mask to see if it is copied
             {
                 CopyPlaneRect(src, plane, dst, plane, rect, to);
                 copied++;
@@ -45,9 +45,9 @@ public static class BitmapOps
         {
             int rows = Math.Min(dst.Rows, Math.Max(src.Rows - origin.Y, 0));
 
-            for (int row = 0; row < rows; row++)
+            for (int rowIndex = 0; rowIndex < rows; rowIndex++)
             {
-                CopyWindowRow(src, dst, plane, origin.Y + row, row, firstByte, shift);
+                CopyWindowRow(src, dst, plane, origin.Y + rowIndex, rowIndex, firstByte, shift);
             }
         }
     }
@@ -60,20 +60,20 @@ public static class BitmapOps
         {
             bool[] bits = ReadRect(bitmap, plane, area);
 
-            for (int y = 0; y < area.Height; y++)
+            for (int positionY = 0; positionY < area.Height; positionY++)
             {
-                for (int x = 0; x < area.Width; x++)
+                for (int positionX = 0; positionX < area.Width; positionX++)
                 {
-                    int sourceX = x + by.X;
-                    int sourceY = y + by.Y;
+                    int sourceX = positionX + by.X;
+                    int sourceY = positionY + by.Y;
                     bool inside = sourceX >= 0 && sourceX < area.Width && sourceY >= 0 && sourceY < area.Height;
 
                     // Outside the shape, use bit p of the fill colour.
                     bool on = inside ? bits[sourceY * area.Width + sourceX] : ((fill >> plane) & 1) != 0;
 
-                    if (bitmap.Contains(area.X + x, area.Y + y))
+                    if (bitmap.Contains(area.X + positionX, area.Y + positionY))
                     {
-                        bitmap.SetBit(plane, area.X + x, area.Y + y, on);
+                        bitmap.SetBit(plane, area.X + positionX, area.Y + positionY, on);
                     }
                 }
             }
@@ -96,7 +96,7 @@ public static class BitmapOps
             byte high = from[firstByte + index];
             byte low = firstByte + index + 1 < from.Length ? from[firstByte + index + 1] : (byte)0;
 
-            to[index] = shift == 0 ? high : (byte)((high << shift) | (low >> (PIXELS_PER_BYTE - shift)));
+            to[index] = shift == 0 ? high : (byte)((high << shift) | (low >> (PIXELS_PER_BYTE - shift)));  // shift pixels left, pulling in top bits of the next byte
         }
     }
 
@@ -105,14 +105,14 @@ public static class BitmapOps
     {
         bool[] bits = new bool[Math.Max(rect.Width, 0) * Math.Max(rect.Height, 0)];
 
-        for (int y = 0; y < rect.Height; y++)
+        for (int positionY = 0; positionY < rect.Height; positionY++)
         {
-            for (int x = 0; x < rect.Width; x++)
+            for (int positionX = 0; positionX < rect.Width; positionX++)
             {
-                int px = rect.X + x;
-                int py = rect.Y + y;
+                int px = rect.X + positionX;
+                int py = rect.Y + positionY;
 
-                bits[y * rect.Width + x] = src.Contains(px, py) && src.Bit(plane, px, py);
+                bits[positionY * rect.Width + positionX] = src.Contains(px, py) && src.Bit(plane, px, py);
             }
         }
 
@@ -120,18 +120,18 @@ public static class BitmapOps
     }
 
     // Writes one plane of a rectangle, skipping pixels that fall outside the bitmap.
-    private static void WriteRect(Bitmap dst, int plane, Rect rect, (int X, int Y) at, bool[] bits)
+    private static void WriteRect(Bitmap dst, int plane, Rect rect, (int X, int Y) offset, bool[] bits)
     {
-        for (int y = 0; y < rect.Height; y++)
+        for (int positionY = 0; positionY < rect.Height; positionY++)
         {
-            for (int x = 0; x < rect.Width; x++)
+            for (int positionX = 0; positionX < rect.Width; positionX++)
             {
-                int px = at.X + x;
-                int py = at.Y + y;
+                int px = offset.X + positionX;
+                int py = offset.Y + positionY;
 
                 if (dst.Contains(px, py))
                 {
-                    dst.SetBit(plane, px, py, bits[y * rect.Width + x]);
+                    dst.SetBit(plane, px, py, bits[positionY * rect.Width + positionX]);
                 }
             }
         }

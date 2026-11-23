@@ -20,14 +20,14 @@ internal static class WalkTerrain
 
     /// What entering the world position costs the planner: blocked (-1), open (0), or open but
     /// worth avoiding (wading). Uses the same blocking check as the hero's own steps.
-    internal static int CellCost(Data.Game game, int x, int y)
+    internal static int CellCost(Data.Game game, int positionX, int positionY)
     {
-        if (Blocking.BlockedAt(game, (short)x, (short)y, 0) != 0)
+        if (Blocking.BlockedAt(game, (short)positionX, (short)positionY, 0) != 0)
         {
             return -1;
         }
 
-        int terrain = MapLookup.TerrainAt(game, x, y + FEET_OFFSET);
+        int terrain = MapLookup.TerrainAt(game, positionX, positionY + FEET_OFFSET);
 
         if (terrain == DEEP_WATER)
         {

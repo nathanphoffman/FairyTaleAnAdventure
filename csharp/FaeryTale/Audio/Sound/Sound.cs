@@ -38,6 +38,9 @@ public sealed class Voice
 /// non-zero = loop).
 public sealed partial class Sound
 {
+    // An instrument word's waveform number is its high byte, so it is shifted down by one byte.
+    private const int BITS_PER_BYTE = 8;
+
     internal readonly Voice[] Voices = Enumerable.Range(0, AudioTables.VOICE_COUNT).Select(_ => new Voice()).ToArray();
     internal readonly Channel[] Chans = Enumerable.Range(0, AudioTables.VOICE_COUNT).Select(_ => new Channel()).ToArray();
     internal int Tempo = AudioTables.DEFAULT_TEMPO;
@@ -102,7 +105,7 @@ public sealed partial class Sound
 
             // An instrument word holds the waveform number in its high byte and the volume envelope in the low one.
             Voices[voice] = null!;
-            ReplaceVoice(voice, new Voice { Track = tracks[voice], TrackStart = tracks[voice], WaveNum = (byte)(word >> 8), VolNum = (byte)word, VolDelay = -1 });
+            ReplaceVoice(voice, new Voice { Track = tracks[voice], TrackStart = tracks[voice], WaveNum = (byte)(word >> BITS_PER_BYTE), VolNum = (byte)word, VolDelay = -1 }); // word >> 8 is the high byte, the cast to byte keeps the low one
         }
 
         TimeClock = 0;

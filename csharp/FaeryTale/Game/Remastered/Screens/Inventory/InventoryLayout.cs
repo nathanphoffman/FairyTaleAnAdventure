@@ -91,21 +91,21 @@ public static class InventoryLayout
         return (cells, titles);
     }
 
-    private static void PlaceColumn(InventorySection[] sections, int x, List<InventoryCell> cells, List<InventoryTitle> titles)
+    private static void PlaceColumn(InventorySection[] sections, int positionX, List<InventoryCell> cells, List<InventoryTitle> titles)
     {
-        int y = FIRST_SECTION_Y;
+        int positionY = FIRST_SECTION_Y;
 
         foreach (InventorySection section in sections)
         {
-            titles.Add(new InventoryTitle(section.Title, x, y));
-            y += TITLE_HEIGHT;
+            titles.Add(new InventoryTitle(section.Title, positionX, positionY));
+            positionY += TITLE_HEIGHT;
 
             for (int index = 0; index < section.Items.Length; index++)
             {
-                cells.Add(new InventoryCell(section.Items[index], x + index % PER_ROW * PITCH_X, y + index / PER_ROW * PITCH_Y));
+                cells.Add(new InventoryCell(section.Items[index], positionX + index % PER_ROW * PITCH_X, positionY + index / PER_ROW * PITCH_Y));
             }
 
-            y += (section.Items.Length + PER_ROW - 1) / PER_ROW * PITCH_Y + SECTION_GAP;
+            positionY += (section.Items.Length + PER_ROW - 1) / PER_ROW * PITCH_Y + SECTION_GAP;
         }
     }
 }

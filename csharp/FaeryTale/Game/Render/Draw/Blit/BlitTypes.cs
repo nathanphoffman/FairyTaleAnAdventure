@@ -120,18 +120,18 @@ internal sealed class BlitMemory(Bitmap bitmap, byte[] queue, byte[] mask, byte[
 {
     private const int BYTE_BITS = 8;
 
-    public byte Byte(Loc at)
+    public byte Byte(Loc offset)
     {
-        (byte[] bytes, long baseOffset) = AreaBytes(at.Area);
-        long index = baseOffset + at.Pos;
+        (byte[] bytes, long baseOffset) = AreaBytes(offset.Area);
+        long index = baseOffset + offset.Pos;
 
         return index >= 0 && index < bytes.Length ? bytes[index] : (byte)0;
     }
 
-    public void SetByte(Loc at, byte value)
+    public void SetByte(Loc offset, byte value)
     {
-        (byte[] bytes, long baseOffset) = AreaBytes(at.Area);
-        long index = baseOffset + at.Pos;
+        (byte[] bytes, long baseOffset) = AreaBytes(offset.Area);
+        long index = baseOffset + offset.Pos;
 
         if (index >= 0 && index < bytes.Length)
         {
@@ -140,13 +140,13 @@ internal sealed class BlitMemory(Bitmap bitmap, byte[] queue, byte[] mask, byte[
     }
 
     /// Reads a big-endian 16-bit word (the first byte is the high half).
-    public uint ReadWord(Loc at) => ((uint)Byte(at) << BYTE_BITS) | Byte(at.Add(1));
+    public uint ReadWord(Loc offset) => ((uint)Byte(offset) << BYTE_BITS) | Byte(offset.Add(1));
 
     /// Writes a big-endian 16-bit word (the high byte is stored first).
-    public void WriteWord(Loc at, uint value)
+    public void WriteWord(Loc offset, uint value)
     {
-        SetByte(at, (byte)(value >> BYTE_BITS));
-        SetByte(at.Add(1), (byte)value);
+        SetByte(offset, (byte)(value >> BYTE_BITS));  // the high byte of the 16-bit value is bits 8 and up
+        SetByte(offset.Add(1), (byte)value);
     }
 
     // The bytes of an area, and how far in the position 0 of the area is.

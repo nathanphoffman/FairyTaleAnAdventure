@@ -273,17 +273,17 @@ public sealed partial class SdlDisplay : IDisplayDevice, IDisposable
     // With the old picture SDL reports mouse positions in the 640x400 logical screen (it handles the
     // letterboxing), so only the doubled rows need undoing. With the native size picture they are
     // pixels of the window.
-    private void MouseMovedTo(int x, int y)
+    private void MouseMovedTo(int positionX, int positionY)
     {
         if (WindowControls.NativeRendering)
         {
-            (int pixelX, int pixelY) = ToOutputPixels(x, y);
+            (int pixelX, int pixelY) = ToOutputPixels(positionX, positionY);
 
             nativePresenter.Composer.RouteMouse(pixelX, pixelY);
 
             return;
         }
 
-        InputBridge.MouseMove(x, y / ROW_SCALE);
+        InputBridge.MouseMove(positionX, positionY / ROW_SCALE);
     }
 }

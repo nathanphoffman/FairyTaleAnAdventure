@@ -19,6 +19,20 @@ public static class MapCamera
     private const int FAR_INSET = 10;
     private const int LAST_STEP = 136;
 
+    // Page turn bands past the near fold: each runs from a first to a last distance and has its own inset.
+    private const int NEAR_FOLD_LAST = 10;
+    private const int LAST_STEP_INSET = 7;
+    private const int OUTER_BAND_FIRST = 124;
+    private const int OUTER_BAND_LAST = 135;
+    private const int OUTER_BAND_INSET = 6;
+    private const int MIDDLE_BAND_FIRST = 99;
+    private const int MIDDLE_BAND_LAST = 123;
+    private const int MIDDLE_BAND_INSET = 5;
+    private const int INNER_BAND_FIRST = 72;
+    private const int INNER_BAND_LAST = 98;
+    private const int INNER_BAND_INSET = 4;
+    private const int DEFAULT_INSET = 3;
+
     private static readonly int[] NEAR_FOLD = [9, 9, 8, 7, 6, 5, 5, 5, 4, 4, 4];
 
     /// Sign-extends a 15 bit difference to 16 bits.
@@ -29,14 +43,14 @@ public static class MapCamera
     /// Where the camera goes for a hero position: it creeps along once the hero is 20 pixels (10
     /// vertically) off centre, and jumps once the hero is 70 (24 up, 44 down) off. The hero is
     /// kept at about (144, 70) on screen.
-    internal static (ushort X, ushort Y) CameraAfter(ushort cameraX, ushort cameraY, int x, int y)
+    internal static (ushort X, ushort Y) CameraAfter(ushort cameraX, ushort cameraY, int positionX, int positionY)
     {
-        short cx = (short)(x - CAMERA_CENTER_X);
-        short cy = (short)(y - CAMERA_CENTER_Y);
-        short dx = SignExtend15((short)(cx - cameraX));
-        short dy = SignExtend15((short)(cy - cameraY));
+        short cx = (short)(positionX - CAMERA_CENTER_X);
+        short cy = (short)(positionY - CAMERA_CENTER_Y);
+        short deltaX = SignExtend15((short)(cx - cameraX));
+        short deltaY = SignExtend15((short)(cy - cameraY));
 
-        return (NewCameraX(cameraX, cx, dx), NewCameraY(cameraY, cy, dy));
+        return (NewCameraX(cameraX, cx, deltaX), NewCameraY(cameraY, cy, deltaY));
     }
 
     private static ushort NewCameraX(ushort cameraX, short target, short delta)
@@ -80,19 +94,19 @@ public static class MapCamera
     }
 
     /// Moves the camera (MapX, MapY) after the hero.
-    public static void MoveCameraTo(World world, int x, int y) =>
-        (world.MapX, world.MapY) = CameraAfter(world.MapX, world.MapY, x, y);
+    public static void MoveCameraTo(World world, int positionX, int positionY) =>
+        (world.MapX, world.MapY) = CameraAfter(world.MapX, world.MapY, positionX, positionY);
 
     /// Small lookup used by the page-turn animation: how far in from the top and bottom a strip of
     /// the curling page starts, given its distance from the fold.
-    public static int PageTurnInset(int x) => x switch
+    public static int PageTurnInset(int positionX) => positionX switch
     {
-        <= 10 => NEAR_FOLD[x],
+        <= NEAR_FOLD_LAST => NEAR_FOLD[positionX],
         >= FAR_EDGE => FAR_INSET,
-        LAST_STEP => 7,
-        >= 124 and <= 135 => 6,
-        >= 99 and <= 123 => 5,
-        >= 72 and <= 98 => 4,
-        _ => 3,
+        LAST_STEP => LAST_STEP_INSET,
+        >= OUTER_BAND_FIRST and <= OUTER_BAND_LAST => OUTER_BAND_INSET,
+        >= MIDDLE_BAND_FIRST and <= MIDDLE_BAND_LAST => MIDDLE_BAND_INSET,
+        >= INNER_BAND_FIRST and <= INNER_BAND_LAST => INNER_BAND_INSET,
+        _ => DEFAULT_INSET,
     };
 }

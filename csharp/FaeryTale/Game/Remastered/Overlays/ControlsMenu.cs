@@ -147,19 +147,19 @@ public static class ControlsMenu
         int width = LABEL_CHARACTERS * Overlay.GLYPH_SIZE * ENTRY_SCALE + PANEL_PADDING * 2;
         int left = (Overlay.WIDTH - COLUMNS * width - (COLUMNS - 1) * COLUMN_GAP) / 2;
         int rows = (ACTIONS.Length + 2 + COLUMNS - 1) / COLUMNS;
-        int top = (FULL_HEIGHT - (rows * ROW_SPACING + HEADING_GAP + HELP_GAP)) / 2 + HEADING_GAP;
+        int topEdge = (FULL_HEIGHT - (rows * ROW_SPACING + HEADING_GAP + HELP_GAP)) / 2 + HEADING_GAP;
 
         return Enumerable.Range(0, ACTIONS.Length + 2)
-            .Select(index => (left + index % COLUMNS * (width + COLUMN_GAP), top + index / COLUMNS * ROW_SPACING, width, ENTRY_ASCENT + PANEL_PADDING * 2 + Overlay.GLYPH_SIZE))
+            .Select(index => (left + index % COLUMNS * (width + COLUMN_GAP), topEdge + index / COLUMNS * ROW_SPACING, width, ENTRY_ASCENT + PANEL_PADDING * 2 + Overlay.GLYPH_SIZE))
             .ToArray();
     }
 
     private static (int Left, int Top, int Width, int Height) HeadingArea()
     {
         int width = Overlay.TextWidth(HEADING, TITLE_SCALE) + PANEL_PADDING * 2;
-        int top = Areas()[0].Top - HEADING_GAP;
+        int topEdge = Areas()[0].Top - HEADING_GAP;
 
-        return ((Overlay.WIDTH - width) / 2, top, width, TITLE_ASCENT + PANEL_PADDING * 2);
+        return ((Overlay.WIDTH - width) / 2, topEdge, width, TITLE_ASCENT + PANEL_PADDING * 2);
     }
 
     // The text of an entry: an action and its key, or one of the two buttons.

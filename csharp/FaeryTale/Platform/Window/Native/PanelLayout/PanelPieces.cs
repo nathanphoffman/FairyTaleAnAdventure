@@ -9,13 +9,13 @@ internal sealed partial class PanelLayout
     {
         while (waiting.TryDequeue(out int index))
         {
-            int x = index % width;
-            int y = index / width;
+            int positionX = index % width;
+            int positionY = index / width;
 
-            SeedIfInside(frame, frameWidth, firstLine, x - 1, y);
-            SeedIfInside(frame, frameWidth, firstLine, x + 1, y);
-            SeedIfInside(frame, frameWidth, firstLine, x, y - 1);
-            SeedIfInside(frame, frameWidth, firstLine, x, y + 1);
+            SeedIfInside(frame, frameWidth, firstLine, positionX - 1, positionY);
+            SeedIfInside(frame, frameWidth, firstLine, positionX + 1, positionY);
+            SeedIfInside(frame, frameWidth, firstLine, positionX, positionY - 1);
+            SeedIfInside(frame, frameWidth, firstLine, positionX, positionY + 1);
         }
     }
 
@@ -30,12 +30,12 @@ internal sealed partial class PanelLayout
 
         int left = BOX_LEFT - FRAME_PIXELS + MENU_SHIFT;
         int right = BOX_LEFT + BOX_COLUMN_SPACING + BOX_WIDTH + FRAME_PIXELS + MENU_SHIFT;
-        int top = FIRST_BOX_LINE - FRAME_LINES + TOP_PAD_LINES;
+        int topEdge = FIRST_BOX_LINE - FRAME_LINES + TOP_PAD_LINES;
         int bottom = FIRST_BOX_LINE + lastBoxRow * BOX_ROW_SPACING + BOX_HEIGHT + FRAME_LINES + TOP_PAD_LINES;
 
-        for (int y = top; y < Math.Min(bottom, ArrangedLines); y++)
+        for (int positionY = topEdge; positionY < Math.Min(bottom, ArrangedLines); positionY++)
         {
-            Array.Fill(Arranged, SOLID, y * ArrangedWidth + left, right - left);
+            Array.Fill(Arranged, SOLID, positionY * ArrangedWidth + left, right - left);
         }
     }
 
@@ -43,17 +43,17 @@ internal sealed partial class PanelLayout
     // as they are (0, the wood shows); the others are copied, solid.
     private void CopyPieces(uint[] frame, int frameWidth, int firstLine)
     {
-        for (int y = 0; y < lines; y++)
+        for (int positionY = 0; positionY < lines; positionY++)
         {
-            for (int x = 0; x < width; x++)
+            for (int positionX = 0; positionX < width; positionX++)
             {
-                if (!background[y * width + x])
+                if (!background[positionY * width + positionX])
                 {
-                    (int newX, int newY) = Moved(x, y);
+                    (int newX, int newY) = Moved(positionX, positionY);
 
                     if (newY >= 0 && newY < ArrangedLines)
                     {
-                        Arranged[newY * ArrangedWidth + newX] = SOLID | frame[(firstLine + y) * frameWidth + x];
+                        Arranged[newY * ArrangedWidth + newX] = SOLID | frame[(firstLine + positionY) * frameWidth + positionX];
                     }
                 }
             }
@@ -63,8 +63,8 @@ internal sealed partial class PanelLayout
     // A colour with red, green and blue cut down to the panel's wood brightness.
     private static uint Darken(uint color)
     {
-        uint Part(int shift) => ((color >> shift) & 0xff) * WOOD_BRIGHTNESS_PERCENT / 100 << shift;
+        uint Part(int shift) => ((color >> shift) & CHANNEL_MASK) * WOOD_BRIGHTNESS_PERCENT / PERCENT_SCALE << shift;  // pull one 8-bit colour channel out, scale it by the percent, move it back
 
-        return (color & 0xff000000) | Part(16) | Part(8) | Part(0);
+        return (color & SOLID) | Part(RED_SHIFT) | Part(GREEN_SHIFT) | Part(0);
     }
 }

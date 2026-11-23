@@ -41,6 +41,12 @@ public static class ContainerContents
 
     private const short CONTAINER_GOLD = 100;
 
+    // Two key rolls land on odd key types that fold onto an ordinary key of the same kind.
+    private const int ODD_KEY_FIRST = 22;
+    private const int ODD_KEY_SECOND = 23;
+    private const int FOLDED_KEY_FIRST = 16;
+    private const int FOLDED_KEY_SECOND = 20;
+
     /// What was inside a container. Returns true (the container is always used up).
     public static bool Open(Data.Game game, IOutput output)
     {
@@ -105,8 +111,8 @@ public static class ContainerContents
 
         return key switch
         {
-            22 => 16,
-            23 => 20,
+            ODD_KEY_FIRST => FOLDED_KEY_FIRST,
+            ODD_KEY_SECOND => FOLDED_KEY_SECOND,
             _ => key,
         };
     }

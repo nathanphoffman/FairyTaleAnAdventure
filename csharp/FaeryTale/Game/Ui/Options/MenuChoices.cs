@@ -227,10 +227,10 @@ public static class MenuChoices
 
             while (direction < DIRECTIONS)
             {
-                ushort x = (ushort)MapSteps.StepX(game.Hero.X, direction, DOOR_REACH);
-                ushort y = (ushort)MapSteps.StepY(game.Hero.Y, direction, DOOR_REACH);
+                ushort positionX = (ushort)MapSteps.StepX(game.Hero.X, direction, DOOR_REACH);
+                ushort positionY = (ushort)MapSteps.StepY(game.Hero.Y, direction, DOOR_REACH);
 
-                if (KeyDoors.OpenDoorNear(game, output, x, y, (uint)key + 1) != 0)
+                if (KeyDoors.OpenDoorNear(game, output, positionX, positionY, (uint)key + 1) != 0)
                 {
                     game.Hero.Stuff[key + KEYBASE]--;
 

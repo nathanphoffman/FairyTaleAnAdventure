@@ -11,9 +11,19 @@ public sealed class Rng
     private const int ROTATE_BITS = 6;
     private const int LOW_WORD_MASK = 0xffff;
 
+    // The seeds a fresh game starts with, taken from the original.
+    private const int FIRST_STARTING_SEED = 19837325;
+    private const int SECOND_STARTING_SEED = 23098324;
+
+    // Masks that keep the low 2, 3, 6 and 8 bits: random values of 0 to 3, 7, 63 and 255.
+    private const int FOUR_VALUES_MASK = 3;
+    private const int EIGHT_VALUES_MASK = 7;
+    private const int SIXTY_FOUR_VALUES_MASK = 63;
+    private const int TWO_FIFTY_SIX_VALUES_MASK = 255;
+
     /// Only Seed1 is used; Seed2 is saved with the game.
-    public int Seed1 = 19837325;
-    public int Seed2 = 23098324;
+    public int Seed1 = FIRST_STARTING_SEED;
+    public int Seed2 = SECOND_STARTING_SEED;
 
     /// Steps the generator once: returns the new seed and the random value.
     public static (int Seed, int Value) Step(int seed)
@@ -46,16 +56,16 @@ public sealed class Rng
     public int Rand2() => Next() & 1;
 
     /// Random 0 to 3.
-    public int Rand4() => Next() & 3;
+    public int Rand4() => Next() & FOUR_VALUES_MASK;
 
     /// Random 0 to 7 (also used as a random compass direction).
-    public int Rand8() => Next() & 7;
+    public int Rand8() => Next() & EIGHT_VALUES_MASK;
 
     /// Random 0 to 63.
-    public int Rand64() => Next() & 63;
+    public int Rand64() => Next() & SIXTY_FOUR_VALUES_MASK;
 
     /// Random 0 to 255.
-    public int Rand256() => Next() & 255;
+    public int Rand256() => Next() & TWO_FIFTY_SIX_VALUES_MASK;
 
     /// A random number from 0 to n - 1, for any n up to 16 bits.
     public int Rnd(int n) => Bounded(Next(), n);

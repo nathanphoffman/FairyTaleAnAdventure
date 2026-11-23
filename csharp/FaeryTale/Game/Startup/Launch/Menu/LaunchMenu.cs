@@ -40,6 +40,13 @@ internal static partial class LaunchMenu
         ("Reimagined Experience", "The remastered experience with reworked content.", Experience.Reimagined),
     ];
 
+    // Each board's wood grain is made from its own seed so no two boards look alike.
+    private const uint OPTION_BOARD_SEED_BASE = 21;
+    private const uint HEADING_BOARD_SEED = 11;
+    private const uint QUIT_BOARD_SEED = 31;
+    private const uint BOOK_BOARD_SEED = 32;
+    private const uint PROLOGUE_BOARD_SEED = 33;
+
     private const string HEADING = "Choose your adventure";
 
     // Descriptions are drawn at half the size of the titles.

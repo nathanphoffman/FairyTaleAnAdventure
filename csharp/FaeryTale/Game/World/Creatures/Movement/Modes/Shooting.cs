@@ -149,15 +149,15 @@ internal sealed partial class MoveContext
     {
         Missile missile = CurrentMissile;
         int d = facing;
-        int dx = d >= 0 && d < ObjectTables.Bowshotx.Length ? ObjectTables.Bowshotx[d] : 0;
+        int deltaX = d >= 0 && d < ObjectTables.Bowshotx.Length ? ObjectTables.Bowshotx[d] : 0;
 
-        missile.AbsX = (ushort)(actor.AbsX + dx);
+        missile.AbsX = (ushort)(actor.AbsX + deltaX);
         missile.AbsY = actor.AbsY;
 
         sbyte[] table = actor.Weapon == WEAPON_BOW ? ObjectTables.Bowshoty : ObjectTables.Gunshoty;
-        int dy = d >= 0 && d < table.Length ? table[d] : 0;
+        int deltaY = d >= 0 && d < table.Length ? table[d] : 0;
 
-        missile.AbsY = (ushort)(missile.AbsY + dy);
+        missile.AbsY = (ushort)(missile.AbsY + deltaY);
         missile.TimeOfFlight = 0;
         missile.Direction = actor.Facing;
         missile.Archer = (sbyte)slot;

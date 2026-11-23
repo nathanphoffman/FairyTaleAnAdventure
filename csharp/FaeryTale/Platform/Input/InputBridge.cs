@@ -21,8 +21,14 @@ public static class InputBridge
     private const int POINTER_MAX_X = 315;
     private const int POINTER_MIN_Y = 147;
     private const int POINTER_MAX_Y = 195;
+    private const int POINTER_START_X = 160;
+    private const int POINTER_START_Y = 170;
 
-    private static readonly bool[] arrows = new bool[4];
+    // The four arrows are held in order up, down, left, right.
+    private const int ARROW_COUNT = 4;
+    private const int RIGHT_ARROW_INDEX = 3;
+
+    private static readonly bool[] arrows = new bool[ARROW_COUNT];
     private static int heldDirection;
     private const string MAP_KEY = "M";
     private const string INVENTORY_KEY = "I";
@@ -42,7 +48,7 @@ public static class InputBridge
     private static bool rightDown;
 
     /// Pointer position for drawing the cursor, in lores pixels and screen lines.
-    public static (int X, int Y) Pointer { get; private set; } = (160, 170);
+    public static (int X, int Y) Pointer { get; private set; } = (POINTER_START_X, POINTER_START_Y);
 
     /// A key was pressed or released: passes it on to the game as an arrow, the fire button or a
     /// key code. A name SDL does not know does nothing.
@@ -172,12 +178,12 @@ public static class InputBridge
     /// The mouse moved to a position in the 640x200 frame.
     public static void MouseMove(int frameX, int frameY)
     {
-        int x = frameX / FRAME_TO_LORES;
+        int positionX = frameX / FRAME_TO_LORES;
 
-        InputHandler.MouseMoved(x, frameY);
+        InputHandler.MouseMoved(positionX, frameY);
         Pointer = InputHandler.RemasteredControls
-            ? (Math.Clamp(x, 0, LORES_WIDTH - 1), Math.Clamp(frameY, 0, SCREEN_LINES - 1))
-            : (Math.Clamp(x, POINTER_MIN_X, POINTER_MAX_X), Math.Clamp(frameY, POINTER_MIN_Y, POINTER_MAX_Y));
+            ? (Math.Clamp(positionX, 0, LORES_WIDTH - 1), Math.Clamp(frameY, 0, SCREEN_LINES - 1))
+            : (Math.Clamp(positionX, POINTER_MIN_X, POINTER_MAX_X), Math.Clamp(frameY, POINTER_MIN_Y, POINTER_MAX_Y));
     }
 
     /// A mouse button was pressed or released.
@@ -202,7 +208,7 @@ public static class InputBridge
     {
         arrows[index] = down;
 
-        int next = KeyNames.DirectionCode(arrows[0], arrows[1], arrows[2], arrows[3]);
+        int next = KeyNames.DirectionCode(arrows[0], arrows[1], arrows[2], arrows[RIGHT_ARROW_INDEX]);
         int old = heldDirection;
 
         heldDirection = next;

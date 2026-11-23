@@ -136,16 +136,16 @@ public static class ClickToAttack
     // Whether nothing solid lies between the hero and the enemy (a shot goes in a straight line).
     private static bool HasClearShot(Data.Game game, Shape hero, Shape enemy)
     {
-        int dx = enemy.AbsX - hero.AbsX;
-        int dy = enemy.AbsY - hero.AbsY;
-        int steps = (Math.Max(Math.Abs(dx), Math.Abs(dy)) - SIGHT_END_MARGIN) / SIGHT_STEP;
+        int deltaX = enemy.AbsX - hero.AbsX;
+        int deltaY = enemy.AbsY - hero.AbsY;
+        int steps = (Math.Max(Math.Abs(deltaX), Math.Abs(deltaY)) - SIGHT_END_MARGIN) / SIGHT_STEP;
 
         for (int step = 1; step <= steps; step++)
         {
-            int x = hero.AbsX + dx * step * SIGHT_STEP / Math.Max(Math.Abs(dx), Math.Abs(dy));
-            int y = hero.AbsY + dy * step * SIGHT_STEP / Math.Max(Math.Abs(dx), Math.Abs(dy));
+            int positionX = hero.AbsX + deltaX * step * SIGHT_STEP / Math.Max(Math.Abs(deltaX), Math.Abs(deltaY));
+            int positionY = hero.AbsY + deltaY * step * SIGHT_STEP / Math.Max(Math.Abs(deltaX), Math.Abs(deltaY));
 
-            if (Blocking.BlockedAt(game, (short)x, (short)y, 0) != 0)
+            if (Blocking.BlockedAt(game, (short)positionX, (short)positionY, 0) != 0)
             {
                 return false;
             }

@@ -44,13 +44,13 @@ public static class OverviewMap
     public static (short X, short Y) OverviewOrigin(int mx, int my, ushort regionX, ushort regionY)
     {
         // Camera pixels to sectors (256 to a sector), then back to the left / top edge of the overview.
-        short x = unchecked((short)(((ushort)mx >> SECTOR_SHIFT) - HALF_OVERVIEW_WIDTH - regionX));
-        short y = unchecked((short)(((ushort)my >> SECTOR_SHIFT) - HALF_OVERVIEW_HEIGHT - regionY));
+        short positionX = unchecked((short)(((ushort)mx >> SECTOR_SHIFT) - HALF_OVERVIEW_WIDTH - regionX));
+        short positionY = unchecked((short)(((ushort)my >> SECTOR_SHIFT) - HALF_OVERVIEW_HEIGHT - regionY)); // same conversion as x, using the vertical size
 
-        x = Wrap(x);
-        y = Wrap(y);
+        positionX = Wrap(positionX);
+        positionY = Wrap(positionY);
 
-        return ((short)Math.Clamp((int)x, 0, MAP_SECTORS_WIDE - OVERVIEW_COLUMNS), (short)Math.Clamp((int)y, 0, MapLookup.SECTOR_ROWS_IN_REGION - OVERVIEW_ROWS));
+        return ((short)Math.Clamp((int)positionX, 0, MAP_SECTORS_WIDE - OVERVIEW_COLUMNS), (short)Math.Clamp((int)positionY, 0, MapLookup.SECTOR_ROWS_IN_REGION - OVERVIEW_ROWS));
     }
 
     /// Draws the overview map (the magic map spell): each sector is one 16 by 8 block of pixels
@@ -111,7 +111,7 @@ public static class OverviewMap
 
                 // A 16 pixel row is two bytes, high byte first; the second copy is for the other page.
                 bytes[at] = (byte)(words[plane] >> BYTE_SHIFT);
-                bytes[at + OVERVIEW_LINE_COPY] = (byte)(words[plane] >> BYTE_SHIFT);
+                bytes[at + OVERVIEW_LINE_COPY] = (byte)(words[plane] >> BYTE_SHIFT); // top byte of the 16-bit word: shift right 8 drops the low byte
                 bytes[at + 1] = (byte)words[plane];
                 bytes[at + OVERVIEW_LINE_COPY + 1] = (byte)words[plane];
             }

@@ -34,7 +34,7 @@ public abstract class Font
         }
 
         // HUNK_HEADER: 0, table size, first, last, one size per hunk, then HUNK_CODE, size, data.
-        if (Be32(file, 8) is not { } table)
+        if (Be32(file, HUNK_TABLE_SIZE_OFFSET) is not { } table)
         {
             return null;
         }
@@ -50,7 +50,7 @@ public abstract class Font
     }
 
     /// Draws character character with its baseline at the pen and returns how far the pen moves.
-    public abstract int DrawGlyph(Bitmap bitmap, Pen pen, byte character, int planes);
+    public abstract int DrawGlyph(Bitmap bitmap, Pen drawingPen, byte character, int planes);
 
     /// How far the pen moves across after a character (its width with the space after it).
     public abstract int AdvanceOf(byte character);
@@ -63,6 +63,11 @@ public abstract class Font
     private const int HUNK_HEADER_FIXED = 20;
     private const int HUNK_CODE_PREFIX = 8;
     private const int LONG_BYTES = 4;
+
+    // Where the table size sits in the hunk header, and how big one entry of the glyph location table is
+    // (a 16 bit bit-offset then a 16 bit width).
+    private const int HUNK_TABLE_SIZE_OFFSET = 8;
+    private const int CHAR_LOC_ENTRY_BYTES = 4;
 
     // Where the TextFont sits inside the DiskFontHeader, and where its fields sit inside that.
     private const int TEXTFONT_OFFSET = 58;
@@ -80,7 +85,7 @@ public abstract class Font
         offset >= 0 && offset + 2 <= data.Length ? BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(offset)) : null;
 
     internal static uint? Be32(byte[] data, int offset) =>
-        offset >= 0 && offset + 4 <= data.Length ? BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset)) : null;
+        offset >= 0 && offset + LONG_BYTES <= data.Length ? BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset)) : null;
 
     // Cuts the glyph strip and the three per-glyph tables out of a font segment.
     private static BitmapFont? ReadFontTables(byte[] segment)
@@ -113,8 +118,8 @@ public abstract class Font
 
         for (int index = 0; index < count; index++)
         {
-            if (Be16(segment, (int)charLoc + index * 4) is not { } offset
-                || Be16(segment, (int)charLoc + index * 4 + 2) is not { } width
+            if (Be16(segment, (int)charLoc + index * CHAR_LOC_ENTRY_BYTES) is not { } offset
+                || Be16(segment, (int)charLoc + index * CHAR_LOC_ENTRY_BYTES + 2) is not { } width
                 || Be16(segment, (int)charSpace + index * 2) is not { } space
                 || Be16(segment, (int)charKern + index * 2) is not { } kern)
             {
@@ -137,25 +142,25 @@ public abstract class Font
 
         public override int AdvanceOf(byte character) => SIZE;
 
-        public override int DrawGlyph(Bitmap bitmap, Pen pen, byte character, int planes)
+        public override int DrawGlyph(Bitmap bitmap, Pen drawingPen, byte character, int planes)
         {
-            int top = pen.Y - BASELINE;
+            int topEdge = drawingPen.Y - BASELINE;
             byte[] glyph = Font8x8.BasicLegacy[character & ASCII_MASK];
-            bool jam2 = (pen.Mode & Drawing.JAM2) != 0;
+            bool jam2 = (drawingPen.Mode & Drawing.JAM2) != 0;
 
-            for (int row = 0; row < SIZE; row++)
+            for (int rowIndex = 0; rowIndex < SIZE; rowIndex++)
             {
                 for (int column = 0; column < SIZE; column++)
                 {
-                    bool on = ((glyph[row] >> column) & 1) != 0; // bit 0 is leftmost
+                    bool on = ((glyph[rowIndex] >> column) & 1) != 0; // bit 0 is leftmost
 
                     if (on)
                     {
-                        bitmap.Plot(pen.X + column, top + row, pen.Fg, false, planes);
+                        bitmap.Plot(drawingPen.X + column, topEdge + rowIndex, drawingPen.Fg, false, planes);
                     }
                     else if (jam2)
                     {
-                        bitmap.Plot(pen.X + column, top + row, pen.Bg, false, planes);
+                        bitmap.Plot(drawingPen.X + column, topEdge + rowIndex, drawingPen.Bg, false, planes);
                     }
                 }
             }
@@ -169,6 +174,7 @@ public abstract class Font
     private sealed class BitmapFont(int height, int baseline, byte low, byte high, int modulo, byte[] data, int count) : Font
     {
         private const byte LEFTMOST_BIT_FIRST = 0x80;
+    private const int BITS_PER_BYTE = 8;
 
         private readonly (ushort Offset, ushort Width)[] locations = new (ushort, ushort)[count];
         private readonly ushort[] spaces = new ushort[count];
@@ -184,23 +190,23 @@ public abstract class Font
         public override int AdvanceOf(byte character) =>
             spaces[character >= low && character <= high ? character - low : high - low + 1];
 
-        public override int DrawGlyph(Bitmap bitmap, Pen pen, byte character, int planes)
+        public override int DrawGlyph(Bitmap bitmap, Pen drawingPen, byte character, int planes)
         {
             // The "default" glyph sits after the last real one.
             int index = character >= low && character <= high ? character - low : high - low + 1;
             (ushort bitOffset, ushort bitWidth) = locations[index];
             int advance = spaces[index];
             int kern = kerns[index];
-            int top = pen.Y - baseline;
-            bool jam2 = (pen.Mode & Drawing.JAM2) != 0;
+            int topEdge = drawingPen.Y - baseline;
+            bool jam2 = (drawingPen.Mode & Drawing.JAM2) != 0;
 
-            for (int row = 0; row < height; row++)
+            for (int rowIndex = 0; rowIndex < height; rowIndex++)
             {
                 if (jam2)
                 {
-                    for (int x = 0; x < advance; x++)
+                    for (int positionX = 0; positionX < advance; positionX++)
                     {
-                        bitmap.Plot(pen.X + x, top + row, pen.Bg, false, planes);
+                        bitmap.Plot(drawingPen.X + positionX, topEdge + rowIndex, drawingPen.Bg, false, planes);
                     }
                 }
 
@@ -209,9 +215,9 @@ public abstract class Font
                     int bit = bitOffset + column;
 
                     // The leftmost pixel of a byte is its top bit.
-                    if ((data[row * modulo + bit / 8] & (LEFTMOST_BIT_FIRST >> (bit % 8))) != 0)
+                    if ((data[rowIndex * modulo + bit / BITS_PER_BYTE] & (LEFTMOST_BIT_FIRST >> (bit % BITS_PER_BYTE))) != 0)
                     {
-                        bitmap.Plot(pen.X + kern + column, top + row, pen.Fg, false, planes);
+                        bitmap.Plot(drawingPen.X + kern + column, topEdge + rowIndex, drawingPen.Fg, false, planes);
                     }
                 }
             }

@@ -67,7 +67,7 @@ public interface IOutput
     // ---- the text cursor and the story pages ----
 
     /// Moves the text position of the area being written to.
-    void SetTextPosition(int x, int y);
+    void SetTextPosition(int positionX, int positionY);
 
     /// Writes in the story font from now on.
     void UseStoryFont();
@@ -95,7 +95,7 @@ public interface IOutput
     // ---- whole screens and pictures ----
 
     /// Lights direction dir on the compass (9 and above light none).
-    void DrawCompass(short dir);
+    void DrawCompass(short direction);
 
     /// Draws the pictures of everything the hero holds on a black page.
     void DrawItemList(Hero hero);
@@ -105,7 +105,7 @@ public interface IOutput
     void DrawOverviewMap(MapData map, World world, int mx, int my);
 
     /// Marks the hero's place on the overview map, if it is inside the map.
-    void MarkOverviewMap((int X, int Y)? at);
+    void MarkOverviewMap((int X, int Y)? offset);
 
     /// Clears the page being drawn to black.
     void ClearDrawingPage();
@@ -122,7 +122,7 @@ public interface IOutput
 
     /// Makes the play field 2 * x wide and 2 * y high, centred on the screen, and the text panel the
     /// height that is left over (the intro zoom).
-    void SetZoomSize(int x, int y);
+    void SetZoomSize(int positionX, int positionY);
 
     /// Loads the picture file with this name onto the page being drawn.
     void LoadPictureToDrawingPage(string name);

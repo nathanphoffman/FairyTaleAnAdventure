@@ -22,6 +22,9 @@ public static class WitchBeam
 
     // The beam has 64 directions, 4 bytes (two points) each.
     private const int POINT_BYTES = 4;
+
+    // The second point's y is the fourth byte of a direction's four-byte entry.
+    private const int SECOND_POINT_Y_OFFSET = 3;
     private const int DIRECTIONS_BEFORE = 63;
     private const int DIRECTIONS_AFTER = 1;
 
@@ -29,12 +32,12 @@ public static class WitchBeam
     /// value the original kept.
     internal static short Side((short X, short Y) p1, (short X, short Y) p2, short xh, short yh)
     {
-        short dx = unchecked((short)(p2.X - p1.X));
-        short dy = unchecked((short)(p2.Y - p1.Y));
+        short deltaX = unchecked((short)(p2.X - p1.X));
+        short deltaY = unchecked((short)(p2.Y - p1.Y));
         short dx1 = unchecked((short)(xh - p1.X));
         short dy1 = unchecked((short)(yh - p1.Y));
 
-        return unchecked((short)(dx * dy1 - dy * dx1));
+        return unchecked((short)(deltaX * dy1 - deltaY * dx1));
     }
 
     /// Draws the witch's beam on page page and records on which side of its edges the hero is.
@@ -55,14 +58,14 @@ public static class WitchBeam
     }
 
     // The two points of the beam edge for direction dir, relative to the witch.
-    private static ((short X, short Y) Near, (short X, short Y) Far) Edge(short dir, FPage fp)
+    private static ((short X, short Y) Near, (short X, short Y) Far) Edge(short direction, FPage fp)
     {
-        int start = (byte)(dir * POINT_BYTES);
+        int start = (byte)(direction * POINT_BYTES);
         sbyte[] points = ObjectTables.Witchpoints;
 
         return (
             ((short)(points[start] + fp.WitchX), (short)(points[start + 1] + fp.WitchY)),
-            ((short)(points[start + 2] + fp.WitchX), (short)(points[start + 3] + fp.WitchY)));
+            ((short)(points[start + 2] + fp.WitchX), (short)(points[start + SECOND_POINT_Y_OFFSET] + fp.WitchY)));
     }
 
     // Fills the beam's quadrilateral with the corners (in drawing order) in complement mode, so

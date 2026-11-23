@@ -52,30 +52,30 @@ public static class PanelButtonOutline
 
         if (wanted && menuShowsIt && slot >= 0)
         {
-            int x = LEFT_COLUMN_X + slot % COLUMNS * COLUMN_SPACING;
-            int y = FIRST_ROW_Y + slot / COLUMNS * ROW_SPACING;
+            int positionX = LEFT_COLUMN_X + slot % COLUMNS * COLUMN_SPACING;
+            int positionY = FIRST_ROW_Y + slot / COLUMNS * ROW_SPACING;
 
-            overlay.Images.Add(Square(x - MARGIN, y - MARGIN));
+            overlay.Images.Add(Square(positionX - MARGIN, positionY - MARGIN));
         }
     }
 
     // A hollow square picture with its top left corner at a place on the grid.
-    private static Image Square(int left, int top)
+    private static Image Square(int left, int topEdge)
     {
         int width = BOX_WIDTH + 2 * MARGIN;
         int height = BOX_HEIGHT + 2 * MARGIN;
         uint[] pixels = new uint[width * height];
 
-        for (int y = 0; y < height; y++)
+        for (int positionY = 0; positionY < height; positionY++)
         {
-            for (int x = 0; x < width; x++)
+            for (int positionX = 0; positionX < width; positionX++)
             {
-                bool onRing = x < THICKNESS || y < THICKNESS || x >= width - THICKNESS || y >= height - THICKNESS;
+                bool onRing = positionX < THICKNESS || positionY < THICKNESS || positionX >= width - THICKNESS || positionY >= height - THICKNESS;
 
-                pixels[y * width + x] = onRing ? RED : 0;
+                pixels[positionY * width + positionX] = onRing ? RED : 0;
             }
         }
 
-        return new Image(left, top, width, height, pixels);
+        return new Image(left, topEdge, width, height, pixels);
     }
 }

@@ -223,11 +223,11 @@ public static class Brothers
     }
 
     // Puts one actor back at its start: its kind, its position and the first picture with no weapon.
-    private static void PlaceAtStart(Shape actor, sbyte kind, ushort x, ushort y)
+    private static void PlaceAtStart(Shape actor, sbyte kind, ushort positionX, ushort positionY)
     {
         actor.Kind = kind;
-        actor.AbsX = x;
-        actor.AbsY = y;
+        actor.AbsX = positionX;
+        actor.AbsY = positionY;
         actor.Index = 0;
         actor.Weapon = 0;
     }

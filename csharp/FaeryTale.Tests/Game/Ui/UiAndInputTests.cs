@@ -172,14 +172,14 @@ public class UiAndInputTests
     public void StoneJumpRules()
     {
         byte[] list = [54, 43, 71, 77, 78, 102, 66, 121, 12, 85, 79, 40, 107, 38, 73, 21, 12, 26, 26, 53, 84, 60];
-        ushort x = (54 << 8) + 100;
-        ushort y = (43 << 8) + 70;
+        ushort positionX = (54 << 8) + 100;
+        ushort positionY = (43 << 8) + 70;
 
-        Assert.IsType<Magic.StoneJump.Refused>(Magic.StoneTarget(143, x, y, 0, list));
-        Assert.IsType<Magic.StoneJump.Refused>(Magic.StoneTarget(144, (ushort)(x + 100), y, 0, list));
-        Assert.IsType<Magic.StoneJump.Refused>(Magic.StoneTarget(144, x, (ushort)(y + 100), 0, list));
+        Assert.IsType<Magic.StoneJump.Refused>(Magic.StoneTarget(143, positionX, positionY, 0, list));
+        Assert.IsType<Magic.StoneJump.Refused>(Magic.StoneTarget(144, (ushort)(positionX + 100), positionY, 0, list));
+        Assert.IsType<Magic.StoneJump.Refused>(Magic.StoneTarget(144, positionX, (ushort)(positionY + 100), 0, list));
         Assert.IsType<Magic.StoneJump.NoRing>(Magic.StoneTarget(144, 0x0500 + 100, 0x0500 + 70, 0, list));
-        Assert.Equal(new Magic.StoneJump.To((71 << 8) + 100, (77 << 8) + 70), Magic.StoneTarget(144, x, y, 0, list));
+        Assert.Equal(new Magic.StoneJump.To((71 << 8) + 100, (77 << 8) + 70), Magic.StoneTarget(144, positionX, positionY, 0, list));
         Assert.Equal(new Magic.StoneJump.To((73 << 8) + 90, (21 << 8) + 65), Magic.StoneTarget(144, (84 << 8) + 90, (60 << 8) + 65, 7, list));
         Assert.Equal(new Magic.StoneJump.To((84 << 8) + 90, (60 << 8) + 65), Magic.StoneTarget(144, (54 << 8) + 90, (43 << 8) + 65, 9, list));
     }

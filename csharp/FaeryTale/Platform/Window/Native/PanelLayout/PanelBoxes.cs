@@ -11,16 +11,16 @@ internal sealed partial class PanelLayout
         KeepFilledBoxes(frame, frameWidth, firstLine);
         waiting.Clear();
 
-        for (int x = 0; x < width; x++)
+        for (int positionX = 0; positionX < width; positionX++)
         {
-            Seed(frame, frameWidth, firstLine, x, 0);
-            Seed(frame, frameWidth, firstLine, x, lines - 1);
+            Seed(frame, frameWidth, firstLine, positionX, 0);
+            Seed(frame, frameWidth, firstLine, positionX, lines - 1);
         }
 
-        for (int y = 0; y < lines; y++)
+        for (int positionY = 0; positionY < lines; positionY++)
         {
-            Seed(frame, frameWidth, firstLine, 0, y);
-            Seed(frame, frameWidth, firstLine, width - 1, y);
+            Seed(frame, frameWidth, firstLine, 0, positionY);
+            Seed(frame, frameWidth, firstLine, width - 1, positionY);
         }
 
         Spread(frame, frameWidth, firstLine);
@@ -31,27 +31,27 @@ internal sealed partial class PanelLayout
     {
         for (int column = 0; column < BOX_COLUMNS; column++)
         {
-            for (int row = 0; row < BOX_ROWS; row++)
+            for (int rowIndex = 0; rowIndex < BOX_ROWS; rowIndex++)
             {
-                (int left, int top) = (BOX_LEFT + column * BOX_COLUMN_SPACING, FIRST_BOX_LINE + row * BOX_ROW_SPACING);
+                (int left, int top) = (BOX_LEFT + column * BOX_COLUMN_SPACING, FIRST_BOX_LINE + rowIndex * BOX_ROW_SPACING);
 
                 if (HasColor(frame, frameWidth, firstLine, left, top))
                 {
                     MarkKept(left, top);
-                    lastBoxRow = Math.Max(lastBoxRow, row);
+                    lastBoxRow = Math.Max(lastBoxRow, rowIndex);
                 }
             }
         }
     }
 
     // Whether a menu box has any colour in it.
-    private static bool HasColor(uint[] frame, int frameWidth, int firstLine, int left, int top)
+    private static bool HasColor(uint[] frame, int frameWidth, int firstLine, int left, int topEdge)
     {
-        for (int y = top; y < top + BOX_HEIGHT; y++)
+        for (int positionY = topEdge; positionY < topEdge + BOX_HEIGHT; positionY++)
         {
-            for (int x = left; x < left + BOX_WIDTH; x++)
+            for (int positionX = left; positionX < left + BOX_WIDTH; positionX++)
             {
-                if ((frame[(firstLine + y) * frameWidth + x] & COLOR_MASK) != 0)
+                if ((frame[(firstLine + positionY) * frameWidth + positionX] & COLOR_MASK) != 0)
                 {
                     return true;
                 }
@@ -61,20 +61,20 @@ internal sealed partial class PanelLayout
         return false;
     }
 
-    private void MarkKept(int left, int top)
+    private void MarkKept(int left, int topEdge)
     {
-        for (int y = top; y < top + BOX_HEIGHT; y++)
+        for (int positionY = topEdge; positionY < topEdge + BOX_HEIGHT; positionY++)
         {
-            Array.Fill(kept, true, y * width + left, BOX_WIDTH);
+            Array.Fill(kept, true, positionY * width + left, BOX_WIDTH);
         }
     }
 
     // Starts the spread at a pixel when it is black background not yet found and not in a kept box.
-    private void Seed(uint[] frame, int frameWidth, int firstLine, int x, int y)
+    private void Seed(uint[] frame, int frameWidth, int firstLine, int positionX, int positionY)
     {
-        int index = y * width + x;
+        int index = positionY * width + positionX;
 
-        if (!background[index] && !kept[index] && (frame[(firstLine + y) * frameWidth + x] & COLOR_MASK) == 0)
+        if (!background[index] && !kept[index] && (frame[(firstLine + positionY) * frameWidth + positionX] & COLOR_MASK) == 0)
         {
             background[index] = true;
             waiting.Enqueue(index);
@@ -82,11 +82,11 @@ internal sealed partial class PanelLayout
     }
 
     // Seeds at a pixel unless it is outside the panel.
-    private void SeedIfInside(uint[] frame, int frameWidth, int firstLine, int x, int y)
+    private void SeedIfInside(uint[] frame, int frameWidth, int firstLine, int positionX, int positionY)
     {
-        if (x >= 0 && x < width && y >= 0 && y < lines)
+        if (positionX >= 0 && positionX < width && positionY >= 0 && positionY < lines)
         {
-            Seed(frame, frameWidth, firstLine, x, y);
+            Seed(frame, frameWidth, firstLine, positionX, positionY);
         }
     }
 }

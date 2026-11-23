@@ -37,6 +37,9 @@ internal static class StoryPages
     /// How long the page turn takes (it turns at one picture for every refresh of the monitor).
     private const double TURN_MS = 1100;
 
+    // Smoothstep easing: progress squared times (3 - 2 * progress) starts and ends slowly.
+    private const double SMOOTHSTEP_BASE = 3;
+
     /// The story pictures with the zoom in and out (skipped if the player presses Space).
     public static void PlayIntro(Data.Game game, Video video)
     {
@@ -46,14 +49,14 @@ internal static class StoryPages
 
         video.Screen.Pages[1].Ras = 0;
 
-        for (int x = 0; x <= ZOOM_FULL; x += ZOOM_STEP)
+        for (int positionX = 0; positionX <= ZOOM_FULL; positionX += ZOOM_STEP)
         {
             if (Launch.LeaveIntroNow(game.Ui))
             {
                 break;
             }
 
-            ScreenEffects.SetIntroZoom(game, video, x);
+            ScreenEffects.SetIntroZoom(game, video, positionX);
         }
 
         video.Screen.Pages[1].Ras = 1;
@@ -73,20 +76,20 @@ internal static class StoryPages
 
         video.Screen.Pages[1].Ras = 0;
 
-        for (int x = ZOOM_NORMAL - ZOOM_NORMAL % ZOOM_STEP; x >= 0; x -= ZOOM_STEP)
+        for (int positionX = ZOOM_NORMAL - ZOOM_NORMAL % ZOOM_STEP; positionX >= 0; positionX -= ZOOM_STEP)
         {
             if (Launch.LeaveIntroNow(game.Ui))
             {
                 break;
             }
 
-            ScreenEffects.SetIntroZoom(game, video, x);
+            ScreenEffects.SetIntroZoom(game, video, positionX);
         }
     }
 
     /// Shows two pictures on the story page, then turns it over. The new pictures are drawn onto
     /// PageB while PageA keeps the old page for the turn.
-    internal static void ShowStoryPage(Data.Game game, Video video, string first, string second, short x, short y)
+    internal static void ShowStoryPage(Data.Game game, Video video, string first, string second, short positionX, short positionY)
     {
         if (game.Ui.IntroSkipRequested != 0)
         {
@@ -105,7 +108,7 @@ internal static class StoryPages
         Bitmap newPage = video.Screen.GetBitmap(BitmapId.PageB);
 
         Files.IffPicture.LoadPicture(first, newPage, PICTURE_X, PICTURE_Y);
-        Files.IffPicture.LoadPicture(second, newPage, x, y);
+        Files.IffPicture.LoadPicture(second, newPage, positionX, positionY);
 
         if (Launch.IntroSkipped(game.Ui) != 0)
         {
@@ -132,7 +135,7 @@ internal static class StoryPages
             }
 
             double progress = frame / (double)frames;
-            uint[] pixels = turn.Render(progress * progress * (3 - 2 * progress));
+            uint[] pixels = turn.Render(progress * progress * (SMOOTHSTEP_BASE - 2 * progress));
 
             video.SetOverlay(new Overlay { Images = { new Image(0, 0, PageTurn.OUTPUT_WIDTH, PageTurn.OUTPUT_HEIGHT, pixels) } });
             Display.AnimationFrame(game, video);
@@ -148,13 +151,13 @@ internal static class StoryPages
     {
         uint[] pixels = new uint[SCREEN_WIDTH * SCREEN_HEIGHT];
 
-        for (int y = 0; y < SCREEN_HEIGHT; y++)
+        for (int positionY = 0; positionY < SCREEN_HEIGHT; positionY++)
         {
-            for (int x = 0; x < SCREEN_WIDTH; x++)
+            for (int positionX = 0; positionX < SCREEN_WIDTH; positionX++)
             {
-                int index = page.Pixel(x, y);
+                int index = page.Pixel(positionX, positionY);
 
-                pixels[y * SCREEN_WIDTH + x] = OPAQUE | Scene.Rgb4(index < colors.Length ? colors[index] : (ushort)0);
+                pixels[positionY * SCREEN_WIDTH + positionX] = OPAQUE | Scene.Rgb4(index < colors.Length ? colors[index] : (ushort)0);
             }
         }
 

@@ -47,12 +47,12 @@ public class MapProbeTests
         Regions.RefreshMinimap(game, output);
         ulong hash = FNV_START;
 
-        for (int x = 0; x < 600; x += 13)
+        for (int positionX = 0; positionX < 600; positionX += 13)
         {
-            for (int y = 0; y < 300; y += 7)
+            for (int positionY = 0; positionY < 300; positionY += 7)
             {
-                int pixelX = (int)mapX + x;
-                int pixelY = (int)mapY + y;
+                int pixelX = (int)mapX + positionX;
+                int pixelY = (int)mapY + positionY;
 
                 Mix(ref hash, MapLookup.TerrainAt(game, pixelX, pixelY));
                 Mix(ref hash, MapLookup.TileIndex(game, pixelX, pixelY));

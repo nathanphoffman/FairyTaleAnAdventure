@@ -36,40 +36,44 @@ public static class ClickToShoot
     private const short WEST = 7;
     private const short SOUTH = 5;
     private const short NORTH = 1;
+    private const short NORTH_WEST = 0;
+    private const short NORTH_EAST = 2;
+    private const short SOUTH_EAST = 4;
+    private const short SOUTH_WEST = 6;
 
     /// The plan for a hero who has an enemy in sight, or null when there is nothing better than the old
     /// way (the enemy is too far, or no step gets him any closer to a line).
     public static Plan? PlanFor(Data.Game game, Shape hero, Shape enemy, bool clearShot)
     {
-        int dx = enemy.AbsX - hero.AbsX;
-        int dy = enemy.AbsY - hero.AbsY;
+        int deltaX = enemy.AbsX - hero.AbsX;
+        int deltaY = enemy.AbsY - hero.AbsY;
 
-        if (Math.Max(Math.Abs(dx), Math.Abs(dy)) > SHOOTING_DISTANCE)
+        if (Math.Max(Math.Abs(deltaX), Math.Abs(deltaY)) > SHOOTING_DISTANCE)
         {
             return null;
         }
 
-        (double offset, short direction) = NearestLine(dx, dy);
+        (double offset, short direction) = NearestLine(deltaX, deltaY);
 
         if (offset <= LINE_TOLERANCE && clearShot)
         {
             return new Plan(direction, true);
         }
 
-        return BestStep(game, hero, dx, dy) is { } step ? new Plan(step, false) : null;
+        return BestStep(game, hero, deltaX, deltaY) is { } step ? new Plan(step, false) : null;
     }
 
     // How far the enemy is off the closest of the four lines through the hero, and the direction that
     // line points to the enemy in. A line across is off by the up and down gap, and so on; a slant is
     // off by the gap between the two gaps over the square root of 2 (the pixels between two slants).
-    internal static (double Offset, short Direction) NearestLine(int dx, int dy)
+    internal static (double Offset, short Direction) NearestLine(int deltaX, int deltaY)
     {
         (double Offset, short Direction)[] lines =
         [
-            (Math.Abs(dy), dx >= 0 ? EAST : WEST),
-            (Math.Abs(dx), dy >= 0 ? SOUTH : NORTH),
-            (Math.Abs(dx - dy) / Math.Sqrt(2), dx >= 0 ? (short)4 : (short)0),
-            (Math.Abs(dx + dy) / Math.Sqrt(2), dx >= 0 ? (short)2 : (short)6),
+            (Math.Abs(deltaY), deltaX >= 0 ? EAST : WEST),
+            (Math.Abs(deltaX), deltaY >= 0 ? SOUTH : NORTH),  // vertical goes south when dy is positive, else north
+            (Math.Abs(deltaX - deltaY) / Math.Sqrt(2), deltaX >= 0 ? SOUTH_EAST : NORTH_WEST),
+            (Math.Abs(deltaX + deltaY) / Math.Sqrt(2), deltaX >= 0 ? NORTH_EAST : SOUTH_WEST),
         ];
 
         return lines.MinBy(line => line.Offset);
@@ -77,15 +81,15 @@ public static class ClickToShoot
 
     // The walk direction that most improves how lined up the hero is (counting being too close as bad),
     // among the steps he can take; null when none is better than standing.
-    private static short? BestStep(Data.Game game, Shape hero, int dx, int dy)
+    private static short? BestStep(Data.Game game, Shape hero, int deltaX, int deltaY)
     {
-        double best = Cost(dx, dy);
+        double best = Cost(deltaX, deltaY);
         short? bestDirection = null;
 
         for (short direction = 0; direction < DIRECTIONS.Length; direction++)
         {
             (int stepX, int stepY) = DIRECTIONS[direction];
-            double cost = Cost(dx - stepX * STEP, dy - stepY * STEP);
+            double cost = Cost(deltaX - stepX * STEP, deltaY - stepY * STEP);
 
             if (cost < best && Blocking.BlockedAt(game, (short)(hero.AbsX + stepX * STEP), (short)(hero.AbsY + stepY * STEP), 0) == 0)
             {
@@ -98,10 +102,10 @@ public static class ClickToShoot
     }
 
     // How bad a place is: off the line of fire, plus extra when the enemy is nearer than KEEP_AWAY.
-    private static double Cost(int dx, int dy)
+    private static double Cost(int deltaX, int deltaY)
     {
-        double near = Math.Max(0, KEEP_AWAY - Math.Max(Math.Abs(dx), Math.Abs(dy)));
+        double near = Math.Max(0, KEEP_AWAY - Math.Max(Math.Abs(deltaX), Math.Abs(deltaY)));
 
-        return NearestLine(dx, dy).Offset + near * CROWDING_WEIGHT;
+        return NearestLine(deltaX, deltaY).Offset + near * CROWDING_WEIGHT;
     }
 }

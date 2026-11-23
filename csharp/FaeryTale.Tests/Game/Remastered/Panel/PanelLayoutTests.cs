@@ -17,14 +17,14 @@ public class PanelLayoutTests
     {
         uint[] frame = new uint[FRAME_WIDTH * (FIRST_LINE + LINES)];
 
-        for (int y = FIRST_LINE + 10; y < FIRST_LINE + 40; y++)
+        for (int positionY = FIRST_LINE + 10; positionY < FIRST_LINE + 40; positionY++)
         {
-            Array.Fill(frame, BEIGE, y * FRAME_WIDTH + 20, 100);
+            Array.Fill(frame, BEIGE, positionY * FRAME_WIDTH + 20, 100);
         }
 
-        for (int y = FIRST_LINE + 2; y < FIRST_LINE + 10; y++)
+        for (int positionY = FIRST_LINE + 2; positionY < FIRST_LINE + 10; positionY++)
         {
-            Array.Fill(frame, BLUE, y * FRAME_WIDTH + 430, 48);
+            Array.Fill(frame, BLUE, positionY * FRAME_WIDTH + 430, 48);
         }
 
         frame[(FIRST_LINE + 5) * FRAME_WIDTH + 440] = 0;
@@ -46,8 +46,8 @@ public class PanelLayoutTests
 
     // A pixel of the new layout, by the classic line it came from (the layout has room above the panel,
     // and the message box is raised).
-    private static uint At(PanelLayout layout, int x, int line) =>
-        layout.Arranged[(line + PanelLayout.TOP_PAD_LINES - (x < 426 ? PanelLayout.MESSAGE_RAISE_LINES : 0)) * layout.ArrangedWidth + x];
+    private static uint At(PanelLayout layout, int positionX, int line) =>
+        layout.Arranged[(line + PanelLayout.TOP_PAD_LINES - (positionX < 426 ? PanelLayout.MESSAGE_RAISE_LINES : 0)) * layout.ArrangedWidth + positionX];
 
     [Fact]
     public void TheBlackBackgroundLetsTheWoodShow()

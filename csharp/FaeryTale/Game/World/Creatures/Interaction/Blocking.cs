@@ -39,13 +39,13 @@ public static class Blocking
     /// Terrain is checked first (wraiths float, so they ignore it; the hero ignores terrain types
     /// 8 and 9). Then every other actor is checked: it blocks if it is within 10 pixels sideways
     /// and 8 pixels up or down. Dead actors and the raft can be walked over.
-    public static int BlockedAt(Data.Game game, short x, short y, short index)
+    public static int BlockedAt(Data.Game game, short positionX, short positionY, short index)
     {
         Shape me = game.Actors.List[index];
 
         if (me.Kind != ActorKind.ENEMY || me.Race != RACE_WRAITH)
         {
-            int terrain = MapLookup.ProbeCollision(game, x, y);
+            int terrain = MapLookup.ProbeCollision(game, positionX, positionY);
 
             if (index == 0 && SOFT_TERRAIN.Contains(terrain))
             {
@@ -60,29 +60,29 @@ public static class Blocking
 
         for (int other = 0; other < game.Actors.Active; other++)
         {
-            if (BlockedByActor(game.Actors, x, y, index, other))
+            if (BlockedByActor(game.Actors, positionX, positionY, index, other))
             {
                 return BLOCKED_BY_ACTOR;
             }
         }
 
-        return index == 0 && game.Experience != Experience.Original && BlockedByChest(game.Actors, x, y) ? BLOCKED_BY_ACTOR : 0;
+        return index == 0 && game.Experience != Experience.Original && BlockedByChest(game.Actors, positionX, positionY) ? BLOCKED_BY_ACTOR : 0;
     }
 
     /// Moves an actor dist in direction dir if nothing blocks it. Returns 1 if it moved.
-    public static int StepFigure(Data.Game game, short figure, short dir, short dist)
+    public static int StepFigure(Data.Game game, short figure, short direction, short dist)
     {
         Shape actor = game.Actors.List[figure];
-        ushort x = (ushort)MapSteps.StepX(actor.AbsX, dir, dist);
-        ushort y = (ushort)MapSteps.StepY(actor.AbsY, dir, dist);
+        ushort positionX = (ushort)MapSteps.StepX(actor.AbsX, direction, dist);
+        ushort positionY = (ushort)MapSteps.StepY(actor.AbsY, direction, dist);
 
-        if (BlockedAt(game, (short)x, (short)y, figure) != 0)
+        if (BlockedAt(game, (short)positionX, (short)positionY, figure) != 0)
         {
             return 0;
         }
 
-        actor.AbsX = x;
-        actor.AbsY = y;
+        actor.AbsX = positionX;
+        actor.AbsY = positionY;
 
         return 1;
     }
@@ -120,21 +120,21 @@ public static class Blocking
     {
         Shape a = game.Actors.List[first];
         Shape b = game.Actors.List[second];
-        int x = Math.Abs(a.AbsX - b.AbsX);
-        int y = Math.Abs(a.AbsY - b.AbsY);
+        int positionX = Math.Abs(a.AbsX - b.AbsX);
+        int positionY = Math.Abs(a.AbsY - b.AbsY);
 
-        if (x > y + y)
+        if (positionX > positionY + positionY)
         {
-            return x;
+            return positionX;
         }
 
-        return y > x + x ? y : (x + y) * DIAGONAL_NUMERATOR / DIAGONAL_DENOMINATOR;
+        return positionY > positionX + positionX ? positionY : (positionX + positionY) * DIAGONAL_NUMERATOR / DIAGONAL_DENOMINATOR;
     }
 
     // Remastered and Reimagined: a treasure chest (shut or open) is solid for the hero, who in the
     // original walks straight over it. The hero is only stopped from walking into the chest: one
     // who already stands in its box (put there by a teleport, say) can walk out.
-    private static bool BlockedByChest(Actors actors, short x, short y)
+    private static bool BlockedByChest(Actors actors, short positionX, short positionY)
     {
         Shape hero = actors.List[0];
 
@@ -143,7 +143,7 @@ public static class Blocking
             Shape item = actors.List[other];
 
             if (item.Kind == ActorKind.OBJECTS && (item.Index == CHEST || item.Index == OPENED_CHEST)
-                && InsideBox(item, x, y) && !InsideBox(item, (short)hero.AbsX, (short)hero.AbsY))
+                && InsideBox(item, positionX, positionY) && !InsideBox(item, (short)hero.AbsX, (short)hero.AbsY))
             {
                 return true;
             }
@@ -153,17 +153,17 @@ public static class Blocking
     }
 
     // Whether the point is inside the collision box around an actor.
-    private static bool InsideBox(Shape actor, short x, short y)
+    private static bool InsideBox(Shape actor, short positionX, short positionY)
     {
-        int dx = x - actor.AbsX;
-        int dy = y - actor.AbsY;
+        int deltaX = positionX - actor.AbsX;
+        int deltaY = positionY - actor.AbsY;
 
-        return dx < BLOCK_HALF_WIDTH && dx > -BLOCK_HALF_WIDTH && dy < BLOCK_HALF_HEIGHT && dy > -BLOCK_HALF_HEIGHT;
+        return deltaX < BLOCK_HALF_WIDTH && deltaX > -BLOCK_HALF_WIDTH && deltaY < BLOCK_HALF_HEIGHT && deltaY > -BLOCK_HALF_HEIGHT;
     }
 
     // Whether actor other stands in the way of actor index at (x, y). Dead actors and rafts can be
     // walked over.
-    private static bool BlockedByActor(Actors actors, short x, short y, short index, int other)
+    private static bool BlockedByActor(Actors actors, short positionX, short positionY, short index, int other)
     {
         Shape actor = actors.List[other];
 
@@ -172,6 +172,6 @@ public static class Blocking
             return false;
         }
 
-        return InsideBox(actor, x, y);
+        return InsideBox(actor, positionX, positionY);
     }
 }

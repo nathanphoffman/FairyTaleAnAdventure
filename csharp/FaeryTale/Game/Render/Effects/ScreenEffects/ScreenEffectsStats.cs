@@ -51,9 +51,9 @@ public static partial class ScreenEffects
         DrawStat(output, WEALTH_X, "Wlth:"u8, hero.Wealth);
     }
 
-    private static void DrawStat(IOutput output, int x, ReadOnlySpan<byte> label, short value)
+    private static void DrawStat(IOutput output, int positionX, ReadOnlySpan<byte> label, short value)
     {
-        TextRoutines.MoveTo(output, x, STATS_Y);
+        TextRoutines.MoveTo(output, positionX, STATS_Y);
         output.PrintContBytes(label);
         output.PrintNumber(value, STAT_DIGITS);
     }

@@ -10,6 +10,10 @@ public sealed class Hero
     /// The slots of the item counts that are saved.
     public const int SAVED_STUFF_SLOTS = 35;
 
+    // Brothers are numbered from 1; the second and third have their own item lists.
+    private const short SECOND_BROTHER = 2;
+    private const short THIRD_BROTHER = 3;
+
     public ushort X;
     public ushort Y;
     public short Sector;
@@ -36,8 +40,8 @@ public sealed class Hero
     /// The item counts of the brother who is playing (brothers are numbered from 1).
     public byte[] Stuff => Brother switch
     {
-        2 => Philstuff,
-        3 => Kevstuff,
+        SECOND_BROTHER => Philstuff,
+        THIRD_BROTHER => Kevstuff,
         _ => Julstuff,
     };
 }

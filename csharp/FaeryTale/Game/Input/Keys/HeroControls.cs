@@ -64,6 +64,9 @@ public static class HeroControls
 
     /// Hunger above this makes the hero stumble sideways now and then.
     internal const short STUMBLE_HUNGER = 120;
+
+    /// A starving hero trips on one draw in this many.
+    private const int STUMBLE_ODDS = 4;
     private const short NOT_WALKING = 9;
     private const short FACING_MASK = 7;
 
@@ -120,7 +123,7 @@ public static class HeroControls
     /// of 2 says which way (1 is right).
     internal static short Stumble(short direction, short hunger, Func<int, int> dice)
     {
-        if (hunger <= STUMBLE_HUNGER || dice(4) != 0)
+        if (hunger <= STUMBLE_HUNGER || dice(STUMBLE_ODDS) != 0)
         {
             return direction;
         }
@@ -223,13 +226,13 @@ public static class HeroControls
             return;
         }
 
-        ushort y = unchecked((ushort)(hero.AbsY - DISMOUNT_STEP));
+        ushort positionY = unchecked((ushort)(hero.AbsY - DISMOUNT_STEP));
 
-        if (Blocking.BlockedAt(game, (short)hero.AbsX, (short)y, 0) == 0
-            && Blocking.BlockedAt(game, (short)hero.AbsX, (short)(ushort)(y + DISMOUNT_CHECK), 0) == 0)
+        if (Blocking.BlockedAt(game, (short)hero.AbsX, (short)positionY, 0) == 0
+            && Blocking.BlockedAt(game, (short)hero.AbsX, (short)(ushort)(positionY + DISMOUNT_CHECK), 0) == 0)
         {
             game.Hero.Riding = 0;
-            hero.AbsY = y;
+            hero.AbsY = positionY;
         }
     }
 

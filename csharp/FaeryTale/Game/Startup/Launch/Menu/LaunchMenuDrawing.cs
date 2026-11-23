@@ -13,9 +13,9 @@ internal static partial class LaunchMenu
     // Makes a board for each area of the menu.
     private static Planks MakePlanks(List<Block> blocks)
     {
-        Image[][] options = blocks.Select((block, index) => Board(BlockArea(block, OPTIONS[index].Label), 21u + (uint)index)).ToArray();
+        Image[][] options = blocks.Select((block, index) => Board(BlockArea(block, OPTIONS[index].Label), OPTION_BOARD_SEED_BASE + (uint)index)).ToArray();
 
-        return new Planks(Board(HeadingArea(), 11)[0], options, Board(QuitArea(), 31), Board(BookArea(), 32), Board(PrologueArea(), 33));
+        return new Planks(Board(HeadingArea(), HEADING_BOARD_SEED)[0], options, Board(QuitArea(), QUIT_BOARD_SEED), Board(BookArea(), BOOK_BOARD_SEED), Board(PrologueArea(), PROLOGUE_BOARD_SEED));
     }
 
     // The heading, the options and Quit as text on wooden boards, the hovered one lit.

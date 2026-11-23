@@ -96,7 +96,7 @@ internal static class Splash
     {
         int left = (Overlay.WIDTH - LINE_WIDTH * Overlay.GLYPH_SIZE * BODY_SCALE) / 2;
         List<Text> lines = [];
-        int y = BODY_Y;
+        int positionY = BODY_Y;
 
         foreach (string paragraph in page.Paragraphs)
         {
@@ -105,11 +105,11 @@ internal static class Splash
 
             foreach (string line in LaunchMenu.Wrap(small ? paragraph[1..] : paragraph, LINE_WIDTH))
             {
-                lines.Add(new Text(line, left, y, color, BODY_SCALE));
-                y += LINE_SPACING;
+                lines.Add(new Text(line, left, positionY, color, BODY_SCALE));
+                positionY += LINE_SPACING;
             }
 
-            y += PARAGRAPH_GAP;
+            positionY += PARAGRAPH_GAP;
         }
 
         return lines;

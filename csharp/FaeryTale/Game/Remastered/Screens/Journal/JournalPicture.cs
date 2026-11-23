@@ -16,6 +16,9 @@ public static class JournalPicture
     private const int TITLE_X = 28;
     private const int TITLE_BASELINE = 14;
 
+    // The kept-count text ends this far left of the close button's corner.
+    private const int KEPT_COUNT_MARGIN = 24;
+
     // The words start this far below the top of the slab, each line this far under the last, and the
     // slab has room until this far from its top.
     private const int FIRST_LINE_BELOW_TOP = 52;
@@ -57,7 +60,7 @@ public static class JournalPicture
         string kept = $"{count} kept";
 
         MenuStyle.AddText(overlay, "Journal", (TITLE_X, baseline), MenuStyle.TITLE_COLOR, TITLE_SCALE);
-        MenuStyle.AddText(overlay, kept, (InventoryLayout.CloseCorner.X - 24 - Overlay.TextWidth(kept, TEXT_SCALE), baseline), MenuStyle.HEADING_COLOR, TEXT_SCALE);
+        MenuStyle.AddText(overlay, kept, (InventoryLayout.CloseCorner.X - KEPT_COUNT_MARGIN - Overlay.TextWidth(kept, TEXT_SCALE), baseline), MenuStyle.HEADING_COLOR, TEXT_SCALE);
 
         (int x, int y) = InventoryLayout.CloseCorner;
 
@@ -68,25 +71,25 @@ public static class JournalPicture
     // The newest entry first, each in the lines it wraps to, until the slab is full.
     private static void AddEntries(Overlay overlay, string[] entries)
     {
-        int y = InventoryLayout.PANEL_TOP + FIRST_LINE_BELOW_TOP;
+        int positionY = InventoryLayout.PANEL_TOP + FIRST_LINE_BELOW_TOP;
         int last = InventoryLayout.PANEL_TOP + LAST_LINE_BELOW_TOP;
 
         for (int index = entries.Length - 1; index >= 0; index--)
         {
             List<string> lines = LaunchMenu.Wrap(entries[index], TEXT_COLUMNS);
 
-            if (y + lines.Count * LINE_HEIGHT > last)
+            if (positionY + lines.Count * LINE_HEIGHT > last)
             {
                 return;
             }
 
             for (int line = 0; line < lines.Count; line++)
             {
-                MenuStyle.AddText(overlay, (line == 0 ? "" : CONTINUATION_INDENT) + lines[line], (TEXT_LEFT, y), index == entries.Length - 1 ? MenuStyle.TITLE_COLOR : MenuStyle.DESCRIPTION_COLOR, TEXT_SCALE);
-                y += LINE_HEIGHT;
+                MenuStyle.AddText(overlay, (line == 0 ? "" : CONTINUATION_INDENT) + lines[line], (TEXT_LEFT, positionY), index == entries.Length - 1 ? MenuStyle.TITLE_COLOR : MenuStyle.DESCRIPTION_COLOR, TEXT_SCALE);  // indent wrapped lines; last entry gets the title color
+                positionY += LINE_HEIGHT;
             }
 
-            y += ENTRY_GAP;
+            positionY += ENTRY_GAP;
         }
     }
 

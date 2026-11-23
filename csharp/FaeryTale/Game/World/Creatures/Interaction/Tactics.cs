@@ -97,11 +97,11 @@ public static class Tactics
     }
 
     // Steers actor index toward a point (or however mode says) if this is one of its active ticks.
-    private static void SteerIf(Data.Game game, bool actsNow, int index, int x, int y, int mode)
+    private static void SteerIf(Data.Game game, bool actsNow, int index, int positionX, int positionY, int mode)
     {
         if (actsNow)
         {
-            Steering.SteerActor(game, index, x, y, mode);
+            Steering.SteerActor(game, index, positionX, positionY, mode);
         }
     }
 

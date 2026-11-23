@@ -11,6 +11,14 @@ public static class ConversationPicture
     private const uint BOARD_SEED = 0x7a1c;
     private const int TEXT_SCALE = 1;
 
+    // Where each colour byte sits in a 0xAARRGGBB pixel, and the mask for one byte.
+    private const int RED_SHIFT = 16;
+    private const int GREEN_SHIFT = 8;
+    private const uint CHANNEL_MASK = 0xff;
+    private const float MAX_CHANNEL = 255f;
+    private const uint ALPHA_MASK = 0xff00_0000;
+    private const float AVERAGE_OF_CHANNELS = 3f;
+
     /// The baseline of a line of text is this far below the top of its glyph box.
     private const int GLYPH_ASCENT = 7;
 
@@ -38,32 +46,32 @@ public static class ConversationPicture
     }
 
     // A board and its words, centred on it (a greyed board is never lit).
-    private static void AddRow(Overlay overlay, Row row, int index, bool hovered)
+    private static void AddRow(Overlay overlay, Row rowIndex, int index, bool hovered)
     {
-        bool lit = hovered && row.Enabled;
-        int width = BubbleLayout.WidthOf(row);
+        bool lit = hovered && rowIndex.Enabled;
+        int width = BubbleLayout.WidthOf(rowIndex);
         int left = BubbleLayout.ButtonLeft;
-        int top = BubbleLayout.ButtonTop(index);
+        int topEdge = BubbleLayout.ButtonTop(index);
 
-        overlay.Images.Add(BoardFor(width, row, lit) with { X = left, Y = top });
+        overlay.Images.Add(BoardFor(width, rowIndex, lit) with { X = left, Y = topEdge });
 
-        int textLeft = left + (width - Overlay.TextWidth(row.Label, TEXT_SCALE)) / 2;
-        int baseline = top + (BubbleLayout.BUTTON_HEIGHT - Overlay.GLYPH_SIZE) / 2 + GLYPH_ASCENT;
-        uint color = !row.Enabled ? GREY_TEXT : lit ? MenuStyle.HOVER_COLOR : MenuStyle.TITLE_COLOR;
+        int textLeft = left + (width - Overlay.TextWidth(rowIndex.Label, TEXT_SCALE)) / 2;
+        int baseline = topEdge + (BubbleLayout.BUTTON_HEIGHT - Overlay.GLYPH_SIZE) / 2 + GLYPH_ASCENT;
+        uint color = !rowIndex.Enabled ? GREY_TEXT : lit ? MenuStyle.HOVER_COLOR : MenuStyle.TITLE_COLOR;  // disabled is grey, else hover or title color
 
-        MenuStyle.AddText(overlay, row.Label, (textLeft, baseline), color, TEXT_SCALE);
+        MenuStyle.AddText(overlay, rowIndex.Label, (textLeft, baseline), color, TEXT_SCALE);
     }
 
     // The board for a row, made once for each look.
-    private static Image BoardFor(int width, Row row, bool lit)
+    private static Image BoardFor(int width, Row rowIndex, bool lit)
     {
-        (int, RowKind, bool, bool) key = (width, row.Kind, lit, row.Enabled);
+        (int, RowKind, bool, bool) key = (width, rowIndex.Kind, lit, rowIndex.Enabled);
 
         if (!boards.TryGetValue(key, out Image? board))
         {
             Image plain = MenuStyle.Board((0, 0, width, BubbleLayout.BUTTON_HEIGHT), BOARD_SEED + (uint)width)[lit ? 1 : 0];
 
-            board = row.Kind != RowKind.Item ? plain : Tint(plain, row.Enabled ? ITEM_TINT : GREY_TINT, !row.Enabled);
+            board = rowIndex.Kind != RowKind.Item ? plain : Tint(plain, rowIndex.Enabled ? ITEM_TINT : GREY_TINT, !rowIndex.Enabled);  // plain if not an item, else grey or tinted copy
             boards[key] = board;
         }
 
@@ -79,20 +87,20 @@ public static class ConversationPicture
         for (int index = 0; index < pixels.Length; index++)
         {
             uint pixel = picture.Pixels[index];
-            float red = (pixel >> 16) & 0xff;
-            float green = (pixel >> 8) & 0xff;
-            float blue = pixel & 0xff;
+            float red = (pixel >> RED_SHIFT) & CHANNEL_MASK;  // red is bits 16-23: shift down, mask to 0-255
+            float green = (pixel >> GREEN_SHIFT) & CHANNEL_MASK;  // green is bits 8-15: shift down, mask to 0-255
+            float blue = pixel & CHANNEL_MASK;
 
             if (grey)
             {
-                red = green = blue = (red + green + blue) / 3f;
+                red = green = blue = (red + green + blue) / AVERAGE_OF_CHANNELS;
             }
 
-            pixels[index] = (pixel & 0xff00_0000) | Channel(red * tint.R) << 16 | Channel(green * tint.G) << 8 | Channel(blue * tint.B);
+            pixels[index] = (pixel & ALPHA_MASK) | Channel(red * tint.R) << RED_SHIFT | Channel(green * tint.G) << GREEN_SHIFT | Channel(blue * tint.B);  // keep alpha, then put each tinted channel back in its byte
         }
 
         return picture with { Pixels = pixels };
     }
 
-    private static uint Channel(float value) => (uint)Math.Clamp(value, 0f, 255f);
+    private static uint Channel(float value) => (uint)Math.Clamp(value, 0f, MAX_CHANNEL);
 }

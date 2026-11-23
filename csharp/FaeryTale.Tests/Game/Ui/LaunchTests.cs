@@ -112,12 +112,12 @@ public class LaunchTests
 
         uint[] plain = Wood.Plank(80, 40, 3);
         uint[] lit = Wood.LitPlank(80, 40, 3);
-        int row = 20 * (80 + Wood.SHADOW);
+        int rowIndex = 20 * (80 + Wood.SHADOW);
 
         static uint Brightness(uint[] pixels, int from, int to) =>
             (uint)Enumerable.Range(from, to - from).Sum(i => (pixels[i] >> 16 & 0xff) + (pixels[i] >> 8 & 0xff) + (pixels[i] & 0xff)) / (uint)(to - from);
 
-        Assert.True(Brightness(lit, row, row + 80) > Brightness(plain, row, row + 80));
+        Assert.True(Brightness(lit, rowIndex, rowIndex + 80) > Brightness(plain, rowIndex, rowIndex + 80));
     }
 
     [Fact]

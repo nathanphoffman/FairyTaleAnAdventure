@@ -3,6 +3,9 @@ namespace FaeryTale.Audio;
 /// One hardware channel of the sound chip: plays signed 8 bit data at a rate set by its period.
 internal sealed class Channel
 {
+    // A signed 8 bit sample runs from -128 to 127; dividing by this scales it to about -1 to 1.
+    private const float SAMPLE_RANGE = 128f;
+
     public sbyte[] Data = [];
     public double Phase;
 
@@ -26,9 +29,9 @@ internal sealed class Channel
         int length = Data.Length;
         int index = (int)Phase;
         float a = Data[Math.Min(index, length - 1)];
-        float b = index + 1 < length ? Data[index + 1] : Looping ? Data[0] : a;
+        float b = index + 1 < length ? Data[index + 1] : Looping ? Data[0] : a;  // next sample, or wrap to start if looping, else hold current
         float fraction = (float)(Phase - Math.Floor(Phase));
-        float sample = (a + (b - a) * fraction) / 128f * (Volume / (float)AudioTables.MAX_VOLUME);
+        float sample = (a + (b - a) * fraction) / SAMPLE_RANGE * (Volume / (float)AudioTables.MAX_VOLUME);
 
         Advance();
 

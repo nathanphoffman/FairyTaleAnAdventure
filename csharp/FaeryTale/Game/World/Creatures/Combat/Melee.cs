@@ -178,17 +178,17 @@ public static class Melee
     private static (short X, short Y) WeaponTip(Data.Game game, Shape attacker, int facing, short strength)
     {
         int reach = strength + strength;
-        short x = (short)(MapSteps.StepX(attacker.AbsX, facing, reach) + game.Rng.Rand8() - TIP_NOISE);
-        short y = (short)(MapSteps.StepY(attacker.AbsY, facing, reach) + game.Rng.Rand8() - TIP_NOISE);
+        short positionX = (short)(MapSteps.StepX(attacker.AbsX, facing, reach) + game.Rng.Rand8() - TIP_NOISE);
+        short positionY = (short)(MapSteps.StepY(attacker.AbsY, facing, reach) + game.Rng.Rand8() - TIP_NOISE);
 
-        return (x, y);
+        return (positionX, positionY);
     }
 
     /// Distance between two points as the larger of the x and y differences (they wrap in 16
     /// bits, as in the original).
-    internal static short Chebyshev(short dx, short dy) => (short)Math.Max(Math.Abs((int)dx), Math.Abs((int)dy));
+    internal static short Chebyshev(short deltaX, short deltaY) => (short)Math.Max(Math.Abs((int)deltaX), Math.Abs((int)deltaY));
 
     /// How far an actor is from the point (x, y), by Chebyshev.
-    internal static short DistanceToPoint(Shape target, short x, short y) =>
-        Chebyshev((short)(target.AbsX - x), (short)(target.AbsY - y));
+    internal static short DistanceToPoint(Shape target, short positionX, short positionY) =>
+        Chebyshev((short)(target.AbsX - positionX), (short)(target.AbsY - positionY));
 }

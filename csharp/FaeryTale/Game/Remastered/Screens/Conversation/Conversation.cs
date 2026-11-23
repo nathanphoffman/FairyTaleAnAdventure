@@ -119,13 +119,13 @@ public static class Conversation
 
     // Does what a row says. Talking ends the conversation; opening the list and buying do not, so
     // several things can be bought one after another.
-    private static void Use(Data.Game game, IOutput output, int number, Row row)
+    private static void Use(Data.Game game, IOutput output, int number, Row rowIndex)
     {
-        switch (row.Kind)
+        switch (rowIndex.Kind)
         {
             case RowKind.Talk:
                 Close();
-                TalkOptions.TalkToActor(game, output, number, (short)row.Number);
+                TalkOptions.TalkToActor(game, output, number, (short)rowIndex.Number);
 
                 break;
 
@@ -134,8 +134,8 @@ public static class Conversation
 
                 break;
 
-            case RowKind.Item when row.Enabled:
-                ShopOptions.BuyFromActor(game, output, number, row.Number);
+            case RowKind.Item when rowIndex.Enabled:
+                ShopOptions.BuyFromActor(game, output, number, rowIndex.Number);
 
                 break;
         }

@@ -28,6 +28,12 @@ internal static class ClickRing
     /// giving how many screen pixels one overlay pixel is.
     private const float OLD_PICTURE_UNIT = 1f;
 
+    // Colours are 0xAARRGGBB, so alpha sits 24 bits up.
+    private const int ALPHA_SHIFT = 24;
+
+    // Half a pixel: the distance from a pixel's middle to its edge.
+    private const float HALF_PIXEL = 0.5f;
+
     private static readonly uint[] greenPixels = Draw(GREEN, OLD_PICTURE_UNIT);
     private static readonly uint[] yellowPixels = Draw(YELLOW, OLD_PICTURE_UNIT);
 
@@ -68,13 +74,13 @@ internal static class ClickRing
         int size = radius * 2 + 1;
         uint[] pixels = new uint[size * size];
 
-        for (int row = 0; row < size; row++)
+        for (int rowIndex = 0; rowIndex < size; rowIndex++)
         {
             for (int column = 0; column < size; column++)
             {
-                float distance = MathF.Sqrt((column - radius) * (column - radius) + (row - radius) * (row - radius));
+                float distance = MathF.Sqrt((column - radius) * (column - radius) + (rowIndex - radius) * (rowIndex - radius));
 
-                pixels[row * size + column] = PixelAt(distance, color, unit);
+                pixels[rowIndex * size + column] = PixelAt(distance, color, unit);
             }
         }
 
@@ -99,9 +105,9 @@ internal static class ClickRing
 
         uint rgb = ring >= line ? color : OUTLINE;
 
-        return (uint)alpha << 24 | rgb;
+        return (uint)alpha << ALPHA_SHIFT | rgb;  // alpha goes in the top byte of the 0xAARRGGBB colour
     }
 
     // 0 to 1: how much of a pixel is inside an edge, given its signed distance (soft edge).
-    private static float Coverage(float signedDistance) => Math.Clamp(0.5f + signedDistance / EDGE_SOFTNESS, 0f, 1f);
+    private static float Coverage(float signedDistance) => Math.Clamp(HALF_PIXEL + signedDistance / EDGE_SOFTNESS, 0f, 1f);
 }

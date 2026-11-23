@@ -11,13 +11,13 @@ namespace FaeryTale.Game.Ui;
 public static partial class TakeItems
 {
     /// The inventory slot for object id in the (id, slot) pair table Itrans, which ends with a 0 id.
-    internal static int? ItemSlot(uint id, byte[] table)
+    internal static int? ItemSlot(uint identifier, byte[] table)
     {
-        for (int at = 0; table[at] != 0; at += 2)
+        for (int offset = 0; table[offset] != 0; offset += 2)
         {
-            if (id == table[at])
+            if (identifier == table[offset])
             {
-                return table[at + 1];
+                return table[offset + 1];
             }
         }
 
@@ -45,10 +45,10 @@ public static partial class TakeItems
     private static bool TakeObject(Data.Game game, IOutput output)
     {
         Shape actor = game.Actors.List[game.Actors.NearestObject];
-        uint id = (byte)actor.Index;
+        uint identifier = (byte)actor.Index;
         uint owner = (uint)actor.Vitality & OWNER_MASK;
 
-        switch (ClassifyTake(id, game.Hero.Hunger, game.World.Region))
+        switch (ClassifyTake(identifier, game.Hero.Hunger, game.World.Region))
         {
             case Take.Gold:
                 Messages.AnnounceTreasure(game, output, "50 gold pieces");
@@ -74,7 +74,7 @@ public static partial class TakeItems
                 return ContainerContents.Open(game, output);
 
             case Take.Plain:
-                return TakePlainItem(game, output, id);
+                return TakePlainItem(game, output, identifier);
 
             default:
                 return false; // eggs and left things are not taken
@@ -113,9 +113,9 @@ public static partial class TakeItems
     }
 
     // A single item lying about: the slot is found in the Itrans table. Unknown objects are left.
-    private static bool TakePlainItem(Data.Game game, IOutput output, uint id)
+    private static bool TakePlainItem(Data.Game game, IOutput output, uint identifier)
     {
-        if (ItemSlot(id, ObjectTables.Itrans) is not { } found)
+        if (ItemSlot(identifier, ObjectTables.Itrans) is not { } found)
         {
             return false;
         }

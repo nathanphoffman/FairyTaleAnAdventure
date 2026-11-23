@@ -14,6 +14,9 @@ public sealed class HeadlessDisplay : IDisplayDevice
 {
     private const int TICK_MILLISECONDS = 20; // 50 Hz
 
+    // When the display falls this many ticks behind, it restarts its pacing instead of rushing to catch up.
+    private const int MAX_LAG_TICKS = 4;
+
     /// Used when FTA_SHOT_AFTER is not set.
     private const uint DEFAULT_AFTER_TICKS = 1;
 
@@ -121,7 +124,7 @@ public sealed class HeadlessDisplay : IDisplayDevice
         DateTime now = DateTime.UtcNow;
         TimeSpan wait = nextTick > now ? nextTick - now : TimeSpan.Zero;
 
-        nextTick = now > nextTick.AddMilliseconds(TICK_MILLISECONDS * 4) ? now.AddMilliseconds(TICK_MILLISECONDS) : nextTick.AddMilliseconds(TICK_MILLISECONDS);
+        nextTick = now > nextTick.AddMilliseconds(TICK_MILLISECONDS * MAX_LAG_TICKS) ? now.AddMilliseconds(TICK_MILLISECONDS) : nextTick.AddMilliseconds(TICK_MILLISECONDS);
 
         if (!fast && wait > TimeSpan.Zero)
         {

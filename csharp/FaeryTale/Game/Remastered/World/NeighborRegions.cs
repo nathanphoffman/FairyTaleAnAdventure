@@ -56,10 +56,10 @@ public sealed class NeighborRegions
 
     /// The tile at a tile column and row of the world if it is in a loaded neighbour: its tile
     /// number plus REGION_STEP times (its region + 1), or -1 when there is none.
-    public int TileAt(Data.Game game, int column, int row)
+    public int TileAt(Data.Game game, int column, int rowIndex)
     {
-        int sectorColumn = column >> SECTOR_COLUMN_SHIFT;
-        int sectorRow = row >> SECTOR_ROW_SHIFT;
+        int sectorColumn = column >> SECTOR_COLUMN_SHIFT;  // each sector is 16 tiles wide, so >> 4 divides by 16
+        int sectorRow = rowIndex >> SECTOR_ROW_SHIFT;  // each sector is 8 tiles tall, so >> 3 divides by 8
 
         if (sectorColumn >= WORLD_SECTOR_COLUMNS || sectorRow >= WORLD_SECTOR_ROWS)
         {
@@ -73,8 +73,8 @@ public sealed class NeighborRegions
             return -1;
         }
 
-        int sector = snapshot.Map.MapByte(((sectorRow - snapshot.OriginY) << MAP_ROW_SHIFT) + sectorColumn);
-        int tile = snapshot.Map.SectorByte(sector * SECTOR_TILES + (row % SECTOR_TILE_ROWS) * SECTOR_ROW_TILES + (column % SECTOR_ROW_TILES));
+        int sector = snapshot.Map.MapByte(((sectorRow - snapshot.OriginY) << MAP_ROW_SHIFT) + sectorColumn);  // << 7 is times 128: the map is 128 sectors per row
+        int tile = snapshot.Map.SectorByte(sector * SECTOR_TILES + (rowIndex % SECTOR_TILE_ROWS) * SECTOR_ROW_TILES + (column % SECTOR_ROW_TILES));
 
         return tile + REGION_STEP * (region + 1);
     }
@@ -101,16 +101,16 @@ public sealed class NeighborRegions
     private static HashSet<int> RegionsIn((int First, int Last) columns, (int First, int Last) rows)
     {
         HashSet<int> regions = [];
-        int firstColumn = Math.Clamp(columns.First >> SECTOR_COLUMN_SHIFT, 0, WORLD_SECTOR_COLUMNS - 1);
-        int lastColumn = Math.Clamp(columns.Last >> SECTOR_COLUMN_SHIFT, 0, WORLD_SECTOR_COLUMNS - 1);
-        int firstRow = Math.Clamp(rows.First >> SECTOR_ROW_SHIFT, 0, WORLD_SECTOR_ROWS - 1);
-        int lastRow = Math.Clamp(rows.Last >> SECTOR_ROW_SHIFT, 0, WORLD_SECTOR_ROWS - 1);
+        int firstColumn = Math.Clamp(columns.First >> SECTOR_COLUMN_SHIFT, 0, WORLD_SECTOR_COLUMNS - 1);  // clamp the tile column to a sector column (>> 4 = / 16)
+        int lastColumn = Math.Clamp(columns.Last >> SECTOR_COLUMN_SHIFT, 0, WORLD_SECTOR_COLUMNS - 1);  // same, for the last column
+        int firstRow = Math.Clamp(rows.First >> SECTOR_ROW_SHIFT, 0, WORLD_SECTOR_ROWS - 1);  // clamp the tile row to a sector row (>> 3 = / 8)
+        int lastRow = Math.Clamp(rows.Last >> SECTOR_ROW_SHIFT, 0, WORLD_SECTOR_ROWS - 1);  // same, for the last row
 
         foreach (int column in new[] { firstColumn, lastColumn })
         {
-            foreach (int row in new[] { firstRow, lastRow })
+            foreach (int rowIndex in new[] { firstRow, lastRow })
             {
-                regions.Add(RegionOf(column, row));
+                regions.Add(RegionOf(column, rowIndex));
             }
         }
 
@@ -119,7 +119,7 @@ public sealed class NeighborRegions
 
     // The region a sector of the world is in: two across, four down.
     private static int RegionOf(int sectorColumn, int sectorRow) =>
-        ((sectorColumn >> REGION_SECTOR_COLUMN_SHIFT) & 1) + REGION_COLUMNS * ((sectorRow >> REGION_SECTOR_ROW_SHIFT) & (REGION_ROWS - 1));
+        ((sectorColumn >> REGION_SECTOR_COLUMN_SHIFT) & 1) + REGION_COLUMNS * ((sectorRow >> REGION_SECTOR_ROW_SHIFT) & (REGION_ROWS - 1));  // low bit of the 64-sector column block picks left/right; rows come in blocks of 32, masked to 0-3
 
     // Reads a region's map and tile pictures from the disk.
     private static Snapshot Load(int region)
@@ -136,6 +136,6 @@ public sealed class NeighborRegions
             graphics.LoadImageBank(bank, (short)need.Image[bank]);
         }
 
-        return new Snapshot(map, graphics, new WorldImages(), (region & 1) << REGION_SECTOR_COLUMN_SHIFT, (region >> 1) << REGION_SECTOR_ROW_SHIFT);
+        return new Snapshot(map, graphics, new WorldImages(), (region & 1) << REGION_SECTOR_COLUMN_SHIFT, (region >> 1) << REGION_SECTOR_ROW_SHIFT);  // region bit 0 is the column (x64); the rest is the row (x32)
     }
 }

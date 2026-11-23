@@ -30,9 +30,9 @@ public static class EnteringDoors
     internal static Door DoorAt(int index) => Tables.DoorList[index];
 
     /// Goes in through the door at the tile (x, y), if there is one and the hero may enter it.
-    public static void EnterDoor(Data.Game game, IOutput output, ushort x, ushort y)
+    public static void EnterDoor(Data.Game game, IOutput output, ushort positionX, ushort positionY)
     {
-        if (FindOutdoorDoor(x, y) is not { } index)
+        if (FindOutdoorDoor(positionX, positionY) is not { } index)
         {
             return;
         }
@@ -84,7 +84,7 @@ public static class EnteringDoors
 
     /// Binary search of the (sorted) outdoor doors for the one whose entrance covers the point. A
     /// door matches within 16 pixels to the right of its x; vertical doors need the exact x.
-    internal static int? FindOutdoorDoor(ushort x, ushort y)
+    internal static int? FindOutdoorDoor(ushort positionX, ushort positionY)
     {
         int low = 0;
         int high = TravelDoors.DOOR_COUNT - 1;
@@ -94,23 +94,23 @@ public static class EnteringDoors
             int middle = (high + low) / 2;
             Door d = DoorAt(middle);
 
-            if (d.Xc1 > x)
+            if (d.Xc1 > positionX)
             {
                 high = middle - 1;
             }
-            else if (d.Xc1 + TravelDoors.TILE_WIDTH < x)
+            else if (d.Xc1 + TravelDoors.TILE_WIDTH < positionX)
             {
                 low = middle + 1;
             }
-            else if (d.Xc1 < x && (d.Kind & 1) == 0)
+            else if (d.Xc1 < positionX && (d.Kind & 1) == 0)
             {
                 low = middle + 1; // vertical door: its x must match exactly
             }
-            else if (d.Yc1 > y)
+            else if (d.Yc1 > positionY)
             {
                 high = middle - 1;
             }
-            else if (d.Yc1 < y)
+            else if (d.Yc1 < positionY)
             {
                 low = middle + 1;
             }

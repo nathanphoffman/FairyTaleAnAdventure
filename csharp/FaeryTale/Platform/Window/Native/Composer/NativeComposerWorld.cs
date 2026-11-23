@@ -79,17 +79,17 @@ internal sealed partial class NativeComposer
             int barWidth = HEALTH_BAR_WIDTH * view.Scale;
             int barHeight = HEALTH_BAR_HEIGHT * view.Scale;
             int left = (int)Math.Round(x) - barWidth / 2;
-            int top = (int)Math.Round(y);
+            int topEdge = (int)Math.Round(y);
             int green = (int)Math.Round(bar.Fraction * barWidth);
 
             Overlay overlay = new();
 
-            overlay.Images.Add(new Image(left - view.Scale, top - view.Scale, barWidth + 2 * view.Scale, barHeight + 2 * view.Scale, Filled((barWidth + 2 * view.Scale) * (barHeight + 2 * view.Scale), HEALTH_BAR_EDGE)));
-            overlay.Images.Add(new Image(left, top, barWidth, barHeight, Filled(barWidth * barHeight, HEALTH_BAR_GONE)));
+            overlay.Images.Add(new Image(left - view.Scale, topEdge - view.Scale, barWidth + 2 * view.Scale, barHeight + 2 * view.Scale, Filled((barWidth + 2 * view.Scale) * (barHeight + 2 * view.Scale), HEALTH_BAR_EDGE)));
+            overlay.Images.Add(new Image(left, topEdge, barWidth, barHeight, Filled(barWidth * barHeight, HEALTH_BAR_GONE)));
 
             if (green > 0)
             {
-                overlay.Images.Add(new Image(left, top, green, barHeight, Filled(green * barHeight, HEALTH_BAR_LEFT)));
+                overlay.Images.Add(new Image(left, topEdge, green, barHeight, Filled(green * barHeight, HEALTH_BAR_LEFT)));
             }
 
             overlay.Draw(picture, width);

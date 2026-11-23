@@ -86,7 +86,7 @@ public static class Regions
     /// left corner, so the middle is 151 pixels across and 64 down from it, and a sector is 256
     /// pixels.
     public static (uint Column, uint Row) CenterSector(World world) =>
-        ((world.MapX + CENTER_OFFSET_X) >> SECTOR_PIXELS_SHIFT, (world.MapY + CENTER_OFFSET_Y) >> SECTOR_PIXELS_SHIFT);
+        ((world.MapX + CENTER_OFFSET_X) >> SECTOR_PIXELS_SHIFT, (world.MapY + CENTER_OFFSET_Y) >> SECTOR_PIXELS_SHIFT); // pixels to sectors by shifting right (divide by sector size)
 
     /// Loads the pending region completely (LoadRegionPiece does one piece per call).
     public static void LoadRegionNow(Data.Game game, IOutput output)
@@ -142,7 +142,7 @@ public static class Regions
 
         // The map is two regions wide (64 sectors each) and four high (32 sectors each).
         uint regionColumn = (column >> REGION_WIDTH_SHIFT) & 1;
-        uint regionRow = (row >> REGION_HEIGHT_SHIFT) & REGION_ROW_MASK;
+        uint regionRow = (row >> REGION_HEIGHT_SHIFT) & REGION_ROW_MASK; // & 1 keeps only the low bit: left or right region
 
         game.World.TargetRegion = (ushort)(regionColumn + regionRow + regionRow);
 
@@ -160,8 +160,8 @@ public static class Regions
         int regionRow = world.TargetRegion >> 1;
         int regionColumn = world.TargetRegion >= FIRST_INDOOR_REGION ? 0 : world.TargetRegion & 1;
 
-        world.OriginX = (ushort)(regionColumn << REGION_WIDTH_SHIFT);
-        world.OriginY = (ushort)(regionRow << REGION_HEIGHT_SHIFT);
+        world.OriginX = (ushort)(regionColumn << REGION_WIDTH_SHIFT); // region column times region width, via shift
+        world.OriginY = (ushort)(regionRow << REGION_HEIGHT_SHIFT); // region row times region height, via shift
     }
 
     /// Loads the sector table and the region map of a region into a map of its own (the new world

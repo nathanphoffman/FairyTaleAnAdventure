@@ -84,10 +84,10 @@ public static class EnemyPathing
 
         for (int step = 1; step <= steps; step++)
         {
-            int x = actor.AbsX + (target.X - actor.AbsX) * step / steps;
-            int y = actor.AbsY + (target.Y - actor.AbsY) * step / steps;
+            int positionX = actor.AbsX + (target.X - actor.AbsX) * step / steps;
+            int positionY = actor.AbsY + (target.Y - actor.AbsY) * step / steps;
 
-            if (MapLookup.ProbeCollision(game, x, y) != 0)
+            if (MapLookup.ProbeCollision(game, positionX, positionY) != 0)
             {
                 return false;
             }
@@ -135,16 +135,16 @@ public static class EnemyPathing
 
     // What entering a position costs an enemy: blocked by terrain or deep water, open, or wading.
     // Other actors are left out on purpose: they move, and the enemy's own walking deals with them.
-    private static int CellCost(Data.Game game, int x, int y)
+    private static int CellCost(Data.Game game, int positionX, int positionY)
     {
-        if (MapLookup.ProbeCollision(game, x, y) != 0)
+        if (MapLookup.ProbeCollision(game, positionX, positionY) != 0)
         {
             return -1;
         }
 
-        int terrain = MapLookup.TerrainAt(game, x, y + FEET_OFFSET);
+        int terrain = MapLookup.TerrainAt(game, positionX, positionY + FEET_OFFSET);
 
-        return terrain == DEEP_WATER ? -1 : terrain == 0 ? 0 : WADING_COST;
+        return terrain == DEEP_WATER ? -1 : terrain == 0 ? 0 : WADING_COST;  // deep water blocks (-1), dry land is free (0), else wading cost
     }
 
     private static int RoundDivide(int value, int by) => (int)Math.Round((double)value / by, MidpointRounding.AwayFromZero);

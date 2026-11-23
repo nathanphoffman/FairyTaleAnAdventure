@@ -16,18 +16,18 @@ public class PathsTests
     [Fact]
     public void FindsFilesIgnoringCase()
     {
-        string dir = Path.Combine(Path.GetTempPath(), $"fta_paths_{Environment.ProcessId}");
-        Directory.CreateDirectory(Path.Combine(dir, "Fonts"));
-        File.WriteAllText(Path.Combine(dir, "Fonts", "Amber"), "x");
+        string direction = Path.Combine(Path.GetTempPath(), $"fta_paths_{Environment.ProcessId}");
+        Directory.CreateDirectory(Path.Combine(direction, "Fonts"));
+        File.WriteAllText(Path.Combine(direction, "Fonts", "Amber"), "x");
 
         try
         {
-            Assert.Equal(Path.Combine(dir, "Fonts", "Amber"), Paths.FindIgnoreCase(dir, "fonts/amber"));
-            Assert.Null(Paths.FindIgnoreCase(dir, "fonts/missing"));
+            Assert.Equal(Path.Combine(direction, "Fonts", "Amber"), Paths.FindIgnoreCase(direction, "fonts/amber"));
+            Assert.Null(Paths.FindIgnoreCase(direction, "fonts/missing"));
         }
         finally
         {
-            Directory.Delete(dir, true);
+            Directory.Delete(direction, true);
         }
     }
 }

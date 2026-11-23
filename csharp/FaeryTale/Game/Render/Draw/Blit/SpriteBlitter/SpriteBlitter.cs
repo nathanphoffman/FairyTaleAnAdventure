@@ -25,6 +25,9 @@ public static partial class SpriteBlitter
     /// The scenery mask starts this many bytes into the mask region.
     private const int MASK_START = 2;
 
+    /// A mask byte with every pixel set, the starting point for ANDing the planes together.
+    private const int ALL_PIXELS_SET = 0xff;
+
     /// Zeroes the start of the scenery mask, a rectangle sized like a BLTSIZE value.
     public static void ClearMemory(Video video, int size)
     {

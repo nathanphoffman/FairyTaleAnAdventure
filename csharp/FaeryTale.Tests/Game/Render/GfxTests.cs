@@ -122,13 +122,13 @@ public class GfxTests
     public void ALineMovesThePenIncludingBothEnds()
     {
         Bitmap bitmap = new(16, 8, 1);
-        Pen pen = PenOf(1);
-        pen.X = 1;
-        pen.Y = 1;
+        Pen drawingPen = PenOf(1);
+        drawingPen.X = 1;
+        drawingPen.Y = 1;
 
-        Drawing.LineTo(bitmap, ref pen, (5, 3), 1);
+        Drawing.LineTo(bitmap, ref drawingPen, (5, 3), 1);
 
-        Assert.Equal((5, 3), (pen.X, pen.Y));
+        Assert.Equal((5, 3), (drawingPen.X, drawingPen.Y));
         Assert.Equal(1, bitmap.Pixel(1, 1));
         Assert.Equal(1, bitmap.Pixel(5, 3));
     }
@@ -149,13 +149,13 @@ public class GfxTests
     public void ComplementModeDrawsTwiceToErase()
     {
         Bitmap bitmap = new(16, 4, 1);
-        Pen pen = PenOf(1);
-        pen.Mode = Drawing.COMPLEMENT;
+        Pen drawingPen = PenOf(1);
+        drawingPen.Mode = Drawing.COMPLEMENT;
 
-        Drawing.RectFill(bitmap, pen, (0, 0), (3, 3), 1);
+        Drawing.RectFill(bitmap, drawingPen, (0, 0), (3, 3), 1);
         Assert.Equal(1, bitmap.Pixel(1, 1));
 
-        Drawing.RectFill(bitmap, pen, (0, 0), (3, 3), 1);
+        Drawing.RectFill(bitmap, drawingPen, (0, 0), (3, 3), 1);
         Assert.Equal(0, bitmap.Pixel(1, 1));
     }
 
@@ -174,9 +174,9 @@ public class GfxTests
     public void ABuiltinLetterIsDrawnAdvancingEight()
     {
         Bitmap bitmap = new(16, 16, 1);
-        Pen pen = new() { X = 0, Y = 8 };
+        Pen drawingPen = new() { X = 0, Y = 8 };
 
-        Assert.Equal(8, Font.Builtin.DrawGlyph(bitmap, pen, (byte)'I', 1));
+        Assert.Equal(8, Font.Builtin.DrawGlyph(bitmap, drawingPen, (byte)'I', 1));
         Assert.Contains(Enumerable.Range(0, 16), y => Enumerable.Range(0, 8).Any(x => bitmap.Pixel(x, y) == 1));
     }
 

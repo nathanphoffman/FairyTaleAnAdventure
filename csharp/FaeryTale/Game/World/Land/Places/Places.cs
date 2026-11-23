@@ -73,14 +73,14 @@ public static class Places
     /// Moves the hero to the world position (x, y) and reloads what is needed there. With flag
     /// set the region is worked out from the position (like walking through a door); otherwise
     /// NewRegion must already be set. If the spot is blocked the hero is moved down until it is free.
-    public static int TransferHero(Data.Game game, IOutput output, ushort x, ushort y, ushort flag)
+    public static int TransferHero(Data.Game game, IOutput output, ushort positionX, ushort positionY, ushort flag)
     {
-        game.World.MapX = (ushort)(game.World.MapX + (ushort)(x - game.Hero.X));
-        game.World.MapY = (ushort)(game.World.MapY + (ushort)(y - game.Hero.Y));
-        game.Hero.X = x;
-        game.Actors.List[0].AbsX = x;
-        game.Hero.Y = y;
-        game.Actors.List[0].AbsY = y;
+        game.World.MapX = (ushort)(game.World.MapX + (ushort)(positionX - game.Hero.X));
+        game.World.MapY = (ushort)(game.World.MapY + (ushort)(positionY - game.Hero.Y));
+        game.Hero.X = positionX;
+        game.Actors.List[0].AbsX = positionX;
+        game.Hero.Y = positionY;
+        game.Actors.List[0].AbsY = positionY;
 
         game.Encounter.Number = 0;
 
@@ -91,9 +91,9 @@ public static class Places
             // Only the lowest bit of the sector column matters: which half of the region it is in;
             // the sector row's low bits pick the region row.
             uint column = (sectorColumn >> Regions.REGION_WIDTH_SHIFT) & 1;
-            uint row = (sectorRow >> Regions.REGION_HEIGHT_SHIFT) & TRANSFER_ROW_MASK;
+            uint rowIndex = (sectorRow >> Regions.REGION_HEIGHT_SHIFT) & TRANSFER_ROW_MASK;  // mask keeps only the low row bits
 
-            game.World.NewRegion = (ushort)(column + row + row);
+            game.World.NewRegion = (ushort)(column + rowIndex + rowIndex);
         }
 
         game.Ui.HeldDirection = 0;
@@ -160,13 +160,13 @@ public static class Places
     {
         int rows = Math.Min(table.Length / PLACE_ROW_BYTES, PLACE_TABLE_ROWS);
 
-        for (int row = 0; row < rows; row++)
+        for (int rowIndex = 0; rowIndex < rows; rowIndex++)
         {
-            int at = row * PLACE_ROW_BYTES;
+            int offset = rowIndex * PLACE_ROW_BYTES;
 
-            if (sector >= table[at] && sector <= table[at + 1])
+            if (sector >= table[offset] && sector <= table[offset + 1])
             {
-                return table[at + 2];
+                return table[offset + 2];
             }
         }
 
@@ -194,9 +194,9 @@ public static class Places
     {
         // The hero's sector column and row relative to the loaded region: 256 pixels to a sector.
         ushort column = (ushort)((game.Hero.X >> SECTOR_SHIFT) - game.World.OriginX);
-        ushort row = (ushort)((game.Hero.Y >> SECTOR_SHIFT) - game.World.OriginY);
+        ushort rowIndex = (ushort)((game.Hero.Y >> SECTOR_SHIFT) - game.World.OriginY);  // same shift for the row
 
-        return game.World.NewRegion < Regions.NO_REGION || (column & OUTSIDE_COLUMN_BIT) != 0 || (row & OUTSIDE_ROW_BIT) != 0;
+        return game.World.NewRegion < Regions.NO_REGION || (column & OUTSIDE_COLUMN_BIT) != 0 || (rowIndex & OUTSIDE_ROW_BIT) != 0;
     }
 
     // Remembers the place the hero is in, and says its name when it changes (if flag is set).

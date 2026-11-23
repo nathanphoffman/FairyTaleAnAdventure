@@ -24,6 +24,19 @@ public sealed class Overlay
     private const int GLYPH_BASELINE = 7;
     private const byte HINT_DARKNESS = 230;
 
+    // Colours are 0xAARRGGBB: the alpha byte sits 24 bits up, red 16, green 8.
+    private const int ALPHA_SHIFT = 24;
+    private const int RED_SHIFT = 16;
+    private const int GREEN_SHIFT = 8;
+    private const uint OPAQUE_ALPHA = 0xff00_0000;
+
+    // The largest value of one colour channel, and the mask that picks a channel out.
+    private const uint CHANNEL_MAX = 255;
+    private const uint CHANNEL_MASK = 0xff;
+
+    // Characters above 127 are not in the built-in font, so glyph lookups keep only 7 bits.
+    private const int GLYPH_CODE_MASK = 0x7f;
+
     public List<Shade> Shades { get; init; } = new();
 
     public List<Image> Images { get; init; } = new();
@@ -111,12 +124,12 @@ public sealed class Overlay
         bool coversGrid = shade.X <= 0 && shade.Y <= 0 && shade.X + shade.Width >= WIDTH && shade.Y + shade.Height >= HEIGHT;
         int left = coversGrid ? 0 : Math.Clamp(placement.OriginX + shade.X * placement.Scale, 0, width);
         int right = coversGrid ? width : Math.Clamp(placement.OriginX + (shade.X + shade.Width) * placement.Scale, 0, width);
-        int top = coversGrid ? 0 : Math.Clamp(placement.OriginY + shade.Y * placement.Scale, 0, height);
+        int topEdge = coversGrid ? 0 : Math.Clamp(placement.OriginY + shade.Y * placement.Scale, 0, height);
         int bottom = coversGrid ? height : Math.Clamp(placement.OriginY + (shade.Y + shade.Height) * placement.Scale, 0, height);
 
         // The rows are independent, so they are darkened on all the cores (the dark overlay of the
         // menus and the map covers the whole window, many pixels every frame).
-        Parallel.For(top, Math.Max(bottom, top), row =>
+        Parallel.For(topEdge, Math.Max(bottom, topEdge), row =>
         {
             for (int column = left; column < Math.Max(right, left); column++)
             {
@@ -132,16 +145,16 @@ public sealed class Overlay
         int height = frame.Length / width;
         int scale = placement.Scale;
 
-        for (int row = 0; row < image.Height; row++)
+        for (int rowIndex = 0; rowIndex < image.Height; rowIndex++)
         {
-            int rowTop = placement.OriginY + (image.Y + row) * scale;
+            int rowTop = placement.OriginY + (image.Y + rowIndex) * scale;
 
             for (int column = 0; column < image.Width; column++)
             {
-                uint color = image.Pixels[row * image.Width + column];
+                uint color = image.Pixels[rowIndex * image.Width + column];
                 int columnLeft = placement.OriginX + (image.X + column) * scale;
 
-                if (color >> 24 == 0)
+                if (color >> ALPHA_SHIFT == 0)  // alpha is the top byte; 0 means fully transparent
                 {
                     continue;
                 }
@@ -152,11 +165,11 @@ public sealed class Overlay
                 int firstX = Math.Max(columnLeft, 0);
                 int lastX = Math.Min(columnLeft + scale, width);
 
-                for (int y = firstY; y < lastY; y++)
+                for (int positionY = firstY; positionY < lastY; positionY++)
                 {
-                    for (int x = firstX; x < lastX; x++)
+                    for (int positionX = firstX; positionX < lastX; positionX++)
                     {
-                        frame[y * width + x] = Blend(frame[y * width + x], color);
+                        frame[positionY * width + positionX] = Blend(frame[positionY * width + positionX], color);
                     }
                 }
             }
@@ -164,39 +177,39 @@ public sealed class Overlay
     }
 
     // top over below, by the alpha of top.
-    internal static uint Blend(uint below, uint top)
+    internal static uint Blend(uint below, uint topEdge)
     {
-        uint alpha = top >> 24;
+        uint alpha = topEdge >> ALPHA_SHIFT;  // alpha lives in the top byte (bits 24-31)
 
         if (alpha == 0)
         {
             return below;
         }
 
-        if (alpha == 255)
+        if (alpha == CHANNEL_MAX)
         {
-            return top;
+            return topEdge;
         }
 
         uint Mix(int shift)
         {
-            uint under = (below >> shift) & 0xff;
-            uint over = (top >> shift) & 0xff;
+            uint under = (below >> shift) & CHANNEL_MASK;  // below channel: shift down, mask to 0-255
+            uint over = (topEdge >> shift) & CHANNEL_MASK;  // top channel: shift down, mask to 0-255
 
-            return (under * (255 - alpha) + over * alpha) / 255 << shift;
+            return (under * (CHANNEL_MAX - alpha) + over * alpha) / CHANNEL_MAX << shift;  // weighted average of the two channels, back in place
         }
 
-        return 0xff00_0000 | Mix(16) | Mix(8) | Mix(0);
+        return OPAQUE_ALPHA | Mix(RED_SHIFT) | Mix(GREEN_SHIFT) | Mix(0);
     }
 
     // A colour with each of its red, green and blue parts scaled down by darkness out of 255.
     internal static uint Darken(uint color, byte darkness)
     {
-        uint keep = 255u - darkness;
+        uint keep = CHANNEL_MAX - darkness;
 
-        uint Part(int shift) => ((color >> shift) & 0xff) * keep / 255 << shift;
+        uint Part(int shift) => ((color >> shift) & CHANNEL_MASK) * keep / CHANNEL_MAX << shift;  // scale one channel toward black, put it back in place
 
-        return 0xff00_0000 | Part(16) | Part(8) | Part(0);
+        return OPAQUE_ALPHA | Part(RED_SHIFT) | Part(GREEN_SHIFT) | Part(0);
     }
 
     // Draws a line of text with the built-in font.
@@ -204,21 +217,21 @@ public sealed class Overlay
     {
         int height = frame.Length / width;
         int block = text.Scale * placement.Scale;
-        int top = placement.OriginY + (text.Y - GLYPH_BASELINE * text.Scale) * placement.Scale;
+        int topEdge = placement.OriginY + (text.Y - GLYPH_BASELINE * text.Scale) * placement.Scale;
 
         for (int index = 0; index < text.Content.Length; index++)
         {
-            byte[] glyph = Font8x8.BasicLegacy[text.Content[index] & 0x7f];
+            byte[] glyph = Font8x8.BasicLegacy[text.Content[index] & GLYPH_CODE_MASK];
             int left = placement.OriginX + (text.X + index * GLYPH_SIZE * text.Scale) * placement.Scale;
 
-            for (int row = 0; row < glyph.Length; row++)
+            for (int rowIndex = 0; rowIndex < glyph.Length; rowIndex++)
             {
                 for (int column = 0; column < GLYPH_SIZE; column++)
                 {
                     // Bit 0 of each row is the leftmost pixel.
-                    if (((glyph[row] >> column) & 1) != 0)
+                    if (((glyph[rowIndex] >> column) & 1) != 0)
                     {
-                        FillBlock(frame, (width, height), (left + column * block, top + row * block), (block, text.Color));
+                        FillBlock(frame, (width, height), (left + column * block, topEdge + rowIndex * block), (block, text.Color));
                     }
                 }
             }
@@ -226,14 +239,14 @@ public sealed class Overlay
     }
 
     // Fills a square of the given size at at with a colour, where it is on the frame.
-    private static void FillBlock(uint[] frame, (int Width, int Height) frameSize, (int X, int Y) at, (int Size, uint Color) block)
+    private static void FillBlock(uint[] frame, (int Width, int Height) frameSize, (int X, int Y) offset, (int Size, uint Color) block)
     {
-        for (int y = Math.Max(at.Y, 0); y < Math.Min(at.Y + block.Size, frameSize.Height); y++)
+        for (int positionY = Math.Max(offset.Y, 0); positionY < Math.Min(offset.Y + block.Size, frameSize.Height); positionY++)
         {
-            int start = Math.Min(Math.Max(at.X, 0), frameSize.Width);
-            int end = Math.Clamp(at.X + block.Size, start, frameSize.Width);
+            int start = Math.Min(Math.Max(offset.X, 0), frameSize.Width);
+            int end = Math.Clamp(offset.X + block.Size, start, frameSize.Width);
 
-            Array.Fill(frame, block.Color, y * frameSize.Width + start, end - start);
+            Array.Fill(frame, block.Color, positionY * frameSize.Width + start, end - start);
         }
     }
 }

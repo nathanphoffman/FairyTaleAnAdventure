@@ -40,17 +40,17 @@ public static class DoorTargets
     /// the way out.
     public static int? DoorAt(Data.Game game, (int X, int Y) world)
     {
-        ushort x = (ushort)(world.X & TILE_X_MASK);
-        ushort y = (ushort)(world.Y & TILE_Y_MASK);
+        ushort positionX = (ushort)(world.X & TILE_X_MASK);
+        ushort positionY = (ushort)(world.Y & TILE_Y_MASK);
 
         if (game.World.Region < EnteringDoors.REGION_INSIDE)
         {
-            return EnteringDoors.FindOutdoorDoor(x, y);
+            return EnteringDoors.FindOutdoorDoor(positionX, positionY);
         }
 
         for (int index = 0; index < TravelDoors.DOOR_COUNT; index++)
         {
-            if (LeavingDoors.IsExitHere(EnteringDoors.DoorAt(index), x, y))
+            if (LeavingDoors.IsExitHere(EnteringDoors.DoorAt(index), positionX, positionY))
             {
                 return index;
             }
@@ -65,7 +65,7 @@ public static class DoorTargets
     {
         bool indoors = game.World.Region >= EnteringDoors.REGION_INSIDE;
 
-        if (!indoors || MapLookup.TileNumber(game, (ushort)(world.X >> TILE_X_SHIFT), (ushort)(world.Y >> TILE_Y_SHIFT)) != BLACK_TILE)
+        if (!indoors || MapLookup.TileNumber(game, (ushort)(world.X >> TILE_X_SHIFT), (ushort)(world.Y >> TILE_Y_SHIFT)) != BLACK_TILE)  // pixels to tiles: x is 16 wide (>> 4), y is 32 tall (>> 5)
         {
             return null;
         }

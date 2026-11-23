@@ -6,12 +6,12 @@ namespace FaeryTale.Tests;
 public class ConversationTests
 {
     // A game with one living person standing where the hero cannot be (actor 1).
-    private static FaeryTale.Game.Data.Game GameWithPersonAt(int x, int y)
+    private static FaeryTale.Game.Data.Game GameWithPersonAt(int positionX, int positionY)
     {
         FaeryTale.Game.Data.Game game = new();
         Shape person = game.Actors.List[1];
 
-        (person.Kind, person.State, person.AbsX, person.AbsY) = (ActorKind.SETFIG, 0, (ushort)x, (ushort)y);
+        (person.Kind, person.State, person.AbsX, person.AbsY) = (ActorKind.SETFIG, 0, (ushort)positionX, (ushort)positionY);
         game.Actors.Drawn = 2;
 
         return game;
@@ -48,10 +48,10 @@ public class ConversationTests
 
         for (int index = 0; index < rows.Count; index++)
         {
-            int x = 100 + (BubbleLayout.ButtonLeft + 1) * 2;
-            int y = 50 + (BubbleLayout.ButtonTop(index) + 1) * 2;
+            int positionX = 100 + (BubbleLayout.ButtonLeft + 1) * 2;
+            int positionY = 50 + (BubbleLayout.ButtonTop(index) + 1) * 2;
 
-            Assert.Equal(index, layout.RowAt(x, y, rows));
+            Assert.Equal(index, layout.RowAt(positionX, positionY, rows));
         }
     }
 

@@ -30,8 +30,15 @@ internal sealed partial class PageTurn
     private const double SHADOW_STRENGTH = 0.4;
 
     private const double PIXEL_SIZE = 0.5; // an output pixel is half a picture pixel
+
+    // Sampling at the middle of a pixel, not its corner, is half a pixel in.
+    private const double PIXEL_MIDDLE = 0.5;
     private const int CHANNEL_MASK = 0xff;
     private const uint OPAQUE = 0xff00_0000;
+
+    // Where each colour byte sits in a 0xAARRGGBB pixel.
+    private const int RED_SHIFT = 16;
+    private const int GREEN_SHIFT = 8;
 
     private readonly uint[] oldPage;
     private readonly uint[] newPage;
@@ -54,13 +61,13 @@ internal sealed partial class PageTurn
 
         for (int column = 0; column < OUTPUT_WIDTH; column++)
         {
-            double fromSpine = (column + 0.5) * PIXEL_SIZE - SPINE;
+            double fromSpine = (column + PIXEL_MIDDLE) * PIXEL_SIZE - SPINE;
             uint[] below = fromSpine >= 0 && InsideBook(column / 2) ? newPage : oldPage;
             Flap? flap = FlapAt(fromSpine, Math.Cos(angle), Math.Sin(angle));
 
-            for (int row = 0; row < OUTPUT_HEIGHT; row++)
+            for (int rowIndex = 0; rowIndex < OUTPUT_HEIGHT; rowIndex++)
             {
-                output[row * OUTPUT_WIDTH + column] = PixelAt(below, flap, column / 2, row);
+                output[rowIndex * OUTPUT_WIDTH + column] = PixelAt(below, flap, column / 2, rowIndex);
             }
         }
 
@@ -105,17 +112,17 @@ internal sealed partial class PageTurn
 
     // The colour of one output pixel: the turning page (averaged over the picture columns that
     // squeeze into it) where it covers the pixel, else the page below with the shadow on it.
-    private static uint PixelAt(uint[] below, Flap? flap, int pictureColumn, int row)
+    private static uint PixelAt(uint[] below, Flap? flap, int pictureColumn, int rowIndex)
     {
-        int pictureRow = row / 2;
-        double y = (row + 0.5) * PIXEL_SIZE;
+        int pictureRow = rowIndex / 2;
+        double positionY = (rowIndex + PIXEL_MIDDLE) * PIXEL_SIZE;
 
         if (flap is null)
         {
             return below[pictureRow * PAGE_WIDTH + pictureColumn];
         }
 
-        if (flap.Covers && y >= flap.Inset && y < PAGE_HEIGHT - flap.Inset)
+        if (flap.Covers && positionY >= flap.Inset && positionY < PAGE_HEIGHT - flap.Inset)
         {
             return Scale(Average(flap, pictureRow), flap.Shade);
         }

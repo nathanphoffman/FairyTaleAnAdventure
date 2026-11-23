@@ -45,7 +45,7 @@ public static class WorldOverview
 
     /// The column and row of the picture a world position is on.
     public static (int Column, int Row) TileOf(int worldX, int worldY) =>
-        (Math.Clamp(worldX >> TILE_COLUMN_SHIFT, 0, COLUMNS - 1), Math.Clamp(worldY >> TILE_ROW_SHIFT, 0, ROWS - 1));
+        (Math.Clamp(worldX >> TILE_COLUMN_SHIFT, 0, COLUMNS - 1), Math.Clamp(worldY >> TILE_ROW_SHIFT, 0, ROWS - 1));  // each picture tile is 16 by 32 world pixels, so shift to divide
 
     // Reads every region's map and paints it into the picture.
     private static uint[] Build()
@@ -70,22 +70,22 @@ public static class WorldOverview
         Regions.LoadMapTables(map, Tables.RegionDiskBlocks[region]);
         Regions.LoadTerrainTables(map, Tables.RegionDiskBlocks[region]);
 
-        int firstColumn = (region & 1) << REGION_SECTOR_COLUMN_SHIFT;
-        int firstRow = (region >> 1) << REGION_SECTOR_ROW_SHIFT;
+        int firstColumn = (region & 1) << REGION_SECTOR_COLUMN_SHIFT;  // region bit 0 is left/right half; shifting by 6 multiplies by 64 sectors
+        int firstRow = (region >> 1) << REGION_SECTOR_ROW_SHIFT;  // the other bits are the row; shifting by 5 multiplies by 32 sectors
 
-        for (int row = firstRow; row < firstRow + REGION_SECTOR_ROWS; row++)
+        for (int rowIndex = firstRow; rowIndex < firstRow + REGION_SECTOR_ROWS; rowIndex++)
         {
             for (int column = firstColumn; column < firstColumn + REGION_SECTOR_COLUMNS; column++)
             {
-                int sector = map.MapByte((ushort)(((row - firstRow) << MAP_ROW_SHIFT) + column));
+                int sector = map.MapByte((ushort)(((rowIndex - firstRow) << MAP_ROW_SHIFT) + column));  // << 7 is times 128: the map is 128 sectors per row
 
-                PaintSector(picture, palette, map, sector, (column * SECTOR_TILE_COLUMNS, row * SECTOR_TILE_ROWS));
+                PaintSector(picture, palette, map, sector, (column * SECTOR_TILE_COLUMNS, rowIndex * SECTOR_TILE_ROWS));
             }
         }
     }
 
     // Paints the 16 x 8 tiles of one sector at a tile column and row of the world.
-    private static void PaintSector(uint[] picture, uint[] palette, MapData map, int sector, (int Column, int Row) at)
+    private static void PaintSector(uint[] picture, uint[] palette, MapData map, int sector, (int Column, int Row) offset)
     {
         for (int tileRow = 0; tileRow < SECTOR_TILE_ROWS; tileRow++)
         {
@@ -94,7 +94,7 @@ public static class WorldOverview
                 int tile = map.SectorByte(sector * SECTOR_TILES + tileRow * SECTOR_TILE_COLUMNS + tileColumn);
                 byte color = map.TerrainByte(tile * TERRAIN_ENTRY_BYTES + TERRAIN_COLOR_BYTE);
 
-                picture[(at.Row + tileRow) * COLUMNS + at.Column + tileColumn] = palette[color & PALETTE_MASK];
+                picture[(offset.Row + tileRow) * COLUMNS + offset.Column + tileColumn] = palette[color & PALETTE_MASK];
             }
         }
     }

@@ -33,33 +33,33 @@ public sealed partial class Video
         Screen.Clear(PortId.Map, 0);
     }
 
-    public void SetZoomSize(int x, int y)
+    public void SetZoomSize(int positionX, int positionY)
     {
-        short left = (short)(SCREEN_CENTER_X - x);
-        short top = (short)(SCREEN_CENTER_Y - y);
+        short left = (short)(SCREEN_CENTER_X - positionX);
+        short topEdge = (short)(SCREEN_CENTER_Y - positionY);
 
         for (int ras = 0; ras < 2; ras++)
         {
             Screen.Ras[ras].X = left;
-            Screen.Ras[ras].Y = top;
+            Screen.Ras[ras].Y = topEdge;
         }
 
         Screen.VpPage.X = left;
-        Screen.VpPage.Width = (short)(x + x);
-        Screen.VpPage.Y = top;
-        Screen.VpPage.Height = (short)(y + y);
+        Screen.VpPage.Width = (short)(positionX + positionX);
+        Screen.VpPage.Y = topEdge;
+        Screen.VpPage.Height = (short)(positionY + positionY);
 
         Screen.VpText.X = 0;
         Screen.VpText.Y = 0;
-        Screen.VpText.Height = (short)(ZOOM_TEXT_HEIGHT - y);
+        Screen.VpText.Height = (short)(ZOOM_TEXT_HEIGHT - positionY);
     }
 
     public void LoadPictureToDrawingPage(string name)
     {
-        BitmapId id = Screen.DrawingBitmapId;
+        BitmapId identifier = Screen.DrawingBitmapId;
 
-        Screen.DrawTarget = id;
-        IffPicture.LoadPicture(name, Screen.GetBitmap(id), 0, 0);
+        Screen.DrawTarget = identifier;
+        IffPicture.LoadPicture(name, Screen.GetBitmap(identifier), 0, 0);
     }
 
     public void LoadPanelColors(ReadOnlySpan<ushort> colors) => Screen.LoadColors(ViewPortId.Text, colors);

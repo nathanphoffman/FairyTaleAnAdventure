@@ -39,17 +39,17 @@ public static class PlacardBorder
         {
             for (int step = 0; step < BORDER_STEPS; step++)
             {
-                int dx = xOrigin + BORDER_X_STEPS[step];
-                int dy = yOrigin + BORDER_Y_STEPS[step];
+                int deltaX = xOrigin + BORDER_X_STEPS[step];
+                int deltaY = yOrigin + BORDER_Y_STEPS[step];
 
                 for (int stroke = STROKES_PER_STEP - 1; stroke >= 0; stroke--)
                 {
                     screen.SetAPen(PortId.Map, stroke == 0 ? BORDER_HIGHLIGHT_PEN : BORDER_PEN);
-                    DrawBorderStroke(screen, pass > LONG_EDGE_ABOVE_PASS, (xOrigin, yOrigin), (dx, dy));
+                    DrawBorderStroke(screen, pass > LONG_EDGE_ABOVE_PASS, (xOrigin, yOrigin), (deltaX, deltaY));
                 }
 
-                xOrigin = dx;
-                yOrigin = dy;
+                xOrigin = deltaX;
+                yOrigin = deltaY;
             }
         }
     }

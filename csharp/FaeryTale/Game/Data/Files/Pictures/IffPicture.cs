@@ -30,10 +30,13 @@ public static class IffPicture
     private const int WORD_ROUNDING = 15;
     private const int PIXELS_PER_BYTE = 8;
 
+    // The bitmap header holds the compression type at this byte (after width, height, position, planes, masking).
+    private const int COMPRESSION_TYPE_OFFSET = 10;
+
     /// Loads the picture name into bitmap at byte column x, row y. Returns false if the file is
     /// missing or not a picture the game can read. Used for the title pages, the story pictures,
     /// the text panel background and the winning picture.
-    public static bool LoadPicture(string name, Bitmap bitmap, int x, int y)
+    public static bool LoadPicture(string name, Bitmap bitmap, int positionX, int positionY)
     {
         string? path = Paths.Resolve(name, false);
 
@@ -42,7 +45,7 @@ public static class IffPicture
             return false;
         }
 
-        return ReadForm(File.ReadAllBytes(path), bitmap, x + bitmap.BytesPerRow * y);
+        return ReadForm(File.ReadAllBytes(path), bitmap, positionX + bitmap.BytesPerRow * positionY);
     }
 
     /// Reads the chunks of an IFF file: the header, then the picture body into bitmap at byte
@@ -102,9 +105,9 @@ public static class IffPicture
 
     // Reads the chunk with this id: the body is unpacked into the bitmap, the header is kept and
     // the chunks the game has no use for are skipped. left is how much of the form remains.
-    private static ChunkResult ReadChunk(Chunks chunks, string id, ref Header header, ref long left, (Bitmap Bitmap, int Offset) target)
+    private static ChunkResult ReadChunk(Chunks chunks, string identifier, ref Header header, ref long left, (Bitmap Bitmap, int Offset) target)
     {
-        if (id == BODY)
+        if (identifier == BODY)
         {
             if (chunks.Length() is not { } bodyLength)
             {
@@ -116,7 +119,7 @@ public static class IffPicture
             return ChunkResult.Done;
         }
 
-        if ((id != BMHD && !SKIPPED_CHUNKS.Contains(id)) || chunks.Length() is not { } length)
+        if ((identifier != BMHD && !SKIPPED_CHUNKS.Contains(identifier)) || chunks.Length() is not { } length)
         {
             return ChunkResult.Failed;
         }
@@ -124,7 +127,7 @@ public static class IffPicture
         left -= length + CHUNK_FIELD_BYTES;
         byte[] data = chunks.Take(length);
 
-        if (id == BMHD)
+        if (identifier == BMHD)
         {
             header = Header.Read(data);
         }
@@ -140,9 +143,9 @@ public static class IffPicture
         int bytesPerRow = bitmap.BytesPerRow;
         byte[] line = new byte[rowBytes];
 
-        for (int row = 0; row < header.Height; row++)
+        for (int rowIndex = 0; rowIndex < header.Height; rowIndex++)
         {
-            int start = offset + row * bytesPerRow;
+            int start = offset + rowIndex * bytesPerRow;
 
             for (int plane = 0; plane < BRUSH_PLANES; plane++)
             {
@@ -174,9 +177,9 @@ public static class IffPicture
         // position, plane count and masking fields) the compression type.
         public static Header Read(byte[] data)
         {
-            int Be16(int at) => at + 2 <= data.Length ? BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(at)) : 0;
+            int Be16(int offset) => offset + 2 <= data.Length ? BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(offset)) : 0;
 
-            return new Header { Width = Be16(0), Height = Be16(2), Compressed = data.Length > 10 && data[10] != 0 };
+            return new Header { Width = Be16(0), Height = Be16(2), Compressed = data.Length > COMPRESSION_TYPE_OFFSET && data[COMPRESSION_TYPE_OFFSET] != 0 };
         }
     }
 
@@ -265,11 +268,11 @@ public static class IffPicture
                 return null;
             }
 
-            string id = Encoding.ASCII.GetString(data, at, CHUNK_FIELD_BYTES);
+            string identifier = Encoding.ASCII.GetString(data, at, CHUNK_FIELD_BYTES);
 
             at += CHUNK_FIELD_BYTES;
 
-            return id;
+            return identifier;
         }
 
         public long? Length()

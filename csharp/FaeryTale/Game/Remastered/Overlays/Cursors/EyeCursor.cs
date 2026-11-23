@@ -29,11 +29,11 @@ internal static class EyeCursor
     {
         uint[] result = new uint[WIDTH * HEIGHT];
 
-        for (int y = 0; y < HEIGHT; y++)
+        for (int positionY = 0; positionY < HEIGHT; positionY++)
         {
-            for (int x = 0; x < WIDTH; x++)
+            for (int positionX = 0; positionX < WIDTH; positionX++)
             {
-                result[y * WIDTH + x] = PixelAt(x, y);
+                result[positionY * WIDTH + positionX] = PixelAt(positionX, positionY);
             }
         }
 
@@ -41,40 +41,40 @@ internal static class EyeCursor
     }
 
     // Whether a pixel is inside the almond: the lids are a curve (a parabola) that meets at the corners.
-    private static bool Inside(int x, int y)
+    private static bool Inside(int positionX, int positionY)
     {
-        double across = (x - (WIDTH - 1) / 2.0) / (WIDTH / 2.0);
-        double up = Math.Abs(y - (HEIGHT - 1) / 2.0);
+        double across = (positionX - (WIDTH - 1) / 2.0) / (WIDTH / 2.0);
+        double up = Math.Abs(positionY - (HEIGHT - 1) / 2.0);
         double lid = HEIGHT / 2.0 * (1 - across * across);
 
-        return x >= 0 && x < WIDTH && y >= 0 && y < HEIGHT && up <= lid && Math.Abs(across) < 1;
+        return positionX >= 0 && positionX < WIDTH && positionY >= 0 && positionY < HEIGHT && up <= lid && Math.Abs(across) < 1;
     }
 
-    private static uint PixelAt(int x, int y)
+    private static uint PixelAt(int positionX, int positionY)
     {
-        if (!Inside(x, y))
+        if (!Inside(positionX, positionY))
         {
             return 0;
         }
 
-        if (!Inside(x - 1, y) || !Inside(x + 1, y) || !Inside(x, y - 1) || !Inside(x, y + 1))
+        if (!Inside(positionX - 1, positionY) || !Inside(positionX + 1, positionY) || !Inside(positionX, positionY - 1) || !Inside(positionX, positionY + 1))
         {
             return OUTLINE;
         }
 
-        return EyeballPixel(x - (WIDTH - 1) / 2.0, y - (HEIGHT - 1) / 2.0);
+        return EyeballPixel(positionX - (WIDTH - 1) / 2.0, positionY - (HEIGHT - 1) / 2.0);
     }
 
     // The inside of the eye at a distance from its middle: pupil, iris or white, with a glint.
-    private static uint EyeballPixel(double dx, double dy)
+    private static uint EyeballPixel(double deltaX, double deltaY)
     {
-        double distance = Math.Sqrt(dx * dx + dy * dy);
+        double distance = Math.Sqrt(deltaX * deltaX + deltaY * deltaY);
 
-        if (Math.Abs(dx + GLINT_OFFSET) < 1 && Math.Abs(dy + GLINT_OFFSET) < 1)
+        if (Math.Abs(deltaX + GLINT_OFFSET) < 1 && Math.Abs(deltaY + GLINT_OFFSET) < 1)
         {
             return GLINT;
         }
 
-        return distance <= PUPIL_RADIUS ? PUPIL : distance <= IRIS_RADIUS ? IRIS : WHITE;
+        return distance <= PUPIL_RADIUS ? PUPIL : distance <= IRIS_RADIUS ? IRIS : WHITE;  // nested ternary: innermost ring wins, else white
     }
 }

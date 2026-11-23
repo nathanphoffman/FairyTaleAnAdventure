@@ -17,14 +17,14 @@ internal sealed partial class MoveContext
     /// The turtle's direction of swimming: straight on while there is deep water ahead, otherwise
     /// one step right, then two to the left of that, then one more to the left; the last is used
     /// whether or not it is water. waterAhead(dir) says if the turtle could swim that way.
-    internal static short TurtleHeading(short dir, Func<short, bool> waterAhead)
+    internal static short TurtleHeading(short direction, Func<short, bool> waterAhead)
     {
-        if (waterAhead(dir))
+        if (waterAhead(direction))
         {
-            return dir;
+            return direction;
         }
 
-        short right = (short)((dir + 1) & FACING_MASK);
+        short right = (short)((direction + 1) & FACING_MASK);
 
         if (waterAhead(right))
         {
@@ -121,12 +121,12 @@ internal sealed partial class MoveContext
     // tries turning right, then left, then back to straight on the left again.
     private void TurtleSwims()
     {
-        int x = actor.AbsX;
-        int y = actor.AbsY;
+        int positionX = actor.AbsX;
+        int positionY = actor.AbsY;
 
-        facing = TurtleHeading(facing, direction => TerrainAtPoint(PosX(x, direction, TURTLE_STEP), PosY(y, direction, TURTLE_STEP)) == TERRAIN_DEEP_WATER);
-        game.Actors.TestX = PosX(x, facing, TURTLE_STEP);
-        game.Actors.TestY = PosY(y, facing, TURTLE_STEP);
+        facing = TurtleHeading(facing, direction => TerrainAtPoint(PosX(positionX, direction, TURTLE_STEP), PosY(positionY, direction, TURTLE_STEP)) == TERRAIN_DEEP_WATER);
+        game.Actors.TestX = PosX(positionX, facing, TURTLE_STEP);
+        game.Actors.TestY = PosY(positionY, facing, TURTLE_STEP);
         game.Hero.Riding = 0;
         image = (short)(facing + facing + (cycle & 1));
     }

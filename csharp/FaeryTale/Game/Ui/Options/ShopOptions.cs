@@ -123,7 +123,7 @@ public static class ShopOptions
             return new Purchase.TooPoor();
         }
 
-        Bought what = item == FOOD ? Bought.Food : item == ARROWS ? Bought.Arrows : Bought.Item;
+        Bought what = item == FOOD ? Bought.Food : item == ARROWS ? Bought.Arrows : Bought.Item; // checks food, then arrows, otherwise a plain item
 
         return new Purchase.Made((short)(wealth - price), what);
     }
