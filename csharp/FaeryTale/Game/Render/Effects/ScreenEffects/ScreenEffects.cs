@@ -7,7 +7,7 @@ namespace FaeryTale.Game.Render;
 
 /// Screen effects and panel updates: the compass, the item list screen, the print queue, the
 /// intro zoom and the win sequence. (Fading the colours is in Fading.)
-public static class ScreenEffects
+public static partial class ScreenEffects
 {
     // The compass is drawn in the third plane of the text panel.
     private const int COMPASS_PLANE = 2;
@@ -180,75 +180,6 @@ public static class ScreenEffects
         }
     }
 
-    /// The size of the picture during the intro's zoom: x is half the width in pixels (0 to 160),
-    /// the height keeps the 8:5 shape. Moves the page and text view ports to match, fades the
-    /// colours with the size (black when small), and shows the result.
-    public static void SetIntroZoom(Data.Game game, IOutput output, int x)
-    {
-        int y = x * ZOOM_ASPECT_HEIGHT / ZOOM_ASPECT_WIDTH;
-
-        Display.Delay(game, output, 2);
-        output.SetZoomSize(x, y);
-        Fading.FadePage(
-            game,
-            output,
-            ((short)(y * 2 - ZOOM_FADE_RED), (short)(y * 2 - ZOOM_FADE_GREEN), (short)(y * 2 - ZOOM_FADE_BLUE)),
-            0,
-            Tables.IntroColors);
-        Display.FlipPages(game, output);
-    }
-
-    /// The win screen: shows the picture and brings the sun up behind it by cycling the sky
-    /// colours through SunColors, with two glowing colours that fade out near the end.
-    public static void WinColors(Data.Game game, IOutput output)
-    {
-        TextRoutines.PlacardText(output, WIN_MESSAGE_FIRST);
-        Messages.Name(game, output);
-        TextRoutines.PlacardText(output, WIN_MESSAGE_SECOND);
-        output.DrawPlacardBorder();
-        Display.Delay(game, output, WIN_MESSAGE_PAUSE);
-        ShowWinPictureInBlack(game, output);
-        RiseSun(game, output);
-
-        Display.Delay(game, output, SUNRISE_END_PAUSE);
-        output.LoadPageColors(Tables.BlackColors);
-    }
-
-    /// The palette for step number of the sunrise over the ending picture. Colours 1 and 28 are
-    /// white, 0 and 31 black; the sky and sun colours come from SunColors offset by number, and
-    /// the glow (29, 30) is a fixed orange at first and then fades out.
-    internal static ushort[] SunrisePalette(int number)
-    {
-        ushort[] colors = new ushort[Fading.COLOR_COUNT];
-
-        foreach (int white in WHITE_COLORS)
-        {
-            colors[white] = WHITE;
-        }
-
-        for (int color = FIRST_SUNRISE_COLOR; color <= LAST_SUNRISE_COLOR; color++)
-        {
-            int index = number + color;
-
-            colors[color] = index > 0 ? (ushort)ObjectTables.SunColors[index] : (ushort)0;
-        }
-
-        if (number > SUN_GLOW_UNTIL)
-        {
-            colors[GLOW_FIRST] = GLOW_BRIGHT_FIRST;
-            colors[GLOW_SECOND] = GLOW_BRIGHT_SECOND;
-        }
-        else
-        {
-            int fade = (number + GLOW_FADE_OFFSET) / 2;
-
-            colors[GLOW_FIRST] = (ushort)(RED_STEP * fade);
-            colors[GLOW_SECOND] = (ushort)(RED_STEP * (fade / 2));
-        }
-
-        return colors;
-    }
-
     // The pictures of the objects as one long bitmap: the object sprite sheet holds each plane of
     // an image 32 bytes after the one before, so plane p starts p * 32 bytes into the sheet.
     private static Bitmap ItemPictures(Video video)
@@ -286,82 +217,5 @@ public static class ScreenEffects
                 y = unchecked((ushort)(y + item.Ydelta));
             }
         }
-    }
-
-    // Shows the winning picture with every colour black, so the sunrise can fade it in.
-    private static void ShowWinPictureInBlack(Data.Game game, IOutput output)
-    {
-        output.LoadPictureToDrawingPage("winpic");
-        output.LoadPageColors(Tables.BlackColors);
-        output.LoadPanelColors(Tables.BlackColors);
-        output.SetPanelVisible(false);
-        SetIntroZoom(game, output, WIN_SCREEN_SIZE);
-    }
-
-    // Steps through the sunrise palettes, one pause each.
-    private static void RiseSun(Data.Game game, IOutput output)
-    {
-        for (int number = SUNRISE_START; number > SUNRISE_END; number--)
-        {
-            output.LoadPageColors(SunrisePalette(number));
-
-            if (number == SUNRISE_START)
-            {
-                Display.Delay(game, output, SUNRISE_FIRST_PAUSE);
-            }
-
-            Display.Delay(game, output, SUNRISE_STEP_PAUSE);
-        }
-    }
-
-    // Debug information: the hero's map position and the memory left.
-    private static void ShowDebugCoords(Hero hero, IOutput output)
-    {
-        output.Print("Coords = ");
-        output.PrintNumber(hero.X, COORD_DIGITS);
-        output.PrintNumber(hero.Y, COORD_DIGITS);
-        output.Print("Memory Available: ");
-        output.PrintNumber(FAKE_FREE_BYTES, COORD_DIGITS);
-    }
-
-    // Debug information: the hero's sector and the type of the extent the hero is in.
-    private static void ShowDebugSector(World world, Hero hero, IOutput output)
-    {
-        output.Print("You are at: ");
-        output.PrintNumber(hero.X / SECTOR_PIXELS, SECTOR_DIGITS);
-        output.PrintNumber(hero.Y / SECTOR_PIXELS, SECTOR_DIGITS);
-        output.Print("H/Sector = ");
-        output.PrintNumber(hero.Sector, SECTOR_DIGITS);
-        output.PrintContBytes(" Extent = "u8);
-        output.PrintNumber(world.ExtentType, EXTENT_DIGITS);
-    }
-
-    // The hero's vitality on the stats line.
-    private static void DrawVitality(Actors actors, IOutput output)
-    {
-        TextRoutines.MoveTo(output, VITALITY_X, STATS_Y);
-        output.PrintContBytes("Vit:"u8);
-        output.PrintNumber(actors.List[0].Vitality, STAT_DIGITS);
-    }
-
-    // Draws the hero's four stats (bravery, luck, kindness, wealth) along the stats line.
-    private static void DrawStats(Hero hero, IOutput output)
-    {
-        if (hero.Luck < 0)
-        {
-            hero.Luck = 0;
-        }
-
-        DrawStat(output, BRAVERY_X, "Brv:"u8, hero.Brave);
-        DrawStat(output, LUCK_X, "Lck:"u8, hero.Luck);
-        DrawStat(output, KINDNESS_X, "Knd:"u8, hero.Kindness);
-        DrawStat(output, WEALTH_X, "Wlth:"u8, hero.Wealth);
-    }
-
-    private static void DrawStat(IOutput output, int x, ReadOnlySpan<byte> label, short value)
-    {
-        TextRoutines.MoveTo(output, x, STATS_Y);
-        output.PrintContBytes(label);
-        output.PrintNumber(value, STAT_DIGITS);
     }
 }

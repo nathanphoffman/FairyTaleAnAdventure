@@ -1,4 +1,3 @@
-using FaeryTale.Gfx;
 
 namespace FaeryTale.Game.Output;
 

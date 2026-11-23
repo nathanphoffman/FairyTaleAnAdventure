@@ -1,5 +1,4 @@
 using FaeryTale.Game.Data;
-using FaeryTale.Game.Render;
 using FaeryTale.Gfx;
 using static FaeryTale.Gfx.MenuStyle;
 
