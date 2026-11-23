@@ -1,0 +1,234 @@
+﻿namespace FaeryTale.Gfx;
+
+/// Everything shown: the view ports from the top one down, and the pointer. Turned into the
+/// pixels of a frame by Compose.
+public sealed class Scene
+{
+    /// Size of the frame in pixels. The play field is lores (each of its pixels is shown twice as
+    /// wide); the text panel is hires.
+    public const int FRAME_WIDTH = 640;
+    public const int FRAME_HEIGHT = 200;
+
+    private const int LORES_SCALE = 2;
+    private const int BITS_PER_BYTE = 8;
+    private const int NIBBLE_MASK = 15;
+    private const int NIBBLE_TO_BYTE = 17; // 0xF * 17 = 0xFF
+    private const int GREEN_NIBBLE_SHIFT = 4;
+    private const int RED_NIBBLE_SHIFT = 8;
+    private const int RED_BYTE_SHIFT = 16;
+    private const int GREEN_BYTE_SHIFT = 8;
+
+    // The pointer's colours are 16 + the sprite pixel value in the colour table.
+    private const int POINTER_FIRST_COLOR = 16;
+    private const int POINTER_WIDTH = 16;
+    private const int POINTER_MAX_LINES = 32;
+    private const int HIGH_WORD_SHIFT = 16;
+
+    // The alpha part of a 0xAARRGGBB pixel for a fully solid colour.
+    private const uint OPAQUE_ALPHA = 0xff00_0000;
+
+    public List<ViewPort> ViewPorts { get; init; } = [];
+
+    public Pointer? Pointer { get; init; }
+
+    /// 12 bit colour (4 bits per channel, 0x0RGB) to 0xRRGGBB.
+    public static uint Rgb4(ushort color)
+    {
+        // Pulls out each 4 bit component: shift it down, then mask off the rest.
+        uint red = (uint)((color >> RED_NIBBLE_SHIFT) & NIBBLE_MASK);
+        uint green = (uint)((color >> GREEN_NIBBLE_SHIFT) & NIBBLE_MASK); // the same for the middle nibble
+        uint blue = (uint)(color & NIBBLE_MASK); // the last nibble needs no shift
+
+        // Puts the three components, each stretched from 4 to 8 bits, side by side in one pixel.
+        return ((red * NIBBLE_TO_BYTE) << RED_BYTE_SHIFT) | ((green * NIBBLE_TO_BYTE) << GREEN_BYTE_SHIFT) | (blue * NIBBLE_TO_BYTE);
+    }
+
+    /// Draws the whole scene into the frame (FRAME_WIDTH x FRAME_HEIGHT pixels), the pointer too.
+    public void Compose(uint[] frame)
+    {
+        ComposeWithoutPointer(frame);
+        DrawPointerOn(frame, 1);
+    }
+
+    /// Draws the view ports only, for when something is to be drawn over the picture before the
+    /// pointer (see DrawPointerOn).
+    public void ComposeWithoutPointer(uint[] frame)
+    {
+        Array.Fill(frame, 0u);
+
+        foreach (ViewPort viewPort in ViewPorts)
+        {
+            DrawViewPort(viewPort, frame);
+        }
+    }
+
+    /// Draws only the view ports that reach down to a line of the frame or below (the text panel,
+    /// when the play field is drawn some other way); the rest of the frame is cleared.
+    public void ComposeFromLine(uint[] frame, int firstLine)
+    {
+        Array.Fill(frame, 0u);
+
+        foreach (ViewPort viewPort in ViewPorts.Where(viewPort => viewPort.Position.Y + viewPort.Size.Height > firstLine))
+        {
+            DrawViewPort(viewPort, frame);
+        }
+    }
+
+    /// Draws the pointer on a frame FRAME_WIDTH wide whose rows are rowScale times as many as the
+    /// scene's (the overlay's grid has every row twice).
+    public void DrawPointerOn(uint[] frame, int rowScale)
+    {
+        ViewPort? pointerColors = ViewPorts.FirstOrDefault(viewPort => viewPort.ShowsPointer);
+
+        if (Pointer is not null && pointerColors is not null)
+        {
+            DrawPointer(frame, pointerColors.Colors, Pointer, rowScale);
+        }
+    }
+
+    // Sets a frame pixel if it lies inside the frame.
+    internal static void PutPixel(uint[] frame, int positionX, int positionY, uint color)
+    {
+        if (positionX >= 0 && positionX < FRAME_WIDTH && positionY >= 0 && positionY < frame.Length / FRAME_WIDTH)
+        {
+            frame[positionY * FRAME_WIDTH + positionX] = color;
+        }
+    }
+
+    // Draws one view port's rows into the frame.
+    private static void DrawViewPort(ViewPort viewPort, uint[] frame)
+    {
+        Bitmap bitmap = viewPort.Bitmap;
+
+        for (int rowIndex = 0; rowIndex < viewPort.Size.Height; rowIndex++)
+        {
+            int sourceY = viewPort.Scroll.Y + rowIndex;
+            int outY = viewPort.Position.Y + rowIndex;
+
+            if (sourceY < 0 || sourceY >= bitmap.Rows || outY < 0 || outY >= FRAME_HEIGHT)
+            {
+                continue;
+            }
+
+            for (int column = 0; column < viewPort.Size.Width; column++)
+            {
+                int sourceX = viewPort.Scroll.X + column;
+
+                if (sourceX < 0 || sourceX >= bitmap.BytesPerRow * BITS_PER_BYTE)
+                {
+                    continue;
+                }
+
+                int index = bitmap.Pixel(sourceX, sourceY);
+                uint color = index < viewPort.Colors.Length ? Rgb4(viewPort.Colors[index]) : 0;
+                int screenX = viewPort.Position.X + column;
+
+                if (viewPort.Hires)
+                {
+                    PutPixel(frame, screenX, outY, color);
+                }
+                else
+                {
+                    PutPixel(frame, screenX * LORES_SCALE, outY, color);
+                    PutPixel(frame, screenX * LORES_SCALE + 1, outY, color);
+                }
+            }
+        }
+    }
+
+    /// Draws the pointer on a frame of any size with its top left corner at a pixel, each pixel of
+    /// the sprite a square of pixelSize frame pixels (used by the native size drawing).
+    public void DrawPointerAtPixel(uint[] frame, int width, (int X, int Y) offset, int pixelSize)
+    {
+        ViewPort? pointerColors = ViewPorts.FirstOrDefault(viewPort => viewPort.ShowsPointer);
+
+        if (Pointer is null || pointerColors is null)
+        {
+            return;
+        }
+
+        int height = frame.Length / width;
+
+        for (int line = 0; line < POINTER_MAX_LINES; line++)
+        {
+            uint word = 1 + line < Pointer.Image.Length ? Pointer.Image[1 + line] : 0;
+
+            if (word == 0)
+            {
+                break;
+            }
+
+            for (int bit = 0; bit < POINTER_WIDTH; bit++)
+            {
+                // How the colour number of one pointer pixel is found: the word holds two bitplanes, the
+                // high half is the colour's low bit and the low half is its high bit. The leftmost pixel
+                // is the highest bit of each half, so shift counts down from the left; "& 1" keeps that
+                // one bit, and "<< 1" moves the high-bit plane up to where the second bit belongs.
+                int shift = POINTER_WIDTH - 1 - bit;
+                // Reads one bit from each half of the word, then joins them: the high half's bit is the colour's low bit.
+                int value = (((ushort)(word >> HIGH_WORD_SHIFT) >> shift) & 1) | ((((ushort)word >> shift) & 1) << 1);
+
+                if (value != 0 && POINTER_FIRST_COLOR + value < pointerColors.Colors.Length)
+                {
+                    FillSquare(frame, (width, height), (offset.X + bit * pixelSize, offset.Y + line * pixelSize), pixelSize, Rgb4(pointerColors.Colors[POINTER_FIRST_COLOR + value]));
+                }
+            }
+        }
+    }
+
+    // A square of one colour (opaque), where it is on the frame.
+    private static void FillSquare(uint[] frame, (int Width, int Height) size, (int X, int Y) offset, int side, uint color)
+    {
+        for (int positionY = Math.Max(offset.Y, 0); positionY < Math.Min(offset.Y + side, size.Height); positionY++)
+        {
+            int start = Math.Min(Math.Max(offset.X, 0), size.Width);
+            int end = Math.Clamp(offset.X + side, start, size.Width);
+
+            Array.Fill(frame, OPAQUE_ALPHA | color, positionY * size.Width + start, end - start);
+        }
+    }
+
+    // Draws the mouse pointer: a 16 pixel wide sprite, 2 frame pixels per sprite pixel.
+    private static void DrawPointer(uint[] frame, ushort[] colors, Pointer pointer, int rowScale)
+    {
+        for (int line = 0; line < POINTER_MAX_LINES; line++)
+        {
+            uint word = 1 + line < pointer.Image.Length ? pointer.Image[1 + line] : 0;
+
+            if (word == 0)
+            {
+                break;
+            }
+
+            for (int copy = 0; copy < rowScale; copy++)
+            {
+                DrawPointerLine(frame, colors, word, (pointer.Position.X * LORES_SCALE, (pointer.Position.Y + line) * rowScale + copy));
+            }
+        }
+    }
+
+    // Draws one line of the pointer sprite. A 32 bit value holds two 16 pixel rows of a bitplane.
+    private static void DrawPointerLine(uint[] frame, ushort[] colors, uint word, (int X, int Y) origin)
+    {
+        ushort a = (ushort)(word >> HIGH_WORD_SHIFT);  // top 16 bits of the word are plane a
+        ushort b = (ushort)word;
+
+        for (int bit = 0; bit < POINTER_WIDTH; bit++)
+        {
+            int shift = POINTER_WIDTH - 1 - bit;
+
+            // One pixel of the two interleaved planes: plane a is the low bit, plane b the high bit.
+            int value = ((a >> shift) & 1) | (((b >> shift) & 1) << 1);
+
+            if (value == 0 || POINTER_FIRST_COLOR + value >= colors.Length)
+            {
+                continue;
+            }
+
+            for (int deltaX = 0; deltaX < LORES_SCALE; deltaX++)
+            {
+                PutPixel(frame, origin.X + bit * LORES_SCALE + deltaX, origin.Y, Rgb4(colors[POINTER_FIRST_COLOR + value]));
+            }
+        }
+    }
+}
