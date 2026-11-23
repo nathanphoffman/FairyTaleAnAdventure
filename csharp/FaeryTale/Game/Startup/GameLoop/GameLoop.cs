@@ -1,14 +1,11 @@
-using FaeryTale.Game.Creatures.Ai;
 using FaeryTale.Game.Data;
 using FaeryTale.Game.Creatures.Combat;
-using FaeryTale.Game.Creatures;
 using FaeryTale.Game.Creatures.Movement;
 using FaeryTale.Game.Files;
 using FaeryTale.Game.Input;
 using FaeryTale.Game.Input.Keys;
 using FaeryTale.Game.Land;
 using FaeryTale.Game.Land.TravelDoors;
-using FaeryTale.Game.Output;
 using FaeryTale.Game.Remastered;
 using FaeryTale.Game.Reimagined;
 using FaeryTale.Game.Render;
@@ -17,7 +14,7 @@ using FaeryTale.Game.Testing;
 namespace FaeryTale.Game.Startup;
 
 /// The main loop: one pass per frame, reading input, moving the actors, updating the world and drawing.
-public static class GameLoop
+public static partial class GameLoop
 {
     // Screen modes (ViewStatus).
     private const sbyte VIEW_NORMAL = 0;
@@ -88,24 +85,6 @@ public static class GameLoop
             RunFrame(game, video, state);
         }
     }
-
-    /// The map's horizontal step as a 10 bit signed number (the map wraps round at the edges).
-    internal static short WrapScrollDifference(short difference) =>
-        (difference & DIF_SIGN_BIT) != 0 ? unchecked((short)(difference | DIF_SIGN_EXTEND)) : (short)(difference & DIF_MASK);
-
-    /// The scroll direction ScrollMap takes for the map moving one tile by (x, y), if it can scroll.
-    internal static int? ScrollDirection(short scrollX, short scrollY) => (scrollX, scrollY) switch
-    {
-        (1, 1) => SCROLL_UP_LEFT,
-        (1, 0) => SCROLL_LEFT,
-        (1, -1) => SCROLL_DOWN_LEFT,
-        (0, 1) => SCROLL_UP,
-        (0, -1) => SCROLL_DOWN,
-        (-1, 1) => SCROLL_UP_RIGHT,
-        (-1, 0) => SCROLL_RIGHT,
-        (-1, -1) => SCROLL_DOWN_RIGHT,
-        _ => null,
-    };
 
     // One frame: input, moving everything, updating the map and the world, then drawing.
     private static void RunFrame(Data.Game game, Video video, FrameState state)
@@ -184,180 +163,6 @@ public static class GameLoop
         }
 
         DrawFrame(game, video, state, scrollX, scrollY);
-    }
-
-    // M (Remastered and Reimagined) opens the big map where there is an outdoor world to show.
-    private static void OpenMapIfAsked(Data.Game game, Video video)
-    {
-        if (MapScreen.TakeRequest() && MapSettings.Enabled && game.Experience != Experience.Original && game.World.Region < Regions.FIRST_INDOOR_REGION)
-        {
-            MapScreen.Show(game, video);
-        }
-    }
-
-    // Reads one key and handles it.
-    private static void ReadKeyboard(Data.Game game, IOutput output)
-    {
-        sbyte key = unchecked((sbyte)InputHandler.NextKey());
-        bool notPause = !PauseMenu.IsPaused(game);
-
-        if (key == InputHandler.ESCAPE_KEY && output is Video video)
-        {
-            PressEscape(game, video);
-        }
-        else if (key != 0)
-        {
-            KeyHandler.HandleKey(game, output, key, notPause ? 1 : 0);
-        }
-    }
-
-    // Escape leaves this game for the game selection. Remastered and Reimagined ask first with the
-    // game menu, which can also resume or leave the program.
-    private static void PressEscape(Data.Game game, Video video)
-    {
-        GameMenuChoice choice = game.Experience == Experience.Original ? GameMenuChoice.BackToGameSelection : GameMenu.Show(game, video);
-
-        if (choice == GameMenuChoice.ExitGame)
-        {
-            game.Ui.ExitProgram = true;
-        }
-
-        if (choice != GameMenuChoice.Resume)
-        {
-            game.Ui.QuitRequested = 1;
-        }
-    }
-
-    // The screen modes that stop a normal frame. Returns true if this frame ends here (the item
-    // list and the like only flash the pointer and handle the print queue).
-    private static bool HandleViewStatus(Data.Game game, Video video)
-    {
-        if (game.Ui.ViewStatus == VIEW_PAUSED)
-        {
-            Display.Delay(game, video, PAUSE_WAIT);
-            game.Ui.ViewStatus = VIEW_REDRAW;
-        }
-        else if (game.Ui.ViewStatus == VIEW_BIG || game.Ui.ViewStatus == VIEW_BIG_STILL)
-        {
-            bool flashOn = (video.Screen.Flasher & FLASH_BIT) != 0 && game.Ui.ViewStatus == VIEW_BIG;
-
-            video.Screen.SetColor(ViewPortId.Page, STATUS_COLOR, flashOn ? (FLASH_COLOR, FLASH_COLOR, FLASH_COLOR) : (0u, 0u, 0u));
-            ScreenEffects.HandlePrintRequest(game, video);
-
-            return true;
-        }
-
-        return false;
-    }
-
-    // Moves the hero, the raft and every monster and person (the actor count is read each time
-    // round, as in the original).
-    private static void MoveEverything(Data.Game game, IOutput output, FrameState state)
-    {
-        Carriers.RaftProximity(game);
-
-        for (int index = 0; index < game.Actors.Active; index++)
-        {
-            ActorMovement.MoveActor(game, output, index, state.Cycle, ref state.LastTerrain);
-        }
-    }
-
-    // Redraws the whole map when the view asks for it (two frames in a row after a change, so both
-    // pages get it). Returns true if it did.
-    private static bool RedrawWholeMap(Data.Game game, Video video)
-    {
-        if (game.Ui.ViewStatus != VIEW_REDRAW && game.Ui.ViewStatus != VIEW_REDRAW_2 && game.Ui.ViewStatus != VIEW_CHANGED)
-        {
-            return false;
-        }
-
-        Regions.RefreshMinimap(game, video);
-        MapTiles.DrawMap(game, video);
-
-        if (game.Ui.ViewStatus == VIEW_REDRAW)
-        {
-            game.Ui.ViewStatus = VIEW_REDRAW_2;
-        }
-        else if (game.Ui.ViewStatus == VIEW_REDRAW_2)
-        {
-            game.Ui.ViewStatus = VIEW_NORMAL;
-        }
-
-        return true;
-    }
-
-    // Brings the map in line with the camera: loads a waiting region, then redraws the whole map
-    // or scrolls it by one tile. Returns the scroll step used and whether the world gets its turn
-    // this frame (it does when the map is redrawn from scratch, or did not move at all).
-    private static (short X, short Y, bool WorldUpdate) UpdateMapView(Data.Game game, Video video)
-    {
-        (short scrollX, short scrollY) = ScrollStep(video.Screen, game.World);
-
-        if (game.World.NewRegion < NO_REGION)
-        {
-            SpriteLoading.LoadPendingRegion(game, video);
-        }
-
-        if (RedrawWholeMap(game, video))
-        {
-            return (0, 0, true);
-        }
-
-        if (scrollX != 0 || scrollY != 0)
-        {
-            Regions.RefreshMinimap(game, video);
-        }
-
-        if (ScrollDirection(scrollX, scrollY) is { } direction)
-        {
-            MapTiles.ScrollMap(video.Screen, direction);
-            ScreenEffects.KeepFrameLength(game, video);
-
-            return (scrollX, scrollY, false);
-        }
-
-        if (scrollX == 0 && scrollY == 0)
-        {
-            // No motion: the world gets its turn here.
-            ScreenEffects.HandlePrintRequest(game, video);
-
-            return (scrollX, scrollY, true);
-        }
-
-        // Moved too far to scroll: redraw the whole map.
-        MapTiles.DrawMap(game, video);
-        ScreenEffects.KeepFrameLength(game, video);
-
-        return (0, 0, false);
-    }
-
-    // How the map moved since the last frame, in tiles (x wraps at 10 bits).
-    private static (short X, short Y) ScrollStep(Screen screen, World world)
-    {
-        // Pixels to tiles: a shift is a divide by the tile width / height.
-        world.TileX = (ushort)(world.MapX >> TILE_WIDTH_SHIFT);
-        world.TileY = (ushort)(world.MapY >> TILE_HEIGHT_SHIFT);
-
-        FPage page = screen.DrawingPage;
-        short difX = unchecked((short)(world.TileX - page.IsvX));
-        short difY = unchecked((short)(world.TileY - page.IsvY));
-
-        return (WrapScrollDifference(difX), difY);
-    }
-
-    // The once-per-frame world update: the clock, then (unless time is frozen) new monsters,
-    // talking, what the monsters want to do, and hunger.
-    private static void RunWorldUpdate(Data.Game game, IOutput output)
-    {
-        Clock.DayNightTick(game, output);
-
-        if (game.World.FreezeTimer == 0)
-        {
-            Spawning.SpawnEncounters(game, output);
-            NearbySpeech.SpeakNearby(game, output);
-            EnemyGoals.UpdateEnemyGoals(game, output);
-            Survival.SurvivalTick(game, output);
-        }
     }
 
     // Fights, missiles and drawing, then shows the page that was just drawn.

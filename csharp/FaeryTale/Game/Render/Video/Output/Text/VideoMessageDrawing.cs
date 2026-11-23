@@ -1,4 +1,3 @@
-using FaeryTale.Game.Input;
 using FaeryTale.Game.Output;
 using FaeryTale.Game.Remastered;
 using FaeryTale.Gfx;
