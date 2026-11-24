@@ -1,9 +1,10 @@
-using FaeryTale.Game.Data;
+﻿using FaeryTale.Game.Data;
 using FaeryTale.Game.Land;
 using FaeryTale.Game.Output;
 using FaeryTale.Game.Render;
+using FaeryTale.Game.Ui;
 
-namespace FaeryTale.Game.Ui;
+namespace FaeryTale.Game.Spells;
 
 /// Magic: the spells that move or heal the hero.
 public static partial class Magic

@@ -1,9 +1,10 @@
-using FaeryTale.Game.Creatures;
+﻿using FaeryTale.Game.Creatures;
 using FaeryTale.Game.Data;
 using FaeryTale.Game.Output;
 using FaeryTale.Game.Render;
+using FaeryTale.Game.Ui;
 
-namespace FaeryTale.Game.Ui;
+namespace FaeryTale.Game.Spells;
 
 /// Magic: the map and the fear spell.
 public static partial class Magic

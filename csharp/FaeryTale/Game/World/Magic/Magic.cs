@@ -1,8 +1,9 @@
-using FaeryTale.Game.Data;
+﻿using FaeryTale.Game.Data;
 using FaeryTale.Game.Output;
 using FaeryTale.Game.Reimagined;
+using FaeryTale.Game.Ui;
 
-namespace FaeryTale.Game.Ui;
+namespace FaeryTale.Game.Spells;
 
 /// The Magic menu actions: casting the spells the hero has stones, vials and so on for. Each use
 /// takes one from the stack. Also what the spells do once cast: the map, the stone jump, healing

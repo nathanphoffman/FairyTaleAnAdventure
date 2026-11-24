@@ -1,3 +1,4 @@
+using FaeryTale.Game.Spells;
 using FaeryTale.Game.Data;
 using FaeryTale.Game.Input;
 using FaeryTale.Game.Input.Keys;
