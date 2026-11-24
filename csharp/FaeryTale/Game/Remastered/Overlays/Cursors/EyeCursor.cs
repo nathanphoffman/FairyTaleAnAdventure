@@ -19,26 +19,10 @@ internal static class EyeCursor
     private const uint PUPIL = 0xff10_1820;
     private const uint GLINT = 0xffff_ffff;
 
-    private static readonly uint[] pixels = Draw();
+    private static readonly uint[] pixels = CursorPixels.Build(WIDTH, HEIGHT, PixelAt);
 
     /// The icon with its middle at an overlay position.
     public static Image At((int X, int Y) center) => new(center.X - WIDTH / 2, center.Y - HEIGHT / 2, WIDTH, HEIGHT, pixels);
-
-    // Every pixel of the icon.
-    private static uint[] Draw()
-    {
-        uint[] result = new uint[WIDTH * HEIGHT];
-
-        for (int positionY = 0; positionY < HEIGHT; positionY++)
-        {
-            for (int positionX = 0; positionX < WIDTH; positionX++)
-            {
-                result[positionY * WIDTH + positionX] = PixelAt(positionX, positionY);
-            }
-        }
-
-        return result;
-    }
 
     // Whether a pixel is inside the almond: the lids are a curve (a parabola) that meets at the corners.
     private static bool Inside(int positionX, int positionY)

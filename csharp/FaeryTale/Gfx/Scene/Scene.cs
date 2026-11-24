@@ -165,6 +165,7 @@ public sealed class Scene
                 // is the highest bit of each half, so shift counts down from the left; "& 1" keeps that
                 // one bit, and "<< 1" moves the high-bit plane up to where the second bit belongs.
                 int shift = POINTER_WIDTH - 1 - bit;
+
                 // Reads one bit from each half of the word, then joins them: the high half's bit is the colour's low bit.
                 int value = (((ushort)(word >> HIGH_WORD_SHIFT) >> shift) & 1) | ((((ushort)word >> shift) & 1) << 1);
 

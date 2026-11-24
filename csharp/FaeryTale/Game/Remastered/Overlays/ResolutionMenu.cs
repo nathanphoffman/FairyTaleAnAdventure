@@ -28,7 +28,7 @@ public static class ResolutionMenu
         (int Left, int Top, int Width, int Height)[] areas = Areas(choices);
         Image[][] boards = areas.Select((area, index) => Board(area, ENTRY_SEED + (uint)index)).ToArray();
 
-        WaitForRelease(game, video);
+        MenuExit.WaitForRelease(game, video);
 
         while (true)
         {
@@ -52,16 +52,7 @@ public static class ResolutionMenu
             Display.Delay(game, video, 1);
         }
 
-        Leave(game, video);
-    }
-
-    // The click that opened the list is waited out, so it does not also choose a size.
-    private static void WaitForRelease(Data.Game game, Video video)
-    {
-        while (InputHandler.LeftButtonDown)
-        {
-            Display.Delay(game, video, 1);
-        }
+        MenuExit.Leave(game, video);
     }
 
     // The board of each choice: all as wide as the longest words, in a column in the middle of the
@@ -107,18 +98,4 @@ public static class ResolutionMenu
     // Whether a choice is what the window is now.
     private static bool IsCurrent(WindowControls.Resolution choice) =>
         choice.Text == WindowControls.ResolutionText;
-
-    // Takes the list off the screen, and keeps the click or key that closed it out of the game.
-    private static void Leave(Data.Game game, Video video)
-    {
-        while (InputHandler.LeftButtonDown)
-        {
-            Display.Delay(game, video, 1);
-        }
-
-        video.SetOverlay(new Overlay());
-        InputHandler.TakeClick();
-        InputHandler.ResetKeyBuffer();
-        InputHandler.ForgetLastMenu();
-    }
 }

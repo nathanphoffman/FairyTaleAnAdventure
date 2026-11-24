@@ -53,7 +53,7 @@ public static class ControlsMenu
         Image heading = Board(HeadingArea(), HEADING_SEED)[0];
         string help = "Click an action, then press the key you want for it.";
 
-        WaitForRelease(game, video);
+        MenuExit.WaitForRelease(game, video);
 
         while (true)
         {
@@ -69,7 +69,7 @@ public static class ControlsMenu
                 }
 
                 help = Choose(game, video, entry);
-                WaitForRelease(game, video);
+                MenuExit.WaitForRelease(game, video);
             }
 
             if (InputHandler.NextKey() == InputHandler.ESCAPE_KEY)
@@ -131,14 +131,6 @@ public static class ControlsMenu
         AddCentered(overlay, "Escape keeps the old key", FULL_HEIGHT / 2 + HELP_GAP, DESCRIPTION_COLOR, ENTRY_SCALE);
 
         return overlay;
-    }
-
-    private static void WaitForRelease(Data.Game game, Video video)
-    {
-        while (InputHandler.LeftButtonDown)
-        {
-            Display.Delay(game, video, 1);
-        }
     }
 
     // The boards: two columns of the same width, a row at a time, under the heading.
@@ -203,7 +195,7 @@ public static class ControlsMenu
 
     private static void Leave(Data.Game game, Video video)
     {
-        WaitForRelease(game, video);
+        MenuExit.WaitForRelease(game, video);
         video.SetOverlay(new Overlay());
         InputHandler.TakeClick();
         InputHandler.ResetKeyBuffer();

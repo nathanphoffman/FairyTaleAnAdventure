@@ -69,25 +69,21 @@ public sealed partial class Video : IOutput
         Screen.VpPage.Ras = Screen.Pages[finished].Ras;
     }
 
-    public void Present()
-    {
-        Screen.PointerPosition = Platform.InputBridge.Pointer;
-        Device.Present(Screen.ToScene());
-    }
+    public void Present() => Device.Present(SceneWithPointer());
 
-    public void WaitFrame()
-    {
-        Screen.PointerPosition = Platform.InputBridge.Pointer;
-        Device.WaitFrame(Screen.ToScene());
-    }
+    public void WaitFrame() => Device.WaitFrame(SceneWithPointer());
 
     public void SetOverlay(Overlay overlay) => Device.SetOverlay(overlay);
 
     public double AnimationFrameMs => Device.AnimationFrameMs;
 
-    public void ShowAnimationFrame()
+    public void ShowAnimationFrame() => Device.ShowAnimationFrame(SceneWithPointer());
+
+    // The device draws the pointer from the scene, so refresh it just before each hand-off.
+    private Scene SceneWithPointer()
     {
         Screen.PointerPosition = Platform.InputBridge.Pointer;
-        Device.ShowAnimationFrame(Screen.ToScene());
+
+        return Screen.ToScene();
     }
 }

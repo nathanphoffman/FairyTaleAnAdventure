@@ -13,9 +13,9 @@ public static class RemasteredKeys
     private static readonly Dictionary<string, string> TRANSLATION = new()
     {
         ["W"] = "Up",
-        ["A"] = "Left",
-        ["S"] = "Down",
-        ["D"] = "Right",
+        ["A"] = KeyNames.LEFT,
+        ["S"] = KeyNames.DOWN,
+        ["D"] = KeyNames.RIGHT,
         ["H"] = "S",
         ["N"] = "A",
         ["Z"] = "W",

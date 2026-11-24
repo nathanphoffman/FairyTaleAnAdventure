@@ -12,6 +12,9 @@ namespace FaeryTale.Platform;
 /// game logic only counts ticks, not time.
 public sealed class HeadlessDisplay : IDisplayDevice
 {
+    /// The environment variable that turns on the unpaced fast mode.
+    public const string FAST_VARIABLE = "FTA_FAST";
+
     private const int TICK_MILLISECONDS = 20; // 50 Hz
 
     // When the display falls this many ticks behind, it restarts its pacing instead of rushing to catch up.
@@ -36,7 +39,7 @@ public sealed class HeadlessDisplay : IDisplayDevice
     private readonly List<KeyEvent> keys;
     private readonly List<Click> clicks = TestScript.ClicksFromEnvironment();
     private readonly List<TimedCommand> commands = TestScript.CommandsFromEnvironment();
-    private readonly bool fast = Environment.GetEnvironmentVariable("FTA_FAST") is not null;
+    private readonly bool fast = Environment.GetEnvironmentVariable(FAST_VARIABLE) is not null;
     private readonly DateTime started = DateTime.UtcNow;
     private Overlay overlay = new();
     private (uint[] Pixels, int Width, int Height) shown;
@@ -51,8 +54,8 @@ public sealed class HeadlessDisplay : IDisplayDevice
 
         if (launchSkipped)
         {
-            keys.Add(new KeyEvent(SKIP_INTRO_PRESS, "Space", true));
-            keys.Add(new KeyEvent(SKIP_INTRO_RELEASE, "Space", false));
+            keys.Add(new KeyEvent(SKIP_INTRO_PRESS, KeyNames.SPACE, true));
+            keys.Add(new KeyEvent(SKIP_INTRO_RELEASE, KeyNames.SPACE, false));
         }
     }
 

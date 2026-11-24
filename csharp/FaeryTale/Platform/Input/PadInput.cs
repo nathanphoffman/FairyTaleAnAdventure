@@ -65,11 +65,11 @@ internal sealed class PadInput
             SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_B => "?",
             SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_LEFTSHOULDER => "U",
             SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_RIGHTSHOULDER => "G",
-            SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_START => "Space",
+            SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_START => KeyNames.SPACE,
             SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_DPAD_UP => "Up",
-            SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_DPAD_DOWN => "Down",
-            SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_DPAD_LEFT => "Left",
-            SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_DPAD_RIGHT => "Right",
+            SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_DPAD_DOWN => KeyNames.DOWN,
+            SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_DPAD_LEFT => KeyNames.LEFT,
+            SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_DPAD_RIGHT => KeyNames.RIGHT,
             _ => null,
         };
 
@@ -84,8 +84,8 @@ internal sealed class PadInput
     {
         (int first, string firstKey, string secondKey) = axis switch
         {
-            SDL_GameControllerAxis.SDL_CONTROLLER_AXIS_LEFTX => (0, "Left", "Right"),
-            SDL_GameControllerAxis.SDL_CONTROLLER_AXIS_LEFTY => (2, "Up", "Down"),
+            SDL_GameControllerAxis.SDL_CONTROLLER_AXIS_LEFTX => (0, KeyNames.LEFT, KeyNames.RIGHT),
+            SDL_GameControllerAxis.SDL_CONTROLLER_AXIS_LEFTY => (2, "Up", KeyNames.DOWN),
             _ => (-1, "", ""),
         };
 

@@ -10,6 +10,12 @@ namespace FaeryTale.Platform;
 /// direction codes 20-29, bit 7 = released.
 public static class KeyNames
 {
+    /// The names SDL gives the keys the game uses from more than one place.
+    public const string SPACE = "Space";
+    public const string LEFT = "Left";
+    public const string RIGHT = "Right";
+    public const string DOWN = "Down";
+
     /// What a key does in the game.
     public enum KeyKind
     {
@@ -101,9 +107,9 @@ public static class KeyNames
         Dictionary<string, Key> names = new(StringComparer.OrdinalIgnoreCase)
         {
             ["Up"] = new(KeyKind.Arrow, 0),
-            ["Down"] = new(KeyKind.Arrow, 1),
-            ["Left"] = new(KeyKind.Arrow, 2),
-            ["Right"] = new(KeyKind.Arrow, RIGHT_ARROW),
+            [DOWN] = new(KeyKind.Arrow, 1),
+            [LEFT] = new(KeyKind.Arrow, 2),
+            [RIGHT] = new(KeyKind.Arrow, RIGHT_ARROW),
             ["Left Ctrl"] = new(KeyKind.Fire, 0),
             ["Right Ctrl"] = new(KeyKind.Fire, 0),
             ["-"] = Code('-'),
@@ -119,7 +125,7 @@ public static class KeyNames
             [","] = Code(','),
             ["."] = Code('.'),
             ["Keypad ."] = Code('.'),
-            ["Space"] = Code(SPACE_CODE),
+            [SPACE] = Code(SPACE_CODE),
             ["Backspace"] = Code(BACKSPACE_CODE),
             ["Tab"] = Code(TAB_CODE),
             ["Return"] = Code(RETURN_CODE),

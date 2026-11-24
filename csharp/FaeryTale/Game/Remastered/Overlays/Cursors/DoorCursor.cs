@@ -25,26 +25,10 @@ internal static class DoorCursor
     private const int KNOB_X = WIDTH - 6;
     private const int KNOB_Y = HEIGHT / 2 + 2;
 
-    private static readonly uint[] pixels = Draw();
+    private static readonly uint[] pixels = CursorPixels.Build(WIDTH, HEIGHT, PixelAt);
 
     /// The icon with its middle at an overlay position.
     public static Image At((int X, int Y) center) => new(center.X - WIDTH / 2, center.Y - HEIGHT / 2, WIDTH, HEIGHT, pixels);
-
-    // Every pixel of the icon: outside the door shape nothing, along its edge the outline, inside wood.
-    private static uint[] Draw()
-    {
-        uint[] result = new uint[WIDTH * HEIGHT];
-
-        for (int positionY = 0; positionY < HEIGHT; positionY++)
-        {
-            for (int positionX = 0; positionX < WIDTH; positionX++)
-            {
-                result[positionY * WIDTH + positionX] = PixelAt(positionX, positionY);
-            }
-        }
-
-        return result;
-    }
 
     // Whether a pixel is part of the door: a rectangle with a half circle on top.
     private static bool Inside(int positionX, int positionY)

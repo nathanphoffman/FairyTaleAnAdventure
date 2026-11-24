@@ -22,7 +22,7 @@ static IDisplayDevice CreateDisplay(string[] args)
     bool headless = args.Contains("--headless")
         || Environment.GetEnvironmentVariable("FTA_SHOT") is not null
         || Environment.GetEnvironmentVariable("FTA_STATE") is not null
-        || Environment.GetEnvironmentVariable("FTA_FAST") is not null;
+        || Environment.GetEnvironmentVariable(HeadlessDisplay.FAST_VARIABLE) is not null;
 
     if (headless)
     {

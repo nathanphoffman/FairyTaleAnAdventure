@@ -27,7 +27,7 @@ public sealed partial class SdlDisplay : IDisplayDevice, IDisposable
     private readonly IntPtr window;
     private IntPtr renderer;
     private readonly uint[] frame = new uint[Scene.FRAME_WIDTH * Scene.FRAME_HEIGHT];
-    private readonly bool fast = Environment.GetEnvironmentVariable("FTA_FAST") is not null;
+    private readonly bool fast = Environment.GetEnvironmentVariable(HeadlessDisplay.FAST_VARIABLE) is not null;
     private readonly PadInput pad = new();
     private Overlay overlay = new();
     private bool cursorShown;

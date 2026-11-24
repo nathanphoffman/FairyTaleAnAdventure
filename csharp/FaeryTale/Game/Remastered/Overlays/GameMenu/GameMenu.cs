@@ -120,7 +120,7 @@ public static class GameMenu
             Display.Delay(game, video, 1);
         }
 
-        Leave(game, video);
+        MenuExit.Leave(game, video);
 
         return choice;
     }
@@ -265,18 +265,4 @@ public static class GameMenu
 
     private static string Percent(double factor) => $"{Math.Round(factor * PERCENT_SCALE)}%";
 
-    // Takes the menu off the screen and makes sure the click or key that closed it does not carry
-    // on into the game.
-    private static void Leave(Data.Game game, Video video)
-    {
-        while (InputHandler.LeftButtonDown)
-        {
-            Display.Delay(game, video, 1);
-        }
-
-        video.SetOverlay(new Overlay());
-        InputHandler.TakeClick();
-        InputHandler.ResetKeyBuffer();
-        InputHandler.ForgetLastMenu();
-    }
 }

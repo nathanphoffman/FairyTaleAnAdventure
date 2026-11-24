@@ -163,30 +163,37 @@ public static partial class Magic
         {
             case SPELL_LIGHT:
                 game.World.LightTimer += LIGHT_TIME;
+
                 break;
 
             case SPELL_SECRET:
                 game.World.SecretTimer += SECRET_TIME;
+
                 break;
 
             case SPELL_FREEZE:
                 game.World.FreezeTimer += FREEZE_TIME;
+
                 break;
 
             case SPELL_MAP when game.Experience == Experience.Reimagined:
                 InfernoSkull.Cast(game);
+
                 break;
 
             case SPELL_MAP:
                 ShowMap(game, output);
+
                 break;
 
             case SPELL_HEAL:
                 Heal(game, output);
+
                 break;
 
             case SPELL_FEAR:
                 ScareEnemies(game, output);
+
                 break;
         }
     }
